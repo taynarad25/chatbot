@@ -151,200 +151,200 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
     if (etapas[numero]) {
         const info = etapas[numero];
         // --- FLUXO: AGENDAMENTO (OPÇÃO 3) ---
-if (info.fluxo === "agendamento") {
-    // 1. Receber Nome
-    if (info.etapa === "evento_nome") {
-        info.nome = msg.body;
-        info.etapa = "evento_rede";
-        return msg.reply("Qual rede está organizando? (Ex: Jovens, Mulheres, Code)");
-    }
-    
-    // 2. Receber Rede
-    if (info.etapa === "evento_rede") {
-        info.rede = msg.body;
-        info.etapa = "evento_mes";
-        return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio)");
-    }
-
-    // 3. Receber Mês e Perguntar Dia da Semana
-    if (info.etapa === "evento_mes") {
-        const mes = parseInt(msg.body);
-        if (isNaN(mes) || mes < 1 || mes > 12) return msg.reply("❌ Mês inválido. Digite de 1 a 12.");
-        info.mes = mes;
-        info.etapa = "evento_tipo_dia";
-        return msg.reply("Qual o dia da semana desejado?\n\n1 - Sábados\n2 - Domingos\n3 - Sextas\n4 - Outro dia");
-    }
-
-    // 4. Receber Dia da Semana e Perguntar Horário
-    if (info.etapa === "evento_tipo_dia") {
-        const escolha = msg.body;
-        const diasMapa = { "1": 6, "2": 0, "3": 5 };
-        // Se não for 1, 2 ou 3, vira "OUTRO" e o bot busca em todos os dias do mês
-        info.diaSemanaFiltro = diasMapa[escolha] !== undefined ? diasMapa[escolha] : "OUTRO";
-        
-        info.etapa = "evento_horario";
-        return msg.reply("⏰ Qual o horário do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos longos.");
-    }
-
-    // 5. Receber Horário e Mostrar Datas Disponíveis
-    if (info.etapa === "evento_horario") {
-        const entrada = msg.body.toUpperCase();
-        info.horario = entrada;
-        info.isDiaInteiro = entrada.includes("DIA");
-        
-        await msg.reply("🔍 Consultando agendas e aplicando regras de reserva...");
-
-        try {
-            const ano = 2026;
-            const inicioBusca = new Date(ano, info.mes - 1, 1).toISOString();
-            const fimBusca = new Date(ano, info.mes, 0, 23, 59, 59).toISOString();
-
-            let todosEventos = [];
-            for (const id of agendasParaLer) {
-                const res = await calendar.events.list({
-                    calendarId: id,
-                    timeMin: inicioBusca,
-                    timeMax: fimBusca,
-                    singleEvents: true,
-                });
-                if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+        if (info.fluxo === "agendamento") {
+            // 1. Receber Nome
+            if (info.etapa === "evento_nome") {
+                info.nome = msg.body;
+                info.etapa = "evento_rede";
+                return msg.reply("Qual rede está organizando? (Ex: Jovens, Mulheres, Code)");
+            }
+            
+            // 2. Receber Rede
+            if (info.etapa === "evento_rede") {
+                info.rede = msg.body;
+                info.etapa = "evento_mes";
+                return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio)");
             }
 
-            // Gera os dias do mês de acordo com o filtro (Sáb, Dom, etc)
-            let diasPossiveis = [];
-            let dataCursor = new Date(ano, info.mes - 1, 1);
-            while (dataCursor.getMonth() === info.mes - 1) {
-                if (info.diaSemanaFiltro === "OUTRO" || dataCursor.getDay() === info.diaSemanaFiltro) {
-                    diasPossiveis.push(new Date(dataCursor));
+            // 3. Receber Mês e Perguntar Dia da Semana
+            if (info.etapa === "evento_mes") {
+                const mes = parseInt(msg.body);
+                if (isNaN(mes) || mes < 1 || mes > 12) return msg.reply("❌ Mês inválido. Digite de 1 a 12.");
+                info.mes = mes;
+                info.etapa = "evento_tipo_dia";
+                return msg.reply("Qual o dia da semana desejado?\n\n1 - Sábados\n2 - Domingos\n3 - Sextas\n4 - Outro dia");
+            }
+
+            // 4. Receber Dia da Semana e Perguntar Horário
+            if (info.etapa === "evento_tipo_dia") {
+                const escolha = msg.body;
+                const diasMapa = { "1": 6, "2": 0, "3": 5 };
+                // Se não for 1, 2 ou 3, vira "OUTRO" e o bot busca em todos os dias do mês
+                info.diaSemanaFiltro = diasMapa[escolha] !== undefined ? diasMapa[escolha] : "OUTRO";
+                
+                info.etapa = "evento_horario";
+                return msg.reply("⏰ Qual o horário do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos longos.");
+            }
+
+            // 5. Receber Horário e Mostrar Datas Disponíveis
+            if (info.etapa === "evento_horario") {
+                const entrada = msg.body.toUpperCase();
+                info.horario = entrada;
+                info.isDiaInteiro = entrada.includes("DIA");
+                
+                await msg.reply("🔍 Consultando agendas e aplicando regras de reserva...");
+
+                try {
+                    const ano = 2026;
+                    const inicioBusca = new Date(ano, info.mes - 1, 1).toISOString();
+                    const fimBusca = new Date(ano, info.mes, 0, 23, 59, 59).toISOString();
+
+                    let todosEventos = [];
+                    for (const id of agendasParaLer) {
+                        const res = await calendar.events.list({
+                            calendarId: id,
+                            timeMin: inicioBusca,
+                            timeMax: fimBusca,
+                            singleEvents: true,
+                        });
+                        if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+                    }
+
+                    // Gera os dias do mês de acordo com o filtro (Sáb, Dom, etc)
+                    let diasPossiveis = [];
+                    let dataCursor = new Date(ano, info.mes - 1, 1);
+                    while (dataCursor.getMonth() === info.mes - 1) {
+                        if (info.diaSemanaFiltro === "OUTRO" || dataCursor.getDay() === info.diaSemanaFiltro) {
+                            diasPossiveis.push(new Date(dataCursor));
+                        }
+                        dataCursor.setDate(dataCursor.getDate() + 1);
+                    }
+
+                    // Filtra os dias sem conflito
+                    let disponiveis = diasPossiveis.filter(dataMsg => {
+                        const diaS = dataMsg.getDate();
+                        const eventosNoDia = todosEventos.filter(ev => {
+                            const startStr = ev.start.dateTime || ev.start.date;
+                            const endStr = ev.end.dateTime || ev.end.date;
+                            const evStart = new Date(startStr);
+                            const evEnd = new Date(endStr);
+                            const diaInicio = startStr.includes('T') ? evStart.getDate() : parseInt(startStr.split('-')[2]);
+                            const diaFim = endStr.includes('T') ? evEnd.getDate() : parseInt(endStr.split('-')[2]);
+                            return (diaS >= diaInicio && diaS <= diaFim);
+                        });
+
+                        if (eventosNoDia.length === 0) return true;
+                        if (info.isDiaInteiro && eventosNoDia.length > 0) return false;
+
+                        const [hDesejada] = info.horario.split(":").map(Number);
+                        return !eventosNoDia.some(ev => {
+                            if (ev.start.date) return true; // Bloqueia se houver evento de dia inteiro (Retiro)
+                            if (ev.summary.toLowerCase().includes("code")) return false; // Exceção Rede Code
+                            
+                            const evStart = new Date(ev.start.dateTime);
+                            const evEnd = new Date(ev.end.dateTime);
+                            const hIni = evStart.getHours();
+                            const hFim = evEnd.getHours() || (hIni + 1);
+                            return (hDesejada < hFim && (hDesejada + 3) > hIni);
+                        });
+                    });
+
+                    // REGRA DO SÁBADO LIVRE: Se for Sábado e não for Code, reservamos 1.
+                    if (info.diaSemanaFiltro === 6 && !info.rede.toLowerCase().includes("code")) {
+                        if (disponiveis.length > 1) {
+                            disponiveis.pop(); // Esconde o último disponível para a igreja ter folga
+                        } else {
+                            disponiveis = []; // Se só tem um, não mostra
+                        }
+                    }
+
+                    if (disponiveis.length === 0) {
+                        delete etapas[numero];
+                        return msg.reply("❌ Não há datas disponíveis para essas condições neste mês.");
+                    }
+
+                    info.datasEncontradas = disponiveis;
+                    info.etapa = "evento_finalizar";
+                    let lista = "📅 *Datas Disponíveis:*\n\n";
+                    disponiveis.forEach((d, i) => {
+                        const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+                        lista += `${i + 1} - ${d.getDate()}/${info.mes} (${diasSemana[d.getDay()]})\n`;
+                    });
+                    return msg.reply(lista + "\nDigite o número da opção desejada:");
+
+                } catch (e) {
+                    console.error(e);
+                    delete etapas[numero];
+                    return msg.reply("⚠️ Erro ao acessar a agenda.");
                 }
-                dataCursor.setDate(dataCursor.getDate() + 1);
             }
 
-            // Filtra os dias sem conflito
-            let disponiveis = diasPossiveis.filter(dataMsg => {
-                const diaS = dataMsg.getDate();
-                const eventosNoDia = todosEventos.filter(ev => {
-                    const startStr = ev.start.dateTime || ev.start.date;
-                    const endStr = ev.end.dateTime || ev.end.date;
-                    const evStart = new Date(startStr);
-                    const evEnd = new Date(endStr);
-                    const diaInicio = startStr.includes('T') ? evStart.getDate() : parseInt(startStr.split('-')[2]);
-                    const diaFim = endStr.includes('T') ? evEnd.getDate() : parseInt(endStr.split('-')[2]);
-                    return (diaS >= diaInicio && diaS <= diaFim);
-                });
-
-                if (eventosNoDia.length === 0) return true;
-                if (info.isDiaInteiro && eventosNoDia.length > 0) return false;
-
-                const [hDesejada] = info.horario.split(":").map(Number);
-                return !eventosNoDia.some(ev => {
-                    if (ev.start.date) return true; // Bloqueia se houver evento de dia inteiro (Retiro)
-                    if (ev.summary.toLowerCase().includes("code")) return false; // Exceção Rede Code
-                    
-                    const evStart = new Date(ev.start.dateTime);
-                    const evEnd = new Date(ev.end.dateTime);
-                    const hIni = evStart.getHours();
-                    const hFim = evEnd.getHours() || (hIni + 1);
-                    return (hDesejada < hFim && (hDesejada + 3) > hIni);
-                });
-            });
-
-            // REGRA DO SÁBADO LIVRE: Se for Sábado e não for Code, reservamos 1.
-            if (info.diaSemanaFiltro === 6 && !info.rede.toLowerCase().includes("code")) {
-                if (disponiveis.length > 1) {
-                    disponiveis.pop(); // Esconde o último disponível para a igreja ter folga
-                } else {
-                    disponiveis = []; // Se só tem um, não mostra
-                }
-            }
-
-            if (disponiveis.length === 0) {
+            // 6. Finalizar
+            if (info.etapa === "evento_finalizar") {
+                const escolha = parseInt(msg.body) - 1;
+                if (isNaN(escolha) || !info.datasEncontradas[escolha]) return msg.reply("❌ Escolha um número da lista.");
+                
+                const dataFinal = info.datasEncontradas[escolha];
+                const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horario}\n\nAguarde a confirmação da secretaria!`;
+                await msg.reply(resumo);
                 delete etapas[numero];
-                return msg.reply("❌ Não há datas disponíveis para essas condições neste mês.");
+                return;
             }
-
-            info.datasEncontradas = disponiveis;
-            info.etapa = "evento_finalizar";
-            let lista = "📅 *Datas Disponíveis:*\n\n";
-            disponiveis.forEach((d, i) => {
-                const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-                lista += `${i + 1} - ${d.getDate()}/${info.mes} (${diasSemana[d.getDay()]})\n`;
-            });
-            return msg.reply(lista + "\nDigite o número da opção desejada:");
-
-        } catch (e) {
-            console.error(e);
-            delete etapas[numero];
-            return msg.reply("⚠️ Erro ao acessar a agenda.");
+            return; // 👈 COLOCA EXATAMENTE AQUI
         }
-    }
 
-    // 6. Finalizar
-    if (info.etapa === "evento_finalizar") {
-        const escolha = parseInt(msg.body) - 1;
-        if (isNaN(escolha) || !info.datasEncontradas[escolha]) return msg.reply("❌ Escolha um número da lista.");
-        
-        const dataFinal = info.datasEncontradas[escolha];
-        const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horario}\n\nAguarde a confirmação da secretaria!`;
-        await msg.reply(resumo);
-        delete etapas[numero];
-        return;
-    }
-    return; // 👈 COLOCA EXATAMENTE AQUI
-}
-
-    // 1️⃣ HORÁRIO DOS CULTOS
-    if (texto === "1") {
-        return msg.reply(`📅 *Horário dos Cultos*\n\nDomingo\n18h \n\nPrimeiro domingo do mês\n08h30 — Santa Ceia\n⚠️ Não há culto à noite.\n\nEsperamos você!`);
-    }
-
-    // 2️⃣ AGENDA DA IGREJA
-    if (texto === "2") {
-        const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-        const hoje = new Date();
-        const inicioBusca = hoje.toISOString();
-        const fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0).toISOString();
-
-        try {
-            let todosEventos = [];
-            for (const id of agendasParaLer) {
-                const res = await calendar.events.list({ calendarId: id, timeMin: inicioBusca, timeMax: fimBusca, singleEvents: true, orderBy: "startTime" });
-                if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+            // 1️⃣ HORÁRIO DOS CULTOS
+            if (texto === "1") {
+                return msg.reply(`📅 *Horário dos Cultos*\n\nDomingo\n18h \n\nPrimeiro domingo do mês\n08h30 — Santa Ceia\n⚠️ Não há culto à noite.\n\nEsperamos você!`);
             }
-            todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
 
-            let msgAgenda = "📋 *Agenda Casa Forte*\n\n";
-            todosEventos.forEach(ev => {
-                const d = new Date(ev.start.dateTime || ev.start.date);
-                if (d.getDay() === 6 || d.getDay() === 0) {
-                    const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
-                    msgAgenda += `📌 *${dataFmt}* | ${ev.summary}\n`;
-                }
-            });
-            return msg.reply(msgAgenda);
-        } catch (e) { return msg.reply("Erro ao carregar agenda."); }
-    }
+            // 2️⃣ AGENDA DA IGREJA
+            if (texto === "2") {
+                const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+                const hoje = new Date();
+                const inicioBusca = hoje.toISOString();
+                const fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0).toISOString();
 
-    // 3️⃣ INICIAR AGENDAMENTO
-    if (texto === "3" && isLider) {
-        etapas[numero] = { fluxo: "agendamento", etapa: "evento_nome" };
-        return msg.reply("📅 *Novo Evento*\nQual o nome do evento?");
-    }
+                try {
+                    let todosEventos = [];
+                    for (const id of agendasParaLer) {
+                        const res = await calendar.events.list({ calendarId: id, timeMin: inicioBusca, timeMax: fimBusca, singleEvents: true, orderBy: "startTime" });
+                        if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+                    }
+                    todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
 
-    // 4️⃣ ATENDIMENTO PASTORAL
-    if (texto === "4") {
-        etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
-        return msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?");
-    }
+                    let msgAgenda = "📋 *Agenda Casa Forte*\n\n";
+                    todosEventos.forEach(ev => {
+                        const d = new Date(ev.start.dateTime || ev.start.date);
+                        if (d.getDay() === 6 || d.getDay() === 0) {
+                            const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
+                            msgAgenda += `📌 *${dataFmt}* | ${ev.summary}\n`;
+                        }
+                    });
+                    return msg.reply(msgAgenda);
+                } catch (e) { return msg.reply("Erro ao carregar agenda."); }
+            }
 
-    // 5️⃣ AULAS DE MÚSICA
-    if (texto === "5") {
-        return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\nPara inscrições, digite "MÚSICA".`);
-    }
+            // 3️⃣ INICIAR AGENDAMENTO
+            if (texto === "3" && isLider) {
+                etapas[numero] = { fluxo: "agendamento", etapa: "evento_nome" };
+                return msg.reply("📅 *Novo Evento*\nQual o nome do evento?");
+            }
 
-    // 6️⃣ SECRETARIA
-    if (texto === "6") {
-        return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.`);
-    }
+            // 4️⃣ ATENDIMENTO PASTORAL
+            if (texto === "4") {
+                etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
+                return msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?");
+            }
+
+            // 5️⃣ AULAS DE MÚSICA
+            if (texto === "5") {
+                return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\nPara inscrições, digite "MÚSICA".`);
+            }
+
+            // 6️⃣ SECRETARIA
+            if (texto === "6") {
+                return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.`);
+            }
     }
 });
