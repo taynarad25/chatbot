@@ -1,25 +1,47 @@
 // =====================================
-// IMPORTAÇÕES
+// IMPORTAÇÕES E CONFIGURAÇÕES GLOBAIS
 // =====================================
 const qrcode = require("qrcode-terminal");
 const { Client, LocalAuth } = require("whatsapp-web.js");
-
 const { google } = require("googleapis");
+
+const calendarId = "secretariacasaforte.cf@gmail.com"; 
 
 const auth = new google.auth.GoogleAuth({
   keyFile: "credenciais-google.json",
-  scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+  scopes: ["https://www.googleapis.com/auth/calendar"],
 });
 
 const calendar = google.calendar({
   version: "v3",
-  auth,
+  auth: auth, 
 });
 
-const calendarId = "secretariacasaforte.cf@gmail.com";
+const agendasParaLer = [
+  calendarId,
+  "16b2f3baec9c14aba0d43a139b12a04893c33edb9fb45a0b8f081403a3eaa036@group.calendar.google.com", 
+  "d336e4e99db8329a2d52b123252a822073e8f23a67784892e68f3476147e694d@group.calendar.google.com", 
+  "15141665d120f01b145b6a77603eb2313fac0c0e3073033addc151d9561a79d0@group.calendar.google.com", 
+  "51dcf0048432b8fcdbdb663f6198d88398b6481c73f81847bbc867cf25534458@group.calendar.google.com", 
+  "10e97ba829f906588511279bb65b8ce6c8667d9c548339f04de137f9d8ab8a5d@group.calendar.google.com", 
+  "bd9c2b98016d155d427591ed6c339224516db3724146b5dcd3f94c4fe6c22c84@group.calendar.google.com", 
+  "b9daab311cb773bd14efd27ce6efbada7aa94ac8a5adce857b5c694b75fe2803@group.calendar.google.com", 
+  "fa6cf624289edd4efd67cdd11367d6fd7c15e6d74b319ab579ef378498f5fdd9@group.calendar.google.com", 
+  "548839d693663fb3a5854930256f5fd321534a13af3ba67c5a09e6f347992be8@group.calendar.google.com", 
+  "8876e79827d1469f76bcb2758de55158ef3625dba3413ec2c1ea161f5030021b@group.calendar.google.com", 
+  "10a17be6c05bc778f05dbfbddb0fda8ea1e73d2c2349b806230cc4990a14191a@group.calendar.google.com" 
+];
 
+const lideres = [
+    "5511995824388@c.us", "5511970658048@c.us", "5511985526434@c.us", 
+    "5511983338655@c.us", "5511970498716@c.us", "5511946798919@c.us", 
+    "5511951617993@c.us", "5511997832279@c.us", "5511973419733@c.us", 
+    "5511944565738@c.us", "5511969536715@c.us", "5511957022269@c.us", 
+    "5511942685501@c.us"
+];
+
+// Funções auxiliares
 async function buscarEventos(inicio, fim) {
-
   const res = await calendar.events.list({
     calendarId: calendarId,
     timeMin: inicio,
@@ -27,130 +49,63 @@ async function buscarEventos(inicio, fim) {
     singleEvents: true,
     orderBy: "startTime",
   });
-
   return res.data.items;
 }
 
 function sabadosDoMes(ano, mes) {
-
   const sabados = [];
   const data = new Date(ano, mes - 1, 1);
-
   while (data.getMonth() === mes - 1) {
-
-    if (data.getDay() === 6) {
-
-      sabados.push(new Date(data));
-
-    }
-
+    if (data.getDay() === 6) sabados.push(new Date(data));
     data.setDate(data.getDate() + 1);
   }
-
   return sabados;
 }
 
-function formatarData(data) {
-
-  return data.toLocaleDateString("pt-BR");
-
-}
-
-// =====================================
-// LISTA DE LÍDERES
-// =====================================
-const lideres = [
-    "5511995824388@c.us", // Gabi H 
-    "5511970658048@c.us", // Gabi A
-    "5511985526434@c.us", // Gisa
-    "5511983338655@c.us", // Rosa
-    "5511970498716@c.us", // Isa
-    "5511946798919@c.us", // Jeferson
-    "5511951617993@c.us", // Lari
-    "5511997832279@c.us", // Idel
-    "5511973419733@c.us", // Fernanda
-    "5511944565738@c.us", // Mota
-    "5511969536715@c.us", // Cíntia
-    "5511957022269@c.us", // Maurício
-    "5511942685501@c.us", // Gabi
-    // Adicione mais números conforme necessário
-];
-
 const etapas = {};
 
-// =====================================
-// CLIENTE
-// =====================================
 const client = new Client({
   authStrategy: new LocalAuth(),
 });
 
-// =====================================
-// QR CODE
-// =====================================
 client.on("qr", (qr) => {
   console.log("Escaneie o QR Code:");
   qrcode.generate(qr, { small: true });
 });
 
-// =====================================
-// CONECTADO
-// =====================================
 client.on("ready", () => {
   console.log("✅ Bot conectado!");
-});
+})
 
-// =====================================
-// INICIAR
-// =====================================
 client.initialize();
 
 // =====================================
-// RECEBER MENSAGEM
+// RECEBER MENSAGEM (LÓGICA PRINCIPAL)
 // =====================================
 client.on("message", async (msg) => {
-  // Ignora mensagens de grupo
-  if (msg.from.endsWith("@g.us")) return;
+    console.log("Mensagem recebida:", msg.body);
+    if (msg.from.endsWith("@g.us")) return;
 
-  // Pega contato e número
-  const contato = await msg.getContact();
-  const numero = contato.id._serialized;
+    const contato = await msg.getContact();
+    const numero = contato.id._serialized;
+    const texto = msg.body.toLowerCase().trim();
+    const isLider = lideres.includes(numero);
 
-  console.log("Número real:", numero);
+if (
+    texto === "oi" ||
+    texto === "oii" ||
+    texto === "olá" ||
+    texto === "ola" ||
+    texto === "menu" ||
+    texto === "bom dia" ||
+    texto === "boa tarde" ||
+    texto === "boa noite" ||
+    texto === "paz"
+) {
+    delete etapas[numero];
 
-  // Texto da mensagem e verificação de líder
-  const texto = msg.body.toLowerCase().trim();
-  const isLider = lideres.includes(numero);
-
-  // Busca a etapa do contato
-  const etapa = etapas[numero];
-
-  // Se existir etapa, processa as ações relacionadas
-  if (etapa) {
-    console.log("Etapa atual do usuário:", etapa.etapa);
-
-    if (etapa.etapa === "evento_horario") {
-      // Aqui vai o código específico da etapa "evento_horario"
-      console.log("Processando evento_horario...");
-      // Exemplo: msg.reply("Escolha o horário desejado.");
-    }
-
-    // Outras etapas podem ser verificadas da mesma forma
-    // else if (etapa.etapa === "outra_etapa") { ... }
-  } else {
-    // Usuário sem etapa definida: fluxo normal ou mensagem padrão
-    console.log("Usuário sem etapa definida. Continuando fluxo normal...");
-    // Exemplo: msg.reply("Olá! Como posso te ajudar?");
-  }
-
-  // =====================================
-  // MENU PRINCIPAL
-  // =====================================
-  if (/^(menu|oi|olá|ola|bom dia|boa tarde|boa noite|paz)$/i.test(texto)) {
-    if (isLider) {
-      await client.sendMessage(
-        msg.from,
-        `Olá! 👋
+    const menu = isLider 
+        ? `Olá! 👋
 Secretaria da Comunidade Cristã Casa Forte.
 
 Escolha uma opção:
@@ -163,11 +118,8 @@ Escolha uma opção:
 6️⃣ Falar com a secretaria
 
 Digite *menu* a qualquer momento para voltar ao menu principal.`
-      );
-    } else {
-      await client.sendMessage(
-        msg.from,
-        `Olá! 👋
+        
+        : `Olá! 👋
 Secretaria da Comunidade Cristã Casa Forte.
 
 Escolha uma opção:
@@ -178,381 +130,209 @@ Escolha uma opção:
 5️⃣ Aulas de música
 6️⃣ Falar com a secretaria
 
-Digite *menu* a qualquer momento para voltar ao menu principal.`
-      );
-    }
-    return;
-  }
+Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
-  // =====================================
-  // HORÁRIO DOS CULTOS
-  // =====================================
-if (texto === "1") {
-
-  await client.sendMessage(
-    msg.from,
-`📅 Horário dos Cultos
-
-Domingo
-18h — Culto de Celebração
-
-Primeiro domingo do mês
-08h30 — Santa Ceia + Sala de Oração
-
-⚠️ No primeiro domingo não há culto à noite.
-
-Esperamos você!
-
-Digite *menu* para voltar ao menu principal.`
-
-  );
-
-  return;
+    return msg.reply(menu);
 }
 
-  // =====================================
-  // AGENDA DA IGREJA
-  // =====================================
-  if (texto === "2") {
-
-    const { google } = require("googleapis");
-    const calendar = google.calendar("v3");
-
-    const auth = new google.auth.GoogleAuth({
-        keyFile: "credenciais-google.json",
-        scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
-    });
-
-    const authClient = await auth.getClient();
-
-    const hoje = new Date();
-    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-
-    const response = await calendar.events.list({
-        auth: authClient,
-        calendarId: "primary", // ou ID da agenda da igreja
-        timeMin: primeiroDia.toISOString(),
-        timeMax: ultimoDia.toISOString(),
-        singleEvents: true,
-        orderBy: "startTime",
-    });
-
-    const eventos = response.data.items;
-
-    let mensagem = "📅 *Agenda de Sábados da Igreja*\n\n";
-
-    eventos.forEach(evento => {
-
-        const dataEvento = new Date(evento.start.dateTime || evento.start.date);
-        const diaSemana = dataEvento.getDay();
-
-        if (diaSemana === 6) { // 6 = sábado
-
-            const data = dataEvento.toLocaleDateString("pt-BR");
-
-            const hora = evento.start.dateTime
-                ? dataEvento.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-                : "Horário não definido";
-
-            mensagem += `📌 ${evento.summary}\n📅 ${data}\n⏰ ${hora}\n\n`;
-        }
-
-    });
-
-    if (mensagem === "📅 *Agenda de Sábados da Igreja*\n\n") {
-        mensagem += "Não há eventos cadastrados para sábado neste mês.";
+    // 1. VERIFICA SE O USUÁRIO ESTÁ EM ALGUM FLUXO (ETAPA)
+    if (etapas[numero]) {
+        const info = etapas[numero];
+        // --- FLUXO: AGENDAMENTO (OPÇÃO 3) ---
+if (info.fluxo === "agendamento") {
+    // 1. Receber Nome
+    if (info.etapa === "evento_nome") {
+        info.nome = msg.body;
+        info.etapa = "evento_rede";
+        return msg.reply("Qual rede está organizando? (Ex: Jovens, Mulheres, Code)");
+    }
+    
+    // 2. Receber Rede
+    if (info.etapa === "evento_rede") {
+        info.rede = msg.body;
+        info.etapa = "evento_mes";
+        return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio)");
     }
 
-    msg.reply(mensagem);
-}
-
-  // =====================================
-// FLUXO DE AGENDAMENTO DE EVENTO
-// =====================================
-
-// OPÇÃO 3 - INICIAR
-if (msg.body === "3" && lideres.includes(numero)) {
-
-  etapas[numero] = { passo: "evento_nome" };
-
-  await client.sendMessage(
-    msg.from,
-`📅 *Agendamento de Evento*
-
-Qual o *nome do evento*?`
-  );
-
-  return;
-}
-
-
-// RECEBER NOME DO EVENTO
-if (etapas[numero]?.passo === "evento_nome") {
-
-  etapas[numero].nome = msg.body;
-  etapas[numero].passo = "evento_rede";
-
-  await client.sendMessage(
-    msg.from,
-`Qual rede está organizando?
-
-Exemplo:
-• Jovens
-• Mulheres
-• Homens`
-  );
-
-  return;
-}
-
-// RECEBER REDE
-if (etapas[numero]?.passo === "evento_rede") {
-
-  etapas[numero].rede = msg.body;
-  etapas[numero].passo = "evento_mes";
-
-  await client.sendMessage(
-    msg.from,
-`📅 Digite o *número do mês* do evento.
-
-Exemplo:
-3 para Março
-4 para Abril
-5 para Maio`
-  );
-
-  return;
-}
-
-// RECEBER MÊS
-if (etapas[numero]?.passo === "evento_mes") {
-
-  const mes = parseInt(msg.body);
-  const ano = new Date().getFullYear();
-
-  etapas[numero].mes = mes;
-  etapas[numero].ano = ano;
-  etapas[numero].passo = "evento_horario";
-
-  await client.sendMessage(
-    msg.from,
-`⏰ Qual o horário do evento?
-
-Digite por exemplo:
-18:00
-19:30
-
-O bot verificará quais sábados estão livres nesse horário.`
-  );
-
-  return;
-}
-
-// RECEBER HORÁRIO
-
-if (etapa?.etapa === "evento_horario") {
-    // Validar horário digitado pelo usuário
-    const [hora, minuto] = msg.body.split(":").map(Number);
-    if (isNaN(hora) || isNaN(minuto)) {
-        await msg.reply("O horário digitado é inválido. Digite no formato HH:MM, por exemplo 18:00");
-        return;
+    // 3. Receber Mês e Perguntar Dia da Semana
+    if (info.etapa === "evento_mes") {
+        const mes = parseInt(msg.body);
+        if (isNaN(mes) || mes < 1 || mes > 12) return msg.reply("❌ Mês inválido. Digite de 1 a 12.");
+        info.mes = mes;
+        info.etapa = "evento_tipo_dia";
+        return msg.reply("Qual o dia da semana desejado?\n\n1 - Sábados\n2 - Domingos\n3 - Sextas\n4 - Outro dia");
     }
 
-    etapa.horario = msg.body;
+    // 4. Receber Dia da Semana e Perguntar Horário
+    if (info.etapa === "evento_tipo_dia") {
+        const escolha = msg.body;
+        const diasMapa = { "1": 6, "2": 0, "3": 5 };
+        // Se não for 1, 2 ou 3, vira "OUTRO" e o bot busca em todos os dias do mês
+        info.diaSemanaFiltro = diasMapa[escolha] !== undefined ? diasMapa[escolha] : "OUTRO";
+        
+        info.etapa = "evento_horario";
+        return msg.reply("⏰ Qual o horário do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos longos.");
+    }
 
-    const ano = new Date().getFullYear();
+    // 5. Receber Horário e Mostrar Datas Disponíveis
+    if (info.etapa === "evento_horario") {
+        const entrada = msg.body.toUpperCase();
+        info.horario = entrada;
+        info.isDiaInteiro = entrada.includes("DIA");
+        
+        await msg.reply("🔍 Consultando agendas e aplicando regras de reserva...");
 
-    // Buscar todos os sábados do mês
-    const sabados = sabadosDoMes(ano, etapa.mes);
+        try {
+            const ano = 2026;
+            const inicioBusca = new Date(ano, info.mes - 1, 1).toISOString();
+            const fimBusca = new Date(ano, info.mes, 0, 23, 59, 59).toISOString();
 
-    // Buscar eventos já existentes
-    const inicioMes = new Date(ano, etapa.mes - 1, 1);
-    const fimMes = new Date(ano, etapa.mes, 0);
-    const eventos = await buscarEventos(inicioMes.toISOString(), fimMes.toISOString());
+            let todosEventos = [];
+            for (const id of agendasParaLer) {
+                const res = await calendar.events.list({
+                    calendarId: id,
+                    timeMin: inicioBusca,
+                    timeMax: fimBusca,
+                    singleEvents: true,
+                });
+                if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+            }
 
-    const sabadosDisponiveis = [];
+            // Gera os dias do mês de acordo com o filtro (Sáb, Dom, etc)
+            let diasPossiveis = [];
+            let dataCursor = new Date(ano, info.mes - 1, 1);
+            while (dataCursor.getMonth() === info.mes - 1) {
+                if (info.diaSemanaFiltro === "OUTRO" || dataCursor.getDay() === info.diaSemanaFiltro) {
+                    diasPossiveis.push(new Date(dataCursor));
+                }
+                dataCursor.setDate(dataCursor.getDate() + 1);
+            }
 
-    for (let sabado of sabados) {
-        const inicioEvento = new Date(sabado);
-        inicioEvento.setHours(hora);
-        inicioEvento.setMinutes(minuto);
+            // Filtra os dias sem conflito
+            let disponiveis = diasPossiveis.filter(dataMsg => {
+                const diaS = dataMsg.getDate();
+                const eventosNoDia = todosEventos.filter(ev => {
+                    const startStr = ev.start.dateTime || ev.start.date;
+                    const endStr = ev.end.dateTime || ev.end.date;
+                    const evStart = new Date(startStr);
+                    const evEnd = new Date(endStr);
+                    const diaInicio = startStr.includes('T') ? evStart.getDate() : parseInt(startStr.split('-')[2]);
+                    const diaFim = endStr.includes('T') ? evEnd.getDate() : parseInt(endStr.split('-')[2]);
+                    return (diaS >= diaInicio && diaS <= diaFim);
+                });
 
-        const fimEvento = new Date(inicioEvento);
-        fimEvento.setHours(fimEvento.getHours() + 3); // duração padrão
+                if (eventosNoDia.length === 0) return true;
+                if (info.isDiaInteiro && eventosNoDia.length > 0) return false;
 
-        let ocupado = eventos.some(evento => {
-            const inicioGoogle = new Date(evento.start.dateTime || evento.start.date);
-            const fimGoogle = new Date(evento.end.dateTime || evento.end.date);
-            return inicioEvento < fimGoogle && fimEvento > inicioGoogle;
-        });
+                const [hDesejada] = info.horario.split(":").map(Number);
+                return !eventosNoDia.some(ev => {
+                    if (ev.start.date) return true; // Bloqueia se houver evento de dia inteiro (Retiro)
+                    if (ev.summary.toLowerCase().includes("code")) return false; // Exceção Rede Code
+                    
+                    const evStart = new Date(ev.start.dateTime);
+                    const evEnd = new Date(ev.end.dateTime);
+                    const hIni = evStart.getHours();
+                    const hFim = evEnd.getHours() || (hIni + 1);
+                    return (hDesejada < hFim && (hDesejada + 3) > hIni);
+                });
+            });
 
-        if (!ocupado) {
-            sabadosDisponiveis.push(sabado);
+            // REGRA DO SÁBADO LIVRE: Se for Sábado e não for Code, reservamos 1.
+            if (info.diaSemanaFiltro === 6 && !info.rede.toLowerCase().includes("code")) {
+                if (disponiveis.length > 1) {
+                    disponiveis.pop(); // Esconde o último disponível para a igreja ter folga
+                } else {
+                    disponiveis = []; // Se só tem um, não mostra
+                }
+            }
+
+            if (disponiveis.length === 0) {
+                delete etapas[numero];
+                return msg.reply("❌ Não há datas disponíveis para essas condições neste mês.");
+            }
+
+            info.datasEncontradas = disponiveis;
+            info.etapa = "evento_finalizar";
+            let lista = "📅 *Datas Disponíveis:*\n\n";
+            disponiveis.forEach((d, i) => {
+                const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+                lista += `${i + 1} - ${d.getDate()}/${info.mes} (${diasSemana[d.getDay()]})\n`;
+            });
+            return msg.reply(lista + "\nDigite o número da opção desejada:");
+
+        } catch (e) {
+            console.error(e);
+            delete etapas[numero];
+            return msg.reply("⚠️ Erro ao acessar a agenda.");
         }
     }
 
-    if (sabadosDisponiveis.length === 0) {
-        await msg.reply("Não encontramos sábados disponíveis nesse horário neste mês.");
+    // 6. Finalizar
+    if (info.etapa === "evento_finalizar") {
+        const escolha = parseInt(msg.body) - 1;
+        if (isNaN(escolha) || !info.datasEncontradas[escolha]) return msg.reply("❌ Escolha um número da lista.");
+        
+        const dataFinal = info.datasEncontradas[escolha];
+        const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horario}\n\nAguarde a confirmação da secretaria!`;
+        await msg.reply(resumo);
         delete etapas[numero];
         return;
     }
-
-    etapa.datas = sabadosDisponiveis;
-    etapa.etapa = "evento_data";
-
-    // Montar resposta para o usuário
-    let resposta = "Sábados disponíveis:\n\n";
-    sabadosDisponiveis.forEach((d, i) => {
-        resposta += `${i + 1} - ${d.getDate()}/${d.getMonth() + 1}\n`;
-    });
-
-    await msg.reply(resposta);
+    return; // 👈 COLOCA EXATAMENTE AQUI
 }
 
-// =====================================
-// ESCOLHA DA DATA
-// =====================================
-
-if (etapa?.etapa === "evento_data") {
-    const escolha = parseInt(msg.body) - 1;
-
-    if (isNaN(escolha) || !etapa.datas[escolha]) {
-        await msg.reply("Escolha uma das opções enviadas.");
-        return;
+    // 1️⃣ HORÁRIO DOS CULTOS
+    if (texto === "1") {
+        return msg.reply(`📅 *Horário dos Cultos*\n\nDomingo\n18h \n\nPrimeiro domingo do mês\n08h30 — Santa Ceia\n⚠️ Não há culto à noite.\n\nEsperamos você!`);
     }
 
-    const dataEscolhida = etapa.datas[escolha];
+    // 2️⃣ AGENDA DA IGREJA
+    if (texto === "2") {
+        const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+        const hoje = new Date();
+        const inicioBusca = hoje.toISOString();
+        const fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0).toISOString();
 
-    const resumo = `📅 Solicitação de Evento
+        try {
+            let todosEventos = [];
+            for (const id of agendasParaLer) {
+                const res = await calendar.events.list({ calendarId: id, timeMin: inicioBusca, timeMax: fimBusca, singleEvents: true, orderBy: "startTime" });
+                if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+            }
+            todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
 
-Evento: ${etapa.nome}
-Rede: ${etapa.rede}
-Data solicitada: ${dataEscolhida.getDate()}/${dataEscolhida.getMonth() + 1}
-Horário: ${etapa.horario}
+            let msgAgenda = "📋 *Agenda Casa Forte*\n\n";
+            todosEventos.forEach(ev => {
+                const d = new Date(ev.start.dateTime || ev.start.date);
+                if (d.getDay() === 6 || d.getDay() === 0) {
+                    const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
+                    msgAgenda += `📌 *${dataFmt}* | ${ev.summary}\n`;
+                }
+            });
+            return msg.reply(msgAgenda);
+        } catch (e) { return msg.reply("Erro ao carregar agenda."); }
+    }
 
-✅ Solicitação registrada!
+    // 3️⃣ INICIAR AGENDAMENTO
+    if (texto === "3" && isLider) {
+        etapas[numero] = { fluxo: "agendamento", etapa: "evento_nome" };
+        return msg.reply("📅 *Novo Evento*\nQual o nome do evento?");
+    }
 
-A secretaria da igreja irá verificar a agenda e confirmar a data o mais breve possível.`;
+    // 4️⃣ ATENDIMENTO PASTORAL
+    if (texto === "4") {
+        etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
+        return msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?");
+    }
 
-    await msg.reply(resumo);
+    // 5️⃣ AULAS DE MÚSICA
+    if (texto === "5") {
+        return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\nPara inscrições, digite "MÚSICA".`);
+    }
 
-    // Finaliza o fluxo e limpa etapa
-    delete etapas[numero];
-}
-
-// =====================================
-// ATENDIMENTO PASTORAL
-// =====================================
-
-// INICIAR ATENDIMENTO
-if (texto === "4") {
-
-  etapas[msg.from] = { passo: "nome" };
-
-  await client.sendMessage(
-    msg.from,
-`🙏 *Atendimento Pastoral*
-
-Se você deseja conversar ou receber oração, teremos alegria em ajudar.
-
-Para começarmos:
-
-📝 Qual é o seu *nome*?
-
-Digite *menu* para voltar ao menu principal.`
-  );
-
-  return;
-}
-
-// RECEBER NOME
-if (etapas[msg.from]?.passo === "nome") {
-
-  etapas[msg.from].nome = msg.body;
-  etapas[msg.from].passo = "horario";
-
-  await client.sendMessage(
-    msg.from,
-`Obrigado, *${msg.body}*! 🙏
-
-Agora nos diga:
-
-⏰ *Quais horários você tem disponibilidade para que um dos pastores entre em contato com você?*
-
-Exemplo:
-• Manhã
-• Tarde
-• Noite
-
-Digite *menu* para voltar ao menu principal.`
-  );
-
-  return;
-}
-
-// RECEBER HORÁRIO
-if (etapas[msg.from]?.passo === "horario") {
-
-  const nome = etapas[msg.from].nome;
-  const horario = msg.body;
-
-  await client.sendMessage(
-    msg.from,
-`🙏 *Pedido de atendimento recebido!*
-
-📌 Nome: ${nome}
-⏰ Disponibilidade: ${horario}
-
-Nossa equipe pastoral entrará em contato com você em breve.
-
-Deus abençoe!`
-  );
-
-  delete etapas[msg.from];
-
-  return;
-}
-
-  // =====================================
-  // AULAS DE MÚSICA
-  // =====================================
-  if (texto === "5") {
-
-    await client.sendMessage(
-      msg.from,
-`🎵 Aulas de Música
-
-Oferecemos aulas de:
-
-🎤 Canto
-🎹 Teclado
-🎸 Violão
-🎸 Guitarra
-
-Para mais informações sobre horários e inscrição, digite "MÚSICA".`
-    );
-
-    return;
-  }
-
-  // =====================================
-  // SECRETARIA
-  // =====================================
-  if (texto === "6") {
-
-    await client.sendMessage(
-      msg.from,
-`📞 Secretaria
-
-Um atendente responderá sua mensagem em breve.
-
-Horário de atendimento:
-Terça a Sábado
-🕗 08h às 18h`
-    );
-
-    return;
-  }
-
+    // 6️⃣ SECRETARIA
+    if (texto === "6") {
+        return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.`);
+    }
+    }
 });
