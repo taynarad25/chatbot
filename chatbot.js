@@ -103,6 +103,8 @@ client.on("message", async (msg) => {
     const texto = msg.body.toLowerCase().trim();
     const isLider = lideres.includes(numero);
 
+    console.log(`Mensagem recebida de ${numero}: "${msg.body}"`);
+
 if (
     texto === "oi" ||
     texto === "oii" ||
@@ -115,6 +117,8 @@ if (
     texto === "paz"
 ) {
     delete etapas[numero];
+
+    console.log(`Enviando menu para ${numero}`);
 
     const menu = isLider 
         ? `Olá! 👋
@@ -150,10 +154,14 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
     // 1. VERIFICA SE O USUÁRIO ESTÁ EM ALGUM FLUXO (ETAPA)
     if (etapas[numero]) {
         const info = etapas[numero];
+
+        console.log(`Usuário ${numero} em fluxo: ${info.fluxo}, etapa: ${info.etapa}`);
+
         // --- FLUXO: AGENDAMENTO (OPÇÃO 3) ---
         if (info.fluxo === "agendamento") {
             // 1. Receber Nome
             if (info.etapa === "evento_nome") {
+                console.log(`Recebendo nome do evento de ${numero}: ${msg.body}`);
                 info.nome = msg.body;
                 info.etapa = "evento_rede";
                 return msg.reply("Qual rede está organizando? (Ex: Jovens, Mulheres, Code)");
@@ -161,6 +169,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             
             // 2. Receber Rede
             if (info.etapa === "evento_rede") {
+                console.log(`Recebendo rede do evento de ${numero}: ${msg.body}`);
                 info.rede = msg.body;
                 info.etapa = "evento_mes";
                 return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio)");
@@ -170,6 +179,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             if (info.etapa === "evento_mes") {
                 const mes = parseInt(msg.body);
                 if (isNaN(mes) || mes < 1 || mes > 12) return msg.reply("❌ Mês inválido. Digite de 1 a 12.");
+                console.log(`Mês selecionado por ${numero}: ${mes}`);
                 info.mes = mes;
                 info.etapa = "evento_tipo_dia";
                 return msg.reply("Qual o dia da semana desejado?\n\n1 - Sábados\n2 - Domingos\n3 - Sextas\n4 - Outro dia");
@@ -181,6 +191,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 const diasMapa = { "1": 6, "2": 0, "3": 5 };
                 // Se não for 1, 2 ou 3, vira "OUTRO" e o bot busca em todos os dias do mês
                 info.diaSemanaFiltro = diasMapa[escolha] !== undefined ? diasMapa[escolha] : "OUTRO";
+                console.log(`Dia da semana selecionado por ${numero}: ${escolha} (${info.diaSemanaFiltro})`);
                 
                 info.etapa = "evento_horario";
                 return msg.reply("⏰ Qual o horário do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos longos.");
@@ -191,8 +202,11 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 const entrada = msg.body.toUpperCase();
                 info.horario = entrada;
                 info.isDiaInteiro = entrada.includes("DIA");
+                console.log(`Horário do evento de ${numero}: ${entrada}`);
                 
                 await msg.reply("🔍 Consultando agendas e aplicando regras de reserva...");
+
+                console.log(`Consultando agendas para agendamento de ${numero}`);
 
                 try {
                     const ano = 2026;
@@ -258,6 +272,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                         }
                     }
 
+                    console.log(`Datas disponíveis para ${numero}: ${disponiveis.length}`);
+
                     if (disponiveis.length === 0) {
                         delete etapas[numero];
                         return msg.reply("❌ Não há datas disponíveis para essas condições neste mês.");
@@ -273,7 +289,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                     return msg.reply(lista + "\nDigite o número da opção desejada:");
 
                 } catch (e) {
-                    console.error(e);
+                    console.error(`Erro ao consultar agendas para ${numero}:`, e);
                     delete etapas[numero];
                     return msg.reply("⚠️ Erro ao acessar a agenda.");
                 }
@@ -286,6 +302,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 
                 const dataFinal = info.datasEncontradas[escolha];
                 const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horario}\n\nAguarde a confirmação da secretaria!`;
+                console.log(`Agendamento solicitado por ${numero}: ${resumo.replace(/\n/g, ' | ')}`);
                 await msg.reply(resumo);
                 delete etapas[numero];
                 return;
@@ -296,15 +313,19 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
     }
     // 1️⃣ HORÁRIO DOS CULTOS
     if (texto === "1") {
+        console.log(`Opção 1 selecionada por ${numero}`);
         return msg.reply(`📅 *Horário dos Cultos*\n\nDomingo\n18h \n\nPrimeiro domingo do mês\n08h30 — Santa Ceia\n⚠️ Não há culto à noite.\n\nEsperamos você!`);
     }
 
     // 2️⃣ AGENDA DA IGREJA
     if (texto === "2") {
+        console.log(`Opção 2 selecionada por ${numero}`);
         const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
         const hoje = new Date();
         const inicioBusca = hoje.toISOString();
         const fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0).toISOString();
+
+        console.log(`Buscando agenda para ${numero}`);
 
         try {
             let todosEventos = [];
@@ -313,6 +334,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
             }
             todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
+
+            console.log(`Encontrados ${todosEventos.length} eventos para ${numero}`);
 
             let msgAgenda = "📋 *Agenda Casa Forte*\n\n";
             todosEventos.forEach(ev => {
@@ -323,28 +346,35 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 }
             });
             return msg.reply(msgAgenda);
-        } catch (e) { return msg.reply("Erro ao carregar agenda."); }
+        } catch (e) { 
+            console.error(`Erro ao buscar agenda para ${numero}:`, e);
+            return msg.reply("Erro ao carregar agenda."); 
+        }
     }
 
     // 3️⃣ INICIAR AGENDAMENTO
     if (texto === "3" && isLider) {
+        console.log(`Opção 3 selecionada por ${numero}, iniciando agendamento`);
         etapas[numero] = { fluxo: "agendamento", etapa: "evento_nome" };
         return msg.reply("📅 *Novo Evento*\nQual o nome do evento?");
     }
 
     // 4️⃣ ATENDIMENTO PASTORAL
     if (texto === "4") {
+        console.log(`Opção 4 selecionada por ${numero}, iniciando atendimento pastoral`);
         etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
         return msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?");
     }
 
     // 5️⃣ AULAS DE MÚSICA
     if (texto === "5") {
+        console.log(`Opção 5 selecionada por ${numero}`);
         return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\nPara inscrições, digite "MÚSICA".`);
     }
 
     // 6️⃣ SECRETARIA
     if (texto === "6") {
+        console.log(`Opção 6 selecionada por ${numero}`);
         return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.`);
     }
 });
