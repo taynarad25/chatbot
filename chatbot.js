@@ -293,58 +293,58 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             return; // 👈 COLOCA EXATAMENTE AQUI
         }
 
-        // 1️⃣ HORÁRIO DOS CULTOS
-        if (texto === "1") {
-            return msg.reply(`📅 *Horário dos Cultos*\n\nDomingo\n18h \n\nPrimeiro domingo do mês\n08h30 — Santa Ceia\n⚠️ Não há culto à noite.\n\nEsperamos você!`);
-        }
+    }
+    // 1️⃣ HORÁRIO DOS CULTOS
+    if (texto === "1") {
+        return msg.reply(`📅 *Horário dos Cultos*\n\nDomingo\n18h \n\nPrimeiro domingo do mês\n08h30 — Santa Ceia\n⚠️ Não há culto à noite.\n\nEsperamos você!`);
+    }
 
-        // 2️⃣ AGENDA DA IGREJA
-        if (texto === "2") {
-            const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-            const hoje = new Date();
-            const inicioBusca = hoje.toISOString();
-            const fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0).toISOString();
+    // 2️⃣ AGENDA DA IGREJA
+    if (texto === "2") {
+        const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+        const hoje = new Date();
+        const inicioBusca = hoje.toISOString();
+        const fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0).toISOString();
 
-            try {
-                let todosEventos = [];
-                for (const id of agendasParaLer) {
-                    const res = await calendar.events.list({ calendarId: id, timeMin: inicioBusca, timeMax: fimBusca, singleEvents: true, orderBy: "startTime" });
-                    if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+        try {
+            let todosEventos = [];
+            for (const id of agendasParaLer) {
+                const res = await calendar.events.list({ calendarId: id, timeMin: inicioBusca, timeMax: fimBusca, singleEvents: true, orderBy: "startTime" });
+                if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+            }
+            todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
+
+            let msgAgenda = "📋 *Agenda Casa Forte*\n\n";
+            todosEventos.forEach(ev => {
+                const d = new Date(ev.start.dateTime || ev.start.date);
+                if (d.getDay() === 6 || d.getDay() === 0) {
+                    const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
+                    msgAgenda += `📌 *${dataFmt}* | ${ev.summary}\n`;
                 }
-                todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
+            });
+            return msg.reply(msgAgenda);
+        } catch (e) { return msg.reply("Erro ao carregar agenda."); }
+    }
 
-                let msgAgenda = "📋 *Agenda Casa Forte*\n\n";
-                todosEventos.forEach(ev => {
-                    const d = new Date(ev.start.dateTime || ev.start.date);
-                    if (d.getDay() === 6 || d.getDay() === 0) {
-                        const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
-                        msgAgenda += `📌 *${dataFmt}* | ${ev.summary}\n`;
-                    }
-                });
-                return msg.reply(msgAgenda);
-            } catch (e) { return msg.reply("Erro ao carregar agenda."); }
-        }
+    // 3️⃣ INICIAR AGENDAMENTO
+    if (texto === "3" && isLider) {
+        etapas[numero] = { fluxo: "agendamento", etapa: "evento_nome" };
+        return msg.reply("📅 *Novo Evento*\nQual o nome do evento?");
+    }
 
-        // 3️⃣ INICIAR AGENDAMENTO
-        if (texto === "3" && isLider) {
-            etapas[numero] = { fluxo: "agendamento", etapa: "evento_nome" };
-            return msg.reply("📅 *Novo Evento*\nQual o nome do evento?");
-        }
+    // 4️⃣ ATENDIMENTO PASTORAL
+    if (texto === "4") {
+        etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
+        return msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?");
+    }
 
-        // 4️⃣ ATENDIMENTO PASTORAL
-        if (texto === "4") {
-            etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
-            return msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?");
-        }
+    // 5️⃣ AULAS DE MÚSICA
+    if (texto === "5") {
+        return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\nPara inscrições, digite "MÚSICA".`);
+    }
 
-        // 5️⃣ AULAS DE MÚSICA
-        if (texto === "5") {
-            return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\nPara inscrições, digite "MÚSICA".`);
-        }
-
-        // 6️⃣ SECRETARIA
-        if (texto === "6") {
-            return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.`);
-        }
+    // 6️⃣ SECRETARIA
+    if (texto === "6") {
+        return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.`);
     }
 });
