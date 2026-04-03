@@ -95,7 +95,6 @@ client.initialize();
 // RECEBER MENSAGEM (LÓGICA PRINCIPAL)
 // =====================================
 client.on("message", async (msg) => {
-    console.log("Mensagem recebida:", msg.body);
     if (msg.from.endsWith("@g.us")) return;
 
     const contato = await msg.getContact();
