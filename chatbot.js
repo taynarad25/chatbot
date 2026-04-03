@@ -1,17 +1,21 @@
 // =====================================
 // IMPORTAÇÕES E CONFIGURAÇÕES GLOBAIS
 // =====================================
+const fs = require("fs");
 const qrcode = require("qrcode-terminal");
 const QRCode = require("qrcode");
-const nodemailer = require("nodemailer");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const { google } = require("googleapis");
 
-const calendarId = "secretariacasaforte.cf@gmail.com"; 
+const calendarId = "secretariacasaforte.cf@gmail.com";
 
 const auth = new google.auth.GoogleAuth({
   keyFile: "credenciais-google.json",
-  scopes: ["https://www.googleapis.com/auth/calendar"],
+  scopes: [
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/gmail.send",
+  ],
+  subject: calendarId,
 });
 
 const calendar = google.calendar({
@@ -64,6 +68,46 @@ function sabadosDoMes(ano, mes) {
   return sabados;
 }
 
+const gmail = google.gmail({ version: "v1", auth });
+
+async function sendQrEmail(to, filePath) {
+  const attachment = fs.readFileSync(filePath).toString("base64");
+  const boundary = "----=_NextPart_000_0000_01D00000.00000000";
+  const message = [
+    `From: ${calendarId}`,
+    `To: ${to}`,
+    "Subject: Novo QR Code Whatsapp gerado",
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary=${boundary}`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 7bit",
+    "",
+    "Um novo QR Code foi gerado. Anexo está o arquivo PNG.",
+    "",
+    `--${boundary}`,
+    "Content-Type: image/png; name=whatsapp-qr.png",
+    "Content-Transfer-Encoding: base64",
+    "Content-Disposition: attachment; filename=whatsapp-qr.png",
+    "",
+    attachment,
+    "",
+    `--${boundary}--`,
+  ].join("\r\n");
+
+  const raw = Buffer.from(message)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  return gmail.users.messages.send({
+    userId: "me",
+    requestBody: { raw },
+  });
+}
+
 const etapas = {};
 
 const client = new Client({
@@ -82,16 +126,6 @@ const client = new Client({
 // =====================================
 // QR CODE
 // =====================================
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com", // <substitua pelo seu SMTP>
-  port: 587,
-  secure: false,
-  auth: {
-    user: "vmbotconnect@gmail.com",
-    pass: "Chatbot@1",
-  },
-});
-
 client.on("qr", async (qr) => {
   console.log("Escaneie o QR Code:");
   qrcode.generate(qr, { small: true });
@@ -101,15 +135,8 @@ client.on("qr", async (qr) => {
     await QRCode.toFile(filePath, qr, { type: "png", width: 600 });
     console.log("QR salvo em", filePath);
 
-    const info = await transporter.sendMail({
-      from: 'Bot <vmbotconnect@gmail.com>',
-      to: 'secretariacasaforte.cf@gmail.com',
-      subject: 'Novo QR Code Whatsapp gerado',
-      text: 'Um novo QR Code foi gerado. Anexo está o arquivo PNG.',
-      attachments: [{ filename: 'whatsapp-qr.png', path: filePath }],
-    });
-
-    console.log("Email enviado com QR:", info.messageId);
+    const res = await sendQrEmail(calendarId, filePath);
+    console.log("Email enviado com QR:", res.data.id);
   } catch (error) {
     console.error("Falha ao gerar/enviar QR por email:", error);
   }
