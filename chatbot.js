@@ -90,7 +90,7 @@ client.on("ready", () => {
 })
 
 client.initialize();
-
+// teste
 // =====================================
 // RECEBER MENSAGEM (LÓGICA PRINCIPAL)
 // =====================================
