@@ -2,8 +2,6 @@
 // IMPORTAÇÕES E CONFIGURAÇÕES GLOBAIS
 // =====================================
 const qrcode = require("qrcode-terminal");
-const QRCode = require("qrcode");
-const nodemailer = require("nodemailer");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const { google } = require("googleapis");
 
@@ -82,37 +80,9 @@ const client = new Client({
 // =====================================
 // QR CODE
 // =====================================
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com", // <substitua pelo seu SMTP>
-  port: 587,
-  secure: false,
-  auth: {
-    user: "vmbotconnect@gmail.com",
-    pass: "Chatbot@1",
-  },
-});
-
-client.on("qr", async (qr) => {
+client.on("qr", (qr) => {
   console.log("Escaneie o QR Code:");
   qrcode.generate(qr, { small: true });
-
-  const filePath = "qr.png";
-  try {
-    await QRCode.toFile(filePath, qr, { type: "png", width: 600 });
-    console.log("QR salvo em", filePath);
-
-    const info = await transporter.sendMail({
-      from: 'Bot <vmbotconnect@gmail.com>',
-      to: 'secretariacasaforte.cf@gmail.com',
-      subject: 'Novo QR Code Whatsapp gerado',
-      text: 'Um novo QR Code foi gerado. Anexo está o arquivo PNG.',
-      attachments: [{ filename: 'whatsapp-qr.png', path: filePath }],
-    });
-
-    console.log("Email enviado com QR:", info.messageId);
-  } catch (error) {
-    console.error("Falha ao gerar/enviar QR por email:", error);
-  }
 });
 
 client.on("ready", () => {
