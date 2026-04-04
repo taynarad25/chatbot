@@ -2,6 +2,7 @@
   "dependencies": {
     "googleapis": "^171.4.0",
     "moment-timezone": "^0.5.45",
+    "nodemailer": "^6.9.4",
     "openai": "^4.78.1",
     "qrcode": "^1.5.1",
     "qrcode-terminal": "^0.12.0",
