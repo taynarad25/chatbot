@@ -136,16 +136,18 @@ function criarClient() {
   });
 
   client.on("message", async (msg) => {
-    if (msg.from.endsWith("@g.us")) return;
+    try {
+      if (msg.from.endsWith("@g.us")) return;
 
-    const contato = await msg.getContact();
-    const numero = contato.id._serialized;
-    const texto = msg.body.toLowerCase().trim();
-    const isLider = lideres.includes(numero);
+      const contato = await msg.getContact();
+      const numero = contato.id._serialized;
+      const texto = msg.body.toLowerCase().trim();
+      // Verificação mais flexível para o número de líder
+      const isLider = lideres.some(l => numero.includes(l));
 
-    console.log(`Mensagem recebida de ${numero}: "${msg.body}"`);
+      console.log(`[Mensagem Recebida] De: ${numero} | Texto: "${msg.body}"`);
 
-    if (
+      if (
       texto === "oi" ||
       texto === "oii" ||
       texto === "olá" ||
@@ -192,19 +194,19 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
     if (etapas[numero]) {
       const info = etapas[numero];
-
-      console.log(`Usuário ${numero} em fluxo: ${info.fluxo}, etapa: ${info.etapa}`);
+      console.log(`[Fluxo Ativo] Usuário: ${numero} | Fluxo: ${info.fluxo} | Etapa: ${info.etapa}`);
 
       if (info.fluxo === "agendamento") {
+        // Lógica de agendamento (Opção 3)
         if (info.etapa === "evento_nome") {
-          console.log(`Recebendo nome do evento de ${numero}: ${msg.body}`);
+          console.log(`[Agendamento] Nome do evento: ${msg.body}`);
           info.nome = msg.body;
           info.etapa = "evento_rede";
           return msg.reply("Qual rede está organizando? (Ex: Jovens, Mulheres, Code)");
         }
 
         if (info.etapa === "evento_rede") {
-          console.log(`Recebendo rede do evento de ${numero}: ${msg.body}`);
+          console.log(`[Agendamento] Rede: ${msg.body}`);
           info.rede = msg.body;
           info.etapa = "evento_mes";
           return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio)");
@@ -212,8 +214,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
         if (info.etapa === "evento_mes") {
           const mes = parseInt(msg.body);
-          if (isNaN(mes) || mes < 1 || mes > 12) return msg.reply("❌ Mês inválido. Digite de 1 a 12.");
-          console.log(`Mês selecionado por ${numero}: ${mes}`);
+          if (isNaN(mes) || mes < 1 || mes > 12) return msg.reply("❌ Mês inválido. Digite um número de 1 a 12.");
+          console.log(`[Agendamento] Mês: ${mes}`);
           info.mes = mes;
           info.etapa = "evento_tipo_dia";
           return msg.reply("Qual o dia da semana desejado?\n\n1 - Sábados\n2 - Domingos\n3 - Sextas\n4 - Outro dia");
@@ -226,21 +228,20 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           console.log(`Dia da semana selecionado por ${numero}: ${escolha} (${info.diaSemanaFiltro})`);
 
           info.etapa = "evento_horario";
-          return msg.reply("⏰ Qual o horário do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos longos.");
+          return msg.reply("⏰ Qual o horário do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração.");
         }
 
         if (info.etapa === "evento_horario") {
           const entrada = msg.body.toUpperCase();
           info.horario = entrada;
           info.isDiaInteiro = entrada.includes("DIA");
-          console.log(`Horário do evento de ${numero}: ${entrada}`);
+          console.log(`[Agendamento] Horário: ${entrada}`);
 
           await msg.reply("🔍 Consultando agendas e aplicando regras de reserva...");
-
-          console.log(`Consultando agendas para agendamento de ${numero}`);
+          console.log(`[Agenda] Consultando disponibilidades para ${numero}...`);
 
           try {
-            const ano = 2026;
+            const ano = new Date().getFullYear();
             const inicioBusca = new Date(ano, info.mes - 1, 1).toISOString();
             const fimBusca = new Date(ano, info.mes, 0, 23, 59, 59).toISOString();
 
@@ -329,6 +330,16 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           delete etapas[numero];
           return;
         }
+      } else if (info.fluxo === "pastoral") {
+        // Lógica de atendimento pastoral (Opção 4)
+        if (info.etapa === "nome") {
+          info.nome = msg.body;
+          info.etapa = "finalizado";
+          console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${numero})`);
+          await msg.reply(`Obrigado, ${info.nome}. 🙏\nSua solicitação de atendimento pastoral foi registrada. A secretaria entrará em contato em breve para agendar.`);
+          delete etapas[numero];
+          return;
+        }
       }
       return;
     }
@@ -386,6 +397,10 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
     if (texto === "6") {
       console.log(`Opção 6 selecionada por ${numero}`);
       return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.`);
+    }
+
+    } catch (err) {
+      console.error("[Erro Fatal no Listener de Mensagens]:", err);
     }
   });
 }
