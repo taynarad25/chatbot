@@ -223,7 +223,10 @@ function renderIndexHtml() {
       const requestBtn = document.getElementById('requestQr');
       const hideRequest = json.connected || json.initializing || json.generatingQr || json.hasQr;
       requestBtn.style.display = hideRequest ? 'none' : 'inline-block';
-      messageEl.textContent = json.message || '';
+      // Atualiza a mensagem apenas se o status trouxer uma nova informação (evita limpar o "Ok" das ações)
+      if (json.message) {
+        messageEl.textContent = json.message;
+      }
       } catch (err) {
         console.error('Falha ao conectar com o servidor:', err);
         // Se o site cair (offline), redirecionamos para login para garantir o logout visual

@@ -12,6 +12,8 @@ module.exports = {
       ".git",
       "*.log"
     ],
+    max_restarts: 10,
+    restart_delay: 5000, // Aguarda 5 segundos antes de tentar reiniciar após um erro
     env: {
       NODE_ENV: "production",
     }

@@ -132,6 +132,7 @@ function criarClient() {
     clientReady = false;
     pendingQr = null;
     isGeneratingQr = false;
+    isInitializing = false;
     console.log("WhatsApp desconectado:", reason);
   });
 
@@ -457,6 +458,11 @@ async function disconnectClient() {
   console.log("🔌 Iniciando processo de desconexão...");
   if (!client) {
     console.warn("⚠️ Tentativa de desconexão ignorada: Nenhum cliente ativo.");
+    // Garante que o status seja resetado mesmo se o objeto client não existir
+    clientReady = false;
+    isInitializing = false;
+    isGeneratingQr = false;
+    pendingQr = null;
     return { ok: false, message: "Não há cliente ativo para desconectar." };
   }
 
@@ -466,16 +472,17 @@ async function disconnectClient() {
     } else if (typeof client.destroy === "function") {
       await client.destroy();
     }
+    console.log("✅ WhatsApp desconectado e sessão encerrada.");
+    return { ok: true, message: "WhatsApp desconectado com sucesso." };
+  } catch (err) {
+    console.error("❌ Erro ao desconectar WhatsApp:", err);
+    return { ok: true, message: "WhatsApp desconectado (com aviso de erro no processo)." };
+  } finally {
     client = null;
     clientReady = false;
     isInitializing = false;
     isGeneratingQr = false;
     pendingQr = null;
-    console.log("✅ WhatsApp desconectado e sessão encerrada.");
-    return { ok: true, message: "WhatsApp desconectado com sucesso." };
-  } catch (err) {
-    console.error("❌ Erro ao desconectar WhatsApp:", err);
-    return { ok: false, message: "Erro ao desconectar WhatsApp." };
   }
 }
 
