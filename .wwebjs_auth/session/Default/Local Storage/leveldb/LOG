@@ -1,6 +1,3 @@
-2026/04/03-20:45:01.316 f984 Reusing MANIFEST /home/taynara/chatbot/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
-2026/04/03-20:45:01.323 f984 Recovering log #7
-2026/04/03-20:45:01.323 f984 Reusing old log /home/taynara/chatbot/.wwebjs_auth/session/Default/Local Storage/leveldb/000007.log 
-2026/04/04-18:21:23.528 f984 Level-0 table #11: started
-2026/04/04-18:21:23.811 f984 Level-0 table #11: 15679 bytes OK
-2026/04/04-18:21:23.968 f984 Delete type=0 #7
+2026/04/05-01:37:48.635 124c7 Reusing MANIFEST /home/taynara/chatbot/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
+2026/04/05-01:37:49.211 124c7 Recovering log #10
+2026/04/05-01:37:49.215 124c7 Reusing old log /home/taynara/chatbot/.wwebjs_auth/session/Default/Local Storage/leveldb/000010.log 

@@ -1,0 +1,7 @@
+2026/04/05-02:23:04.411 15b5b Creating DB /home/taynara/chatbot/.wwebjs_auth/session-bot-1775355773902/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb since it was missing.
+2026/04/05-02:23:05.169 15b5b Reusing MANIFEST /home/taynara/chatbot/.wwebjs_auth/session-bot-1775355773902/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/05-02:23:07.095 15b63 Manual compaction at level-0 from '\x00\x01\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x02\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/04/05-02:23:08.117 15b5e Level-0 table #5: started
+2026/04/05-02:23:08.346 15b5e Level-0 table #5: 8315 bytes OK
+2026/04/05-02:23:08.781 15b5e Delete type=0 #3
+2026/04/05-02:23:08.785 15b5e Manual compaction at level-0 from '\x00\x02\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x03\x00\x00\x00' @ 0 : 0; will stop at (end)
