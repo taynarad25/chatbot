@@ -12,7 +12,7 @@ require('dotenv').config();
     if (typeof args[0] === "string" && (args[0].includes("▄") || args[0].includes("█") || args[0].includes("▀"))) {
       return original(...args);
     }
-    original(`[${new Date().toLocaleString("pt-BR")}]`, ...args);
+    original(`[${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}]`, ...args);
   };
 });
 
