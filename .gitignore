@@ -1,0 +1,14 @@
+node_modules/
+.wwebjs_cache/
+.wwebjs_auth/
+*.deb
+
+# Segurança (Credenciais e Segredos)
+credenciais-google.json
+.env
+
+# Logs e Sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
