@@ -48,14 +48,22 @@ const calendar = google.calendar({
 
 // Funções auxiliares
 async function buscarEventos(inicio, fim) {
-  const res = await calendar.events.list({
-    calendarId: calendarId,
-    timeMin: inicio,
-    timeMax: fim,
-    singleEvents: true,
-    orderBy: "startTime",
-  });
-  return res.data.items;
+  let todosEventos = [];
+  for (const id of agendasParaLer) {
+    try {
+      const res = await calendar.events.list({
+        calendarId: id,
+        timeMin: inicio,
+        timeMax: fim,
+        singleEvents: true,
+        orderBy: "startTime",
+      });
+      if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+    } catch (e) {
+      console.error(`[Google Calendar] Erro na agenda ${id}:`, e.message);
+    }
+  }
+  return todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
 }
 
 function sabadosDoMes(ano, mes) {
@@ -340,13 +348,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
       console.log(`Buscando agenda para ${numero}`);
 
       try {
-        let todosEventos = [];
-        for (const id of agendasParaLer) {
-          const res = await calendar.events.list({ calendarId: id, timeMin: inicioBusca, timeMax: fimBusca, singleEvents: true, orderBy: "startTime" });
-          if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
-        }
-        todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
-
+        const todosEventos = await buscarEventos(inicioBusca, fimBusca);
         console.log(`Encontrados ${todosEventos.length} eventos para ${numero}`);
 
         let msgAgenda = "📋 *Agenda Casa Forte*\n\n";
@@ -402,38 +404,20 @@ async function startClient() {
   } catch (err) {
     const message = err?.message || "";
     if (message.includes("already running") || message.includes("Use a different `userDataDir`") || message.includes("already in use")) {
-      console.warn("⚠️ Sessão do Chrome bloqueada. Tentando iniciar com nova pasta de sessão...");
+      console.warn("⚠️ Sessão do Chrome bloqueada. O PM2 reiniciará o processo para tentar liberar o lock.");
       try {
         if (client) await client.destroy();
       } catch (destroyErr) {
         console.warn("❌ Falha ao destruir o cliente antigo:", destroyErr?.message || destroyErr);
       }
-      client = null;
-      clientReady = false;
-      pendingQr = null;
-      clientId = `bot-${Date.now()}`;
-      criarClient();
-      try {
-        await client.initialize();
-        console.log("🚀 Cliente reinicializado com novo ID de sessão.");
-        return;
-      } catch (retryErr) {
-        console.error("❌ Erro fatal ao iniciar o WhatsApp com nova sessão:", retryErr);
-        isGeneratingQr = false;
-      }
+      process.exit(1); // Força o PM2 a reiniciar o bot do zero
     } else {
       console.error("❌ Erro ao iniciar o WhatsApp:", err);
-      try {
-        if (client) await client.destroy();
-      } catch (destroyErr) {
-        // Silencioso pois o target já pode estar fechado
-      }
-      client = null;
-      clientReady = false;
-      isGeneratingQr = false;
+      await cancelQr();
     }
   } finally {
     isInitializing = false;
+    isGeneratingQr = clientReady || !!pendingQr;
   }
 }
 
