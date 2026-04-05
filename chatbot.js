@@ -1,13 +1,40 @@
+// Carrega as variáveis de ambiente do arquivo .env
+require('dotenv').config();
+
 // =====================================
 // IMPORTAÇÕES E CONFIGURAÇÕES GLOBAIS
 // =====================================
+// Configuração global de logs com data e hora
+["log", "warn", "error"].forEach((method) => {
+  const original = console[method];
+  console[method] = (...args) => {
+    // Evita colocar timestamp em linhas do QR Code para não quebrar a formatação
+    if (typeof args[0] === "string" && (args[0].includes("▄") || args[0].includes("█") || args[0].includes("▀"))) {
+      return original(...args);
+    }
+    original(`[${new Date().toLocaleString("pt-BR")}]`, ...args);
+  };
+});
+
 const qrcodeTerminal = require("qrcode-terminal");
 const qrcode = require("qrcode");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const { google } = require("googleapis");
 const { startWebServer } = require("./web");
 
-const calendarId = "secretariacasaforte.cf@gmail.com"; 
+// Configurações sensíveis via Variáveis de Ambiente
+const calendarId = process.env.GOOGLE_CALENDAR_ID; 
+const additionalCalendars = (process.env.GOOGLE_ADDITIONAL_CALENDARS || "")
+  .split(",")
+  .map(id => id.trim())
+  .filter(Boolean);
+
+const agendasParaLer = [calendarId, ...additionalCalendars].filter(Boolean);
+
+const lideres = (process.env.WHATSAPP_LIDERES || "")
+  .split(",")
+  .map(num => num.trim())
+  .filter(Boolean);
 
 const auth = new google.auth.GoogleAuth({
   keyFile: "credenciais-google.json",
@@ -18,29 +45,6 @@ const calendar = google.calendar({
   version: "v3",
   auth: auth, 
 });
-
-const agendasParaLer = [
-  calendarId,
-  "16b2f3baec9c14aba0d43a139b12a04893c33edb9fb45a0b8f081403a3eaa036@group.calendar.google.com", 
-  "d336e4e99db8329a2d52b123252a822073e8f23a67784892e68f3476147e694d@group.calendar.google.com", 
-  "15141665d120f01b145b6a77603eb2313fac0c0e3073033addc151d9561a79d0@group.calendar.google.com", 
-  "51dcf0048432b8fcdbdb663f6198d88398b6481c73f81847bbc867cf25534458@group.calendar.google.com", 
-  "10e97ba829f906588511279bb65b8ce6c8667d9c548339f04de137f9d8ab8a5d@group.calendar.google.com", 
-  "bd9c2b98016d155d427591ed6c339224516db3724146b5dcd3f94c4fe6c22c84@group.calendar.google.com", 
-  "b9daab311cb773bd14efd27ce6efbada7aa94ac8a5adce857b5c694b75fe2803@group.calendar.google.com", 
-  "fa6cf624289edd4efd67cdd11367d6fd7c15e6d74b319ab579ef378498f5fdd9@group.calendar.google.com", 
-  "548839d693663fb3a5854930256f5fd321534a13af3ba67c5a09e6f347992be8@group.calendar.google.com", 
-  "8876e79827d1469f76bcb2758de55158ef3625dba3413ec2c1ea161f5030021b@group.calendar.google.com", 
-  "10a17be6c05bc778f05dbfbddb0fda8ea1e73d2c2349b806230cc4990a14191a@group.calendar.google.com" 
-];
-
-const lideres = [
-    "5511995824388@c.us", "5511970658048@c.us", "5511985526434@c.us", 
-    "5511983338655@c.us", "5511970498716@c.us", "5511946798919@c.us", 
-    "5511951617993@c.us", "5511997832279@c.us", "5511973419733@c.us", 
-    "5511944565738@c.us", "5511969536715@c.us", "5511957022269@c.us", 
-    "5511942685501@c.us"
-];
 
 // Funções auxiliares
 async function buscarEventos(inicio, fim) {
@@ -488,3 +492,4 @@ function getStatus() {
 }
 
 startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
+startClient();

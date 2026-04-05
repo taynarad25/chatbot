@@ -2,9 +2,9 @@ const http = require("http");
 const { URL } = require("url");
 const crypto = require("crypto");
 
-const LOGIN_USERNAME = process.env.WHATSAPP_CONTROL_USER || "admin";
-const PASSWORD_SALT = process.env.WHATSAPP_CONTROL_SALT || "a9b8c7d6e5f4";
-const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH || "193abee702cbe0fffb1165ddc2c06f7f65dec890f3b74e752c289b66dfa81c3cc85059da13c02b24506ad5b9215453fe67b6f14a45679f4c179bb3771141f8d2";
+const LOGIN_USERNAME = process.env.WHATSAPP_CONTROL_USER;
+const PASSWORD_SALT = process.env.WHATSAPP_CONTROL_SALT;
+const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH;
 const COOKIE_NAME = "whatsapp_control_session";
 const SESSION_TTL = 1000 * 60 * 15;
 const sessions = {};
@@ -191,7 +191,7 @@ function renderIndexHtml() {
       const lines = [];
       if (json.connected) {
         lines.push('<strong>Status:</strong> Conectado ✅');
-      } else if (json.initializing) {
+      } else if (json.initializing || json.generatingQr) {
         lines.push('<strong>Status:</strong> Inicializando... ⏳');
       } else {
         lines.push('<strong>Status:</strong> Desconectado');
