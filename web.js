@@ -97,8 +97,17 @@ function renderLoginHtml(message = "") {
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
-    input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+    input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
     button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
+    .password-wrapper { position: relative; }
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 18px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 1.2rem;
+    }
     .error { color: #dc3545; margin-bottom: 1rem; }
   </style>
 </head>
@@ -108,11 +117,23 @@ function renderLoginHtml(message = "") {
     <div id="loginError" class="error">${message ? message : ""}</div>
     <form id="loginForm">
       <input name="username" placeholder="Usuário" autocomplete="username" required />
-      <input name="password" type="password" placeholder="Senha" autocomplete="current-password" required />
+      <div class="password-wrapper">
+        <input id="password" name="password" type="password" placeholder="Senha" autocomplete="current-password" required />
+        <span id="togglePassword" class="toggle-password">👁️</span>
+      </div>
       <button type="submit">Entrar</button>
     </form>
   </div>
   <script>
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passwordInput.setAttribute('type', type);
+      togglePassword.textContent = type === 'password' ? '👀' : '🙈';
+    });
+
     const errorEl = document.getElementById('loginError');
     document.getElementById('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();

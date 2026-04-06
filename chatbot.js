@@ -4,18 +4,8 @@ require('dotenv').config();
 // =====================================
 // IMPORTAÇÕES E CONFIGURAÇÕES GLOBAIS
 // =====================================
-// Configuração global de logs com data e hora
-["log", "warn", "error"].forEach((method) => {
-  const original = console[method];
-  console[method] = (...args) => {
-    // Evita colocar timestamp em linhas do QR Code para não quebrar a formatação
-    if (typeof args[0] === "string" && (args[0].includes("▄") || args[0].includes("█") || args[0].includes("▀"))) {
-      return original(...args);
-    }
-    original(`[${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}]`, ...args);
-  };
-});
-
+const fs = require('fs');
+const path = require('path');
 const qrcodeTerminal = require("qrcode-terminal");
 const qrcode = require("qrcode");
 const { Client, LocalAuth } = require("whatsapp-web.js");
@@ -30,11 +20,15 @@ const additionalCalendars = (process.env.GOOGLE_ADDITIONAL_CALENDARS || "")
   .filter(Boolean);
 
 const agendasParaLer = [calendarId, ...additionalCalendars].filter(Boolean);
+console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
 
 const lideres = (process.env.WHATSAPP_LIDERES || "")
   .split(",")
   .map(num => num.trim())
   .filter(Boolean);
+if (lideres.length > 0) {
+  console.log(`[Config] ${lideres.length} número(s) de líder(es) carregado(s).`);
+}
 
 const auth = new google.auth.GoogleAuth({
   keyFile: "credenciais-google.json",
@@ -102,8 +96,7 @@ function criarClient() {
   });
 
   client.on("qr", async (qr) => {
-    console.log("Escaneie o QR Code:");
-    qrcodeTerminal.generate(qr, { small: true });
+    console.log("✅ QR Code gerado com sucesso.");
     try {
       const dataUrl = await qrcode.toDataURL(qr);
       pendingQr = { qr, dataUrl, createdAt: new Date().toISOString() };
@@ -146,7 +139,7 @@ function criarClient() {
       // Verificação mais flexível para o número de líder
       const isLider = lideres.some(l => numero.includes(l));
 
-      console.log(`[Mensagem Recebida] De: ${numero} | Texto: "${msg.body}"`);
+      console.log(`[Mensagem Recebida] De: ${numero} (${isLider ? 'Líder' : 'Usuário'}) | Texto: "${msg.body}"`);
 
       if (
       texto === "oi" ||
@@ -341,6 +334,52 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           delete etapas[numero];
           return;
         }
+      } else if (info.fluxo === "ver_agenda") {
+        // Lógica de consulta de agenda (Opção 2)
+        if (info.etapa === "escolha_mes") {
+          const escolha = msg.body.trim();
+          if (escolha !== "1" && escolha !== "2") return msg.reply("❌ Opção inválida. Digite 1 ou 2.");
+
+          const hoje = new Date();
+          let inicioBusca, fimBusca, mesNome;
+          const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+          if (escolha === "1") {
+            // Do momento atual até o fim do mês corrente
+            inicioBusca = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString();
+            fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59).toISOString();
+            mesNome = meses[hoje.getMonth()];
+          } else {
+            // Do primeiro ao último dia do próximo mês
+            inicioBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1).toISOString();
+            fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0, 23, 59, 59).toISOString();
+            const proximoMesIdx = (hoje.getMonth() + 1) % 12;
+            mesNome = meses[proximoMesIdx];
+          }
+
+          console.log(`[Agenda] Buscando eventos para ${numero} em ${mesNome}`);
+          await msg.reply(`🔍 Consultando eventos de ${mesNome}...`);
+
+          try {
+            const todosEventos = await buscarEventos(inicioBusca, fimBusca);
+            let msgAgenda = `📋 *Agenda Casa Forte - ${mesNome}*\n\n`;
+            let encontrou = false;
+            todosEventos.forEach(ev => {
+              const d = new Date(ev.start.dateTime || ev.start.date);
+              if (d.getDay() === 6 || d.getDay() === 0) {
+                const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
+                msgAgenda += `📌 *${dataFmt}* | ${ev.summary}\n`;
+                encontrou = true;
+              }
+            });
+            delete etapas[numero];
+            return msg.reply(encontrou ? msgAgenda : `📅 Não há eventos programados para ${mesNome}.`);
+          } catch (e) {
+            console.error(`Erro ao buscar agenda para ${numero}:`, e);
+            delete etapas[numero];
+            return msg.reply("⚠️ Erro ao carregar agenda.");
+          }
+        }
       }
       return;
     }
@@ -352,30 +391,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
     if (texto === "2") {
       console.log(`Opção 2 selecionada por ${numero}`);
-      const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-      const hoje = new Date();
-      const inicioBusca = hoje.toISOString();
-      const fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0).toISOString();
-
-      console.log(`Buscando agenda para ${numero}`);
-
-      try {
-        const todosEventos = await buscarEventos(inicioBusca, fimBusca);
-        console.log(`Encontrados ${todosEventos.length} eventos para ${numero}`);
-
-        let msgAgenda = "📋 *Agenda Casa Forte*\n\n";
-        todosEventos.forEach(ev => {
-          const d = new Date(ev.start.dateTime || ev.start.date);
-          if (d.getDay() === 6 || d.getDay() === 0) {
-            const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
-            msgAgenda += `📌 *${dataFmt}* | ${ev.summary}\n`;
-          }
-        });
-        return msg.reply(msgAgenda);
-      } catch (e) {
-        console.error(`Erro ao buscar agenda para ${numero}:`, e);
-        return msg.reply("Erro ao carregar agenda.");
-      }
+      etapas[numero] = { fluxo: "ver_agenda", etapa: "escolha_mes" };
+      return msg.reply("📅 *Ver Agenda*\n\nQual período você deseja consultar?\n\n1 - Este mês\n2 - Próximo mês");
     }
 
     if (texto === "3" && isLider) {
@@ -498,4 +515,13 @@ function getStatus() {
 }
 
 startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
-startClient();
+
+// Verifica se existe uma sessão salva para decidir se inicia o bot automaticamente.
+// Isso evita que o QR Code seja gerado sem que haja alguém logado no painel para ver.
+const sessionPath = path.join(__dirname, ".wwebjs_auth", `session-${clientId}`);
+if (fs.existsSync(sessionPath)) {
+  console.log("[Autostart] Sessão detectada. Conectando ao WhatsApp...");
+  startClient();
+} else {
+  console.log("[Autostart] Nenhuma sessão detectada. O QR Code só será gerado após solicitação no painel.");
+}

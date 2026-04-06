@@ -14,8 +14,10 @@ module.exports = {
     ],
     max_restarts: 10,
     restart_delay: 5000, // Aguarda 5 segundos antes de tentar reiniciar após um erro
+    log_date_format: "DD-MM-YYYY HH:mm:ss",
     env: {
       NODE_ENV: "production",
+      TZ: "America/Sao_Paulo",
     }
   }]
 };
