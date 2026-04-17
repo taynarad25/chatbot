@@ -8,6 +8,7 @@ const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH;
 const COOKIE_NAME = "whatsapp_control_session";
 const SESSION_TTL = 1000 * 60 * 15;
 const sessions = {};
+const loginAttempts = {}; // Simples rate limiting em memória
 
 function sendJson(res, status, data) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -44,8 +45,12 @@ function isAuthenticated(req) {
   const sessionId = getSessionId(req);
   if (!sessionId) return false;
   const session = sessions[sessionId];
-  if (!session) return false;
+  if (!session) {
+    console.warn(`[Auth] Sessão inválida ou expirada: ${sessionId}`);
+    return false;
+  }
   if (Date.now() - session.createdAt > SESSION_TTL) {
+    console.log(`[Auth] Sessão ${sessionId} expirou por tempo de inatividade.`);
     delete sessions[sessionId];
     return false;
   }
@@ -54,7 +59,8 @@ function isAuthenticated(req) {
 
 function setSessionCookie(res, token) {
   const expires = new Date(Date.now() + SESSION_TTL).toUTCString();
-  res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Expires=${expires}`);
+  // Adicionado SameSite=Strict e Secure (Nota: Secure exige HTTPS para funcionar no navegador)
+  res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Expires=${expires}; SameSite=Strict; Secure`);
 }
 
 function clearSessionCookie(res) {
@@ -299,8 +305,16 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         const password = body.password?.trim();
         console.log(`[Web] Tentativa de login iniciada para o usuário: "${username}"`);
 
+        // Rate Limiting básico
+        const ip = req.socket.remoteAddress;
+        if (loginAttempts[ip] && loginAttempts[ip] > 5) {
+            console.error(`[Security] Bloqueio temporário de login por excesso de tentativas: IP ${ip}`);
+            return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
+        }
+
         if (username === LOGIN_USERNAME && validatePassword(password)) {
           const token = createSession();
+          delete loginAttempts[ip];
           setSessionCookie(res, token);
           console.log(`[Web] Login bem-sucedido: Usuário "${username}" autenticado.`);
           return sendJson(res, 200, { ok: true });
@@ -314,6 +328,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     }
 
     if (path !== '/login' && !isAuthenticated(req)) {
+      console.warn(`[Security] Acesso negado a ${path} - Usuário não autenticado.`);
       if (req.method === 'GET') {
         res.writeHead(302, { Location: '/login' });
         return res.end();

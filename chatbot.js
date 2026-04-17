@@ -54,6 +54,7 @@ async function buscarEventos(inicio, fim) {
       });
       if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
     } catch (e) {
+      console.error(`[Google Calendar] Erro detalhado na agenda ${id}:`, e.response?.data || e.message);
       console.error(`[Google Calendar] Erro na agenda ${id}:`, e.message);
     }
   }
@@ -131,7 +132,31 @@ function criarClient() {
 
   client.on("message", async (msg) => {
     try {
-      if (msg.from.endsWith("@g.us")) return;
+      // Lógica para mensagens em grupo (Confirmação da Secretaria)
+      if (msg.from.endsWith("@g.us")) {
+        const chat = await msg.getChat();
+        if (chat.name === "Mensagens Secretaria" && msg.hasQuotedMsg) {
+          const texto = msg.body.toLowerCase().trim();
+          if (texto === "agendar" || texto === "não agendar") {
+            const quotedMsg = await msg.getQuotedMessage();
+            // Verifica se a mensagem respondida é o resumo enviado pelo bot
+            if (quotedMsg.fromMe && quotedMsg.body.includes("Ref: ")) {
+              const match = quotedMsg.body.match(/Ref: ([\d-]+@c\.us)/);
+              if (match) {
+                const solicitanteId = match[1];
+                const feedback = texto === "agendar"
+                  ? "✅ *Agendamento Confirmado!*\n\nSua solicitação foi aprovada pela secretaria da Casa Forte. Nos vemos lá! 🙏\n\nDigite *menu* para voltar ao menu principal."
+                  : "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
+
+                await client.sendMessage(solicitanteId, feedback);
+                console.log(`[Secretaria] Feedback "${texto}" enviado para ${solicitanteId}`);
+                return msg.reply(`✅ Feedback enviado com sucesso para o solicitante.`);
+              }
+            }
+          }
+        }
+        return; // Ignora outras mensagens em grupos
+      }
 
       const contato = await msg.getContact();
       const numero = contato.id._serialized;
@@ -141,21 +166,13 @@ function criarClient() {
 
       console.log(`[Mensagem Recebida] De: ${numero} (${isLider ? 'Líder' : 'Usuário'}) | Texto: "${msg.body}"`);
 
-      if (
-      texto === "oi" ||
-      texto === "oii" ||
-      texto === "olá" ||
-      texto === "ola" ||
-      texto === "menu" ||
-      texto === "bom dia" ||
-      texto === "boa tarde" ||
-      texto === "boa noite" ||
-      texto === "paz"
-    ) {
+      const saudacoes = ["oi", "ola", "olá", "paz", "bom dia", "boa tarde", "boa noite", "menu"];
+      const ehSaudacao = saudacoes.some(s => texto.startsWith(s));
+      const opcoesValidas = isLider ? ["1", "2", "3", "4", "5", "6", "7"] : ["1", "2", "4", "5", "6"];
+
+      // Atende saudações ou qualquer mensagem que não seja uma opção de menu válida (quando fora de um fluxo)
+      if (ehSaudacao || (!etapas[numero] && !opcoesValidas.includes(texto))) {
       delete etapas[numero];
-
-      console.log(`Enviando menu para ${numero}`);
-
       const menu = isLider
         ? `Olá! 👋
 Secretaria da Comunidade Cristã Casa Forte.
@@ -164,10 +181,11 @@ Escolha uma opção:
 
 1️⃣ Horário dos cultos
 2️⃣ Ver agenda da igreja
-3️⃣ Agendar evento (líderes)
+3️⃣ Agendar ou alterar evento (líderes)
 4️⃣ Atendimento pastoral
 5️⃣ Aulas de música
 6️⃣ Falar com a secretaria
+7️⃣ Comunicados e Avisos nos Cultos
 
 Digite *menu* a qualquer momento para voltar ao menu principal.`
         : `Olá! 👋
@@ -192,6 +210,97 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
       if (info.fluxo === "agendamento") {
         // Lógica de agendamento (Opção 3)
+        if (info.etapa === "evento_acao") {
+          if (msg.body === "1") {
+            info.etapa = "evento_nome";
+            console.log(`[Fluxo] Usuário ${numero} iniciou novo agendamento.`);
+            return msg.reply("📅 *Novo Agendamento*\nQual o nome do evento?");
+          } else if (msg.body === "2") {
+            info.etapa = "alterar_departamento";
+            console.log(`[Fluxo] Usuário ${numero} iniciou alteração de evento.`);
+            return msg.reply("De qual departamento é o evento que deseja alterar?\n\n1 - Epifania\n2 - Rede Code\n3 - Intercessão\n4 - Rede de Homens\n5 - Rede de Casais\n6 - Rede de mulheres\n7 - Flechas Kids\n8 - Projeto Social Seeds\n9 - Outros");
+          } else {
+            return msg.reply("❌ Opção inválida. Digite 1 para Agendar ou 2 para Alterar.");
+          }
+        }
+
+        if (info.etapa === "alterar_departamento") {
+          const deptoMapa = {
+            "1": "Epifania", "2": "Rede Code", "3": "Intercessão",
+            "4": "Rede de Homens", "5": "Rede de Casais", "6": "Rede de mulheres",
+            "7": "Rede Kids", "8": "Projeto Social Seeds", "9": "Outros"
+          };
+          const depto = deptoMapa[msg.body];
+          if (!depto) return msg.reply("❌ Escolha um departamento da lista (1 a 9).");
+
+          info.departamento = depto;
+          await msg.reply(`🔍 Buscando eventos de *${depto}* em ${new Date().getFullYear()}...`);
+
+          try {
+            const ano = new Date().getFullYear();
+            const inicioAno = new Date(ano, 0, 1).toISOString();
+            const fimAno = new Date(ano, 11, 31, 23, 59, 59).toISOString();
+            
+            // Busca eventos que contenham o nome do departamento no resumo
+            const eventos = await buscarEventos(inicioAno, fimAno);
+            const filtrados = eventos.filter(ev => 
+              (ev.summary && ev.summary.toLowerCase().includes(depto.toLowerCase())) || 
+              (depto === "Outros")
+            );
+
+            if (filtrados.length === 0) {
+              delete etapas[numero];
+              return msg.reply(`📅 Não encontrei eventos futuros para o departamento ${depto}.`);
+            }
+
+            info.eventosEncontrados = filtrados.slice(0, 15); // Limita a 15 para não travar o zap
+            info.etapa = "alterar_selecionar_evento";
+            
+            let lista = `📋 *Eventos de ${depto}*\nQual você deseja alterar?\n\n`;
+            info.eventosEncontrados.forEach((ev, i) => {
+              const d = new Date(ev.start.dateTime || ev.start.date);
+              lista += `${i + 1} - ${d.getDate()}/${d.getMonth()+1}: ${ev.summary}\n`;
+            });
+            return msg.reply(lista);
+          } catch (e) {
+            console.error(e);
+            delete etapas[numero];
+            return msg.reply("⚠️ Erro ao buscar eventos.");
+          }
+        }
+
+        if (info.etapa === "alterar_selecionar_evento") {
+          const index = parseInt(msg.body) - 1;
+          if (isNaN(index) || !info.eventosEncontrados[index]) return msg.reply("❌ Escolha um número válido da lista.");
+          
+          info.eventoParaAlterar = info.eventosEncontrados[index];
+          info.etapa = "alterar_detalhes";
+          return msg.reply(`📝 Você selecionou: *${info.eventoParaAlterar.summary}*\n\nQuais alterações você precisa fazer? (Ex: Mudar horário para 20h, alterar data para o dia seguinte, etc)`);
+        }
+
+        if (info.etapa === "alterar_detalhes") {
+          info.detalhesAlteracao = msg.body;
+          const dataOriginal = new Date(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date);
+          
+          const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde o retorno da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+          
+          // Notificar o grupo
+          try {
+            const chats = await client.getChats();
+            const grupo = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
+            if (grupo) {
+              const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\nRef: ${numero}`;
+              await grupo.sendMessage(resumoGrupo);
+            }
+          } catch (error) {
+            console.error("Erro ao notificar grupo:", error);
+          }
+
+          await msg.reply(resumo);
+          delete etapas[numero];
+          return;
+        }
+
         if (info.etapa === "evento_nome") {
           console.log(`[Agendamento] Nome do evento: ${msg.body}`);
           info.nome = msg.body;
@@ -231,7 +340,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           info.isDiaInteiro = entrada.includes("DIA");
           console.log(`[Agendamento] Horário: ${entrada}`);
 
-          await msg.reply("🔍 Consultando agendas e aplicando regras de reserva...");
+          await msg.reply("🔍 Consultando agenda...");
           console.log(`[Agenda] Consultando disponibilidades para ${numero}...`);
 
           try {
@@ -239,11 +348,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const inicioBusca = new Date(ano, info.mes - 1, 1).toISOString();
             const fimBusca = new Date(ano, info.mes, 0, 23, 59, 59).toISOString();
 
-            let todosEventos = [];
-            for (const id of agendasParaLer) {
-              const res = await calendar.events.list({ calendarId: id, timeMin: inicioBusca, timeMax: fimBusca, singleEvents: true });
-              if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
-            }
+            const todosEventos = await buscarEventos(inicioBusca, fimBusca);
 
             let diasPossiveis = [];
             let dataCursor = new Date(ano, info.mes - 1, 1);
@@ -272,7 +377,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               const [hDesejada] = info.horario.split(":").map(Number);
               return !eventosNoDia.some(ev => {
                 if (ev.start.date) return true;
-                if (ev.summary.toLowerCase().includes("code")) return false;
+                if (ev.summary && ev.summary.toLowerCase().includes("code")) return false;
 
                 const evStart = new Date(ev.start.dateTime);
                 const evEnd = new Date(ev.end.dateTime);
@@ -318,9 +423,50 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           if (isNaN(escolha) || !info.datasEncontradas[escolha]) return msg.reply("❌ Escolha um número da lista.");
 
           const dataFinal = info.datasEncontradas[escolha];
-          const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horario}\n\nAguarde a confirmação da secretaria!`;
+          const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horario}\n\nAguarde a confirmação da secretaria!\n\n📝 *Enquanto aguarda a confirmação, por favor, já preencha o formulário detalhado com os dados do evento:* \nhttps://forms.gle/LXLGbS3CDxQwxMBf6\n\nDigite *menu* para voltar ao menu principal.`;
+
+          // Notificar o grupo de agendamento
+          try {
+            const chats = await client.getChats();
+            const grupoAgendamento = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
+            if (grupoAgendamento) {
+              const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horario}\n\n_Responda a este resumo com "agendar" ou "não agendar" para notificar o líder._\nRef: ${numero}`;
+              await grupoAgendamento.sendMessage(resumoGrupo);
+              console.log(`[Notificação] Resumo enviado ao grupo 'Mensagens Secretaria'.`);
+            } else {
+              console.warn("[Aviso] Grupo 'Mensagens Secretaria' não encontrado para envio da notificação.");
+            }
+          } catch (error) {
+            console.error("[Erro] Falha ao enviar notificação para o grupo:", error);
+          }
+
           console.log(`Agendamento solicitado por ${numero}: ${resumo.replace(/\n/g, ' | ')}`);
           await msg.reply(resumo);
+          delete etapas[numero];
+          return;
+        }
+      } else if (info.fluxo === "comunicados") {
+        // Lógica de comunicados (Opção 7)
+        if (info.etapa === "texto_comunicado") {
+          const comunicado = msg.body;
+          const resumoUsuario = `📢 *Solicitação de Comunicado Enviada!*\n\nSua mensagem foi encaminhada para a secretaria analisar e incluir nos avisos do culto.\n\nDigite *menu* para voltar ao menu principal.`;
+
+          // Notificar o grupo
+          try {
+            const chats = await client.getChats();
+            const grupo = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
+            if (grupo) {
+              const resumoGrupo = `📢 *NOVO COMUNICADO PARA O CULTO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📝 *Mensagem:* ${comunicado}`;
+              await grupo.sendMessage(resumoGrupo);
+              console.log(`[Comunicado] Enviado ao grupo por ${numero}`);
+            } else {
+              console.warn("[Aviso] Grupo 'Mensagens Secretaria' não encontrado para o comunicado.");
+            }
+          } catch (error) {
+            console.error("Erro ao notificar grupo sobre comunicado:", error);
+          }
+
+          await msg.reply(resumoUsuario);
           delete etapas[numero];
           return;
         }
@@ -328,34 +474,40 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
         // Lógica de atendimento pastoral (Opção 4)
         if (info.etapa === "nome") {
           info.nome = msg.body;
-          info.etapa = "finalizado";
-          console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${numero})`);
-          await msg.reply(`Obrigado, ${info.nome}. 🙏\nSua solicitação de atendimento pastoral foi registrada. A secretaria entrará em contato em breve para agendar.`);
+          info.etapa = "disponibilidade";
+          console.log(`[Pastoral] Nome recebido: ${info.nome} (${numero}). Solicitando disponibilidade.`);
+          return msg.reply(`Obrigado, ${info.nome}. 🙏\nAgora, por favor, informe quais os *dias e horários* você tem disponível para o atendimento.`);
+        }
+
+        if (info.etapa === "disponibilidade") {
+          info.disponibilidade = msg.body;
+          console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${numero}). Disponibilidade: ${info.disponibilidade}`);
+          await msg.reply(`Perfeito! Sua solicitação de atendimento pastoral foi registrada.\n\n👤 *Nome:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\nA secretaria entrará em contato em breve para confirmar o agendamento. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
           delete etapas[numero];
           return;
         }
       } else if (info.fluxo === "ver_agenda") {
         // Lógica de consulta de agenda (Opção 2)
         if (info.etapa === "escolha_mes") {
-          const escolha = msg.body.trim();
-          if (escolha !== "1" && escolha !== "2") return msg.reply("❌ Opção inválida. Digite 1 ou 2.");
-
           const hoje = new Date();
+          const mesAtual = hoje.getMonth() + 1;
+          const escolha = parseInt(msg.body.trim());
+
+          if (isNaN(escolha) || escolha < mesAtual || escolha > 12) {
+            return msg.reply(`❌ Opção inválida. Por favor, escolha um mês de ${mesAtual} a 12.`);
+          }
+
           let inicioBusca, fimBusca, mesNome;
           const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+          mesNome = meses[escolha - 1];
+          const ano = hoje.getFullYear();
 
-          if (escolha === "1") {
-            // Do momento atual até o fim do mês corrente
-            inicioBusca = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString();
-            fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59).toISOString();
-            mesNome = meses[hoje.getMonth()];
+          if (escolha === mesAtual) {
+            inicioBusca = new Date(ano, escolha - 1, hoje.getDate()).toISOString();
           } else {
-            // Do primeiro ao último dia do próximo mês
-            inicioBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1).toISOString();
-            fimBusca = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0, 23, 59, 59).toISOString();
-            const proximoMesIdx = (hoje.getMonth() + 1) % 12;
-            mesNome = meses[proximoMesIdx];
+            inicioBusca = new Date(ano, escolha - 1, 1).toISOString();
           }
+          fimBusca = new Date(ano, escolha, 0, 23, 59, 59).toISOString();
 
           console.log(`[Agenda] Buscando eventos para ${numero} em ${mesNome}`);
           await msg.reply(`🔍 Consultando eventos de ${mesNome}...`);
@@ -364,16 +516,50 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const todosEventos = await buscarEventos(inicioBusca, fimBusca);
             let msgAgenda = `📋 *Agenda Casa Forte - ${mesNome}*\n\n`;
             let encontrou = false;
+
+            const agrupados = {};
+            const diasSemanaNomes = ["Domingos", "Segundas", "Terças", "Quartas", "Quintas", "Sextas", "Sábados"];
+
+            // Agrupa os eventos por Nome, Horário e Dia da Semana
             todosEventos.forEach(ev => {
-              const d = new Date(ev.start.dateTime || ev.start.date);
-              if (d.getDay() === 6 || d.getDay() === 0) {
+              const startStr = ev.start.dateTime || ev.start.date;
+              const d = new Date(startStr);
+              const weekday = d.getDay();
+
+              if (weekday !== 3 && weekday !== 4) {
+                const summary = ev.summary || "Evento sem título";
+                const horaFmt = ev.start.dateTime
+                  ? `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+                  : "";
+                const diaNum = d.getDate();
                 const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
-                msgAgenda += `📌 *${dataFmt}* | ${ev.summary}\n`;
-                encontrou = true;
+
+                const chave = `${summary}|${horaFmt}|${weekday}`;
+                if (!agrupados[chave]) {
+                  agrupados[chave] = { summary, horaFmt, weekday, datas: [], primeiroDia: diaNum };
+                }
+                agrupados[chave].datas.push(dataFmt);
               }
             });
+
+            // Ordena os grupos pelo primeiro dia em que aparecem para manter a cronologia
+            const listaOrdenada = Object.values(agrupados).sort((a, b) => a.primeiroDia - b.primeiroDia);
+
+            listaOrdenada.forEach(grp => {
+              const horaStr = grp.horaFmt ? ` às ${grp.horaFmt}` : "";
+              if (grp.datas.length >= 3) {
+                msgAgenda += `🗓️ *Todas as ${diasSemanaNomes[grp.weekday]}*${horaStr} | ${grp.summary}\n`;
+                encontrou = true;
+              } else {
+                grp.datas.forEach(dt => {
+                  msgAgenda += `📌 *${dt}*${horaStr} | ${grp.summary}\n`;
+                  encontrou = true;
+                });
+              }
+            });
+
             delete etapas[numero];
-            return msg.reply(encontrou ? msgAgenda : `📅 Não há eventos programados para ${mesNome}.`);
+            return msg.reply((encontrou ? msgAgenda : `📅 Não há eventos programados para ${mesNome}.`) + "\n\nDigite *menu* para voltar ao menu principal.");
           } catch (e) {
             console.error(`Erro ao buscar agenda para ${numero}:`, e);
             delete etapas[numero];
@@ -386,19 +572,44 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
     if (texto === "1") {
       console.log(`Opção 1 selecionada por ${numero}`);
-      return msg.reply(`📅 *Horário dos Cultos*\n\nDomingo\n18h \n\nPrimeiro domingo do mês\n08h30 — Santa Ceia\n⚠️ Não há culto à noite.\n\nEsperamos você!`);
+      const mensagemCultos = `✨ *Celebre Conosco!* ✨
+
+Estamos esperando por você e sua família em nossos encontros:
+
+⛪ *Culto de Celebração*
+🗓️ Todos os Domingos
+⏰ Às *18h*
+
+🍞 *Santa Ceia + Sala de Oração*
+🗓️ Todo 1º Domingo do Mês
+⏰ Às *08h30*
+⚠️ _Neste dia, não temos culto à noite._
+
+Venha viver um tempo precioso na presença de Deus! 🙏🙌
+
+Digite *menu* para voltar ao menu principal.`;
+      return msg.reply(mensagemCultos);
     }
 
     if (texto === "2") {
       console.log(`Opção 2 selecionada por ${numero}`);
+      const hoje = new Date();
+      const mesAtual = hoje.getMonth();
+      const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+      
+      let listaMeses = "📅 *Ver Agenda*\n\nPara qual mês você deseja consultar?\n\n";
+      for (let i = mesAtual; i < 12; i++) {
+        listaMeses += `${i + 1} - ${meses[i]}\n`;
+      }
+
       etapas[numero] = { fluxo: "ver_agenda", etapa: "escolha_mes" };
-      return msg.reply("📅 *Ver Agenda*\n\nQual período você deseja consultar?\n\n1 - Este mês\n2 - Próximo mês");
+      return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
     }
 
     if (texto === "3" && isLider) {
       console.log(`Opção 3 selecionada por ${numero}, iniciando agendamento`);
-      etapas[numero] = { fluxo: "agendamento", etapa: "evento_nome" };
-      return msg.reply("📅 *Novo Evento*\nQual o nome do evento?");
+      etapas[numero] = { fluxo: "agendamento", etapa: "evento_acao" };
+      return msg.reply("O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente");
     }
 
     if (texto === "4") {
@@ -409,12 +620,30 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
     if (texto === "5") {
       console.log(`Opção 5 selecionada por ${numero}`);
-      return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\nPara inscrições, digite "MÚSICA".`);
+      return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\n*Em breve abriremos novas inscrições!* Fique atento aos avisos.\n\nDigite *menu* para voltar ao menu principal.`);
     }
 
     if (texto === "6") {
       console.log(`Opção 6 selecionada por ${numero}`);
-      return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.`);
+      // Notificar o grupo
+      try {
+        const chats = await client.getChats();
+        const grupo = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
+        if (grupo) {
+          const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n\nO usuário solicitou falar com a secretaria.`;
+          await grupo.sendMessage(avisoSecretaria);
+          console.log(`[Atendimento] Aviso enviado ao grupo por ${numero}`);
+        }
+      } catch (error) {
+        console.error("Erro ao notificar grupo sobre atendimento:", error);
+      }
+      return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
+    }
+
+    if (texto === "7" && isLider) {
+      console.log(`Opção 7 selecionada por ${numero}`);
+      etapas[numero] = { fluxo: "comunicados", etapa: "texto_comunicado" };
+      return msg.reply("📢 *Comunicados e Avisos*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
     }
 
     } catch (err) {
@@ -426,6 +655,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 async function startClient() {
   if (clientReady || isInitializing) return;
   console.log("🚀 Iniciando processo de inicialização do cliente...");
+  console.time("client_init");
   isInitializing = true;
   isGeneratingQr = true;
   pendingQr = null;
@@ -433,6 +663,7 @@ async function startClient() {
   try {
     await client.initialize();
     console.log("⏳ Aguardando geração do QR Code ou autenticação...");
+    console.timeEnd("client_init");
     return;
   } catch (err) {
     const message = err?.message || "";
