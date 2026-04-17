@@ -127,7 +127,7 @@ function criarClient() {
     pendingQr = null;
     isGeneratingQr = false;
     isInitializing = false;
-    console.log("WhatsApp desconectado:", reason);
+    console.warn(`[WhatsApp] Cliente desconectado. Motivo: ${reason}`);
   });
 
   client.on("message", async (msg) => {
@@ -148,8 +148,12 @@ function criarClient() {
                   ? "✅ *Agendamento Confirmado!*\n\nSua solicitação foi aprovada pela secretaria da Casa Forte. Nos vemos lá! 🙏\n\nDigite *menu* para voltar ao menu principal."
                   : "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
 
-                await client.sendMessage(solicitanteId, feedback);
-                console.log(`[Secretaria] Feedback "${texto}" enviado para ${solicitanteId}`);
+                try {
+                  await client.sendMessage(solicitanteId, feedback);
+                  console.log(`[Secretaria] Feedback "${texto}" enviado com sucesso para ${solicitanteId}`);
+                } catch (sendErr) {
+                  console.error(`[Secretaria] Erro ao enviar feedback para ${solicitanteId}:`, sendErr.message);
+                }
                 return msg.reply(`✅ Feedback enviado com sucesso para o solicitante.`);
               }
             }

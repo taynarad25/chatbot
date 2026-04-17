@@ -381,6 +381,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendJson(res, 200, { ok: true });
     }
 
+    console.warn(`[Web] Rota não encontrada: ${req.method} ${path}`);
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
   });
