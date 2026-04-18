@@ -83,15 +83,18 @@ let isGeneratingQr = false;
 function criarClient() {
   client = new Client({
     authStrategy: new LocalAuth({ clientId, dataPath: "./.wwebjs_auth" }),
+    authTimeoutMs: 60000, // Aumenta tempo de espera da autenticação
     puppeteer: {
       headless: true,
+      timeout: 60000, // Aumenta o tempo limite para abrir o Chrome na VM
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--disable-extensions',
-        '--no-zygote'
+        '--no-zygote',
+        '--single-process' // Ajuda a economizar memória em VMs
       ]
     }
   });
