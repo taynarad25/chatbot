@@ -132,6 +132,11 @@ function criarClient() {
 
   client.on("message", async (msg) => {
     try {
+      // Ignora mensagens de status e mensagens enviadas pelo próprio bot
+      if (msg.from === 'status@broadcast' || msg.fromMe) {
+        return;
+      }
+
       // Lógica para mensagens em grupo (Confirmação da Secretaria)
       if (msg.from.endsWith("@g.us")) {
         const chat = await msg.getChat();
