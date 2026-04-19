@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const qrcodeTerminal = require("qrcode-terminal");
 const qrcode = require("qrcode");
+const { execSync } = require('child_process');
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const { google } = require("googleapis");
 const { startWebServer } = require("./web");
@@ -54,8 +55,7 @@ async function buscarEventos(inicio, fim) {
       });
       if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
     } catch (e) {
-      console.error(`[Google Calendar] Erro detalhado na agenda ${id}:`, e.response?.data || e.message);
-      console.error(`[Google Calendar] Erro na agenda ${id}:`, e.message);
+      console.error(`[Google Calendar] Erro na agenda ${id}:`, e.response?.data || e.message);
     }
   }
   return todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
@@ -82,19 +82,19 @@ let isGeneratingQr = false;
 
 function criarClient() {
   client = new Client({
-    authStrategy: new LocalAuth({ clientId, dataPath: "./.wwebjs_auth" }),
+    authStrategy: new LocalAuth({ clientId, dataPath: path.join(__dirname, ".wwebjs_auth") }),
     authTimeoutMs: 60000, // Aumenta tempo de espera da autenticação
     puppeteer: {
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
       headless: true,
       timeout: 60000, // Aumenta o tempo limite para abrir o Chrome na VM
       args: [
         '--no-sandbox',
-        '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
+        '--disable-setuid-sandbox',
         '--disable-gpu',
         '--disable-extensions',
         '--no-zygote',
-        '--single-process' // Ajuda a economizar memória em VMs
       ]
     }
   });
@@ -184,7 +184,7 @@ function criarClient() {
 
       // Atende saudações ou qualquer mensagem que não seja uma opção de menu válida (quando fora de um fluxo)
       if (ehSaudacao || (!etapas[numero] && !opcoesValidas.includes(texto))) {
-      delete etapas[numero];
+        delete etapas[numero];
       const menu = isLider
         ? `Olá! 👋
 Secretaria da Comunidade Cristã Casa Forte.
@@ -668,18 +668,54 @@ async function startClient() {
   if (clientReady || isInitializing) return;
   console.log("🚀 Iniciando processo de inicialização do cliente...");
   console.time("client_init");
+
+  // Força o encerramento de processos zumbis do Chromium antes de iniciar
+  try {
+    console.log("[Browser] Limpando processos antigos do Chromium...");
+    execSync("pkill -9 -f chromium || true");
+  } catch (e) {
+    // Ignora erros se não houver processos para matar
+  }
+
+  // Remove o arquivo SingletonLock do Chromium se ele existir. 
+  // Isso previne o erro "Code 21" (Profile in use) comum em ambientes Docker/PM2.
+  const sessionDir = path.join(__dirname, ".wwebjs_auth", `session-${clientId}`);
+  const profileDir = path.join(sessionDir, "Default");
+  const locks = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
+  
+  [sessionDir, profileDir].forEach(dir => {
+    try {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir);
+      files.forEach(file => {
+        // Verifica se o arquivo contém as palavras-chave de trava do Chromium
+        if (locks.some(lock => file.includes(lock))) {
+          const lockPath = path.join(dir, file);
+          try {
+            // No Linux, SingletonLock é um link simbólico. fs.existsSync falha se o link estiver "quebrado".
+            // Tentamos a remoção direta para garantir que limpe mesmo links órfãos de sessões anteriores.
+            fs.unlinkSync(lockPath);
+            console.log(`[Browser] 🔓 Trava residual removida com sucesso: ${lockPath}`);
+          } catch (e) {
+            // Ignora se o arquivo sumiu entre o readdir e o unlink
+          }
+        }
+      });
+    } catch (err) {
+      // Falha silenciosa se não conseguir ler o diretório (ex: pasta Default ainda não criada)
+    }
+  });
+
   isInitializing = true;
   isGeneratingQr = true;
   pendingQr = null;
   criarClient();
   try {
     await client.initialize();
-    console.log("⏳ Aguardando geração do QR Code ou autenticação...");
-    console.timeEnd("client_init");
     return;
   } catch (err) {
     const message = err?.message || "";
-    if (message.includes("already running") || message.includes("Use a different `userDataDir`") || message.includes("already in use")) {
+    if (message.includes("already running") || message.includes("Use a different `userDataDir`") || message.includes("already in use") || message.includes("Code: 21")) {
       console.warn("⚠️ Sessão do Chrome bloqueada. O PM2 reiniciará o processo para tentar liberar o lock.");
       try {
         if (client) await client.destroy();
@@ -768,3 +804,13 @@ if (fs.existsSync(sessionPath)) {
 } else {
   console.log("[Autostart] Nenhuma sessão detectada. O QR Code só será gerado após solicitação no painel.");
 }
+
+// Tratamento de encerramento gracioso para evitar travas residuais no Chromium
+const gracefulShutdown = async (signal) => {
+  console.log(`[Process] Recebido sinal ${signal}. Encerrando bot de forma limpa...`);
+  await disconnectClient();
+  process.exit(0);
+};
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));

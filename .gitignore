@@ -2,12 +2,9 @@ node_modules/
 .wwebjs_cache/
 .wwebjs_auth/
 *.deb
-
-# Segurança (Credenciais e Segredos)
+docker-compose.yml
 credenciais-google.json
 .env
-
-# Logs e Sistema
 *.log
 npm-debug.log*
 .DS_Store

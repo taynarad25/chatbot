@@ -1,31 +1,57 @@
 const http = require("http");
 const { URL } = require("url");
 const crypto = require("crypto");
+const { promisify } = require("util");
 
-const LOGIN_USERNAME = process.env.WHATSAPP_CONTROL_USER;
-const PASSWORD_SALT = process.env.WHATSAPP_CONTROL_SALT;
-const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH;
+const pbkdf2 = promisify(crypto.pbkdf2);
+
+const LOGIN_USERNAME = process.env.WHATSAPP_CONTROL_USER?.trim();
+const PASSWORD_SALT = process.env.WHATSAPP_CONTROL_SALT?.trim();
+const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH?.trim();
 const COOKIE_NAME = "whatsapp_control_session";
 const SESSION_TTL = 1000 * 60 * 15;
 const sessions = {};
 const loginAttempts = {}; // Simples rate limiting em memória
 
+// Log de diagnóstico na inicialização
+if (!LOGIN_USERNAME || !PASSWORD_SALT || !PASSWORD_HASH) {
+  console.error("[Web] ERRO: Variáveis de autenticação (USER, SALT ou HASH) não encontradas no .env!");
+}
+
+/**
+ * Obtém o IP real do cliente, considerando proxies/Docker
+ */
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0].trim() || 
+         req.headers['x-real-ip'] || 
+         req.socket.remoteAddress;
+}
+
 function sendJson(res, status, data) {
+  if (res.headersSent) return;
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(data));
 }
 
 function sendHtml(res, html) {
-  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  if (res.headersSent) return;
+  // Configura os cabeçalhos de segurança antes de enviar para evitar ERR_HTTP_HEADERS_SENT
+  res.writeHead(200, { 
+    "Content-Type": "text/html; charset=utf-8",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+  });
   res.end(html);
 }
 
-function hashPassword(password) {
-  return crypto.pbkdf2Sync(password, PASSWORD_SALT, 100000, 64, "sha512").toString("hex");
-}
-
-function validatePassword(password) {
-  return hashPassword(password) === PASSWORD_HASH;
+async function validatePassword(password) {
+  try {
+    const derivedKey = await pbkdf2(password, PASSWORD_SALT, 100000, 64, "sha512");
+    return derivedKey.toString("hex") === PASSWORD_HASH;
+  } catch (err) {
+    return false;
+  }
 }
 
 function createSession() {
@@ -45,22 +71,22 @@ function isAuthenticated(req) {
   const sessionId = getSessionId(req);
   if (!sessionId) return false;
   const session = sessions[sessionId];
-  if (!session) {
-    console.warn(`[Auth] Sessão inválida ou expirada: ${sessionId}`);
-    return false;
-  }
+  if (!session) return false;
+
   if (Date.now() - session.createdAt > SESSION_TTL) {
-    console.log(`[Auth] Sessão ${sessionId} expirou por tempo de inatividade.`);
     delete sessions[sessionId];
     return false;
   }
+  // Atualiza o timestamp da sessão para evitar logout por inatividade enquanto navega
+  session.createdAt = Date.now();
   return true;
 }
 
 function setSessionCookie(res, token) {
   const expires = new Date(Date.now() + SESSION_TTL).toUTCString();
   // Adicionado SameSite=Strict e Secure (Nota: Secure exige HTTPS para funcionar no navegador)
-  res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Expires=${expires}; SameSite=Strict; Secure`);
+  // Como você está em HTTPS, a flag Secure é recomendada e deve ser única
+  res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Expires=${expires}; SameSite=Strict`);
 }
 
 function clearSessionCookie(res) {
@@ -266,7 +292,6 @@ function renderIndexHtml() {
       const res = await fetch(path, { method: 'POST' });
       const json = await res.json();
       const messageEl = document.getElementById('actionMessage');
-      messageEl.textContent = json.message || 'Ok';
       await refresh();
     }
 
@@ -303,23 +328,23 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         const body = await parseRequestBody(req);
         const username = body.username?.trim();
         const password = body.password?.trim();
-        console.log(`[Web] Tentativa de login iniciada para o usuário: "${username}"`);
 
         // Rate Limiting básico
-        const ip = req.socket.remoteAddress;
+        const ip = getClientIp(req); 
         if (loginAttempts[ip] && loginAttempts[ip] > 5) {
-            console.error(`[Security] Bloqueio temporário de login por excesso de tentativas: IP ${ip}`);
             return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
         }
 
-        if (username === LOGIN_USERNAME && validatePassword(password)) {
+        const isUserValid = (username === LOGIN_USERNAME);
+        const isPassValid = await validatePassword(password);
+
+        if (isUserValid && isPassValid) {
           const token = createSession();
           delete loginAttempts[ip];
           setSessionCookie(res, token);
-          console.log(`[Web] Login bem-sucedido: Usuário "${username}" autenticado.`);
           return sendJson(res, 200, { ok: true });
         }
-        console.warn(`[Web] Falha de login: Credenciais inválidas fornecidas para o usuário "${username}".`);
+        loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
         return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
       } catch (err) {
         console.error(`[Web] Erro crítico ao processar requisição de login: ${err.message}`);
@@ -328,7 +353,6 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     }
 
     if (path !== '/login' && !isAuthenticated(req)) {
-      console.warn(`[Security] Acesso negado a ${path} - Usuário não autenticado.`);
       if (req.method === 'GET') {
         res.writeHead(302, { Location: '/login' });
         return res.end();
@@ -350,29 +374,25 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     }
 
     if (req.method === 'POST' && path === '/request-qr') {
-      console.log("[Web] Requisição recebida: Solicitar QR Code");
       const status = getStatus();
       if (status.connected) {
         return sendJson(res, 200, { ok: false, message: 'O bot já está conectado. Desconecte antes de gerar um novo QR Code.' });
       }
       await startClient();
-      return sendJson(res, 200);
+      return sendJson(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && path === '/cancel-qr') {
-      console.log("[Web] Requisição recebida: Cancelar solicitação");
       await cancelQr();
-      return sendJson(res, 200);
+      return sendJson(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && path === '/disconnect') {
-      console.log("[Web] Requisição recebida: Desconectar WhatsApp");
       const result = await disconnectClient();
       return sendJson(res, result.ok ? 200 : 500, result);
     }
 
     if (req.method === 'POST' && path === '/logout') {
-      console.log("[Web] Usuário realizou logout do painel.");
       const sessionId = getSessionId(req);
       if (sessionId) {
         delete sessions[sessionId];
@@ -381,7 +401,6 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendJson(res, 200, { ok: true });
     }
 
-    console.warn(`[Web] Rota não encontrada: ${req.method} ${path}`);
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
   });
