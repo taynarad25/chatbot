@@ -16,19 +16,21 @@ jobs:
           curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared.deb
 
-      - name: Executar Deploy via SSH
+      - name: Executar Deploy via SSH Nativo
         run: |
           mkdir -p ~/.ssh
-          # Garante que a chave privada termine com uma linha vazia para não dar erro de leitura
+          # Limpa chaves antigas e configura a nova
+          rm -f ~/.ssh/id_rsa
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # O comando abaixo força o uso do protocolo de túnel correto
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+          # Comando SSH otimizado para túneis Cloudflare
+          ssh -o StrictHostKeyChecking=no \
+              -o BatchMode=yes \
+              -o ConnectTimeout=30 \
               -o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }} --no-autoupdate" \
               tayadm@${{ secrets.SERVER_HOST }} << 'EOF'
             cd /home/tayadm/github/chatbot
             git pull origin main
-            # O build usando o kit do docker costuma ser mais rápido
             DOCKER_BUILDKIT=1 docker-compose up -d --build
           EOF
