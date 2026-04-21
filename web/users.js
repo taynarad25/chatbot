@@ -20,6 +20,14 @@ function saveUser(user) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+function updateUserPassword(username, salt, hash) {
+  const users = loadUsers();
+  if (users[username]) {
+    users[username] = { ...users[username], salt, hash, status: 'active' };
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+  }
+}
+
 function deleteUser(username) {
   const users = loadUsers();
   if (users[username]) delete users[username];
@@ -41,4 +49,4 @@ function initAdmin(username, salt, hash) {
   }
 }
 
-module.exports = { loadUsers, saveUser, deleteUser, initAdmin };
+module.exports = { loadUsers, saveUser, deleteUser, updateUserPassword, initAdmin };

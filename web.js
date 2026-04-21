@@ -62,6 +62,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     const hasAdminUser = Object.values(currentUsers).some(u => u.role === 'admin');
 
     if (req.method === 'GET' && pathName === '/register') {
+      // Self-registration is disabled if an admin user already exists
       return hasAdminUser ? sendHtml(res, views.renderRegisterHtml("Desativado.")) : sendHtml(res, views.renderRegisterHtml());
     }
 
@@ -74,13 +75,22 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         if (loginAttempts[ip] && loginAttempts[ip] > 5) return sendJson(res, 429, { ok: false, message: 'Bloqueado por tentativas.' });
 
         const user = currentUsers[username];
-        if (user && await auth.validatePassword(password, user.salt, user.hash)) {
-          console.log(`[Web] Login realizado com sucesso: ${username} (IP: ${ip})`);
-          const token = auth.createSession(username, user.role);
-          delete loginAttempts[ip];
-          auth.setSessionCookie(res, token);
-          return sendJson(res, 200, { ok: true });
+
+        if (user) {
+          if (user.status === 'pending_password_creation') {
+            // For users created by admin, redirect to set password page
+            const tempToken = auth.createSession(username, user.role, 'pending_password_setup'); // Create a temporary session
+            auth.setSessionCookie(res, tempToken);
+            return sendJson(res, 200, { ok: true, redirect: '/set-password' });
+          } else if (await auth.validatePassword(password, user.salt, user.hash)) {
+            console.log(`[Web] Login realizado com sucesso: ${username} (IP: ${ip})`);
+            const token = auth.createSession(username, user.role);
+            delete loginAttempts[ip];
+            auth.setSessionCookie(res, token);
+            return sendJson(res, 200, { ok: true });
+          }
         }
+
         console.warn(`[Web] Tentativa de login falhou para: ${username} (IP: ${ip})`);
         loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
         return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
@@ -100,7 +110,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         const salt = crypto.randomBytes(16).toString("hex");
         const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
 
-        usersStore.saveUser({ username, salt, hash, role: 'user', createdAt: new Date().toISOString() });
+        usersStore.saveUser({ username, salt, hash, role: 'user', createdAt: new Date().toISOString(), status: 'active' });
         console.log(`[Web] Novo registro de usuário: ${username}`);
         return sendJson(res, 201, { ok: true, message: 'Usuário cadastrado com sucesso.' });
       } catch (err) { console.error("[Web] Erro no cadastro:", err); return sendJson(res, 500, { ok: false, message: 'Erro ao processar cadastro.' }); }
@@ -187,7 +197,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
     if (req.method === 'POST' && pathName === '/logout') {
       const session = auth.getSession(req);
-      if (session) console.log(`[Web] Logout realizado: ${session.username}`);
+      if (session) console.log(`[Web] Logout realizado: ${session.username} (ID da sessão: ${session.id})`);
       auth.clearSessionCookie(res, session?.id);
       return sendJson(res, 200, { ok: true });
     }

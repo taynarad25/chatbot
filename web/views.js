@@ -10,6 +10,7 @@ function renderLoginHtml(message = "") {
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
     button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
     .error { color: #dc3545; margin-bottom: 1rem; }
+    .info { color: #004085; background-color: #cce5ff; border-color: #b8daff; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
     .success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
     .links { margin-top: 1rem; text-align: center; font-size: 0.9rem; }
     .links a { color: #007bff; text-decoration: none; }
@@ -69,6 +70,7 @@ function renderRegisterHtml(message = "") {
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
     button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #28a745; color: #fff; font-size: 1rem; cursor: pointer; }
     .error { color: #dc3545; margin-bottom: 1rem; }
+    .info { color: #004085; background-color: #cce5ff; border-color: #b8daff; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
     .success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
   </style>
 </head>
@@ -104,6 +106,65 @@ function renderRegisterHtml(message = "") {
         const json = await res.json();
         console.error('Erro no cadastro:', json.message);
         document.getElementById('regError').textContent = json.message;
+      }
+    });
+  </script>
+</body></html>`;
+}
+
+function renderSetPasswordHtml(username, message = "") {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Definir Senha - Controle WhatsApp</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
+    .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+    input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
+    .error { color: #dc3545; margin-bottom: 1rem; }
+    .info { color: #004085; background-color: #cce5ff; border-color: #b8daff; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Definir Senha para ${username}</h1>
+    <div id="setMessage" class="info">${message || 'Por favor, defina sua nova senha.'}</div>
+    <form id="setPasswordForm">
+      <input type="hidden" name="username" value="${username}" />
+      <input name="password" type="password" placeholder="Nova Senha" required minlength="6" />
+      <input name="confirmPassword" type="password" placeholder="Confirmar Senha" required minlength="6" />
+      <button type="submit">Definir Senha</button>
+    </form>
+  </div>
+  <script>
+    document.getElementById('setPasswordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const password = formData.get('password');
+      const confirmPassword = formData.get('confirmPassword');
+      const setMessageEl = document.getElementById('setMessage');
+
+      if (password !== confirmPassword) {
+        setMessageEl.textContent = 'As senhas não coincidem.';
+        setMessageEl.className = 'error';
+        return;
+      }
+
+      const res = await fetch('/set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: formData.get('username'), password: password }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setMessageEl.textContent = json.message || 'Senha definida com sucesso! Redirecionando...';
+        setMessageEl.className = 'success';
+        setTimeout(() => window.location.href = '/whatsappcontrol', 2000);
+      } else {
+        setMessageEl.textContent = json.message || 'Erro ao definir senha.';
+        setMessageEl.className = 'error';
       }
     });
   </script>
@@ -161,7 +222,6 @@ function renderIndexHtml() {
       <div id="adminMessage" class="message-box" style="display:none;"></div>
       <form id="addUserForm">
         <input name="username" placeholder="Usuário" required />
-        <input name="password" type="password" placeholder="Senha" required />
         <select name="role"><option value="user">Usuário</option><option value="admin">Administrador</option></select>
         <button type="submit" class="primary">Adicionar</button>
       </form>
@@ -300,5 +360,4 @@ function renderIndexHtml() {
   </script>
 </body></html>`;
 }
-
-module.exports = { renderLoginHtml, renderRegisterHtml, renderIndexHtml };
+module.exports = { renderLoginHtml, renderRegisterHtml, renderSetPasswordHtml, renderIndexHtml };

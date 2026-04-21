@@ -15,9 +15,9 @@ async function validatePassword(password, salt, hash) {
   }
 }
 
-function createSession(username, role) {
+function createSession(username, role, status = 'active') {
   const token = crypto.randomBytes(32).toString("hex");
-  sessions[token] = { username, role, createdAt: Date.now() };
+  sessions[token] = { username, role, status, createdAt: Date.now() };
   return token;
 }
 
