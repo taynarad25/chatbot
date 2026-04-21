@@ -22,7 +22,6 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # Mudando de 'access ssh' para 'access tcp'
           ssh -o StrictHostKeyChecking=no \
               -o ProxyCommand="cloudflared access tcp --hostname ssh.secretariacasaforte.com.br --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}" \
               tayadm@ssh.secretariacasaforte.com.br \
