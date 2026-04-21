@@ -17,22 +17,18 @@ jobs:
           sudo dpkg -i cloudflared.deb
 
       - name: Executar Deploy via SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          CF_ID: ${{ secrets.CF_CLIENT_ID }}
-          CF_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
-          # 1. Configura a chave privada
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          # Garante que a chave privada termine com uma linha vazia para não dar erro de leitura
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # 2. Executa o comando SSH usando o cloudflared como ProxyCommand
+          # O comando abaixo força o uso do protocolo de túnel correto
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
-              -o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h --service-token-id $CF_ID --service-token-secret $CF_SECRET" \
-              tayadm@$SERVER_HOST << 'EOF'
+              -o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }} --no-autoupdate" \
+              tayadm@${{ secrets.SERVER_HOST }} << 'EOF'
             cd /home/tayadm/github/chatbot
             git pull origin main
+            # O build usando o kit do docker costuma ser mais rápido
             DOCKER_BUILDKIT=1 docker-compose up -d --build
           EOF
