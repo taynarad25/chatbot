@@ -75,11 +75,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
         const user = currentUsers[username];
         if (user && await auth.validatePassword(password, user.salt, user.hash)) {
+          console.log(`[Web] Login realizado com sucesso: ${username} (IP: ${ip})`);
           const token = auth.createSession(username, user.role);
           delete loginAttempts[ip];
           auth.setSessionCookie(res, token);
           return sendJson(res, 200, { ok: true });
         }
+        console.warn(`[Web] Tentativa de login falhou para: ${username} (IP: ${ip})`);
         loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
         return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
       } catch (err) { return sendJson(res, 400, { ok: false, message: 'Erro ao processar login.' }); }
@@ -99,6 +101,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
 
         usersStore.saveUser({ username, salt, hash, role: 'user', createdAt: new Date().toISOString() });
+        console.log(`[Web] Novo registro de usuário: ${username}`);
         return sendJson(res, 201, { ok: true, message: 'Usuário cadastrado com sucesso.' });
       } catch (err) { console.error("[Web] Erro no cadastro:", err); return sendJson(res, 500, { ok: false, message: 'Erro ao processar cadastro.' }); }
     }
@@ -132,6 +135,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           const salt = crypto.randomBytes(16).toString("hex");
           const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
           usersStore.saveUser({ username, salt, hash, role, createdAt: new Date().toISOString() });
+          console.log(`[Admin] Usuário '${username}' criado por '${auth.getSession(req).username}'`);
           return sendJson(res, 201, { ok: true, message: 'Usuário adicionado com sucesso.' });
         } catch (err) { console.error("[Web] Erro ao adicionar usuário:", err); return sendJson(res, 500, { ok: false, message: 'Erro ao adicionar usuário.' }); }
       }
@@ -140,6 +144,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         const usernameToDelete = pathName.split('/').pop();
         if (currentUsers[usernameToDelete]?.role !== 'admin') {
           usersStore.deleteUser(usernameToDelete);
+          console.log(`[Admin] Usuário '${usernameToDelete}' excluído por '${auth.getSession(req).username}'`);
           return sendJson(res, 200, { ok: true, message: `Usuário '${usernameToDelete}' excluído.` });
         }
         return sendJson(res, 403, { ok: false, message: `Não é possível excluir o usuário '${usernameToDelete}'.` });
@@ -159,14 +164,17 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     if (req.method === 'POST' && pathName === '/request-qr') {
       const status = getStatus();
       if (status.connected) return sendJson(res, 200, { ok: false, message: 'O bot já está conectado.' });
+      console.log(`[Web] Comando: Solicitar QR Code (por: ${auth.getSession(req).username})`);
       await startClient();
       return sendJson(res, 200, { ok: true, message: 'Solicitação de QR enviada.' });
     }
     if (req.method === 'POST' && pathName === '/cancel-qr') {
+      console.log(`[Web] Comando: Cancelar QR Code (por: ${auth.getSession(req).username})`);
       await cancelQr();
       return sendJson(res, 200, { ok: true, message: 'Solicitação de QR cancelada.' });
     }
     if (req.method === 'POST' && pathName === '/disconnect') {
+      console.log(`[Web] Comando: Desconectar WhatsApp (por: ${auth.getSession(req).username})`);
       const result = await disconnectClient();
       return sendJson(res, result.ok ? 200 : 500, result);
     }
@@ -179,6 +187,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
     if (req.method === 'POST' && pathName === '/logout') {
       const session = auth.getSession(req);
+      if (session) console.log(`[Web] Logout realizado: ${session.username}`);
       auth.clearSessionCookie(res, session?.id);
       return sendJson(res, 200, { ok: true });
     }

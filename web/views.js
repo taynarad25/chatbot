@@ -43,9 +43,12 @@ function renderLoginHtml(message = "") {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(Object.fromEntries(formData)),
       });
-      if (res.ok) window.location.href = '/whatsappcontrol';
-      else {
+      if (res.ok) {
+        console.log('Login bem-sucedido.');
+        window.location.href = '/whatsappcontrol';
+      } else {
         const json = await res.json();
+        console.error('Falha no login:', json.message);
         document.getElementById('loginMessage').textContent = json.message || 'Erro de login.';
         document.getElementById('loginMessage').className = 'error';
       }
@@ -92,12 +95,14 @@ function renderRegisterHtml(message = "") {
       const json = await res.json();
       const regErrorEl = document.getElementById('regError');
       if (res.ok) {
+        console.log('Conta criada com sucesso.');
         regErrorEl.textContent = json.message || 'Conta criada com sucesso! Redirecionando para o login...';
         regErrorEl.className = 'success';
         setTimeout(() => window.location.href = '/login?message=Conta criada com sucesso!', 2000);
       }
       else {
         const json = await res.json();
+        console.error('Erro no cadastro:', json.message);
         document.getElementById('regError').textContent = json.message;
       }
     });
@@ -207,9 +212,13 @@ function renderIndexHtml() {
 
       if (isAdmin) {
         const logs = await fetch('/api/logs').then(r => r.json());
-        const cont = document.getElementById('logsContainer');
-        cont.textContent = logs.logs;
-        cont.scrollTop = cont.scrollHeight;
+        if (logs.ok) {
+          const cont = document.getElementById('logsContainer');
+          cont.textContent = logs.logs;
+          cont.scrollTop = cont.scrollHeight;
+        } else {
+          console.error('Não foi possível carregar os logs do servidor.');
+        }
       }
     }
 
@@ -226,7 +235,8 @@ function renderIndexHtml() {
     }
 
     async function deleteUser(name) {
-      if(confirm('Excluir '+name+'?')) {
+      if (confirm('Tem certeza que deseja excluir o usuário ' + name + '?')) {
+        console.log('Solicitando exclusão do usuário:', name);
         await fetch('/api/admin/users/'+name, { method: 'DELETE' });
         fetchUsers();
       }
@@ -235,21 +245,48 @@ function renderIndexHtml() {
     document.getElementById('addUserForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target));
+      console.log('Tentando adicionar novo usuário:', data.username);
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
+      const json = await res.json();
+      const msgEl = document.getElementById('adminMessage');
+      msgEl.style.display = 'block';
+      msgEl.textContent = json.message;
+      
       if (res.ok) {
+        console.log('Usuário criado com sucesso.');
+        msgEl.style.backgroundColor = '#d4edda';
+        msgEl.style.color = '#155724';
         e.target.reset();
         fetchUsers();
-      } else { alert('Erro ao criar usuário'); }
+      } else { 
+        console.error('Erro ao criar usuário:', json.message);
+        msgEl.style.backgroundColor = '#f8d7da';
+        msgEl.style.color = '#721c24';
+      }
     });
 
-    document.getElementById('requestQr').onclick = () => fetch('/request-qr', {method:'POST'}).then(refresh);
-    document.getElementById('cancelQr').onclick = () => fetch('/cancel-qr', {method:'POST'}).then(refresh);
-    document.getElementById('disconnect').onclick = () => { if(confirm('Desconectar?')) fetch('/disconnect', {method:'POST'}).then(refresh); };
-    document.getElementById('logout').onclick = () => fetch('/logout', {method:'POST'}).then(() => window.location.href='/login');
+    document.getElementById('requestQr').onclick = () => {
+      console.log('Botão: Solicitar QR Code');
+      fetch('/request-qr', {method:'POST'}).then(refresh);
+    };
+    document.getElementById('cancelQr').onclick = () => {
+      console.log('Botão: Cancelar QR Code');
+      fetch('/cancel-qr', {method:'POST'}).then(refresh);
+    };
+    document.getElementById('disconnect').onclick = () => { 
+      if(confirm('Desconectar o WhatsApp?')) {
+        console.log('Botão: Desconectar');
+        fetch('/disconnect', {method:'POST'}).then(refresh); 
+      }
+    };
+    document.getElementById('logout').onclick = () => {
+      console.log('Encerrando sessão...');
+      fetch('/logout', {method:'POST'}).then(() => window.location.href='/login');
+    };
 
     setInterval(refresh, 5000); refresh();
   </script>
