@@ -164,11 +164,26 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     if (req.method === 'GET' && pathName === '/status') return sendJson(res, 200, getStatus());
     
     if (req.method === 'GET' && pathName === '/api/logs') {
-      if (!auth.isAdmin(req)) return sendJson(res, 403, { ok: false, message: 'Acesso negado. Apenas administradores podem ver os logs.' });
+      const session = auth.getSession(req);
+      if (!session || !auth.isAdmin(req)) {
+        console.warn(`[Web] Tentativa de acesso a logs por não-admin ou não autenticado (User: ${session?.username || 'N/A'}, IP: ${getClientIp(req)})`);
+        return sendJson(res, 403, { ok: false, message: 'Acesso negado. Apenas administradores podem ver os logs.' });
+      }
+      const logFilePath = path.join(process.cwd(), "combined.log");
+      console.log(`[Web] Admin '${session.username}' solicitou logs. Tentando ler de: ${logFilePath}`);
       try {
-        const log = fs.readFileSync(path.join(process.cwd(), "combined.log"), 'utf8');
-        return sendJson(res, 200, { ok: true, logs: log.split('\n').slice(-50).join('\n') });
-      } catch (e) { return sendJson(res, 200, { ok: true, logs: "Nenhum log gerado ainda." }); }
+        if (!fs.existsSync(logFilePath)) {
+          console.warn(`[Web] Arquivo de log não encontrado em: ${logFilePath}`);
+          return sendJson(res, 200, { ok: true, logs: "Arquivo de log 'combined.log' não encontrado no servidor." });
+        }
+        const logContent = fs.readFileSync(logFilePath, 'utf8');
+        const lastLines = logContent.split('\n').slice(-50).join('\n');
+        console.log(`[Web] Logs lidos com sucesso para '${session.username}'. ${lastLines.length} caracteres enviados.`);
+        return sendJson(res, 200, { ok: true, logs: lastLines });
+      } catch (e) {
+        console.error(`[Web] Erro ao ler arquivo de log para '${session.username}':`, e);
+        return sendJson(res, 200, { ok: true, logs: `Erro ao ler log: ${e.message}` });
+      }
     }
 
     if (req.method === 'POST' && pathName === '/request-qr') {
