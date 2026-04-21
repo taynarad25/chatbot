@@ -334,7 +334,7 @@ function renderIndexHtml() {
 function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const path = url.pathname;
+    const pathName = url.pathname;
 
     if (req.method === 'GET' && pathName === '/login') {
       return sendHtml(res, renderLoginHtml());
