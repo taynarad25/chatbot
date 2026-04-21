@@ -121,8 +121,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       if (req.method === 'DELETE' && pathName.startsWith('/api/admin/users/')) {
         const usernameToDelete = pathName.split('/').pop();
         if (currentUsers[usernameToDelete]?.role !== 'admin') {
-          delete currentUsers[usernameToDelete];
-          fs.writeFileSync(USERS_FILE, JSON.stringify(currentUsers, null, 2));
+          usersStore.deleteUser(usernameToDelete);
           return sendJson(res, 200, { ok: true });
         }
         return sendJson(res, 403, { ok: false });
@@ -134,7 +133,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     if (req.method === 'GET' && pathName === '/api/logs') {
       if (!auth.isAdmin(req)) return sendJson(res, 403, { ok: false });
       try {
-        const log = fs.readFileSync(path.join(__dirname, "combined.log"), 'utf8');
+        const log = fs.readFileSync(path.join(process.cwd(), "combined.log"), 'utf8');
         return sendJson(res, 200, { ok: true, logs: log.split('\n').slice(-50).join('\n') });
       } catch (e) { return sendJson(res, 200, { ok: true, logs: "Vazio" }); }
     }

@@ -20,6 +20,12 @@ function saveUser(user) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+function deleteUser(username) {
+  const users = loadUsers();
+  if (users[username]) delete users[username];
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
 function initAdmin(username, salt, hash) {
   if (!fs.existsSync(USERS_FILE) && username && salt && hash) {
     const initialUsers = {};
@@ -35,4 +41,4 @@ function initAdmin(username, salt, hash) {
   }
 }
 
-module.exports = { loadUsers, saveUser, initAdmin };
+module.exports = { loadUsers, saveUser, deleteUser, initAdmin };

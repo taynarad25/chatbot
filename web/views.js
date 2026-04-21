@@ -123,10 +123,11 @@ function renderIndexHtml() {
     
     <div id="tab-whatsapp" class="tab-content active">
       <div id="status">Carregando...</div>
+      <div id="actionMessage" style="color: #007bff; margin: 0.5rem 0;"></div>
       <div id="qr"></div>
-      <button class="primary" id="requestQr">Solicitar QR Code</button>
-      <button id="cancelQr">Cancelar</button>
-      <button class="danger" id="disconnect">Desconectar</button>
+      <button class="primary" id="requestQr" style="display:none">Solicitar QR Code</button>
+      <button id="cancelQr" style="display:none">Cancelar QR Code</button>
+      <button class="danger" id="disconnect" style="display:none">Desconectar WhatsApp</button>
     </div>
 
     <div id="tab-admin" class="tab-content">
@@ -144,7 +145,7 @@ function renderIndexHtml() {
 
     <div id="tab-logs" class="tab-content">
       <h3>Logs</h3>
-      <div id="logsContainer"></div>
+      <pre id="logsContainer">Carregando logs...</pre>
     </div>
   </div>
 
@@ -168,9 +169,19 @@ function renderIndexHtml() {
       document.getElementById('btn-tab-admin').style.display = isAdmin ? 'block' : 'none';
       document.getElementById('btn-tab-logs').style.display = isAdmin ? 'block' : 'none';
 
-      document.getElementById('status').innerHTML = 'Status: ' + (json.connected ? 'Conectado ✅' : 'Desconectado');
+      // Lógica de Status e Botões
+      const statusText = json.connected ? 'Conectado ✅' : (json.initializing ? 'Inicializando... ⏳' : 'Desconectado');
+      document.getElementById('status').innerHTML = '<strong>Status:</strong> ' + statusText;
+      
       if (json.hasQr) document.getElementById('qr').innerHTML = '<img src="'+json.qrDataUrl+'" />';
       else document.getElementById('qr').innerHTML = '';
+
+      // Regra de exibição dos botões
+      document.getElementById('disconnect').style.display = json.connected ? 'inline-block' : 'none';
+      // Mostra cancelar se estiver inicializando ou se já tiver QR, mas não estiver conectado ainda
+      document.getElementById('cancelQr').style.display = (json.initializing || json.hasQr) && !json.connected ? 'inline-block' : 'none';
+      // Mostra solicitar apenas se estiver totalmente parado
+      document.getElementById('requestQr').style.display = !json.connected && !json.initializing && !json.hasQr ? 'inline-block' : 'none';
 
       if (isAdmin) {
         const logs = await fetch('/api/logs').then(r => r.json());
@@ -202,12 +213,15 @@ function renderIndexHtml() {
     document.getElementById('addUserForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target));
-      await fetch('/api/admin/users', {
+      const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      e.target.reset(); fetchUsers();
+      if (res.ok) {
+        e.target.reset();
+        fetchUsers();
+      } else { alert('Erro ao criar usuário'); }
     });
 
     document.getElementById('requestQr').onclick = () => fetch('/request-qr', {method:'POST'}).then(refresh);
