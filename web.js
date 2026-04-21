@@ -59,6 +59,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     if (req.method === 'GET' && pathName === '/login') return sendHtml(res, views.renderLoginHtml());
 
     const currentUsers = usersStore.loadUsers();
+    const userCount = Object.keys(currentUsers).length;
     const hasAdminUser = Object.values(currentUsers).some(u => u.role === 'admin');
 
     if (req.method === 'GET' && pathName === '/register') {
