@@ -6,13 +6,6 @@ const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/
 
 const loginAttempts = {}; // Simples rate limiting em memória
 
-// Inicializa o admin caso o arquivo não exista (opcional, conforme sua lógica de segurança)
-const LOGIN_USERNAME = process.env.WHATSAPP_CONTROL_USER;
-const PASSWORD_SALT = process.env.WHATSAPP_CONTROL_SALT;
-const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH;
-if (LOGIN_USERNAME && PASSWORD_SALT && PASSWORD_HASH) {
-  initAdmin(LOGIN_USERNAME, PASSWORD_SALT, PASSWORD_HASH);
-}
 
 function findUser(username) {
   const users = loadUsers();
