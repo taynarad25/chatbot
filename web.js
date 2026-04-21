@@ -34,7 +34,7 @@ function sendHtml(res, html) {
     "Content-Type": "text/html; charset=utf-8",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com"
   });
   res.end(html);
 }
@@ -113,9 +113,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
     if (req.method === 'GET' && (pathName === '/' || pathName === '/whatsappcontrol')) return sendHtml(res, views.renderIndexHtml());
 
-    if (pathName.startsWith('/admin')) {
+    if (pathName.startsWith('/api/admin')) {
       if (!auth.isAdmin(req)) return sendJson(res, 403, { ok: false, message: 'Acesso negado.' });
-      if (req.method === 'GET' && pathName === '/api/admin/users') return sendJson(res, 200, { ok: true, users: Object.values(currentUsers) });
+      if (req.method === 'GET' && (pathName === '/api/admin/users' || pathName === '/api/admin/users/')) return sendJson(res, 200, { ok: true, users: Object.values(currentUsers) });
       
       if (req.method === 'POST' && pathName === '/api/admin/users') {
         try {
@@ -192,7 +192,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendJson(res, 200, { ok: true });
     }
 
-    res.writeHead(404); res.end('Not Found');
+    return sendJson(res, 404, { ok: false, message: 'Rota não encontrada.' });
   }).listen(3000, '0.0.0.0', () => console.log('✅ Web rodando em :3000'));
 }
 
