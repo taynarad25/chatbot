@@ -98,8 +98,11 @@ function createSession(username, role) {
 function getSession(req) {
   const cookie = req.headers.cookie;
   if (!cookie) return null;
-  const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  const sessionId = match ? match[1] : null;
+  
+  // Extração manual para evitar problemas com regex e garantir o token
+  const cookies = Object.fromEntries(cookie.split(';').map(c => c.trim().split('=')));
+  const sessionId = cookies[COOKIE_NAME];
+
   if (!sessionId) return null;
   const session = sessions[sessionId];
   if (!session) return null;
@@ -109,7 +112,7 @@ function getSession(req) {
     return null;
   }
   session.createdAt = Date.now(); // Atualiza o timestamp da sessão
-  return session;
+  return { ...session, id: sessionId };
 }
 
 function isAuthenticated(req) {
@@ -437,6 +440,7 @@ function renderIndexHtml() {
     #qr img { max-width: 100%; height: auto; }
     #status { margin-bottom: 1rem; }
     .note { color: #555; font-size: .95rem; margin-top: .5rem; }
+    #logsContainer { margin-top: 1.5rem; background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; height: 300px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #333; }
     .up{position: relative; padding: 1rem;}
     .up-child{position: absolute; top: 1rem; right: 1rem;}
   </style>
@@ -458,6 +462,10 @@ function renderIndexHtml() {
       <button class="secondary" id="cancelQr">Cancelar solicitação</button>
       <button class="danger" id="disconnect">Desconectar WhatsApp</button>
     </div>
+    <div id="logsView" style="display: none;">
+      <h3>Console Logs (Admin)</h3>
+      <div id="logsContainer">Carregando logs...</div>
+    </div>
     <div class="note">Use este painel para gerencias os QR Codes e desconectar o chatbot.</div>
   </div>
   <script>
@@ -478,6 +486,15 @@ function renderIndexHtml() {
         const userJson = await userRes.json();
         isAdminUser = userJson.ok && userJson.user && userJson.user.role === 'admin';
         document.getElementById('adminLinkContainer').style.display = isAdminUser ? 'block' : 'none';
+        document.getElementById('logsView').style.display = isAdminUser ? 'block' : 'none';
+
+        if (isAdminUser) {
+          const logsRes = await fetch('/api/logs');
+          const logsJson = await logsRes.json();
+          const logsCont = document.getElementById('logsContainer');
+          logsCont.textContent = logsJson.logs || 'Sem logs disponíveis.';
+          logsCont.scrollTop = logsCont.scrollHeight;
+        }
 
       const statusEl = document.getElementById('status');
       const qrEl = document.getElementById('qr');
@@ -561,23 +578,23 @@ function renderIndexHtml() {
 function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const path = url.pathname;
+    const pathName = url.pathname; // Alterado de 'path' para 'pathName' para evitar conflito com o módulo 'path'
 
-    if (req.method === 'GET' && path === '/login') {
+    if (req.method === 'GET' && pathName === '/login') {
       return sendHtml(res, renderLoginHtml());
     }
 
     const users = loadUsers();
     const hasAdminUser = Object.values(users).some(user => user.role === 'admin');
 
-    if (req.method === 'GET' && path === '/register') {
+    if (req.method === 'GET' && pathName === '/register') {
       if (hasAdminUser) {
         return sendHtml(res, renderRegisterHtml("O cadastro de novos usuários está desativado. Por favor, entre em contato com o administrador."));
       }
       return sendHtml(res, renderRegisterHtml());
     }
 
-    if (req.method === 'POST' && path === '/login') {
+    if (req.method === 'POST' && pathName === '/login') {
       try {
         const body = await parseRequestBody(req);
         const username = body.username?.trim();
@@ -606,7 +623,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       }
     }
 
-    if (req.method === 'POST' && path === '/register') {
+    if (req.method === 'POST' && pathName === '/register') {
       if (hasAdminUser) {
         return sendJson(res, 403, { ok: false, message: 'O cadastro de novos usuários está desativado.' });
       }
@@ -695,8 +712,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           return sendJson(res, 500, { ok: false, message: 'Erro interno ao adicionar usuário.' });
         }
       }
-      if (req.method === 'DELETE' && path.startsWith('/api/admin/users/')) {
-        const usernameToDelete = path.split('/').pop();
+      if (req.method === 'DELETE' && pathName.startsWith('/api/admin/users/')) {
+        const usernameToDelete = pathName.split('/').pop();
         const currentUsers = loadUsers();
         if (currentUsers[usernameToDelete] && currentUsers[usernameToDelete].role !== 'admin') { // Não permite excluir o próprio admin
           delete currentUsers[usernameToDelete];
@@ -707,11 +724,22 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       }
     }
 
-    if (req.method === 'GET' && path === '/status') {
+    if (req.method === 'GET' && pathName === '/status') {
       return sendJson(res, 200, getStatus());
     }
 
-    if (req.method === 'POST' && path === '/request-qr') {
+    if (req.method === 'GET' && pathName === '/api/logs') {
+      if (!isAdmin(req)) return sendJson(res, 403, { ok: false });
+      const logPath = path.join(__dirname, "combined.log");
+      if (fs.existsSync(logPath)) {
+        const content = fs.readFileSync(logPath, 'utf8');
+        const lastLines = content.trim().split('\n').slice(-50).join('\n');
+        return sendJson(res, 200, { ok: true, logs: lastLines });
+      }
+      return sendJson(res, 200, { ok: true, logs: "Nenhum log gerado ainda." });
+    }
+
+    if (req.method === 'POST' && pathName === '/request-qr') {
       const status = getStatus();
       if (status.connected) {
         return sendJson(res, 200, { ok: false, message: 'O bot já está conectado. Desconecte antes de gerar um novo QR Code.' });
@@ -720,26 +748,26 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendJson(res, 200, { ok: true });
     }
 
-    if (req.method === 'POST' && path === '/cancel-qr') {
+    if (req.method === 'POST' && pathName === '/cancel-qr') {
       await cancelQr();
       return sendJson(res, 200, { ok: true });
     }
 
-    if (req.method === 'POST' && path === '/disconnect') {
+    if (req.method === 'POST' && pathName === '/disconnect') {
       const result = await disconnectClient();
       return sendJson(res, result.ok ? 200 : 500, result);
     }
 
-    if (req.method === 'GET' && path === '/api/user-info') {
+    if (req.method === 'GET' && pathName === '/api/user-info') {
       const session = getSession(req);
       if (session) return sendJson(res, 200, { ok: true, user: { username: session.username, role: session.role } });
       return sendJson(res, 401, { ok: false, message: 'Não autenticado.' });
     }
 
-    if (req.method === 'POST' && path === '/logout') {
+    if (req.method === 'POST' && pathName === '/logout') {
       const session = getSession(req);
-      if (session) { // Se a sessão existe, a remove
-        delete sessions[Object.keys(sessions).find(key => sessions[key] === session)];
+      if (session && session.id) {
+        delete sessions[session.id];
       }
       clearSessionCookie(res);
       return sendJson(res, 200, { ok: true });

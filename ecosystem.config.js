@@ -14,6 +14,8 @@ module.exports = {
     ],
     max_restarts: 10,
     restart_delay: 5000, // Aguarda 5 segundos antes de tentar reiniciar após um erro
+    out_file: "./combined.log",
+    error_file: "./combined.log",
     log_date_format: "DD-MM-YYYY HH:mm:ss",
     env: {
       NODE_ENV: "production",
