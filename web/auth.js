@@ -59,4 +59,4 @@ function clearSessionCookie(res, sessionId) {
   res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
 }
 
-module.exports = { validatePassword, createSession, getSession, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie };
+module.exports = { validatePassword, createSession, getSession, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie, sessions };

@@ -10,6 +10,7 @@ function renderLoginHtml(message = "") {
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
     button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
     .error { color: #dc3545; margin-bottom: 1rem; }
+    .success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
     .links { margin-top: 1rem; text-align: center; font-size: 0.9rem; }
     .links a { color: #007bff; text-decoration: none; }
   </style>
@@ -17,7 +18,7 @@ function renderLoginHtml(message = "") {
 <body>
   <div class="container">
     <h1>Login</h1>
-    <div id="loginError" class="error">${message}</div>
+    <div id="loginMessage" class="error">${message}</div>
     <form id="loginForm">
       <input name="username" placeholder="Usuário" required />
       <input name="password" type="password" placeholder="Senha" required />
@@ -26,6 +27,14 @@ function renderLoginHtml(message = "") {
     </form>
   </div>
   <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const msg = urlParams.get('message');
+    if (msg) {
+      const loginMessageEl = document.getElementById('loginMessage');
+      loginMessageEl.textContent = msg;
+      loginMessageEl.className = 'success';
+    }
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
@@ -37,7 +46,8 @@ function renderLoginHtml(message = "") {
       if (res.ok) window.location.href = '/whatsappcontrol';
       else {
         const json = await res.json();
-        document.getElementById('loginError').textContent = json.message;
+        document.getElementById('loginMessage').textContent = json.message || 'Erro de login.';
+        document.getElementById('loginMessage').className = 'error';
       }
     });
   </script>
@@ -56,6 +66,7 @@ function renderRegisterHtml(message = "") {
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
     button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #28a745; color: #fff; font-size: 1rem; cursor: pointer; }
     .error { color: #dc3545; margin-bottom: 1rem; }
+    .success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
   </style>
 </head>
 <body>
@@ -78,7 +89,13 @@ function renderRegisterHtml(message = "") {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(Object.fromEntries(formData)),
       });
-      if (res.ok) { alert('Conta criada!'); window.location.href = '/login'; }
+      const json = await res.json();
+      const regErrorEl = document.getElementById('regError');
+      if (res.ok) {
+        regErrorEl.textContent = json.message || 'Conta criada com sucesso! Redirecionando para o login...';
+        regErrorEl.className = 'success';
+        setTimeout(() => window.location.href = '/login?message=Conta criada com sucesso!', 2000);
+      }
       else {
         const json = await res.json();
         document.getElementById('regError').textContent = json.message;
@@ -102,6 +119,7 @@ function renderIndexHtml() {
     .tab-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+    .message-box { padding: 10px; margin-bottom: 10px; border-radius: 5px; }
     button { padding: .8rem; border-radius: 8px; border: none; cursor: pointer; margin-right: 5px; }
     .primary { background: #007bff; color: white; }
     .danger { background: #dc3545; color: white; }
@@ -135,10 +153,11 @@ function renderIndexHtml() {
       <ul id="userList"></ul>
       <hr>
       <h4>Novo Usuário</h4>
+      <div id="adminMessage" class="message-box" style="display:none;"></div>
       <form id="addUserForm">
         <input name="username" placeholder="Usuário" required />
         <input name="password" type="password" placeholder="Senha" required />
-        <select name="role"><option value="user">Usuário</option><option value="admin">Admin</option></select>
+        <select name="role"><option value="user">Usuário</option><option value="admin">Administrador</option></select>
         <button type="submit" class="primary">Adicionar</button>
       </form>
     </div>
@@ -169,6 +188,9 @@ function renderIndexHtml() {
       document.getElementById('btn-tab-admin').style.display = isAdmin ? 'block' : 'none';
       document.getElementById('btn-tab-logs').style.display = isAdmin ? 'block' : 'none';
 
+      const actionMessageEl = document.getElementById('actionMessage');
+      actionMessageEl.style.display = 'none'; // Hide previous action messages
+
       // Lógica de Status e Botões
       const statusText = json.connected ? 'Conectado ✅' : (json.initializing ? 'Inicializando... ⏳' : 'Desconectado');
       document.getElementById('status').innerHTML = '<strong>Status:</strong> ' + statusText;
@@ -179,7 +201,7 @@ function renderIndexHtml() {
       // Regra de exibição dos botões
       document.getElementById('disconnect').style.display = json.connected ? 'inline-block' : 'none';
       // Mostra cancelar se estiver inicializando ou se já tiver QR, mas não estiver conectado ainda
-      document.getElementById('cancelQr').style.display = (json.initializing || json.hasQr) && !json.connected ? 'inline-block' : 'none';
+      document.getElementById('cancelQr').style.display = (json.initializing || (json.hasQr && !json.connected)) ? 'inline-block' : 'none';
       // Mostra solicitar apenas se estiver totalmente parado
       document.getElementById('requestQr').style.display = !json.connected && !json.initializing && !json.hasQr ? 'inline-block' : 'none';
 
