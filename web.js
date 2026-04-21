@@ -1,6 +1,4 @@
 const http = require("http");
-const fs = require("fs");
-const path = require("path");
 const { URL } = require("url");
 const crypto = require("crypto");
 const { promisify } = require("util");
@@ -210,7 +208,6 @@ function renderIndexHtml() {
     .note { color: #555; font-size: .95rem; margin-top: .5rem; }
     .up{position: relative; padding: 1rem;}
     .up-child{position: absolute; top: 1rem; right: 1rem;}
-    #logsContainer { margin-top: 1.5rem; background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; height: 300px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #333; }
   </style>
 </head>
 <body>
@@ -226,10 +223,6 @@ function renderIndexHtml() {
       <button class="primary" id="requestQr">Solicitar QR Code</button>
       <button class="secondary" id="cancelQr">Cancelar solicitação</button>
       <button class="danger" id="disconnect">Desconectar WhatsApp</button>
-    </div>
-    <div id="logsContainer">
-      <div style="color: #888; margin-bottom: 0.5rem; border-bottom: 1px solid #333; padding-bottom: 0.2rem; display: flex; justify-content: space-between;"><span>Console Logs</span><span id="logTime" style="font-size: 0.7rem;"></span></div>
-      <div id="logsContent">Carregando logs...</div>
     </div>
     <div class="note">Use este painel para gerencias os QR Codes e desconectar o chatbot.</div>
   </div>
@@ -287,16 +280,6 @@ function renderIndexHtml() {
       if (json.message) {
         messageEl.textContent = json.message;
       }
-
-      // Buscar logs
-      const logsRes = await fetch('/api/logs');
-      const logsJson = await logsRes.json();
-      if (logsJson.ok) {
-        const logsContent = document.getElementById('logsContent');
-        logsContent.textContent = logsJson.logs;
-        document.getElementById('logTime').textContent = 'Atualizado em: ' + new Date().toLocaleTimeString();
-        logsContent.parentElement.scrollTop = logsContent.parentElement.scrollHeight;
-      }
       } catch (err) {
         console.error('Falha ao conectar com o servidor:', err);
         // Se o site cair (offline), redirecionamos para login para garantir o logout visual
@@ -336,11 +319,11 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const path = url.pathname;
 
-    if (req.method === 'GET' && pathName === '/login') {
+    if (req.method === 'GET' && path === '/login') {
       return sendHtml(res, renderLoginHtml());
     }
 
-    if (req.method === 'POST' && pathName === '/login') {
+    if (req.method === 'POST' && path === '/login') {
       try {
         const body = await parseRequestBody(req);
         const username = body.username?.trim();
@@ -369,7 +352,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       }
     }
 
-    if (pathName !== '/login' && !isAuthenticated(req)) {
+    if (path !== '/login' && !isAuthenticated(req)) {
       if (req.method === 'GET') {
         res.writeHead(302, { Location: '/login' });
         return res.end();
@@ -377,34 +360,20 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
     }
 
-    if (req.method === 'GET' && pathName === '/') {
+    if (req.method === 'GET' && path === '/') {
       res.writeHead(302, { Location: '/whatsappcontrol' });
       return res.end();
     }
 
-    if (req.method === 'GET' && pathName === '/whatsappcontrol') {
+    if (req.method === 'GET' && path === '/whatsappcontrol') {
       return sendHtml(res, renderIndexHtml());
     }
 
-    if (req.method === 'GET' && pathName === '/status') {
+    if (req.method === 'GET' && path === '/status') {
       return sendJson(res, 200, getStatus());
     }
 
-    if (req.method === 'GET' && pathName === '/api/logs') {
-      const logFilePath = path.join(__dirname, "logs", "combined.log");
-      if (fs.existsSync(logFilePath)) {
-        try {
-          const content = fs.readFileSync(logFilePath, 'utf8');
-          const lines = content.trim().split('\n').slice(-50).join('\n');
-          return sendJson(res, 200, { ok: true, logs: lines });
-        } catch (e) {
-          return sendJson(res, 500, { ok: false, logs: "Erro ao ler arquivo." });
-        }
-      }
-      return sendJson(res, 200, { ok: true, logs: "Aguardando geração de logs..." });
-    }
-
-    if (req.method === 'POST' && pathName === '/request-qr') {
+    if (req.method === 'POST' && path === '/request-qr') {
       const status = getStatus();
       if (status.connected) {
         return sendJson(res, 200, { ok: false, message: 'O bot já está conectado. Desconecte antes de gerar um novo QR Code.' });
@@ -413,17 +382,17 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendJson(res, 200, { ok: true });
     }
 
-    if (req.method === 'POST' && pathName === '/cancel-qr') {
+    if (req.method === 'POST' && path === '/cancel-qr') {
       await cancelQr();
       return sendJson(res, 200, { ok: true });
     }
 
-    if (req.method === 'POST' && pathName === '/disconnect') {
+    if (req.method === 'POST' && path === '/disconnect') {
       const result = await disconnectClient();
       return sendJson(res, result.ok ? 200 : 500, result);
     }
 
-    if (req.method === 'POST' && pathName === '/logout') {
+    if (req.method === 'POST' && path === '/logout') {
       const sessionId = getSessionId(req);
       if (sessionId) {
         delete sessions[sessionId];
