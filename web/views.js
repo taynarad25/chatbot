@@ -211,27 +211,35 @@ function renderIndexHtml() {
       document.getElementById('requestQr').style.display = !json.connected && !json.initializing && !json.hasQr ? 'inline-block' : 'none';
 
       if (isAdmin) {
-        const logs = await fetch('/api/logs').then(r => r.json());
-        if (logs.ok) {
-          const cont = document.getElementById('logsContainer');
-          cont.textContent = logs.logs;
-          cont.scrollTop = cont.scrollHeight;
-        } else {
-          console.error('Não foi possível carregar os logs do servidor.');
-        }
+        fetch('/api/logs')
+          .then(r => r.ok ? r.json() : Promise.reject('Erro no servidor'))
+          .then(json => {
+            const cont = document.getElementById('logsContainer');
+            if (json.ok) {
+              cont.textContent = json.logs;
+              cont.scrollTop = cont.scrollHeight;
+            }
+          })
+          .catch(err => console.error('Erro ao buscar logs:', err));
       }
     }
 
     async function fetchUsers() {
-      const res = await fetch('/api/admin/users').then(r => r.json());
-      const list = document.getElementById('userList');
-      list.innerHTML = '';
-      res.users.forEach(u => {
-        const li = document.createElement('li');
-        li.innerHTML = '<span>'+u.username+' ('+u.role+')</span>' + 
-          (u.role !== 'admin' ? '<button class="danger" onclick="deleteUser(\\''+u.username+'\\')">Excluir</button>' : '');
-        list.appendChild(li);
-      });
+      fetch('/api/admin/users')
+        .then(r => r.ok ? r.json() : Promise.reject('Erro ao carregar usuários'))
+        .then(json => {
+          const list = document.getElementById('userList');
+          list.innerHTML = '';
+          if (json.users) {
+            json.users.forEach(u => {
+              const li = document.createElement('li');
+              li.innerHTML = '<span>'+u.username+' ('+u.role+')</span>' + 
+                (u.role !== 'admin' ? '<button class="danger" onclick="deleteUser(\\''+u.username+'\\')">Excluir</button>' : '');
+              list.appendChild(li);
+            });
+          }
+        })
+        .catch(err => console.error(err));
     }
 
     async function deleteUser(name) {
