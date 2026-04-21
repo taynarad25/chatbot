@@ -18,20 +18,20 @@ jobs:
 
       - name: Executar Deploy via SSH
         run: |
-          # 1. Configurar diretório e chave
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # 2. Criar arquivo de config para simplificar o comando SSH
           cat <<EOF > ~/.ssh/config
           Host my-server
               HostName ${{ secrets.SERVER_HOST }}
               User tayadm
               IdentityFile ~/.ssh/id_rsa
               StrictHostKeyChecking no
+              BatchMode yes
+              ConnectTimeout 60
               ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }} --raw
           EOF
 
-          # 3. Executar o comando de forma direta (evita broken pipe)
+          # Executando o comando direto para evitar erro de sessão
           ssh my-server "cd /home/tayadm/github/chatbot && git pull origin main && docker compose up -d --build"
