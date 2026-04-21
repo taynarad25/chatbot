@@ -5,6 +5,7 @@ node_modules/
 docker-compose.yml
 credenciais-google.json
 .env
+login.json
 *.log
 npm-debug.log*
 .DS_Store

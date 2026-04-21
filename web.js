@@ -2,22 +2,79 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
-const { promisify } = require("util");
 const crypto = require("crypto");
+const { promisify } = require("util");
+
 const pbkdf2 = promisify(crypto.pbkdf2);
 
-const usersStore = require("./web/users");
-const auth = require("./web/auth");
-const views = require("./web/views");
+const LOGIN_USERNAME = process.env.WHATSAPP_CONTROL_USER?.trim();
+const PASSWORD_SALT = process.env.WHATSAPP_CONTROL_SALT?.trim();
+const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH?.trim();
+const COOKIE_NAME = "whatsapp_control_session";
+const SESSION_TTL = 1000 * 60 * 15;
+const sessions = {};
+const loginAttempts = {}; // Simples rate limiting em memória
 
-const loginAttempts = {};
+const USERS_FILE = path.join(__dirname, 'login.json');
 
-usersStore.initAdmin(
-  process.env.WHATSAPP_CONTROL_USER?.trim(),
-  process.env.WHATSAPP_CONTROL_SALT?.trim(),
-  process.env.WHATSAPP_CONTROL_HASH?.trim()
-);
+function getUsers() {
+  if (!fs.existsSync(USERS_FILE)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+  } catch (err) {
+    console.error("[Web] Erro ao ler login.json:", err.message);
+    return [];
+  }
+}
 
+function saveUsers(users) {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+    return true;
+  } catch (err) {
+    console.error("[Web] Erro ao salvar login.json:", err.message);
+    return false;
+  }
+}
+
+function findUser(username) {
+  const users = getUsers();
+  return users ? users.find(u => u.username === username) : null;
+}
+
+async function addUser({ username, password, role = 'user', status = 'active' }) {
+  const users = getUsers() || [];
+  if (users.find(u => u.username === username)) return { ok: false, message: "Usuário já existe" };
+  
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
+  const now = new Date().toISOString();
+
+  users.push({
+    username,
+    salt,
+    hash,
+    role,
+    status,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  if (saveUsers(users)) {
+    return { ok: true };
+  } else {
+    return null;
+  }
+}
+
+// Log de diagnóstico na inicialização
+if (!LOGIN_USERNAME || !PASSWORD_SALT || !PASSWORD_HASH) {
+  console.error("[Web] ERRO: Variáveis de autenticação (USER, SALT ou HASH) não encontradas no .env!");
+}
+
+/**
+ * Obtém o IP real do cliente, considerando proxies/Docker
+ */
 function getClientIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0].trim() || 
          req.headers['x-real-ip'] || 
@@ -25,246 +82,386 @@ function getClientIp(req) {
 }
 
 function sendJson(res, status, data) {
+  if (res.headersSent) return;
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(data));
 }
 
 function sendHtml(res, html) {
+  if (res.headersSent) return;
+  // Configura os cabeçalhos de segurança antes de enviar para evitar ERR_HTTP_HEADERS_SENT
   res.writeHead(200, { 
     "Content-Type": "text/html; charset=utf-8",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com"
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
   });
   res.end(html);
 }
 
+async function validatePassword(password, salt, hash) {
+  try {
+    const derivedKey = await pbkdf2(password, salt, 100000, 64, "sha512");
+    return derivedKey.toString("hex") === hash;
+  } catch (err) {
+    return false;
+  }
+}
+
+function createSession() {
+  const token = crypto.randomBytes(32).toString("hex");
+  sessions[token] = { createdAt: Date.now() };
+  return token;
+}
+
+function getSessionId(req) {
+  const cookie = req.headers.cookie;
+  if (!cookie) return null;
+  const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
+  return match ? match[1] : null;
+}
+
+function isAuthenticated(req) {
+  const sessionId = getSessionId(req);
+  if (!sessionId) return false;
+  const session = sessions[sessionId];
+  if (!session) return false;
+
+  if (Date.now() - session.createdAt > SESSION_TTL) {
+    delete sessions[sessionId];
+    return false;
+  }
+  // Atualiza o timestamp da sessão para evitar logout por inatividade enquanto navega
+  session.createdAt = Date.now();
+  return true;
+}
+
+function setSessionCookie(res, token) {
+  const expires = new Date(Date.now() + SESSION_TTL).toUTCString();
+  // Adicionado SameSite=Strict e Secure (Nota: Secure exige HTTPS para funcionar no navegador)
+  // Como você está em HTTPS, a flag Secure é recomendada e deve ser única
+  res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Expires=${expires}; SameSite=Strict`);
+}
+
+function clearSessionCookie(res) {
+  res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
+}
+
 async function parseRequestBody(req) {
   return new Promise((resolve, reject) => {
-    let body = ""; 
-    req.on("data", chunk => body += chunk.toString());
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
     req.on("end", () => {
       try {
-        resolve(req.headers["content-type"]?.includes("application/json") ? JSON.parse(body) : Object.fromEntries(new URLSearchParams(body)));
-      } catch (e) { reject(e); }
+        if (req.headers["content-type"]?.includes("application/json")) {
+          resolve(JSON.parse(body));
+        } else {
+          const params = new URLSearchParams(body);
+          const data = {};
+          for (const [key, value] of params.entries()) {
+            data[key] = value;
+          }
+          resolve(data);
+        }
+      } catch (err) {
+        reject(err);
+      }
     });
+    req.on("error", reject);
   });
+}
+
+function renderLoginHtml(message = "") {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - Controle WhatsApp</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
+    .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+    input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
+    .password-wrapper { position: relative; }
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 18px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 1.2rem;
+    }
+    .error { color: #dc3545; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Login</h1>
+    <div id="loginError" class="error">${message ? message : ""}</div>
+    <form id="loginForm">
+      <input name="username" placeholder="Usuário" autocomplete="username" required />
+      <div class="password-wrapper">
+        <input id="password" name="password" type="password" placeholder="Senha" autocomplete="current-password" required />
+        <span id="togglePassword" class="toggle-password">👁️</span>
+      </div>
+      <button type="submit">Entrar</button>
+    </form>
+  </div>
+  <script>
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passwordInput.setAttribute('type', type);
+      togglePassword.textContent = type === 'password' ? '👀' : '🙈';
+    });
+
+    const errorEl = document.getElementById('loginError');
+    document.getElementById('loginForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorEl.textContent = '';
+      const formData = new FormData(event.target);
+      const body = JSON.stringify({ username: formData.get('username'), password: formData.get('password') });
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      if (res.ok) {
+        window.location.href = '/whatsappcontrol';
+      } else {
+        const json = await res.json();
+        errorEl.textContent = json.message || 'Login falhou.';
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function renderIndexHtml() {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle WhatsApp</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
+    .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+    button { margin: .4rem .2rem .4rem 0; padding: .8rem 1.1rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+    button.primary { background: #007bff; color: white; }
+    button.danger { background: #dc3545; color: white; }
+    button.secondary { background: #6c757d; color: white; }
+    #qr img { max-width: 100%; height: auto; }
+    #status { margin-bottom: 1rem; }
+    .note { color: #555; font-size: .95rem; margin-top: .5rem; }
+    .up{position: relative; padding: 1rem;}
+    .up-child{position: absolute; top: 1rem; right: 1rem;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="up">
+      <div class="up-child"><button class="secondary" id="logout">Logout</button></div>
+    </div>
+    <div class="topbar"><h1>Controle do WhatsApp</h1></div>
+    <div id="status">Carregando status...</div>
+    <div id="actionMessage" style="margin-bottom: .8rem; color: #333;"></div>
+    <div id="qr"></div>
+    <div>
+      <button class="primary" id="requestQr">Solicitar QR Code</button>
+      <button class="secondary" id="cancelQr">Cancelar solicitação</button>
+      <button class="danger" id="disconnect">Desconectar WhatsApp</button>
+    </div>
+    <div class="note">Use este painel para gerencias os QR Codes e desconectar o chatbot.</div>
+  </div>
+  <script>
+    async function refresh() {
+      try {
+        const res = await fetch('/status');
+        
+        // Se o servidor retornar qualquer status diferente de 200 (Sucesso) ou redirecionar
+        if (res.status !== 200 || res.redirected || res.url.includes('/login')) {
+          window.location.href = '/login';
+          return;
+        }
+        const json = await res.json();
+
+      const statusEl = document.getElementById('status');
+      const qrEl = document.getElementById('qr');
+      const messageEl = document.getElementById('actionMessage');
+      const lines = [];
+      if (json.connected) {
+        lines.push('<strong>Status:</strong> Conectado ✅');
+      } else if (json.initializing || json.generatingQr) {
+        lines.push('<strong>Status:</strong> Inicializando... ⏳');
+      } else {
+        lines.push('<strong>Status:</strong> Desconectado');
+      }
+      if (json.hasQr) {
+        lines.push('<strong>QR disponível:</strong> Sim');
+      } else {
+        lines.push('<strong>QR disponível:</strong> Não');
+      }
+      if (json.qrCreatedAt) {
+        lines.push('<strong>Gerado em:</strong> ' + new Date(json.qrCreatedAt).toLocaleString());
+      }
+      statusEl.innerHTML = lines.join('<br>');
+      if (json.hasQr && json.qrDataUrl) {
+        qrEl.innerHTML = '<h2>QR Code</h2><img src="' + json.qrDataUrl + '" alt="QR Code" />';
+      } else if (!json.initializing) {
+        qrEl.innerHTML = '<p>Nenhum QR Code disponível no momento.</p>';
+      } else {
+        qrEl.innerHTML = '';
+      }
+      const cancelBtn = document.getElementById('cancelQr');
+      // Exibe o botão cancelar apenas se estiver em processo de inicialização e ainda não estiver conectado
+      const isGenerating = (json.initializing || json.generatingQr || json.hasQr) && !json.connected;
+      cancelBtn.disabled = !isGenerating;
+      cancelBtn.style.display = isGenerating ? 'inline-block' : 'none';
+      const disconnectBtn = document.getElementById('disconnect');
+      disconnectBtn.disabled = !json.connected;
+      disconnectBtn.style.display = json.connected ? 'inline-block' : 'none';
+      const requestBtn = document.getElementById('requestQr');
+      const hideRequest = json.connected || json.initializing || json.generatingQr || json.hasQr;
+      requestBtn.style.display = hideRequest ? 'none' : 'inline-block';
+      // Atualiza a mensagem apenas se o status trouxer uma nova informação (evita limpar o "Ok" das ações)
+      if (json.message) {
+        messageEl.textContent = json.message;
+      }
+      } catch (err) {
+        console.error('Falha ao conectar com o servidor:', err);
+        // Se o site cair (offline), redirecionamos para login para garantir o logout visual
+        // e forçar nova autenticação quando o serviço retornar.
+        window.location.href = '/login';
+      }
+    }
+
+    async function postAction(path) {
+      const res = await fetch(path, { method: 'POST' });
+      const json = await res.json();
+      const messageEl = document.getElementById('actionMessage');
+      await refresh();
+    }
+
+    document.getElementById('requestQr').addEventListener('click', () => postAction('/request-qr'));
+    document.getElementById('cancelQr').addEventListener('click', () => { console.log('Botão cancelar pressionado'); postAction('/cancel-qr'); });
+    document.getElementById('disconnect').addEventListener('click', () => {
+      if (confirm('Deseja realmente desconectar o WhatsApp?')) {
+        postAction('/disconnect');
+      }
+    });
+    document.getElementById('logout').addEventListener('click', async () => {
+      await fetch('/logout', { method: 'POST' });
+      window.location.href = '/login';
+    });
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>`;
 }
 
 function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const pathName = url.pathname;
+    const path = url.pathname;
 
-    if (req.method === 'GET' && pathName === '/login') return sendHtml(res, views.renderLoginHtml());
-
-    const currentUsers = usersStore.loadUsers();
-    const userCount = Object.keys(currentUsers).length;
-    const hasAdminUser = Object.values(currentUsers).some(u => u.role === 'admin');
-
-    if (req.method === 'GET' && pathName === '/register') {
-      // O registro agora está sempre aberto para quem foi convidado pelo Admin
-      return sendHtml(res, views.renderRegisterHtml());
+    if (req.method === 'GET' && path === '/login') {
+      return sendHtml(res, renderLoginHtml());
     }
 
-    if (req.method === 'POST' && pathName === '/login') {
+    if (req.method === 'POST' && path === '/login') {
       try {
         const body = await parseRequestBody(req);
         const username = body.username?.trim();
         const password = body.password?.trim();
+
+        // Rate Limiting básico
         const ip = getClientIp(req); 
-        if (loginAttempts[ip] && loginAttempts[ip] > 5) return sendJson(res, 429, { ok: false, message: 'Bloqueado por tentativas.' });
-
-        const user = currentUsers[username];
-
-        if (user && user.status === 'pending_password_creation') {
-           return sendJson(res, 401, { ok: false, message: 'Conclua o cadastro primeiro.' });
+        if (loginAttempts[ip] && loginAttempts[ip] > 5) {
+            return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
         }
 
-        if (user && await auth.validatePassword(password, user.salt, user.hash)) {
-            console.log(`[Web] Login realizado com sucesso: ${username} (IP: ${ip})`);
-            const token = auth.createSession(username, user.role);
-            delete loginAttempts[ip];
-            auth.setSessionCookie(res, token);
-            return sendJson(res, 200, { ok: true });
-          }
+        const user = findUser(username);
+        const isPassValid = user ? await validatePassword(password, user.salt, user.hash) : false;
 
-        console.warn(`[Web] Tentativa de login falhou para: ${username} (IP: ${ip})`);
+        if (user && isPassValid && user.status === 'active') {
+          const token = createSession();
+          delete loginAttempts[ip];
+          setSessionCookie(res, token);
+          return sendJson(res, 200, { ok: true });
+        }
         loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
         return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
-      } catch (err) { return sendJson(res, 400, { ok: false, message: 'Erro ao processar login.' }); }
+      } catch (err) {
+        console.error(`[Web] Erro crítico ao processar requisição de login: ${err.message}`);
+        return sendJson(res, 400, { ok: false, message: 'Falha ao processar login.' });
+      }
     }
 
-    if (req.method === 'POST' && pathName === '/register') {
-      try {
-        const body = await parseRequestBody(req);
-        const { username, password } = body;
-        
-        const user = currentUsers[username];
-        if (!user) {
-          return sendJson(res, 404, { ok: false, message: 'Usuário não encontrado. Peça ao Admin para criar seu acesso.' });
-        }
-        if (user.status !== 'pending_password_creation') {
-          return sendJson(res, 400, { ok: false, message: 'Este usuário já possui uma senha definida.' });
-        }
-        
-        const salt = crypto.randomBytes(16).toString("hex");
-        const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
-
-        usersStore.updateUserPassword(username, salt, hash);
-        console.log(`[Web] Cadastro concluído para: ${username}`);
-        return sendJson(res, 200, { ok: true, message: 'Cadastro concluído com sucesso!' });
-      } catch (err) { console.error("[Web] Erro no cadastro:", err); return sendJson(res, 500, { ok: false, message: 'Erro ao processar cadastro.' }); }
-    }
-
-    if (!auth.isAuthenticated(req) && pathName !== '/login' && pathName !== '/register') {
-      if (req.method === 'GET') { res.writeHead(302, { Location: '/login' }); return res.end(); }
-      return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
-    }
-
-    if (req.method === 'GET' && (pathName === '/' || pathName === '/whatsappcontrol')) return sendHtml(res, views.renderIndexHtml());
-
-    // Rota para definição de senha (acessível apenas com token temporário)
-    if (pathName === '/set-password') {
-      const session = auth.getSession(req);
-      if (!session || session.status !== 'pending_password_setup') {
+    if (path !== '/login' && !isAuthenticated(req)) {
+      if (req.method === 'GET') {
         res.writeHead(302, { Location: '/login' });
         return res.end();
       }
-
-      if (req.method === 'GET') return sendHtml(res, views.renderSetPasswordHtml(session.username));
-
-      if (req.method === 'POST') {
-        try {
-          const body = await parseRequestBody(req);
-          const { username, password } = body;
-          if (username !== session.username) return sendJson(res, 403, { ok: false });
-          if (!password || password.length < 6) return sendJson(res, 400, { ok: false, message: 'Senha deve ter no mínimo 6 caracteres.' });
-
-          const salt = crypto.randomBytes(16).toString("hex");
-          const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
-          
-          usersStore.updateUserPassword(username, salt, hash);
-          console.log(`[Web] Senha definida com sucesso para o usuário: ${username}`);
-
-          // Promove a sessão de temporária para ativa
-          auth.clearSessionCookie(res, session.id);
-          const newToken = auth.createSession(username, session.role);
-          auth.setSessionCookie(res, newToken);
-          
-          return sendJson(res, 200, { ok: true, message: 'Senha configurada!' });
-        } catch (err) {
-          console.error("[Web] Erro ao processar nova senha:", err);
-          return sendJson(res, 500, { ok: false });
-        }
-      }
+      return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
     }
 
-    if (pathName.startsWith('/api/admin')) {
-      if (!auth.isAdmin(req)) return sendJson(res, 403, { ok: false, message: 'Acesso negado.' });
-      if (req.method === 'GET' && (pathName === '/api/admin/users' || pathName === '/api/admin/users/')) return sendJson(res, 200, { ok: true, users: Object.values(currentUsers) });
-      
-      if (req.method === 'POST' && pathName === '/api/admin/users') {
-        try {
-          const body = await parseRequestBody(req);
-          const username = body.username?.trim();
-          const role = body.role?.trim();
-
-          if (!username || !role) {
-            return sendJson(res, 400, { ok: false, message: 'Dados incompletos.' });
-          }
-          if (username.length < 3) {
-            return sendJson(res, 400, { ok: false, message: 'Usuário (min 3) muito curto.' });
-          }
-          if (currentUsers[username]) return sendJson(res, 400, { ok: false, message: 'Já existe.' });
-
-          usersStore.saveUser({ username, role, createdAt: new Date().toISOString(), status: 'pending_password_creation' });
-          console.log(`[Admin] Usuário '${username}' criado (aguardando senha) por '${auth.getSession(req).username}'`);
-          return sendJson(res, 201, { ok: true, message: 'Usuário adicionado! Ele criará a senha no primeiro login.' });
-        } catch (err) { console.error("[Web] Erro ao adicionar usuário:", err); return sendJson(res, 500, { ok: false, message: 'Erro ao adicionar usuário.' }); }
-      }
-      
-      if (req.method === 'DELETE' && pathName.startsWith('/api/admin/users/')) {
-        const usernameToDelete = pathName.split('/').pop();
-        if (currentUsers[usernameToDelete]?.role !== 'admin') {
-          usersStore.deleteUser(usernameToDelete);
-          console.log(`[Admin] Usuário '${usernameToDelete}' excluído por '${auth.getSession(req).username}'`);
-          return sendJson(res, 200, { ok: true, message: `Usuário '${usernameToDelete}' excluído.` });
-        }
-        return sendJson(res, 403, { ok: false, message: `Não é possível excluir o usuário '${usernameToDelete}'.` });
-      }
+    if (req.method === 'GET' && path === '/') {
+      res.writeHead(302, { Location: '/whatsappcontrol' });
+      return res.end();
     }
 
-    if (req.method === 'GET' && pathName === '/status') return sendJson(res, 200, getStatus());
-    
-    if (req.method === 'GET' && pathName === '/api/logs') {
-      const session = auth.getSession(req);
-      if (!session || !auth.isAdmin(req)) {
-        console.warn(`[Web] Tentativa de acesso a logs por não-admin ou não autenticado (User: ${session?.username || 'N/A'}, IP: ${getClientIp(req)})`);
-        return sendJson(res, 403, { ok: false, message: 'Acesso negado. Apenas administradores podem ver os logs.' });
-      }
-      const logFilePath = path.join(process.cwd(), "combined.log");
-      try {
-        if (!fs.existsSync(logFilePath)) {
-          console.warn(`[Web] Arquivo de log não encontrado em: ${logFilePath}`);
-          return sendJson(res, 200, { ok: true, logs: "Arquivo de log 'combined.log' não encontrado no servidor." });
-        }
-        const logContent = fs.readFileSync(logFilePath, 'utf8');
-        const lastLines = logContent.split('\n').slice(-50).join('\n');
-        return sendJson(res, 200, { ok: true, logs: lastLines });
-      } catch (e) {
-        console.error(`[Web] Erro ao ler arquivo de log para '${session.username}':`, e);
-        return sendJson(res, 200, { ok: true, logs: `Erro ao ler log: ${e.message}` });
-      }
+    if (req.method === 'GET' && path === '/whatsappcontrol') {
+      return sendHtml(res, renderIndexHtml());
     }
 
-    if (req.method === 'DELETE' && pathName === '/api/logs') {
-      const session = auth.getSession(req);
-      if (!session || !auth.isAdmin(req)) return sendJson(res, 403, { ok: false, message: 'Acesso negado.' });
-      const logFilePath = path.join(process.cwd(), "combined.log");
-      try {
-        fs.truncateSync(logFilePath, 0);
-        console.log(`[Web] Logs limpos por '${session.username}'`);
-        return sendJson(res, 200, { ok: true, message: 'Logs limpos com sucesso.' });
-      } catch (e) {
-        console.error(`[Web] Erro ao limpar arquivo de log:`, e);
-        return sendJson(res, 500, { ok: false, message: 'Erro ao limpar logs.' });
-      }
+    if (req.method === 'GET' && path === '/status') {
+      return sendJson(res, 200, getStatus());
     }
 
-    if (req.method === 'POST' && pathName === '/request-qr') {
+    if (req.method === 'POST' && path === '/request-qr') {
       const status = getStatus();
-      if (status.connected) return sendJson(res, 200, { ok: false, message: 'O bot já está conectado.' });
-      console.log(`[Web] Comando: Solicitar QR Code (por: ${auth.getSession(req).username})`);
+      if (status.connected) {
+        return sendJson(res, 200, { ok: false, message: 'O bot já está conectado. Desconecte antes de gerar um novo QR Code.' });
+      }
       await startClient();
-      return sendJson(res, 200, { ok: true, message: 'Solicitação de QR enviada.' });
-    }
-    if (req.method === 'POST' && pathName === '/cancel-qr') {
-      console.log(`[Web] Comando: Cancelar QR Code (por: ${auth.getSession(req).username})`);
-      await cancelQr();
-      return sendJson(res, 200, { ok: true, message: 'Solicitação de QR cancelada.' });
-    }
-    if (req.method === 'POST' && pathName === '/disconnect') {
-      console.log(`[Web] Comando: Desconectar WhatsApp (por: ${auth.getSession(req).username})`);
-      const result = await disconnectClient();
-      return sendJson(res, result.ok ? 200 : 500, result);
-    }
-    
-    if (req.method === 'GET' && pathName === '/api/user-info') {
-      const session = auth.getSession(req);
-      if (session) return sendJson(res, 200, { ok: true, user: { username: session.username, role: session.role } });
-      return sendJson(res, 401, { ok: false, message: 'Não autenticado.' }); // Adicionado mensagem para consistência
-    }
-
-    if (req.method === 'POST' && pathName === '/logout') {
-      const session = auth.getSession(req);
-      if (session) console.log(`[Web] Logout realizado: ${session.username} (ID da sessão: ${session.id})`);
-      auth.clearSessionCookie(res, session?.id);
       return sendJson(res, 200, { ok: true });
     }
 
-    return sendJson(res, 404, { ok: false, message: 'Rota não encontrada.' });
-  }).listen(3000, '0.0.0.0', () => console.log('✅ Web rodando em :3000'));
+    if (req.method === 'POST' && path === '/cancel-qr') {
+      await cancelQr();
+      return sendJson(res, 200, { ok: true });
+    }
+
+    if (req.method === 'POST' && path === '/disconnect') {
+      const result = await disconnectClient();
+      return sendJson(res, result.ok ? 200 : 500, result);
+    }
+
+    if (req.method === 'POST' && path === '/logout') {
+      const sessionId = getSessionId(req);
+      if (sessionId) {
+        delete sessions[sessionId];
+      }
+      clearSessionCookie(res);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
+  });
+
+  server.listen(3000, '0.0.0.0', () => {
+    console.log('✅ Site de controle rodando em http://0.0.0.0:3000');
+  });
 }
 
 module.exports = { startWebServer };
