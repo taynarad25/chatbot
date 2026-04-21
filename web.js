@@ -405,8 +405,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     res.end('Not found');
   });
 
-  server.listen(3000, () => {
-    console.log('✅ Site de controle rodando em http://localhost:3000');
+  server.listen(3000, '0.0.0.0', () => {
+    console.log('✅ Site de controle rodando em http://0.0.0.0:3000');
   });
 }
 

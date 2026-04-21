@@ -672,9 +672,9 @@ async function startClient() {
   // Força o encerramento de processos zumbis do Chromium antes de iniciar
   try {
     console.log("[Browser] Limpando processos antigos do Chromium...");
-    execSync("pkill -9 -f chromium || true");
+    execSync("pkill -9 -f chromium", { stdio: 'ignore' });
   } catch (e) {
-    // Ignora erros se não houver processos para matar
+    // Silencia o erro se o pkill não encontrar nada
   }
 
   // Remove o arquivo SingletonLock do Chromium se ele existir. 
@@ -711,6 +711,7 @@ async function startClient() {
   pendingQr = null;
   criarClient();
   try {
+    console.log("[WhatsApp] Tentando inicializar o cliente Puppeteer...");
     await client.initialize();
     return;
   } catch (err) {
