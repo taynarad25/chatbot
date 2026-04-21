@@ -733,8 +733,10 @@ async function startClient() {
   try {
     console.log("[WhatsApp] Tentando inicializar o cliente Puppeteer...");
     await client.initialize();
+    console.timeEnd("client_init");
     return;
   } catch (err) {
+    console.timeEnd("client_init");
     const message = err?.message || "";
     if (message.includes("already running") || message.includes("Use a different `userDataDir`") || message.includes("already in use") || message.includes("Code: 21")) {
       console.warn("⚠️ Sessão do Chrome bloqueada. O PM2 reiniciará o processo para tentar liberar o lock.");
@@ -743,6 +745,7 @@ async function startClient() {
       } catch (destroyErr) {
         console.warn("❌ Falha ao destruir o cliente antigo:", destroyErr?.message || destroyErr);
       }
+      isInitializing = false;
       process.exit(1); // Força o PM2 a reiniciar o bot do zero
     } else {
       console.error("❌ Erro ao iniciar o WhatsApp:", err);
