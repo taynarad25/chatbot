@@ -584,8 +584,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendHtml(res, renderLoginHtml());
     }
 
-    const users = loadUsers();
-    const hasAdminUser = Object.values(users).some(user => user.role === 'admin');
+    // Carregamos os dados de usuários e verificamos se existe admin para cada requisição
+    const currentUsers = loadUsers();
+    const hasAdminUser = Object.values(currentUsers).some(user => user.role === 'admin');
 
     if (req.method === 'GET' && pathName === '/register') {
       if (hasAdminUser) {
@@ -606,8 +607,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
             return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
         }
 
-        const users = loadUsers();
-        const user = users[username];
+        const user = currentUsers[username];
 
         if (user && await validatePassword(password, user.salt, user.hash)) {
           const token = createSession(username, user.role);
@@ -637,7 +637,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           return sendJson(res, 400, { ok: false, message: 'Usuário (min 3) ou senha (min 6) muito curtos.' });
         }
 
-        if (users[username]) {
+        if (currentUsers[username]) {
           return sendJson(res, 400, { ok: false, message: 'Este usuário já existe.' });
         }
 
@@ -660,7 +660,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       }
     }
 
-    if (!isAuthenticated(req) && path !== '/login' && path !== '/register') {
+    if (!isAuthenticated(req) && pathName !== '/login' && pathName !== '/register') {
       if (req.method === 'GET') {
         res.writeHead(302, { Location: '/login' });
         return res.end();
@@ -668,27 +668,27 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
     }
 
-    if (req.method === 'GET' && path === '/') {
+    if (req.method === 'GET' && pathName === '/') {
       res.writeHead(302, { Location: '/whatsappcontrol' });
       return res.end();
     }
 
-    if (req.method === 'GET' && path === '/whatsappcontrol') {
+    if (req.method === 'GET' && pathName === '/whatsappcontrol') {
       return sendHtml(res, renderIndexHtml());
     }
 
     // Rotas de administração (apenas para admin)
-    if (path.startsWith('/admin')) {
+    if (pathName.startsWith('/admin')) {
       if (!isAdmin(req)) {
         return sendJson(res, 403, { ok: false, message: 'Acesso negado. Apenas administradores podem acessar esta área.' });
       }
-      if (req.method === 'GET' && path === '/admin') {
+      if (req.method === 'GET' && pathName === '/admin') {
         return sendHtml(res, renderAdminPanelHtml(Object.values(loadUsers())));
       }
-      if (req.method === 'GET' && path === '/api/admin/users') {
+      if (req.method === 'GET' && pathName === '/api/admin/users') {
         return sendJson(res, 200, { ok: true, users: Object.values(loadUsers()) });
       }
-      if (req.method === 'POST' && path === '/api/admin/users') {
+      if (req.method === 'POST' && pathName === '/api/admin/users') {
         try {
           const body = await parseRequestBody(req);
           const username = body.username?.trim();
