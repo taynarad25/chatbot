@@ -19,12 +19,16 @@ jobs:
       - name: Executar Deploy via SSH
         run: |
           mkdir -p ~/.ssh
-          # Usando printf para evitar quebras de linha estranhas na chave
-          printf "%s" "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # Comando direto atravessando o túnel com os Service Tokens
-          ssh -o StrictHostKeyChecking=no \
+          # Tenta rodar apenas o comando do túnel com verbose para ver o erro real da Cloudflare
+          cloudflared access ssh --hostname ssh.secretariacasaforte.com.br \
+            --service-token-id "${{ secrets.CF_CLIENT_ID }}" \
+            --service-token-secret "${{ secrets.CF_CLIENT_SECRET }}" --raw & sleep 5
+          
+          # Se o comando acima falhar, o log vai mostrar por que a porta 65535 fechou
+          ssh -o StrictHostKeyChecking=no -vvv \
               -o ProxyCommand="cloudflared access ssh --hostname ssh.secretariacasaforte.com.br --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }} --raw" \
               tayadm@ssh.secretariacasaforte.com.br \
               "cd /home/tayadm/github/chatbot && git pull origin main && docker compose up -d --build"
