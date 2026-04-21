@@ -63,8 +63,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     const hasAdminUser = Object.values(currentUsers).some(u => u.role === 'admin');
 
     if (req.method === 'GET' && pathName === '/register') {
-      // Self-registration is disabled if an admin user already exists
-      return hasAdminUser ? sendHtml(res, views.renderRegisterHtml("Desativado.")) : sendHtml(res, views.renderRegisterHtml());
+      // O registro agora está sempre aberto para quem foi convidado pelo Admin
+      return sendHtml(res, views.renderRegisterHtml());
     }
 
     if (req.method === 'POST' && pathName === '/login') {
@@ -77,20 +77,17 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
         const user = currentUsers[username];
 
-        if (user) {
-          if (user.status === 'pending_password_creation') {
-            // For users created by admin, redirect to set password page
-            const tempToken = auth.createSession(username, user.role, 'pending_password_setup'); // Create a temporary session
-            auth.setSessionCookie(res, tempToken);
-            return sendJson(res, 200, { ok: true, redirect: '/set-password' });
-          } else if (await auth.validatePassword(password, user.salt, user.hash)) {
+        if (user && user.status === 'pending_password_creation') {
+           return sendJson(res, 401, { ok: false, message: 'Conclua o cadastro primeiro.' });
+        }
+
+        if (user && await auth.validatePassword(password, user.salt, user.hash)) {
             console.log(`[Web] Login realizado com sucesso: ${username} (IP: ${ip})`);
             const token = auth.createSession(username, user.role);
             delete loginAttempts[ip];
             auth.setSessionCookie(res, token);
             return sendJson(res, 200, { ok: true });
           }
-        }
 
         console.warn(`[Web] Tentativa de login falhou para: ${username} (IP: ${ip})`);
         loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
@@ -99,21 +96,24 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     }
 
     if (req.method === 'POST' && pathName === '/register') {
-      if (hasAdminUser) return sendJson(res, 403, { ok: false, message: 'Cadastro desativado.' });
       try {
         const body = await parseRequestBody(req);
         const { username, password } = body;
-        if (!username || !password || username.length < 3 || password.length < 6) {
-          return sendJson(res, 400, { ok: false, message: 'Usuário (min 3) ou senha (min 6) muito curtos.' });
+        
+        const user = currentUsers[username];
+        if (!user) {
+          return sendJson(res, 404, { ok: false, message: 'Usuário não encontrado. Peça ao Admin para criar seu acesso.' });
         }
-        if (currentUsers[username]) return sendJson(res, 400, { ok: false, message: 'Já existe.' });
+        if (user.status !== 'pending_password_creation') {
+          return sendJson(res, 400, { ok: false, message: 'Este usuário já possui uma senha definida.' });
+        }
         
         const salt = crypto.randomBytes(16).toString("hex");
         const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
 
-        usersStore.saveUser({ username, salt, hash, role: 'user', createdAt: new Date().toISOString(), status: 'active' });
-        console.log(`[Web] Novo registro de usuário: ${username}`);
-        return sendJson(res, 201, { ok: true, message: 'Usuário cadastrado com sucesso.' });
+        usersStore.updateUserPassword(username, salt, hash);
+        console.log(`[Web] Cadastro concluído para: ${username}`);
+        return sendJson(res, 200, { ok: true, message: 'Cadastro concluído com sucesso!' });
       } catch (err) { console.error("[Web] Erro no cadastro:", err); return sendJson(res, 500, { ok: false, message: 'Erro ao processar cadastro.' }); }
     }
 

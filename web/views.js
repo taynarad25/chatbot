@@ -63,7 +63,7 @@ function renderRegisterHtml(message = "") {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cadastro - Controle WhatsApp</title>
+  <title>Concluir Cadastro - Controle WhatsApp</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
@@ -76,12 +76,13 @@ function renderRegisterHtml(message = "") {
 </head>
 <body>
   <div class="container">
-    <h1>Novo Perfil</h1>
-    <div id="regError" class="error">${message}</div>
+    <h1>Concluir Cadastro</h1>
+    <div id="regMessage" class="info">${message || 'Defina sua senha para acessar o painel.'}</div>
     <form id="regForm">
-      <input name="username" placeholder="Usuário" required />
-      <input name="password" type="password" placeholder="Senha" required />
-      <button type="submit">Criar Conta</button>
+      <input name="username" placeholder="Seu usuário (conforme criado pelo Admin)" required />
+      <input name="password" type="password" placeholder="Nova Senha" required minlength="6" />
+      <input name="confirmPassword" type="password" placeholder="Confirmar Senha" required minlength="6" />
+      <button type="submit">Definir Senha e Entrar</button>
       <div style="margin-top:1rem; text-align:center;"><a href="/login">Voltar ao login</a></div>
     </form>
   </div>
@@ -89,23 +90,31 @@ function renderRegisterHtml(message = "") {
     document.getElementById('regForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      const msgEl = document.getElementById('regMessage');
+
+      if (data.password !== data.confirmPassword) {
+        msgEl.textContent = 'As senhas não coincidem.';
+        msgEl.className = 'error';
+        return;
+      }
+
       const res = await fetch('/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.fromEntries(formData)),
+        body: JSON.stringify(data),
       });
       const json = await res.json();
-      const regErrorEl = document.getElementById('regError');
       if (res.ok) {
         console.log('Conta criada com sucesso.');
-        regErrorEl.textContent = json.message || 'Conta criada com sucesso! Redirecionando para o login...';
-        regErrorEl.className = 'success';
+        msgEl.textContent = json.message || 'Senha definida! Redirecionando...';
+        msgEl.className = 'success';
         setTimeout(() => window.location.href = '/login?message=Conta criada com sucesso!', 2000);
       }
       else {
-        const json = await res.json();
         console.error('Erro no cadastro:', json.message);
-        document.getElementById('regError').textContent = json.message;
+        msgEl.textContent = json.message;
+        msgEl.className = 'error';
       }
     });
   </script>
