@@ -30,7 +30,7 @@ jobs:
               User tayadm
               IdentityFile ~/.ssh/id_rsa
               StrictHostKeyChecking no
-              ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}
+              ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }} --raw
           EOF
 
           # 3. Executar o comando usando o alias configurado
