@@ -15,8 +15,6 @@ jobs:
           username: taynara
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /home/taynara/chatbot
+            cd /home/tayadm/github/chatbot
             git pull origin main
-            npm install --production
-            # O PM2 reiniciará sozinho pelo 'watch' configurado no ecosystem
-            pm2 save
+            docker-compose up -d --build
