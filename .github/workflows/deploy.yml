@@ -18,6 +18,9 @@ jobs:
 
       - name: Executar Deploy via SSH
         run: |
+          # Verifica se o cloudflared está funcional
+          cloudflared --version
+          
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
@@ -30,7 +33,7 @@ jobs:
               StrictHostKeyChecking no
               BatchMode yes
               ConnectTimeout 60
-              ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }} --raw
+              ProxyCommand cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }} --raw
           EOF
 
           # Executando o comando direto para evitar erro de sessão
