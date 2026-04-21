@@ -13,7 +13,6 @@ const { execSync } = require('child_process');
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const moment = require("moment-timezone");
 const { google } = require("googleapis");
-const { startWebServer } = require("./web");
 
 // =====================================
 // CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
@@ -28,7 +27,7 @@ const logFile = path.join(__dirname, 'combined.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
 const logger = (originalFn, ...args) => {
-  const msg = util.format(getTimestamp(), ...args);
+  const msg = `${getTimestamp()} ${util.format(...args)}`;
   originalFn(msg); // Envia para o stdout/stderr (importante para o comando 'docker logs')
   logStream.write(msg + '\n'); // Salva no arquivo físico
 };
@@ -36,6 +35,9 @@ const logger = (originalFn, ...args) => {
 console.log = (...args) => logger(originalLog, ...args);
 console.error = (...args) => logger(originalError, ...args);
 console.warn = (...args) => logger(originalWarn, ...args);
+
+// Importamos o web.js APÓS configurar o logger global para capturar seus logs iniciais
+const { startWebServer } = require("./web");
 
 // Configurações sensíveis via Variáveis de Ambiente
 const calendarId = process.env.GOOGLE_CALENDAR_ID; 
