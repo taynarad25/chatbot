@@ -218,20 +218,6 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       }
     }
 
-    if (req.method === 'DELETE' && pathName === '/api/logs') {
-      const session = auth.getSession(req);
-      if (!session || !auth.isAdmin(req)) return sendJson(res, 403, { ok: false, message: 'Acesso negado.' });
-      const logFilePath = path.join(process.cwd(), "combined.log");
-      try {
-        fs.truncateSync(logFilePath, 0);
-        console.log(`[Web] Logs limpos por '${session.username}'`);
-        return sendJson(res, 200, { ok: true, message: 'Logs limpos com sucesso.' });
-      } catch (e) {
-        console.error(`[Web] Erro ao limpar arquivo de log:`, e);
-        return sendJson(res, 500, { ok: false, message: 'Erro ao limpar logs.' });
-      }
-    }
-
     if (req.method === 'POST' && pathName === '/request-qr') {
       const status = getStatus();
       if (status.connected) return sendJson(res, 200, { ok: false, message: 'O bot já está conectado.' });
@@ -247,7 +233,6 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     if (req.method === 'POST' && pathName === '/disconnect') {
       console.log(`[Web] Comando: Desconectar WhatsApp (por: ${auth.getSession(req).username})`);
       const result = await disconnectClient();
-      return sendJson(res, result.ok ? 200 : 500, result);
     }
     
     if (req.method === 'GET' && pathName === '/api/user-info') {
