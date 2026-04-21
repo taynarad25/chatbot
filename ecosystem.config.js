@@ -4,6 +4,9 @@ module.exports = {
     script: "./chatbot.js",
     // Monitora mudanças nos arquivos de código para reiniciar automaticamente
     watch: ["chatbot.js", "web.js", ".env"],
+    error_file: "./combined.log",
+    out_file: "./combined.log",
+    merge_logs: true,
     // IGNORAR pastas que mudam constantemente para evitar loops de restart
     ignore_watch: [
       "node_modules",
@@ -14,8 +17,6 @@ module.exports = {
     ],
     max_restarts: 10,
     restart_delay: 5000, // Aguarda 5 segundos antes de tentar reiniciar após um erro
-    out_file: "./combined.log",
-    error_file: "./combined.log",
     log_date_format: "DD-MM-YYYY HH:mm:ss",
     env: {
       NODE_ENV: "production",

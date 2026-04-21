@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const qrcodeTerminal = require("qrcode-terminal");
 const qrcode = require("qrcode");
+const util = require('util');
 const { execSync } = require('child_process');
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const moment = require("moment-timezone");
@@ -22,9 +23,19 @@ const originalLog = console.log;
 const originalError = console.error;
 const originalWarn = console.warn;
 
-console.log = (...args) => originalLog(getTimestamp(), ...args);
-console.error = (...args) => originalError(getTimestamp(), ...args);
-console.warn = (...args) => originalWarn(getTimestamp(), ...args);
+// Configura a escrita manual em arquivo para substituir a funcionalidade do PM2
+const logFile = path.join(__dirname, 'combined.log');
+const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
+const logger = (originalFn, ...args) => {
+  const msg = util.format(getTimestamp(), ...args);
+  originalFn(msg); // Envia para o stdout/stderr (importante para o comando 'docker logs')
+  logStream.write(msg + '\n'); // Salva no arquivo físico
+};
+
+console.log = (...args) => logger(originalLog, ...args);
+console.error = (...args) => logger(originalError, ...args);
+console.warn = (...args) => logger(originalWarn, ...args);
 
 // Configurações sensíveis via Variáveis de Ambiente
 const calendarId = process.env.GOOGLE_CALENDAR_ID; 
