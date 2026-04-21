@@ -124,6 +124,42 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
     if (req.method === 'GET' && (pathName === '/' || pathName === '/whatsappcontrol')) return sendHtml(res, views.renderIndexHtml());
 
+    // Rota para definição de senha (acessível apenas com token temporário)
+    if (pathName === '/set-password') {
+      const session = auth.getSession(req);
+      if (!session || session.status !== 'pending_password_setup') {
+        res.writeHead(302, { Location: '/login' });
+        return res.end();
+      }
+
+      if (req.method === 'GET') return sendHtml(res, views.renderSetPasswordHtml(session.username));
+
+      if (req.method === 'POST') {
+        try {
+          const body = await parseRequestBody(req);
+          const { username, password } = body;
+          if (username !== session.username) return sendJson(res, 403, { ok: false });
+          if (!password || password.length < 6) return sendJson(res, 400, { ok: false, message: 'Senha deve ter no mínimo 6 caracteres.' });
+
+          const salt = crypto.randomBytes(16).toString("hex");
+          const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
+          
+          usersStore.updateUserPassword(username, salt, hash);
+          console.log(`[Web] Senha definida com sucesso para o usuário: ${username}`);
+
+          // Promove a sessão de temporária para ativa
+          auth.clearSessionCookie(res, session.id);
+          const newToken = auth.createSession(username, session.role);
+          auth.setSessionCookie(res, newToken);
+          
+          return sendJson(res, 200, { ok: true, message: 'Senha configurada!' });
+        } catch (err) {
+          console.error("[Web] Erro ao processar nova senha:", err);
+          return sendJson(res, 500, { ok: false });
+        }
+      }
+    }
+
     if (pathName.startsWith('/api/admin')) {
       if (!auth.isAdmin(req)) return sendJson(res, 403, { ok: false, message: 'Acesso negado.' });
       if (req.method === 'GET' && (pathName === '/api/admin/users' || pathName === '/api/admin/users/')) return sendJson(res, 200, { ok: true, users: Object.values(currentUsers) });
@@ -132,22 +168,19 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         try {
           const body = await parseRequestBody(req);
           const username = body.username?.trim();
-          const password = body.password?.trim();
           const role = body.role?.trim();
 
-          if (!username || !password || !role) {
+          if (!username || !role) {
             return sendJson(res, 400, { ok: false, message: 'Dados incompletos.' });
           }
-          if (username.length < 3 || password.length < 6) {
-            return sendJson(res, 400, { ok: false, message: 'Usuário (min 3) ou senha (min 6) muito curtos.' });
+          if (username.length < 3) {
+            return sendJson(res, 400, { ok: false, message: 'Usuário (min 3) muito curto.' });
           }
           if (currentUsers[username]) return sendJson(res, 400, { ok: false, message: 'Já existe.' });
 
-          const salt = crypto.randomBytes(16).toString("hex");
-          const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
-          usersStore.saveUser({ username, salt, hash, role, createdAt: new Date().toISOString() });
-          console.log(`[Admin] Usuário '${username}' criado por '${auth.getSession(req).username}'`);
-          return sendJson(res, 201, { ok: true, message: 'Usuário adicionado com sucesso.' });
+          usersStore.saveUser({ username, role, createdAt: new Date().toISOString(), status: 'pending_password_creation' });
+          console.log(`[Admin] Usuário '${username}' criado (aguardando senha) por '${auth.getSession(req).username}'`);
+          return sendJson(res, 201, { ok: true, message: 'Usuário adicionado! Ele criará a senha no primeiro login.' });
         } catch (err) { console.error("[Web] Erro ao adicionar usuário:", err); return sendJson(res, 500, { ok: false, message: 'Erro ao adicionar usuário.' }); }
       }
       
@@ -171,7 +204,6 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         return sendJson(res, 403, { ok: false, message: 'Acesso negado. Apenas administradores podem ver os logs.' });
       }
       const logFilePath = path.join(process.cwd(), "combined.log");
-      console.log(`[Web] Admin '${session.username}' solicitou logs. Tentando ler de: ${logFilePath}`);
       try {
         if (!fs.existsSync(logFilePath)) {
           console.warn(`[Web] Arquivo de log não encontrado em: ${logFilePath}`);
@@ -179,7 +211,6 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         }
         const logContent = fs.readFileSync(logFilePath, 'utf8');
         const lastLines = logContent.split('\n').slice(-50).join('\n');
-        console.log(`[Web] Logs lidos com sucesso para '${session.username}'. ${lastLines.length} caracteres enviados.`);
         return sendJson(res, 200, { ok: true, logs: lastLines });
       } catch (e) {
         console.error(`[Web] Erro ao ler arquivo de log para '${session.username}':`, e);

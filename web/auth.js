@@ -41,7 +41,8 @@ function getSession(req) {
 }
 
 function isAuthenticated(req) {
-  return !!getSession(req);
+  const session = getSession(req);
+  return session && session.status === 'active';
 }
 
 function isAdmin(req) {
