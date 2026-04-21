@@ -7,9 +7,6 @@ const { promisify } = require("util");
 
 const pbkdf2 = promisify(crypto.pbkdf2);
 
-const LOGIN_USERNAME = process.env.WHATSAPP_CONTROL_USER?.trim();
-const PASSWORD_SALT = process.env.WHATSAPP_CONTROL_SALT?.trim();
-const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH?.trim();
 const COOKIE_NAME = "whatsapp_control_session";
 const SESSION_TTL = 1000 * 60 * 15;
 const sessions = {};
@@ -18,8 +15,8 @@ const loginAttempts = {}; // Simples rate limiting em memória
 const USERS_FILE = path.join(__dirname, 'login.json');
 
 function getUsers() {
-  if (!fs.existsSync(USERS_FILE)) return null;
   try {
+    if (!fs.existsSync(USERS_FILE)) return [];
     return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
   } catch (err) {
     console.error("[Web] Erro ao ler login.json:", err.message);
@@ -43,7 +40,7 @@ function findUser(username) {
 }
 
 async function addUser({ username, password, role = 'user', status = 'active' }) {
-  const users = getUsers() || [];
+  const users = getUsers();
   if (users.find(u => u.username === username)) return { ok: false, message: "Usuário já existe" };
   
   const salt = crypto.randomBytes(16).toString("hex");
@@ -54,8 +51,8 @@ async function addUser({ username, password, role = 'user', status = 'active' })
     username,
     salt,
     hash,
-    role,
     status,
+    role,
     createdAt: now,
     updatedAt: now
   });
@@ -63,13 +60,8 @@ async function addUser({ username, password, role = 'user', status = 'active' })
   if (saveUsers(users)) {
     return { ok: true };
   } else {
-    return null;
+    return { ok: false, message: "Erro ao salvar arquivo" };
   }
-}
-
-// Log de diagnóstico na inicialização
-if (!LOGIN_USERNAME || !PASSWORD_SALT || !PASSWORD_HASH) {
-  console.error("[Web] ERRO: Variáveis de autenticação (USER, SALT ou HASH) não encontradas no .env!");
 }
 
 /**
@@ -464,4 +456,4 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
   });
 }
 
-module.exports = { startWebServer };
+module.exports = { startWebServer, addUser, getUsers };
