@@ -14,6 +14,18 @@ const moment = require("moment-timezone");
 const { google } = require("googleapis");
 const { startWebServer } = require("./web");
 
+// =====================================
+// CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
+// =====================================
+const getTimestamp = () => `[${moment().tz("America/Sao_Paulo").format("DD/MM/YYYY HH:mm:ss")}]`;
+const originalLog = console.log;
+const originalError = console.error;
+const originalWarn = console.warn;
+
+console.log = (...args) => originalLog(getTimestamp(), ...args);
+console.error = (...args) => originalError(getTimestamp(), ...args);
+console.warn = (...args) => originalWarn(getTimestamp(), ...args);
+
 // Configurações sensíveis via Variáveis de Ambiente
 const calendarId = process.env.GOOGLE_CALENDAR_ID; 
 const additionalCalendars = (process.env.GOOGLE_ADDITIONAL_CALENDARS || "")
