@@ -1,67 +1,43 @@
 const http = require("http");
-const fs = require("fs");
-const path = require("path");
 const { URL } = require("url");
-const crypto = require("crypto");
-const { promisify } = require("util");
+const { loadUsers, saveUser, initAdmin } = require("./web/users");
+const { validatePassword, createSession, isAuthenticated, setSessionCookie, clearSessionCookie, getSessionId, sessions } = require("./web/auth");
+const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 
-const pbkdf2 = promisify(crypto.pbkdf2);
-
-const COOKIE_NAME = "whatsapp_control_session";
-const SESSION_TTL = 1000 * 60 * 15;
-const sessions = {};
 const loginAttempts = {}; // Simples rate limiting em memória
 
-const USERS_FILE = path.join(__dirname, 'login.json');
-
-function getUsers() {
-  try {
-    if (!fs.existsSync(USERS_FILE)) return [];
-    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-  } catch (err) {
-    console.error("[Web] Erro ao ler login.json:", err.message);
-    return [];
-  }
-}
-
-function saveUsers(users) {
-  try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-    return true;
-  } catch (err) {
-    console.error("[Web] Erro ao salvar login.json:", err.message);
-    return false;
-  }
+// Inicializa o admin caso o arquivo não exista (opcional, conforme sua lógica de segurança)
+const LOGIN_USERNAME = process.env.WHATSAPP_CONTROL_USER;
+const PASSWORD_SALT = process.env.WHATSAPP_CONTROL_SALT;
+const PASSWORD_HASH = process.env.WHATSAPP_CONTROL_HASH;
+if (LOGIN_USERNAME && PASSWORD_SALT && PASSWORD_HASH) {
+  initAdmin(LOGIN_USERNAME, PASSWORD_SALT, PASSWORD_HASH);
 }
 
 function findUser(username) {
-  const users = getUsers();
-  return users ? users.find(u => u.username === username) : null;
+  const users = loadUsers();
+  return users[username] || null;
 }
 
 async function addUser({ username, password, role = 'user', status = 'active' }) {
-  const users = getUsers();
-  if (users.find(u => u.username === username)) return { ok: false, message: "Usuário já existe" };
+  const users = loadUsers();
+  if (users[username]) return { ok: false, message: "Usuário já existe" };
   
+  const crypto = require("crypto");
   const salt = crypto.randomBytes(16).toString("hex");
+  const pbkdf2 = require("util").promisify(crypto.pbkdf2);
   const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
-  const now = new Date().toISOString();
 
-  users.push({
+  saveUser({
     username,
     salt,
     hash,
     status,
     role,
-    createdAt: now,
-    updatedAt: now
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   });
-
-  if (saveUsers(users)) {
-    return { ok: true };
-  } else {
-    return { ok: false, message: "Erro ao salvar arquivo" };
-  }
+  return { ok: true };
 }
 
 /**
@@ -91,54 +67,6 @@ function sendHtml(res, html) {
   res.end(html);
 }
 
-async function validatePassword(password, salt, hash) {
-  try {
-    const derivedKey = await pbkdf2(password, salt, 100000, 64, "sha512");
-    return derivedKey.toString("hex") === hash;
-  } catch (err) {
-    return false;
-  }
-}
-
-function createSession() {
-  const token = crypto.randomBytes(32).toString("hex");
-  sessions[token] = { createdAt: Date.now() };
-  return token;
-}
-
-function getSessionId(req) {
-  const cookie = req.headers.cookie;
-  if (!cookie) return null;
-  const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  return match ? match[1] : null;
-}
-
-function isAuthenticated(req) {
-  const sessionId = getSessionId(req);
-  if (!sessionId) return false;
-  const session = sessions[sessionId];
-  if (!session) return false;
-
-  if (Date.now() - session.createdAt > SESSION_TTL) {
-    delete sessions[sessionId];
-    return false;
-  }
-  // Atualiza o timestamp da sessão para evitar logout por inatividade enquanto navega
-  session.createdAt = Date.now();
-  return true;
-}
-
-function setSessionCookie(res, token) {
-  const expires = new Date(Date.now() + SESSION_TTL).toUTCString();
-  // Adicionado SameSite=Strict e Secure (Nota: Secure exige HTTPS para funcionar no navegador)
-  // Como você está em HTTPS, a flag Secure é recomendada e deve ser única
-  res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Expires=${expires}; SameSite=Strict`);
-}
-
-function clearSessionCookie(res) {
-  res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
-}
-
 async function parseRequestBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -163,201 +91,6 @@ async function parseRequestBody(req) {
     });
     req.on("error", reject);
   });
-}
-
-function renderLoginHtml(message = "") {
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login - Controle WhatsApp</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
-    .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
-    input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
-    .password-wrapper { position: relative; }
-    .toggle-password {
-      position: absolute;
-      right: 12px;
-      top: 18px;
-      cursor: pointer;
-      user-select: none;
-      font-size: 1.2rem;
-    }
-    .error { color: #dc3545; margin-bottom: 1rem; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Login</h1>
-    <div id="loginError" class="error">${message ? message : ""}</div>
-    <form id="loginForm">
-      <input name="username" placeholder="Usuário" autocomplete="username" required />
-      <div class="password-wrapper">
-        <input id="password" name="password" type="password" placeholder="Senha" autocomplete="current-password" required />
-        <span id="togglePassword" class="toggle-password">👁️</span>
-      </div>
-      <button type="submit">Entrar</button>
-    </form>
-  </div>
-  <script>
-    const togglePassword = document.getElementById('togglePassword');
-    const passwordInput = document.getElementById('password');
-
-    togglePassword.addEventListener('click', () => {
-      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-      passwordInput.setAttribute('type', type);
-      togglePassword.textContent = type === 'password' ? '👀' : '🙈';
-    });
-
-    const errorEl = document.getElementById('loginError');
-    document.getElementById('loginForm').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      errorEl.textContent = '';
-      const formData = new FormData(event.target);
-      const body = JSON.stringify({ username: formData.get('username'), password: formData.get('password') });
-      const res = await fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      });
-      if (res.ok) {
-        window.location.href = '/whatsappcontrol';
-      } else {
-        const json = await res.json();
-        errorEl.textContent = json.message || 'Login falhou.';
-      }
-    });
-  </script>
-</body>
-</html>`;
-}
-
-function renderIndexHtml() {
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Controle WhatsApp</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
-    .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
-    button { margin: .4rem .2rem .4rem 0; padding: .8rem 1.1rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; }
-    button.primary { background: #007bff; color: white; }
-    button.danger { background: #dc3545; color: white; }
-    button.secondary { background: #6c757d; color: white; }
-    #qr img { max-width: 100%; height: auto; }
-    #status { margin-bottom: 1rem; }
-    .note { color: #555; font-size: .95rem; margin-top: .5rem; }
-    .up{position: relative; padding: 1rem;}
-    .up-child{position: absolute; top: 1rem; right: 1rem;}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="up">
-      <div class="up-child"><button class="secondary" id="logout">Logout</button></div>
-    </div>
-    <div class="topbar"><h1>Controle do WhatsApp</h1></div>
-    <div id="status">Carregando status...</div>
-    <div id="actionMessage" style="margin-bottom: .8rem; color: #333;"></div>
-    <div id="qr"></div>
-    <div>
-      <button class="primary" id="requestQr">Solicitar QR Code</button>
-      <button class="secondary" id="cancelQr">Cancelar solicitação</button>
-      <button class="danger" id="disconnect">Desconectar WhatsApp</button>
-    </div>
-    <div class="note">Use este painel para gerencias os QR Codes e desconectar o chatbot.</div>
-  </div>
-  <script>
-    async function refresh() {
-      try {
-        const res = await fetch('/status');
-        
-        // Se o servidor retornar qualquer status diferente de 200 (Sucesso) ou redirecionar
-        if (res.status !== 200 || res.redirected || res.url.includes('/login')) {
-          window.location.href = '/login';
-          return;
-        }
-        const json = await res.json();
-
-      const statusEl = document.getElementById('status');
-      const qrEl = document.getElementById('qr');
-      const messageEl = document.getElementById('actionMessage');
-      const lines = [];
-      if (json.connected) {
-        lines.push('<strong>Status:</strong> Conectado ✅');
-      } else if (json.initializing || json.generatingQr) {
-        lines.push('<strong>Status:</strong> Inicializando... ⏳');
-      } else {
-        lines.push('<strong>Status:</strong> Desconectado');
-      }
-      if (json.hasQr) {
-        lines.push('<strong>QR disponível:</strong> Sim');
-      } else {
-        lines.push('<strong>QR disponível:</strong> Não');
-      }
-      if (json.qrCreatedAt) {
-        lines.push('<strong>Gerado em:</strong> ' + new Date(json.qrCreatedAt).toLocaleString());
-      }
-      statusEl.innerHTML = lines.join('<br>');
-      if (json.hasQr && json.qrDataUrl) {
-        qrEl.innerHTML = '<h2>QR Code</h2><img src="' + json.qrDataUrl + '" alt="QR Code" />';
-      } else if (!json.initializing) {
-        qrEl.innerHTML = '<p>Nenhum QR Code disponível no momento.</p>';
-      } else {
-        qrEl.innerHTML = '';
-      }
-      const cancelBtn = document.getElementById('cancelQr');
-      // Exibe o botão cancelar apenas se estiver em processo de inicialização e ainda não estiver conectado
-      const isGenerating = (json.initializing || json.generatingQr || json.hasQr) && !json.connected;
-      cancelBtn.disabled = !isGenerating;
-      cancelBtn.style.display = isGenerating ? 'inline-block' : 'none';
-      const disconnectBtn = document.getElementById('disconnect');
-      disconnectBtn.disabled = !json.connected;
-      disconnectBtn.style.display = json.connected ? 'inline-block' : 'none';
-      const requestBtn = document.getElementById('requestQr');
-      const hideRequest = json.connected || json.initializing || json.generatingQr || json.hasQr;
-      requestBtn.style.display = hideRequest ? 'none' : 'inline-block';
-      // Atualiza a mensagem apenas se o status trouxer uma nova informação (evita limpar o "Ok" das ações)
-      if (json.message) {
-        messageEl.textContent = json.message;
-      }
-      } catch (err) {
-        console.error('Falha ao conectar com o servidor:', err);
-        // Se o site cair (offline), redirecionamos para login para garantir o logout visual
-        // e forçar nova autenticação quando o serviço retornar.
-        window.location.href = '/login';
-      }
-    }
-
-    async function postAction(path) {
-      const res = await fetch(path, { method: 'POST' });
-      const json = await res.json();
-      const messageEl = document.getElementById('actionMessage');
-      await refresh();
-    }
-
-    document.getElementById('requestQr').addEventListener('click', () => postAction('/request-qr'));
-    document.getElementById('cancelQr').addEventListener('click', () => { console.log('Botão cancelar pressionado'); postAction('/cancel-qr'); });
-    document.getElementById('disconnect').addEventListener('click', () => {
-      if (confirm('Deseja realmente desconectar o WhatsApp?')) {
-        postAction('/disconnect');
-      }
-    });
-    document.getElementById('logout').addEventListener('click', async () => {
-      await fetch('/logout', { method: 'POST' });
-      window.location.href = '/login';
-    });
-
-    refresh();
-    setInterval(refresh, 5000);
-  </script>
-</body>
-</html>`;
 }
 
 function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
@@ -404,6 +137,20 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         return res.end();
       }
       return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
+    }
+
+    if (req.method === 'GET' && path === '/register') {
+      return sendHtml(res, renderRegisterHtml());
+    }
+
+    if (req.method === 'POST' && path === '/register') {
+      try {
+        const body = await parseRequestBody(req);
+        const result = await addUser(body);
+        return sendJson(res, result.ok ? 200 : 400, result);
+      } catch (err) {
+        return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+      }
     }
 
     if (req.method === 'GET' && path === '/') {

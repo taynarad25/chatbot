@@ -9,6 +9,8 @@ function renderLoginHtml(message = "") {
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
     button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
+    .password-wrapper { position: relative; }
+    .toggle-password { position: absolute; right: 12px; top: 18px; cursor: pointer; user-select: none; font-size: 1.2rem; }
     .error { color: #dc3545; margin-bottom: 1rem; }
     .info { color: #004085; background-color: #cce5ff; border-color: #b8daff; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
     .success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
@@ -22,12 +24,23 @@ function renderLoginHtml(message = "") {
     <div id="loginMessage" class="error">${message}</div>
     <form id="loginForm">
       <input name="username" placeholder="Usuário" required />
-      <input name="password" type="password" placeholder="Senha" required />
+      <div class="password-wrapper">
+        <input id="password" name="password" type="password" placeholder="Senha" required />
+        <span id="togglePassword" class="toggle-password">👀</span>
+      </div>
       <button type="submit">Entrar</button>
       <div class="links">Não tem conta? <a href="/register">Cadastre-se</a></div>
     </form>
   </div>
   <script>
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.type === 'password' ? 'text' : 'password';
+      passwordInput.type = type;
+      togglePassword.textContent = type === 'password' ? '👀' : '🙈';
+    });
+
     const urlParams = new URLSearchParams(window.location.search);
     const msg = urlParams.get('message');
     if (msg) {
@@ -69,6 +82,8 @@ function renderRegisterHtml(message = "") {
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
     button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #28a745; color: #fff; font-size: 1rem; cursor: pointer; }
+    .password-wrapper { position: relative; }
+    .toggle-password { position: absolute; right: 12px; top: 18px; cursor: pointer; user-select: none; font-size: 1.2rem; }
     .error { color: #dc3545; margin-bottom: 1rem; }
     .info { color: #004085; background-color: #cce5ff; border-color: #b8daff; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
     .success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
@@ -80,13 +95,24 @@ function renderRegisterHtml(message = "") {
     <div id="regMessage" class="info">${message || 'Defina sua senha para acessar o painel.'}</div>
     <form id="regForm">
       <input name="username" placeholder="Seu usuário (conforme criado pelo Admin)" required />
-      <input name="password" type="password" placeholder="Nova Senha" required minlength="6" />
+      <div class="password-wrapper">
+        <input id="password" name="password" type="password" placeholder="Nova Senha" required minlength="6" />
+        <span id="togglePassword" class="toggle-password">👀</span>
+      </div>
       <input name="confirmPassword" type="password" placeholder="Confirmar Senha" required minlength="6" />
       <button type="submit">Definir Senha e Entrar</button>
       <div style="margin-top:1rem; text-align:center;"><a href="/login">Voltar ao login</a></div>
     </form>
   </div>
   <script>
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.type === 'password' ? 'text' : 'password';
+      passwordInput.type = type;
+      togglePassword.textContent = type === 'password' ? '👀' : '🙈';
+    });
+
     document.getElementById('regForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
