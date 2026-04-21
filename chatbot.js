@@ -10,6 +10,7 @@ const qrcodeTerminal = require("qrcode-terminal");
 const qrcode = require("qrcode");
 const { execSync } = require('child_process');
 const { Client, LocalAuth } = require("whatsapp-web.js");
+const moment = require("moment-timezone");
 const { google } = require("googleapis");
 const { startWebServer } = require("./web");
 
@@ -52,6 +53,7 @@ async function buscarEventos(inicio, fim) {
         timeMax: fim,
         singleEvents: true,
         orderBy: "startTime",
+        maxResults: 2500,
       });
       if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
     } catch (e) {
@@ -530,44 +532,39 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             let encontrou = false;
 
             const agrupados = {};
-            const diasSemanaNomes = ["Domingos", "Segundas", "Terças", "Quartas", "Quintas", "Sextas", "Sábados"];
+            const diasSemanaNomes = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
-            // Agrupa os eventos por Nome, Horário e Dia da Semana
             todosEventos.forEach(ev => {
               const startStr = ev.start.dateTime || ev.start.date;
-              const d = new Date(startStr);
-              const weekday = d.getDay();
+              // Usa moment-timezone para evitar que eventos "pulem" de dia por causa do fuso horário
+              const d = moment.tz(startStr, "America/Sao_Paulo");
+              const weekday = d.day();
 
-              if (weekday !== 3 && weekday !== 4) {
-                const summary = ev.summary || "Evento sem título";
-                const horaFmt = ev.start.dateTime
-                  ? `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-                  : "";
-                const diaNum = d.getDate();
-                const dataFmt = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
+              const summary = ev.summary || "Evento sem título";
+              const horaFmt = ev.start.dateTime ? d.format("HH:mm") : "";
+              const diaNum = d.date();
+              const dataFmt = d.format("DD/MM");
 
-                const chave = `${summary}|${horaFmt}|${weekday}`;
-                if (!agrupados[chave]) {
-                  agrupados[chave] = { summary, horaFmt, weekday, datas: [], primeiroDia: diaNum };
-                }
-                agrupados[chave].datas.push(dataFmt);
+              const chave = `${summary}|${horaFmt}|${weekday}`;
+              if (!agrupados[chave]) {
+                agrupados[chave] = { summary, horaFmt, weekday, datas: [], primeiroDia: diaNum };
               }
+              agrupados[chave].datas.push(dataFmt);
             });
 
-            // Ordena os grupos pelo primeiro dia em que aparecem para manter a cronologia
             const listaOrdenada = Object.values(agrupados).sort((a, b) => a.primeiroDia - b.primeiroDia);
 
             listaOrdenada.forEach(grp => {
               const horaStr = grp.horaFmt ? ` às ${grp.horaFmt}` : "";
+              // Se o evento ocorre 3 ou mais vezes no mês, agrupa como "Todas as [Dia da Semana]"
               if (grp.datas.length >= 3) {
                 msgAgenda += `🗓️ *Todas as ${diasSemanaNomes[grp.weekday]}*${horaStr} | ${grp.summary}\n`;
-                encontrou = true;
               } else {
                 grp.datas.forEach(dt => {
                   msgAgenda += `📌 *${dt}*${horaStr} | ${grp.summary}\n`;
-                  encontrou = true;
                 });
               }
+              encontrou = true;
             });
 
             delete etapas[numero];
