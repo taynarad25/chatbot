@@ -20,7 +20,6 @@ function saveUser(user) {
   users[user.username] = user;
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
-    console.log(`[Users] Usuário '${user.username}' salvo com sucesso.`);
   } catch (err) {
     console.error("[Users] Erro ao gravar arquivo de usuários:", err);
   }

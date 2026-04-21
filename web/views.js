@@ -237,7 +237,10 @@ function renderIndexHtml() {
     </div>
 
     <div id="tab-logs" class="tab-content">
-      <h3>Logs</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+        <h3 style="margin:0;">Logs</h3>
+        <button class="danger" id="clearLogsBtn" style="padding: 5px 10px; font-size: 0.8rem; width: auto;">Limpar Logs</button>
+      </div>
       <pre id="logsContainer">Carregando logs...</pre>
     </div>
   </div>
@@ -363,6 +366,18 @@ function renderIndexHtml() {
     document.getElementById('logout').onclick = () => {
       console.log('Encerrando sessão...');
       fetch('/logout', {method:'POST'}).then(() => window.location.href='/login');
+    };
+
+    document.getElementById('clearLogsBtn').onclick = async () => {
+      if (!confirm('Tem certeza que deseja limpar todos os logs?')) return;
+      console.log('Solicitando limpeza de logs...');
+      const res = await fetch('/api/logs', { method: 'DELETE' });
+      if (res.ok) {
+        console.log('Logs limpos com sucesso.');
+        refresh();
+      } else {
+        console.error('Erro ao limpar logs.');
+      }
     };
 
     setInterval(refresh, 5000); refresh();
