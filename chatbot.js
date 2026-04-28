@@ -46,7 +46,7 @@ const additionalCalendars = (process.env.GOOGLE_ADDITIONAL_CALENDARS || "")
   .map(id => id.trim())
   .filter(Boolean);
 
-const agendasParaLer = [calendarId, ...additionalCalendars].filter(Boolean);
+const agendasParaLer = [...new Set([calendarId, ...additionalCalendars])].filter(Boolean);
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
 
 const lideres = (process.env.WHATSAPP_LIDERES || "")
@@ -207,7 +207,7 @@ function criarClient() {
 
       const saudacoes = ["oi", "ola", "olá", "paz", "bom dia", "boa tarde", "boa noite", "menu"];
       const ehSaudacao = saudacoes.some(s => texto.startsWith(s));
-      const opcoesValidas = isLider ? ["1", "2", "3", "4", "5", "6", "7"] : ["1", "2", "4", "5", "6"];
+      const opcoesValidas = isLider ? ["1", "2", "3", "4", "5", "6", "7"] : ["1", "2", "3", "4", "5"];
 
       // Atende saudações ou qualquer mensagem que não seja uma opção de menu válida (quando fora de um fluxo)
       if (ehSaudacao || (!etapas[numero] && !opcoesValidas.includes(texto))) {
@@ -220,10 +220,10 @@ Escolha uma opção:
 
 1️⃣ Horário dos cultos
 2️⃣ Ver agenda da igreja
-3️⃣ Agendar ou alterar evento (líderes)
-4️⃣ Atendimento pastoral
-5️⃣ Aulas de música
-6️⃣ Falar com a secretaria
+3️⃣ Atendimento pastoral
+4️⃣ Aulas de música
+5️⃣ Falar com a secretaria
+6️⃣ Agendar ou alterar evento (líderes)
 7️⃣ Comunicados e Avisos nos Cultos
 
 Digite *menu* a qualquer momento para voltar ao menu principal.`
@@ -234,9 +234,9 @@ Escolha uma opção:
 
 1️⃣ Horário dos cultos
 2️⃣ Ver agenda da igreja
-4️⃣ Atendimento pastoral
-5️⃣ Aulas de música
-6️⃣ Falar com a secretaria
+3️⃣ Atendimento pastoral
+4️⃣ Aulas de música
+5️⃣ Falar com a secretaria
 
 Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
@@ -541,12 +541,9 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           mesNome = meses[escolha - 1];
           const ano = hoje.getFullYear();
 
-          if (escolha === mesAtual) {
-            inicioBusca = new Date(ano, escolha - 1, hoje.getDate()).toISOString();
-          } else {
-            inicioBusca = new Date(ano, escolha - 1, 1).toISOString();
-          }
-          fimBusca = new Date(ano, escolha, 0, 23, 59, 59).toISOString();
+          // Define o início e fim do mês selecionado usando moment para garantir o fuso horário de SP (UTC-3)
+          inicioBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").startOf('month').toISOString();
+          fimBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").endOf('month').toISOString();
 
           console.log(`[Agenda] Buscando eventos para ${numero} em ${mesNome}`);
           await msg.reply(`🔍 Consultando eventos de ${mesNome}...`);
@@ -640,25 +637,19 @@ Digite *menu* para voltar ao menu principal.`;
       return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
     }
 
-    if (texto === "3" && isLider) {
-      console.log(`Opção 3 selecionada por ${numero}, iniciando agendamento`);
-      etapas[numero] = { fluxo: "agendamento", etapa: "evento_acao" };
-      return msg.reply("O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente");
-    }
-
-    if (texto === "4") {
-      console.log(`Opção 4 selecionada por ${numero}, iniciando atendimento pastoral`);
+    if (texto === "3") {
+      console.log(`Opção 3 selecionada por ${numero}, iniciando atendimento pastoral`);
       etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
       return msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?");
     }
 
-    if (texto === "5") {
-      console.log(`Opção 5 selecionada por ${numero}`);
+    if (texto === "4") {
+      console.log(`Opção 4 selecionada por ${numero}`);
       return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\n*Em breve abriremos novas inscrições!* Fique atento aos avisos.\n\nDigite *menu* para voltar ao menu principal.`);
     }
 
-    if (texto === "6") {
-      console.log(`Opção 6 selecionada por ${numero}`);
+    if (texto === "5") {
+      console.log(`Opção 5 selecionada por ${numero}`);
       // Notificar o grupo
       try {
         const chats = await client.getChats();
@@ -672,6 +663,12 @@ Digite *menu* para voltar ao menu principal.`;
         console.error("Erro ao notificar grupo sobre atendimento:", error);
       }
       return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
+    }
+
+    if (texto === "6" && isLider) {
+      console.log(`Opção 6 selecionada por ${numero}, iniciando agendamento`);
+      etapas[numero] = { fluxo: "agendamento", etapa: "evento_acao" };
+      return msg.reply("O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente");
     }
 
     if (texto === "7" && isLider) {
