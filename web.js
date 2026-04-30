@@ -1,9 +1,12 @@
 const http = require("http");
 const { URL } = require("url");
+const crypto = require("crypto");
+const { promisify } = require("util");
 const { loadUsers, saveUser, initAdmin } = require("./web/users");
 const { validatePassword, createSession, isAuthenticated, setSessionCookie, clearSessionCookie, getSessionId, sessions } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 
+const pbkdf2 = promisify(crypto.pbkdf2);
 const loginAttempts = {}; // Simples rate limiting em memória
 
 
@@ -16,9 +19,7 @@ async function addUser({ username, password, role = 'user', status = 'active' })
   const users = loadUsers();
   if (users[username]) return { ok: false, message: "Usuário já existe" };
   
-  const crypto = require("crypto");
   const salt = crypto.randomBytes(16).toString("hex");
-  const pbkdf2 = require("util").promisify(crypto.pbkdf2);
   const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
 
   saveUser({
@@ -37,7 +38,8 @@ async function addUser({ username, password, role = 'user', status = 'active' })
  * Obtém o IP real do cliente, considerando proxies/Docker
  */
 function getClientIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0].trim() || 
+  return req.headers['cf-connecting-ip'] ||
+         req.headers['x-forwarded-for']?.split(',')[0].trim() || 
          req.headers['x-real-ip'] || 
          req.socket.remoteAddress;
 }
@@ -89,11 +91,14 @@ async function parseRequestBody(req) {
 function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
   const server = http.createServer(async (req, res) => {
     try {
+      const ip = getClientIp(req);
+      
+      // Log imediato para confirmar que a requisição bateu no servidor Node
+      console.log(`[Web] INCOMING: ${req.method} ${req.url} | IP: ${ip} | UA: ${req.headers['user-agent']}`);
+
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const path = url.pathname;
-      const ip = getClientIp(req);
-      // Log de toda requisição recebida
-      console.log(`[Web] ${req.method} ${path} - IP: ${ip}`);
+
       if (req.method === 'GET' && path === '/login') {
         return sendHtml(res, renderLoginHtml());   
       }
@@ -103,15 +108,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           const username = body.username?.trim();
           const password = body.password?.trim();
 
-          if (loginAttempts[ip] && loginAttempts[ip] > 5) {
+          if (loginAttempts[ip] && loginAttempts[ip] > 10) {
+              console.warn(`[Web] Rate limit atingido para o IP: ${ip}`);
               return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
           }
 
           const user = findUser(username);
-          const isPassValid = user ? await validatePassword(password, user.salt, user.hash) : false;
-
-          if (user && isPassValid && (user.status === 'active' || user.status === undefined)) {
-            const token = createSession();
+          if (user && await validatePassword(password, user.salt, user.hash) && (user.status === 'active' || user.status === undefined)) {
+            const token = createSession(username, user.role, user.status);
             delete loginAttempts[ip];
             setSessionCookie(res, token);
             console.log(`[Web] Login bem-sucedido: ${username}`);
@@ -129,6 +133,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           res.writeHead(302, { Location: '/login' });
           return res.end();
         }
+        console.warn(`[Web] 401 Acesso negado para ${path} | IP: ${ip}`);
         return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
       }
       if (req.method === 'GET' && path === '/register') {
