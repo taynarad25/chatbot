@@ -25,7 +25,12 @@ function getSession(req) {
   const cookie = req.headers.cookie;
   if (!cookie) return null;
   
-  const cookies = Object.fromEntries(cookie.split(';').map(c => c.trim().split('=')));
+  const cookies = {};
+  cookie.split(';').forEach(c => {
+    const [key, ...value] = c.trim().split('=');
+    if (key) cookies[key] = value.join('=');
+  });
+
   const sessionId = cookies[COOKIE_NAME];
 
   if (!sessionId) return null;

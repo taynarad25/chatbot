@@ -2,8 +2,8 @@ const http = require("http");
 const { URL } = require("url");
 const crypto = require("crypto");
 const { promisify } = require("util");
-const { loadUsers, saveUser, initAdmin } = require("./web/users");
-const { validatePassword, createSession, isAuthenticated, setSessionCookie, clearSessionCookie, getSessionId, sessions } = require("./web/auth");
+const { loadUsers, saveUser, initAdmin } = require("./web/users"); // Nota: Certifique-se que loadUsers existe
+const { validatePassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 
 const pbkdf2 = promisify(crypto.pbkdf2);
@@ -91,13 +91,12 @@ async function parseRequestBody(req) {
 function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
   const server = http.createServer(async (req, res) => {
     try {
-      const ip = getClientIp(req);
-      
-      // Log imediato para confirmar que a requisição bateu no servidor Node
-      console.log(`[Web] INCOMING: ${req.method} ${req.url} | IP: ${ip} | UA: ${req.headers['user-agent']}`);
-
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const path = url.pathname;
+      const ip = getClientIp(req);
+      
+      // Log imediato e robusto
+      console.log(`[Web] ${req.method} ${path} | IP: ${ip}`);
 
       if (req.method === 'GET' && path === '/login') {
         return sendHtml(res, renderLoginHtml());   
@@ -118,7 +117,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
             const token = createSession(username, user.role, user.status);
             delete loginAttempts[ip];
             setSessionCookie(res, token);
-            console.log(`[Web] Login bem-sucedido: ${username}`);
+            console.log(`[Web] Login bem-sucedido: ${username} (IP: ${ip})`);
             return sendJson(res, 200, { ok: true });
           }
           loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
@@ -155,11 +154,52 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         return res.end();
       }
       if (req.method === 'GET' && path === '/whatsappcontrol') {
-        return sendHtml(res, renderIndexHtml());
+        try {
+          const html = renderIndexHtml();
+          return sendHtml(res, html);
+        } catch (renderErr) {
+          console.error(`[Web] Erro ao renderizar Index:`, renderErr);
+          throw renderErr; // Repassa para o catch global
+        }
       }
       if (req.method === 'GET' && path === '/status') {
         return sendJson(res, 200, getStatus());
       }
+
+      // API: Informações do Usuário Logado
+      if (req.method === 'GET' && path === '/api/user-info') {
+        const session = getSession(req);
+        return sendJson(res, 200, { ok: true, user: session });
+      }
+
+      // API: Listar Usuários (Apenas Admin)
+      if (req.method === 'GET' && path === '/api/admin/users' && isAdmin(req)) {
+        const users = loadUsers();
+        const userList = Object.values(users).map(u => ({ username: u.username, role: u.role }));
+        return sendJson(res, 200, { ok: true, users: userList });
+      }
+
+      // API: Ler Logs (Apenas Admin)
+      if (req.method === 'GET' && path === '/api/logs' && isAdmin(req)) {
+        const logPath = './combined.log';
+        try {
+          const content = require('fs').readFileSync(logPath, 'utf8');
+          return sendJson(res, 200, { ok: true, logs: content });
+        } catch (e) {
+          return sendJson(res, 500, { ok: false, message: 'Erro ao ler arquivo de log' });
+        }
+      }
+
+      // API: Limpar Logs (Apenas Admin)
+      if (req.method === 'DELETE' && path === '/api/logs' && isAdmin(req)) {
+        try {
+          require('fs').writeFileSync('./combined.log', '');
+          return sendJson(res, 200, { ok: true });
+        } catch (e) {
+          return sendJson(res, 500, { ok: false });
+        }
+      }
+
       if (req.method === 'POST' && path === '/request-qr') {
         const status = getStatus();
         if (status.connected) {

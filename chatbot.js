@@ -29,7 +29,8 @@ const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 const logger = (originalFn, ...args) => {
   const msg = `${getTimestamp()} ${util.format(...args)}`;
   originalFn(msg); // Envia para o stdout/stderr (importante para o comando 'docker logs')
-  logStream.write(msg + '\n'); // Salva no arquivo físico
+  // Força a escrita imediata para evitar perda de logs em caso de crash
+  logStream.write(msg + '\n', 'utf8'); 
 };
 
 console.log = (...args) => logger(originalLog, ...args);
@@ -43,6 +44,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (err) => {
   console.error('[Fatal] Exceção não capturada:', err);
+  console.error(err.stack);
   // Dá um tempo para o log gravar antes de sair
   setTimeout(() => process.exit(1), 500);
 });
