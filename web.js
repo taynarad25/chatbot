@@ -14,18 +14,20 @@ const loginAttempts = {}; // Simples rate limiting em memória
 
 function findUser(username) {
   const users = loadUsers();
-  return users[username] || null;
+  return users[username?.toLowerCase().trim()] || null;
 }
 
 async function addUser({ username, password, role = 'user', status = 'active' }) {
   const users = loadUsers();
-  if (users[username]) return { ok: false, message: "Usuário já existe" };
+  const normalizedUser = username?.toLowerCase().trim();
+  if (users[normalizedUser]) return { ok: false, message: "Usuário já existe" };
   
   const salt = crypto.randomBytes(16).toString("hex");
-  const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
+  // Garante que a senha seja tratada da mesma forma que no login
+  const hash = (await pbkdf2(password.trim(), salt, 100000, 64, "sha512")).toString("hex");
 
   saveUser({
-    username,
+    username: normalizedUser,
     salt,
     hash,
     status,

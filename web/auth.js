@@ -47,7 +47,8 @@ function getSession(req) {
 
 function isAuthenticated(req) {
   const session = getSession(req);
-  return session && session.status === 'active';
+  // Permite acesso se o status for 'active' ou se não estiver definido (caso de usuários legados/admin)
+  return session && (session.status === 'active' || session.status === undefined);
 }
 
 function isAdmin(req) {

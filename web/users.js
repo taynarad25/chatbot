@@ -27,18 +27,20 @@ function saveUser(user) {
 
 function updateUserPassword(username, salt, hash) {
   const users = loadUsers();
-  if (users[username]) {
-    users[username] = { ...users[username], salt, hash, status: 'active' };
+  const normalized = username?.toLowerCase().trim();
+  if (users[normalized]) {
+    users[normalized] = { ...users[normalized], salt, hash, status: 'active' };
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
-    console.log(`[Users] Senha atualizada para '${username}'.`);
+    console.log(`[Users] Senha atualizada para '${normalized}'.`);
   }
 }
 
 function deleteUser(username) {
   const users = loadUsers();
-  if (users[username]) delete users[username];
+  const normalized = username?.toLowerCase().trim();
+  if (users[normalized]) delete users[normalized];
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
-  console.log(`[Users] Usuário '${username}' removido.`);
+  console.log(`[Users] Usuário '${normalized}' removido.`);
 }
 
 function initAdmin(username, salt, hash) {
