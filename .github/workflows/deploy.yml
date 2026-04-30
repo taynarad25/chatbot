@@ -31,5 +31,5 @@ jobs:
                 -o ConnectTimeout=15 \
                 -o ProxyCommand="$CF_COMMAND" \
                 tayadm@ssh.secretariacasaforte.com.br \
-                "cd /home/tayadm/github/chatbot && git pull origin main && docker compose up -d --build" && break || (echo "Tentativa $i falhou, tentando novamente em 5s..." && sleep 5);
+                "cd /home/tayadm/github/chatbot && git pull origin main && docker compose build --no-cache && docker compose up -d"
           done
