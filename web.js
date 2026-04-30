@@ -90,6 +90,10 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const path = url.pathname;
+    const ip = getClientIp(req);
+
+    // Log de toda requisição recebida
+    console.log(`[Web] ${req.method} ${path} - IP: ${ip}`);
 
     if (req.method === 'GET' && path === '/login') {
       return sendHtml(res, renderLoginHtml());
@@ -110,10 +114,11 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         const user = findUser(username);
         const isPassValid = user ? await validatePassword(password, user.salt, user.hash) : false;
 
-        if (user && isPassValid && user.status === 'active') {
+        if (user && isPassValid && (user.status === 'active' || user.status === undefined)) {
           const token = createSession();
           delete loginAttempts[ip];
           setSessionCookie(res, token);
+          console.log(`[Web] Login bem-sucedido: ${username}`);
           return sendJson(res, 200, { ok: true });
         }
         loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
@@ -187,8 +192,15 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       return sendJson(res, 200, { ok: true });
     }
 
+    // Rota não encontrada
+    console.warn(`[Web] 404 Not Found: ${req.method} ${path}`);
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
+  });
+
+  // Captura erros globais do servidor para evitar crash e logar Erro 500
+  server.on('error', (err) => {
+    console.error(`[Web] Erro crítico no servidor:`, err);
   });
 
   server.listen(3000, '0.0.0.0', () => {
@@ -196,4 +208,5 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
   });
 }
 
-module.exports = { startWebServer, addUser, getUsers };
+// Removido getUsers que não estava definido e corrigido exportação
+module.exports = { startWebServer, addUser };
