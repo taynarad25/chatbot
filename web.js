@@ -88,114 +88,106 @@ async function parseRequestBody(req) {
 
 function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
   const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const path = url.pathname;
-    const ip = getClientIp(req);
-
-    // Log de toda requisição recebida
-    console.log(`[Web] ${req.method} ${path} - IP: ${ip}`);
-
-    if (req.method === 'GET' && path === '/login') {
-      return sendHtml(res, renderLoginHtml());
-    }
-
-    if (req.method === 'POST' && path === '/login') {
-      try {
-        const body = await parseRequestBody(req);
-        const username = body.username?.trim();
-        const password = body.password?.trim();
-
-        // Rate Limiting básico
-        const ip = getClientIp(req); 
-        if (loginAttempts[ip] && loginAttempts[ip] > 5) {
-            return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
-        }
-
-        const user = findUser(username);
-        const isPassValid = user ? await validatePassword(password, user.salt, user.hash) : false;
-
-        if (user && isPassValid && (user.status === 'active' || user.status === undefined)) {
-          const token = createSession();
-          delete loginAttempts[ip];
-          setSessionCookie(res, token);
-          console.log(`[Web] Login bem-sucedido: ${username}`);
-          return sendJson(res, 200, { ok: true });
-        }
-        loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
-        return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
-      } catch (err) {
-        console.error(`[Web] Erro crítico ao processar requisição de login: ${err.message}`);
-        return sendJson(res, 400, { ok: false, message: 'Falha ao processar login.' });
+    try {
+      const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const path = url.pathname;
+      const ip = getClientIp(req);
+      // Log de toda requisição recebida
+      console.log(`[Web] ${req.method} ${path} - IP: ${ip}`);
+      if (req.method === 'GET' && path === '/login') {
+        return sendHtml(res, renderLoginHtml());   
       }
-    }
+      if (req.method === 'POST' && path === '/login') {
+        try {
+          const body = await parseRequestBody(req);
+          const username = body.username?.trim();
+          const password = body.password?.trim();
 
-    if (path !== '/login' && !isAuthenticated(req)) {
-      if (req.method === 'GET') {
-        res.writeHead(302, { Location: '/login' });
+          if (loginAttempts[ip] && loginAttempts[ip] > 5) {
+              return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
+          }
+
+          const user = findUser(username);
+          const isPassValid = user ? await validatePassword(password, user.salt, user.hash) : false;
+
+          if (user && isPassValid && (user.status === 'active' || user.status === undefined)) {
+            const token = createSession();
+            delete loginAttempts[ip];
+            setSessionCookie(res, token);
+            console.log(`[Web] Login bem-sucedido: ${username}`);
+            return sendJson(res, 200, { ok: true });
+          }
+          loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
+          return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
+        } catch (err) {
+          console.error(`[Web] Erro ao processar login: ${err.message}`);
+          return sendJson(res, 400, { ok: false, message: 'Falha ao processar login.' });
+        }
+      }
+      if (path !== '/login' && !isAuthenticated(req)) {
+        if (req.method === 'GET') {
+          res.writeHead(302, { Location: '/login' });
+          return res.end();
+        }
+        return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
+      }
+      if (req.method === 'GET' && path === '/register') {
+        return sendHtml(res, renderRegisterHtml());
+      
+      }
+      if (req.method === 'POST' && path === '/register') {
+        try {
+          const body = await parseRequestBody(req);
+          const result = await addUser(body);
+          return sendJson(res, result.ok ? 200 : 400, result);
+        } catch (err) {
+          console.error(`[Web] Erro no registro: ${err.message}`);
+          return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+        }
+      }
+      if (req.method === 'GET' && path === '/') {
+        res.writeHead(302, { Location: '/whatsappcontrol' });
         return res.end();
       }
-      return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
-    }
-
-    if (req.method === 'GET' && path === '/register') {
-      return sendHtml(res, renderRegisterHtml());
-    }
-
-    if (req.method === 'POST' && path === '/register') {
-      try {
-        const body = await parseRequestBody(req);
-        const result = await addUser(body);
-        return sendJson(res, result.ok ? 200 : 400, result);
-      } catch (err) {
-        return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+      if (req.method === 'GET' && path === '/whatsappcontrol') {
+        return sendHtml(res, renderIndexHtml());
+      }
+      if (req.method === 'GET' && path === '/status') {
+        return sendJson(res, 200, getStatus());
+      }
+      if (req.method === 'POST' && path === '/request-qr') {
+        const status = getStatus();
+        if (status.connected) {
+          return sendJson(res, 200, { ok: false, message: 'Bot conectado.' });
+        }
+        await startClient();
+        return sendJson(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && path === '/cancel-qr') {
+        await cancelQr();
+        return sendJson(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && path === '/disconnect') {
+        const result = await disconnectClient();
+        return sendJson(res, result.ok ? 200 : 500, result);
+      }
+      if (req.method === 'POST' && path === '/logout') {
+        const sessionId = getSessionId(req);
+        if (sessionId) delete sessions[sessionId];
+        clearSessionCookie(res);
+        return sendJson(res, 200, { ok: true });
+      }
+      // Rota não encontrada
+      console.warn(`[Web] 404 Not Found: ${req.method} ${path}`);
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not found');
+    } catch (globalErr) {
+      console.error(`[Web] 500 Internal Server Error em ${req.url}:`, globalErr);
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, message: 'Erro interno no servidor.' }));
       }
     }
-
-    if (req.method === 'GET' && path === '/') {
-      res.writeHead(302, { Location: '/whatsappcontrol' });
-      return res.end();
-    }
-
-    if (req.method === 'GET' && path === '/whatsappcontrol') {
-      return sendHtml(res, renderIndexHtml());
-    }
-
-    if (req.method === 'GET' && path === '/status') {
-      return sendJson(res, 200, getStatus());
-    }
-
-    if (req.method === 'POST' && path === '/request-qr') {
-      const status = getStatus();
-      if (status.connected) {
-        return sendJson(res, 200, { ok: false, message: 'O bot já está conectado. Desconecte antes de gerar um novo QR Code.' });
-      }
-      await startClient();
-      return sendJson(res, 200, { ok: true });
-    }
-
-    if (req.method === 'POST' && path === '/cancel-qr') {
-      await cancelQr();
-      return sendJson(res, 200, { ok: true });
-    }
-
-    if (req.method === 'POST' && path === '/disconnect') {
-      const result = await disconnectClient();
-      return sendJson(res, result.ok ? 200 : 500, result);
-    }
-
-    if (req.method === 'POST' && path === '/logout') {
-      const sessionId = getSessionId(req);
-      if (sessionId) {
-        delete sessions[sessionId];
-      }
-      clearSessionCookie(res);
-      return sendJson(res, 200, { ok: true });
-    }
-
-    // Rota não encontrada
-    console.warn(`[Web] 404 Not Found: ${req.method} ${path}`);
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not found');
   });
 
   // Captura erros globais do servidor para evitar crash e logar Erro 500

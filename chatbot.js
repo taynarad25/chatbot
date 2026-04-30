@@ -36,6 +36,17 @@ console.log = (...args) => logger(originalLog, ...args);
 console.error = (...args) => logger(originalError, ...args);
 console.warn = (...args) => logger(originalWarn, ...args);
 
+// Captura de erros que fariam o processo morrer sem logar
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Fatal] Rejeição de promessa não tratada em:', promise, 'motivo:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Fatal] Exceção não capturada:', err);
+  // Dá um tempo para o log gravar antes de sair
+  setTimeout(() => process.exit(1), 500);
+});
+
 // Importamos o web.js APÓS configurar o logger global para capturar seus logs iniciais
 const { startWebServer } = require("./web");
 
