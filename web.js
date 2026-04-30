@@ -2,9 +2,9 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
-const crypto = require("crypto");
+const crypto = require("crypto"); // Already imported in auth.js, but needed here for addUser
 const { promisify } = require("util");
-const { loadUsers, saveUser, initAdmin, deleteUser } = require("./web/users");
+const { loadUsers, saveUser, deleteUser } = require("./web/users");
 const { validatePassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 
@@ -18,16 +18,17 @@ function findUser(username) {
 }
 
 async function addUser({ username, password, role = 'user', status = 'active' }) {
+  // This function is used by the /register route.
   const users = loadUsers();
   const normalizedUser = username?.toLowerCase().trim();
   if (users[normalizedUser]) return { ok: false, message: "Usuário já existe" };
   
   const salt = crypto.randomBytes(16).toString("hex");
-  // Garante que a senha seja tratada da mesma forma que no login
-  const hash = (await pbkdf2(password.trim(), salt, 100000, 64, "sha512")).toString("hex");
+  // Ensure password is treated the same way as in login (already trimmed by the route handler)
+  const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
 
   saveUser({
-    username: normalizedUser,
+    username: normalizedUser, // Store normalized username
     salt,
     hash,
     status,
@@ -130,6 +131,10 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
             setSessionCookie(res, token);
             console.log(`[Web] Login bem-sucedido: ${username} (IP: ${ip})`);
             return sendJson(res, 200, { ok: true });
+          } else if (!user) {
+            console.warn(`[Web] Login falhou: Usuário '${username}' não encontrado (IP: ${ip})`);
+          } else {
+            console.warn(`[Web] Login falhou: Senha inválida para usuário '${username}' ou status inativo (IP: ${ip})`);
           }
           loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
           return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
