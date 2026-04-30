@@ -29,8 +29,10 @@ const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 const logger = (originalFn, ...args) => {
   const msg = `${getTimestamp()} ${util.format(...args)}`;
   originalFn(msg); // Envia para o stdout/stderr (importante para o comando 'docker logs')
-  // Força a escrita imediata para evitar perda de logs em caso de crash
-  logStream.write(msg + '\n', 'utf8'); 
+  // Escreve no arquivo e lida com possíveis erros de stream
+  if (logStream.writable) {
+    logStream.write(msg + '\n', 'utf8');
+  }
 };
 
 console.log = (...args) => logger(originalLog, ...args);

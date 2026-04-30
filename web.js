@@ -1,8 +1,10 @@
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 const { URL } = require("url");
 const crypto = require("crypto");
 const { promisify } = require("util");
-const { loadUsers, saveUser, initAdmin } = require("./web/users"); // Nota: Certifique-se que loadUsers existe
+const { loadUsers, saveUser, initAdmin, deleteUser } = require("./web/users");
 const { validatePassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 
@@ -90,13 +92,20 @@ async function parseRequestBody(req) {
 
 function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
   const server = http.createServer(async (req, res) => {
+    const start = Date.now();
+    const ip = getClientIp(req);
+
+    // Intercepta o final da resposta para garantir que TUDO seja logado com o status correto
+    const originalEnd = res.end;
+    res.end = function (...args) {
+      const duration = Date.now() - start;
+      console.log(`[Web] ${req.method} ${req.url} - Status: ${res.statusCode} (${duration}ms) | IP: ${ip}`);
+      return originalEnd.apply(this, args);
+    };
+
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const path = url.pathname;
-      const ip = getClientIp(req);
-      
-      // Log imediato e robusto
-      console.log(`[Web] ${req.method} ${path} | IP: ${ip}`);
 
       if (req.method === 'GET' && path === '/login') {
         return sendHtml(res, renderLoginHtml());   
@@ -172,6 +181,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         return sendJson(res, 200, { ok: true, user: session });
       }
 
+      // API: Deletar Usuário (Apenas Admin)
+      if (req.method === 'DELETE' && path.startsWith('/api/admin/users/') && isAdmin(req)) {
+        const target = path.replace('/api/admin/users/', '');
+        deleteUser(target);
+        return sendJson(res, 200, { ok: true, message: `Usuário ${target} excluído.` });
+      }
+
       // API: Listar Usuários (Apenas Admin)
       if (req.method === 'GET' && path === '/api/admin/users' && isAdmin(req)) {
         const users = loadUsers();
@@ -181,9 +197,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
       // API: Ler Logs (Apenas Admin)
       if (req.method === 'GET' && path === '/api/logs' && isAdmin(req)) {
-        const logPath = './combined.log';
+        const logFile = path.join(__dirname, 'combined.log');
         try {
-          const content = require('fs').readFileSync(logPath, 'utf8');
+          const content = fs.readFileSync(logFile, 'utf8');
           return sendJson(res, 200, { ok: true, logs: content });
         } catch (e) {
           return sendJson(res, 500, { ok: false, message: 'Erro ao ler arquivo de log' });
@@ -193,7 +209,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       // API: Limpar Logs (Apenas Admin)
       if (req.method === 'DELETE' && path === '/api/logs' && isAdmin(req)) {
         try {
-          require('fs').writeFileSync('./combined.log', '');
+          const logFile = path.join(__dirname, 'combined.log');
+          fs.writeFileSync(logFile, '');
           return sendJson(res, 200, { ok: true });
         } catch (e) {
           return sendJson(res, 500, { ok: false });
