@@ -11,5 +11,5 @@ services:
 
 networks:
   bot-bridge:
-    external: true
     name: chatbot_shared_network
+    external: true

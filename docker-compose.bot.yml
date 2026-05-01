@@ -17,5 +17,5 @@ services:
 
 networks:
   bot-bridge:
-    name: chatbot_shared_network # Nome fixo que não muda com o deploy
-    driver: bridge
+    name: chatbot_shared_network
+    external: true
