@@ -5,6 +5,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflare-tunnel
     restart: always
+    env_file: .env
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TOKEN}
     networks:
       - bot-bridge
