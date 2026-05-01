@@ -23,23 +23,31 @@ async function addUser({ username, password, role = 'user', status = 'active' })
   // This function is used by the /register route.
   const users = loadUsers();
   const normalizedUser = username?.toLowerCase().trim();
-  const normalizedPassword = password?.trim(); // Garante que a senha salva não tenha espaços acidentais
   if (users[normalizedUser]) return { ok: false, message: "Usuário já existe" };
   
-  const salt = crypto.randomBytes(16).toString("hex");
-  // Ensure password is treated the same way as in login (already trimmed by the route handler)
-  const hash = (await pbkdf2(normalizedPassword, salt, 100000, 64, "sha512")).toString("hex");
+  let salt = null;
+  let hash = null;
+  let userStatus = status;
+
+  if (password) {
+    const normalizedPassword = password.trim();
+    salt = crypto.randomBytes(16).toString("hex");
+    hash = (await pbkdf2(normalizedPassword, salt, 100000, 64, "sha512")).toString("hex");
+  } else {
+    // Se não veio senha, é criação via admin e fica pendente até o usuário concluir o cadastro
+    userStatus = 'pending';
+  }
 
   saveUser({
     username: normalizedUser, // Store normalized username
     salt,
     hash,
-    status,
+    status: userStatus,
     role,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
-  return { ok: true };
+  return { ok: true, message: userStatus === 'pending' ? "Usuário pré-cadastrado. O líder deve agora acessar a tela de cadastro para definir sua senha." : "Usuário criado com sucesso." };
 }
 
 /**
@@ -167,8 +175,25 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       if (req.method === 'POST' && pathname === '/register') {
         try {
           const body = await parseRequestBody(req);
-          const result = await addUser(body);
-          return sendJson(res, result.ok ? 200 : 400, result);
+          const { username, password } = body;
+          const normalizedUser = username?.toLowerCase().trim();
+          
+          const users = loadUsers();
+          const user = users[normalizedUser];
+
+          if (!user) {
+            return sendJson(res, 404, { ok: false, message: "Usuário não encontrado. Peça para o administrador criar sua conta primeiro." });
+          }
+
+          if (user.status !== 'pending') {
+            return sendJson(res, 400, { ok: false, message: "Este usuário já concluiu o cadastro anteriormente." });
+          }
+
+          const salt = crypto.randomBytes(16).toString("hex");
+          const hash = (await pbkdf2(password.trim(), salt, 100000, 64, "sha512")).toString("hex");
+
+          saveUser({ ...user, salt, hash, status: 'active', updatedAt: new Date().toISOString() });
+          return sendJson(res, 200, { ok: true, message: "Cadastro concluído! Agora você já pode fazer login." });
         } catch (err) {
           console.error(`[Web] Erro no registro: ${err.message}`);
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
