@@ -21,11 +21,12 @@ async function addUser({ username, password, role = 'user', status = 'active' })
   // This function is used by the /register route.
   const users = loadUsers();
   const normalizedUser = username?.toLowerCase().trim();
+  const normalizedPassword = password?.trim(); // Garante que a senha salva não tenha espaços acidentais
   if (users[normalizedUser]) return { ok: false, message: "Usuário já existe" };
   
   const salt = crypto.randomBytes(16).toString("hex");
   // Ensure password is treated the same way as in login (already trimmed by the route handler)
-  const hash = (await pbkdf2(password, salt, 100000, 64, "sha512")).toString("hex");
+  const hash = (await pbkdf2(normalizedPassword, salt, 100000, 64, "sha512")).toString("hex");
 
   saveUser({
     username: normalizedUser, // Store normalized username
@@ -125,16 +126,23 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           }
 
           const user = findUser(username);
-          if (user && await validatePassword(password, user.salt, user.hash) && (user.status === 'active' || user.status === undefined)) {
-            const token = createSession(username, user.role, user.status);
-            delete loginAttempts[ip];
-            setSessionCookie(res, token);
-            console.log(`[Web] Login bem-sucedido: ${username} (IP: ${ip})`);
-            return sendJson(res, 200, { ok: true });
-          } else if (!user) {
+          if (!user) {
             console.warn(`[Web] Login falhou: Usuário '${username}' não encontrado (IP: ${ip})`);
           } else {
-            console.warn(`[Web] Login falhou: Senha inválida para usuário '${username}' ou status inativo (IP: ${ip})`);
+            const isPasswordValid = await validatePassword(password, user.salt, user.hash);
+            const isActive = (user.status === 'active' || user.status === undefined);
+
+            if (isPasswordValid && isActive) {
+              const token = createSession(username, user.role, user.status);
+              delete loginAttempts[ip];
+              setSessionCookie(res, token);
+              console.log(`[Web] Login bem-sucedido: ${username} (IP: ${ip})`);
+              return sendJson(res, 200, { ok: true });
+            } else if (!isPasswordValid) {
+              console.warn(`[Web] Login falhou: Senha incorreta para o usuário '${username}' (IP: ${ip}). Verifique o hash no log de Auth.`);
+            } else {
+              console.warn(`[Web] Login falhou: Usuário '${username}' está com status inativo (${user.status}) (IP: ${ip})`);
+            }
           }
           loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
           return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });

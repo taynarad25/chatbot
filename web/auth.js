@@ -10,8 +10,8 @@ async function validatePassword(password, salt, hash) {
   try {
     const derivedKey = await pbkdf2(password, salt, 100000, 64, "sha512");
     const derivedKeyHex = derivedKey.toString("hex");
-    console.log(`[Auth] Validating password. Derived key (first 8 chars): ${derivedKeyHex.substring(0, 8)}...`);
-    console.log(`[Auth] Stored hash (first 8 chars): ${hash?.substring(0, 8)}...`);
+    console.log(`[Auth] Validating password. Derived key: ${derivedKeyHex}`);
+    console.log(`[Auth] Stored hash: ${hash}`);
     return derivedKeyHex === hash;
   } catch (err) {
     return false;
