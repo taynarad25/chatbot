@@ -211,6 +211,18 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         return sendJson(res, 200, { ok: true, users: userList });
       }
 
+      // API: Criar Usuário (Apenas Admin)
+      if (req.method === 'POST' && pathname === '/api/admin/users' && isAdmin(req)) {
+        try {
+          const body = await parseRequestBody(req);
+          const result = await addUser(body);
+          return sendJson(res, result.ok ? 200 : 400, result);
+        } catch (err) {
+          console.error(`[Web] Erro ao criar usuário via Admin: ${err.message}`);
+          return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+        }
+      }
+
       // API: Ler Logs (Apenas Admin)
       if (req.method === 'GET' && pathname === '/api/logs' && isAdmin(req)) {
         const logFile = path.join(__dirname, 'combined.log');
