@@ -31,5 +31,5 @@ jobs:
                 -o ConnectTimeout=15 \
                 -o ProxyCommand="$CF_COMMAND" \
                 tayadm@ssh.secretariacasaforte.com.br \
-                "cd /home/tayadm/github/chatbot && git pull origin main && docker compose build --no-cache && docker compose up -d --force-recreate --remove-orphans"
+                "cd /home/tayadm/github/chatbot && git pull origin main && docker compose build --no-cache && docker compose up -d --force-recreate --remove-orphans --no-deps whatsapp-bot"
           done
