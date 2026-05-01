@@ -34,5 +34,4 @@ jobs:
                 "cd /home/tayadm/github/chatbot && \
                 git pull origin main && \
                 docker compose build --no-cache whatsapp-bot && \
-                docker compose up -d --force-recreate --remove-orphans --no-deps whatsapp-bot" || [ $? -eq 255 ] && break
-          done
+                docker compose up -d --force-recreate --remove-orphans --no-deps whatsapp-bot"
