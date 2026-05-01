@@ -29,6 +29,6 @@ jobs:
               -o ProxyCommand="$CF_COMMAND" \
               tayadm@ssh.secretariacasaforte.com.br \
               "cd /home/tayadm/github/chatbot && \
-               git pull origin main && \
-               docker compose -f docker-compose.bot.yml build --no-cache whatsapp-bot && \
-               docker compose -f docker-compose.bot.yml up -d --force-recreate --no-deps whatsapp-bot"
+              git pull origin main && \
+              docker network create chatbot_shared_network || true && \
+              docker compose -f docker-compose.bot.yml up -d --build --force-recreate --no-deps whatsapp-bot"

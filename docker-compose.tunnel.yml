@@ -7,8 +7,9 @@ services:
     restart: always
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TOKEN}
     networks:
-      - bot-network
+      - bot-bridge
 
 networks:
-  bot-network:
+  bot-bridge:
     external: true
+    name: chatbot_shared_network
