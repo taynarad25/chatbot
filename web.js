@@ -105,7 +105,6 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     const originalEnd = res.end;
     res.end = function (...args) {
       const duration = Date.now() - start;
-      console.log(`[Web] ${req.method} ${req.url} - Status: ${res.statusCode} (${duration}ms) | IP: ${ip}`);
       return originalEnd.apply(this, args);
     };
 
