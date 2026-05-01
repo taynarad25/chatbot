@@ -25,7 +25,10 @@ jobs:
           CF_COMMAND="cloudflared access tcp --hostname ssh.secretariacasaforte.com.br --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}"
           
           ssh -v -o StrictHostKeyChecking=no \
-              -o ConnectTimeout=60 \
+              -o ConnectTimeout=120 \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
+              -o TCPKeepAlive=yes \
               -o ProxyCommand="$CF_COMMAND" \
               tayadm@ssh.secretariacasaforte.com.br \
               "cd /home/tayadm/github/chatbot && \
