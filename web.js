@@ -14,7 +14,9 @@ const loginAttempts = {}; // Simples rate limiting em memória
 
 function findUser(username) {
   const users = loadUsers();
-  return users[username?.toLowerCase().trim()] || null;
+  const normalized = username?.toLowerCase().trim();
+  console.log(`[Web] Buscando usuário: '${normalized}' dentro das chaves: [${Object.keys(users).join(", ")}]`);
+  return users[normalized] || null;
 }
 
 async function addUser({ username, password, role = 'user', status = 'active' }) {

@@ -5,10 +5,18 @@ const LOGIN_FILE = path.join(__dirname, "..", "login.json");
 
 function loadUsers() {
   try {
-    if (!fs.existsSync(LOGIN_FILE)) return {};
+    if (!fs.existsSync(LOGIN_FILE)) {
+      console.warn(`[Users] Arquivo de usuários não encontrado em: ${LOGIN_FILE}`);
+      return {};
+    }
     const data = fs.readFileSync(LOGIN_FILE, "utf8");
-    if (!data.trim()) return {};
-    return JSON.parse(data);
+    if (!data.trim()) {
+      console.warn(`[Users] O arquivo login.json está vazio.`);
+      return {};
+    }
+    const users = JSON.parse(data);
+    console.log(`[Users] Banco carregado. Usuários detectados: ${Object.keys(users).join(", ") || "Nenhum"}`);
+    return users;
   } catch (err) {
     console.error("[Users] Erro crítico ao carregar usuários. Retornando vazio para evitar perda de dados.", err);
     return {};
