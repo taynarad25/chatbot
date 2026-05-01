@@ -35,3 +35,4 @@ jobs:
                 git pull origin main && \
                 docker compose build --no-cache whatsapp-bot && \
                 docker compose up -d --force-recreate --remove-orphans --no-deps whatsapp-bot"
+          done
