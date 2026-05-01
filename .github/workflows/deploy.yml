@@ -23,7 +23,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           
           # Definindo comando do cloudflared com protocolo estável
-          CF_COMMAND="cloudflared access tcp --hostname ssh.secretariacasaforte.com.br --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}"
+          CF_COMMAND="cloudflared access tcp --hostname ssh.secretariacasaforte.com.br --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }} --protocol quic"
           
           # Tenta 3 vezes com intervalo de 5 segundos
           for i in {1..3}; do
