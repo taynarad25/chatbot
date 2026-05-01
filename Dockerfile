@@ -1,4 +1,6 @@
 FROM node:20-slim
+
+# Instala dependências do Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     procps \
@@ -9,19 +11,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libatk-bridge2.0-0 \
     libgtk-3-0 \
     fonts-liberation \
-    fonts-ipafont-gothic \
-    fonts-wqy-zenhei \
-    fonts-thai-tlwg \
-    fonts-kacst \
-    fonts-freefont-ttf \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
 WORKDIR /usr/src/app
+
+# Ajuste de permissões para o usuário node
 COPY package*.json ./
-RUN npm install -g npm@latest && \
-    npm install --omit=dev
+RUN npm install --omit=dev && npm cache clean --force
+
 COPY . .
+RUN chown -R node:node /usr/src/app
+
+# Roda como usuário node por segurança
+USER node
+
 EXPOSE 3000
 CMD [ "node", "chatbot.js" ]

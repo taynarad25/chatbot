@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  whatsapp-bot:
+    build: .
+    container_name: whatsapp-bot
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file: .env
+    volumes:
+      - ./.wwebjs_auth:/home/tayadm/github/chatbot/.wwebjs_auth
+      - ./combined.log:/home/tayadm/github/chatbot/combined.log
+      - ./login.json:/home/tayadm/github/chatbot/login.json
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
