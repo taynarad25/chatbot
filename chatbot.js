@@ -24,13 +24,28 @@ const originalWarn = console.warn;
 
 // Configura a escrita manual em arquivo para substituir a funcionalidade do PM2
 const logFile = path.join(__dirname, 'combined.log');
-const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+let logStream = null;
+
+try {
+  // Verifica se o caminho existe e se é um diretório para evitar erro EISDIR (comum em mounts Docker)
+  if (fs.existsSync(logFile) && fs.lstatSync(logFile).isDirectory()) {
+    originalError(`${getTimestamp()} [Critical] '${logFile}' é um diretório. O log em arquivo será desativado.`);
+  } else {
+    logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    logStream.on('error', (err) => {
+      originalError(`${getTimestamp()} [LogStream Error] ${err.message}`);
+      logStream = null; // Desativa a escrita se houver erro no stream
+    });
+  }
+} catch (err) {
+  originalError(`${getTimestamp()} [LogStream Init Error] ${err.message}`);
+}
 
 const logger = (originalFn, ...args) => {
   const msg = `${getTimestamp()} ${util.format(...args)}`;
   originalFn(msg); // Envia para o stdout/stderr (importante para o comando 'docker logs')
   // Escreve no arquivo e lida com possíveis erros de stream
-  if (logStream.writable) {
+  if (logStream && logStream.writable) {
     logStream.write(msg + '\n', 'utf8');
   }
 };
