@@ -24,7 +24,7 @@ function createSession(username, role, status = 'active') {
   return token;
 }
 
-function getSession(req) {
+function getSessionId(req) {
   const cookie = req.headers.cookie;
   if (!cookie) return null;
   
@@ -33,8 +33,11 @@ function getSession(req) {
     const [key, ...value] = c.trim().split('=');
     if (key) cookies[key] = value.join('=');
   });
+  return cookies[COOKIE_NAME];
+}
 
-  const sessionId = cookies[COOKIE_NAME];
+function getSession(req) {
+  const sessionId = getSessionId(req);
 
   if (!sessionId) return null;
   const session = sessions[sessionId];
@@ -69,4 +72,4 @@ function clearSessionCookie(res, sessionId) {
   res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
 }
 
-module.exports = { validatePassword, createSession, getSession, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie, sessions };
+module.exports = { validatePassword, createSession, getSession, getSessionId, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie, sessions };

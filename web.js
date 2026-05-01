@@ -111,12 +111,12 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-      const path = url.pathname;
+      const pathname = url.pathname;
 
-      if (req.method === 'GET' && path === '/login') {
+      if (req.method === 'GET' && pathname === '/login') {
         return sendHtml(res, renderLoginHtml());   
       }
-      if (req.method === 'POST' && path === '/login') {
+      if (req.method === 'POST' && pathname === '/login') {
         try {
           const body = await parseRequestBody(req);
           const username = body.username?.trim();
@@ -153,19 +153,19 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           return sendJson(res, 400, { ok: false, message: 'Falha ao processar login.' });
         }
       }
-      if (path !== '/login' && !isAuthenticated(req)) {
+      if (pathname !== '/login' && !isAuthenticated(req)) {
         if (req.method === 'GET') {
           res.writeHead(302, { Location: '/login' });
           return res.end();
         }
-        console.warn(`[Web] 401 Acesso negado para ${path} | IP: ${ip}`);
+        console.warn(`[Web] 401 Acesso negado para ${pathname} | IP: ${ip}`);
         return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
       }
-      if (req.method === 'GET' && path === '/register') {
+      if (req.method === 'GET' && pathname === '/register') {
         return sendHtml(res, renderRegisterHtml());
       
       }
-      if (req.method === 'POST' && path === '/register') {
+      if (req.method === 'POST' && pathname === '/register') {
         try {
           const body = await parseRequestBody(req);
           const result = await addUser(body);
@@ -175,11 +175,11 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
         }
       }
-      if (req.method === 'GET' && path === '/') {
+      if (req.method === 'GET' && pathname === '/') {
         res.writeHead(302, { Location: '/whatsappcontrol' });
         return res.end();
       }
-      if (req.method === 'GET' && path === '/whatsappcontrol') {
+      if (req.method === 'GET' && pathname === '/whatsappcontrol') {
         try {
           const html = renderIndexHtml();
           return sendHtml(res, html);
@@ -188,32 +188,32 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           throw renderErr; // Repassa para o catch global
         }
       }
-      if (req.method === 'GET' && path === '/status') {
+      if (req.method === 'GET' && pathname === '/status') {
         return sendJson(res, 200, getStatus());
       }
 
       // API: Informações do Usuário Logado
-      if (req.method === 'GET' && path === '/api/user-info') {
+      if (req.method === 'GET' && pathname === '/api/user-info') {
         const session = getSession(req);
         return sendJson(res, 200, { ok: true, user: session });
       }
 
       // API: Deletar Usuário (Apenas Admin)
-      if (req.method === 'DELETE' && path.startsWith('/api/admin/users/') && isAdmin(req)) {
-        const target = path.replace('/api/admin/users/', '');
+      if (req.method === 'DELETE' && pathname.startsWith('/api/admin/users/') && isAdmin(req)) {
+        const target = pathname.replace('/api/admin/users/', '');
         deleteUser(target);
         return sendJson(res, 200, { ok: true, message: `Usuário ${target} excluído.` });
       }
 
       // API: Listar Usuários (Apenas Admin)
-      if (req.method === 'GET' && path === '/api/admin/users' && isAdmin(req)) {
+      if (req.method === 'GET' && pathname === '/api/admin/users' && isAdmin(req)) {
         const users = loadUsers();
         const userList = Object.values(users).map(u => ({ username: u.username, role: u.role }));
         return sendJson(res, 200, { ok: true, users: userList });
       }
 
       // API: Ler Logs (Apenas Admin)
-      if (req.method === 'GET' && path === '/api/logs' && isAdmin(req)) {
+      if (req.method === 'GET' && pathname === '/api/logs' && isAdmin(req)) {
         const logFile = path.join(__dirname, 'combined.log');
         try {
           const content = fs.readFileSync(logFile, 'utf8');
@@ -224,7 +224,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       }
 
       // API: Limpar Logs (Apenas Admin)
-      if (req.method === 'DELETE' && path === '/api/logs' && isAdmin(req)) {
+      if (req.method === 'DELETE' && pathname === '/api/logs' && isAdmin(req)) {
         try {
           const logFile = path.join(__dirname, 'combined.log');
           fs.writeFileSync(logFile, '');
@@ -234,7 +234,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         }
       }
 
-      if (req.method === 'POST' && path === '/request-qr') {
+      if (req.method === 'POST' && pathname === '/request-qr') {
         const status = getStatus();
         if (status.connected) {
           return sendJson(res, 200, { ok: false, message: 'Bot conectado.' });
@@ -242,22 +242,22 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
         await startClient();
         return sendJson(res, 200, { ok: true });
       }
-      if (req.method === 'POST' && path === '/cancel-qr') {
+      if (req.method === 'POST' && pathname === '/cancel-qr') {
         await cancelQr();
         return sendJson(res, 200, { ok: true });
       }
-      if (req.method === 'POST' && path === '/disconnect') {
+      if (req.method === 'POST' && pathname === '/disconnect') {
         const result = await disconnectClient();
         return sendJson(res, result.ok ? 200 : 500, result);
       }
-      if (req.method === 'POST' && path === '/logout') {
+      if (req.method === 'POST' && pathname === '/logout') {
         const sessionId = getSessionId(req);
         if (sessionId) delete sessions[sessionId];
         clearSessionCookie(res);
         return sendJson(res, 200, { ok: true });
       }
       // Rota não encontrada
-      console.warn(`[Web] 404 Not Found: ${req.method} ${path}`);
+      console.warn(`[Web] 404 Not Found: ${req.method} ${pathname}`);
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not found');
     } catch (globalErr) {
