@@ -7,9 +7,9 @@ services:
       - "3000:3000"
     env_file: .env
     volumes:
-      - ./.wwebjs_auth:/home/tayadm/github/chatbot/.wwebjs_auth
-      - ./combined.log:/home/tayadm/github/chatbot/combined.log
-      - ./login.json:/home/tayadm/github/chatbot/login.json
+      - ./.wwebjs_auth:/usr/src/app/.wwebjs_auth
+      - ./combined.log:/usr/src/app/combined.log
+      - ./login.json:/usr/src/app/login.json
     networks:
       - bot-bridge
 
