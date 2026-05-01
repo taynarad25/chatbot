@@ -14,7 +14,20 @@ function loadUsers() {
       console.warn(`[Users] O arquivo login.json está vazio.`);
       return {};
     }
-    const users = JSON.parse(data);
+    let usersRaw = JSON.parse(data);
+    let users = usersRaw;
+
+    // Se o arquivo for um Array [...], converte para Objeto {"username": {...}}
+    if (Array.isArray(usersRaw)) {
+      console.warn("[Users] Corrigindo formato de array para objeto no login.json...");
+      users = {};
+      usersRaw.forEach(u => {
+        if (u.username) users[u.username.toLowerCase().trim()] = u;
+      });
+      // Salva de volta para corrigir o arquivo fisicamente
+      fs.writeFileSync(LOGIN_FILE, JSON.stringify(users, null, 2), "utf8");
+    }
+
     console.log(`[Users] Banco carregado. Usuários detectados: ${Object.keys(users).join(", ") || "Nenhum"}`);
     return users;
   } catch (err) {
