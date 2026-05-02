@@ -718,14 +718,26 @@ Digite *menu* para voltar ao menu principal.`;
   });
 }
 
-// =====================================
 // PERSISTÊNCIA DE ESTADO (ATIVO/PARADO)
 // =====================================
 const STATE_FILE = path.join(__dirname, 'bot_state.json');
-const saveBotState = (active) => fs.writeFileSync(STATE_FILE, JSON.stringify({ active }), 'utf8');
+const saveBotState = (active) => {
+  try {
+    if (fs.existsSync(STATE_FILE) && fs.lstatSync(STATE_FILE).isDirectory()) {
+      return console.error(`[Critical] '${STATE_FILE}' é um diretório. Persistência de estado desativada.`);
+    }
+    fs.writeFileSync(STATE_FILE, JSON.stringify({ active }), 'utf8');
+  } catch (err) {
+    console.error(`[State Error] Falha ao salvar estado: ${err.message}`);
+  }
+};
+
 const loadBotState = () => {
-  if (!fs.existsSync(STATE_FILE)) return { active: false };
-  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
+  try {
+    if (!fs.existsSync(STATE_FILE)) return { active: false };
+    if (fs.lstatSync(STATE_FILE).isDirectory()) return { active: false };
+    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+  } 
   catch (e) { return { active: false }; }
 };
 
