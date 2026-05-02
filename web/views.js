@@ -294,19 +294,24 @@ function renderIndexHtml() {
       const actionMessageEl = document.getElementById('actionMessage');
       actionMessageEl.style.display = 'none'; // Hide previous action messages
 
-      // Lógica de Status e Botões
-      const statusText = json.connected ? 'Conectado ✅' : (json.initializing ? 'Inicializando... ⏳' : 'Desconectado');
+      // Lógica de Status detalhada
+      let statusText = 'Desconectado';
+      if (json.connected) statusText = 'Conectado ✅';
+      else if (json.canceling) statusText = 'Cancelando... 🛑';
+      else if (json.hasQr) statusText = 'QR Code Gerado! Aguardando leitura... 📱';
+      else if (json.generatingQr) statusText = 'Gerando QR Code... ⚙️';
+      else if (json.initializing) statusText = 'Inicializando... ⏳';
+
       document.getElementById('status').innerHTML = '<strong>Status:</strong> ' + statusText;
       
       if (json.hasQr) document.getElementById('qr').innerHTML = '<img src="'+json.qrDataUrl+'" />';
       else document.getElementById('qr').innerHTML = '';
 
       // Regra de exibição dos botões
+      const isWorking = json.initializing || json.generatingQr || json.hasQr || json.canceling;
       document.getElementById('disconnect').style.display = json.connected ? 'inline-block' : 'none';
-      // Mostra cancelar se estiver inicializando ou se já tiver QR, mas não estiver conectado ainda
-      document.getElementById('cancelQr').style.display = (json.initializing || (json.hasQr && !json.connected)) ? 'inline-block' : 'none';
-      // Mostra solicitar apenas se estiver totalmente parado
-      document.getElementById('requestQr').style.display = !json.connected && !json.initializing && !json.hasQr ? 'inline-block' : 'none';
+      document.getElementById('cancelQr').style.display = isWorking && !json.connected ? 'inline-block' : 'none';
+      document.getElementById('requestQr').style.display = !json.connected && !isWorking ? 'inline-block' : 'none';
 
       if (isAdmin) {
         fetch('/api/logs')

@@ -2,7 +2,6 @@ node_modules/
 .wwebjs_cache/
 .wwebjs_auth/
 *.deb
-docker-compose.yml
 credenciais-google.json
 .env
 login.json
@@ -10,3 +9,4 @@ login.json
 npm-debug.log*
 .DS_Store
 Thumbs.db
+bot_state.json

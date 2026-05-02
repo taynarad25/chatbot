@@ -9,7 +9,9 @@ const sessions = {};
 async function validatePassword(password, salt, hash) {
   try {
     const derivedKey = await pbkdf2(password, salt, 100000, 64, "sha512");
-    return derivedKey.toString("hex") === hash;
+    const derivedKeyHex = derivedKey.toString("hex");
+    console.log(`[Auth] Validating password.`);
+    return derivedKeyHex === hash;
   } catch (err) {
     return false;
   }
@@ -21,12 +23,20 @@ function createSession(username, role, status = 'active') {
   return token;
 }
 
-function getSession(req) {
+function getSessionId(req) {
   const cookie = req.headers.cookie;
   if (!cookie) return null;
   
-  const cookies = Object.fromEntries(cookie.split(';').map(c => c.trim().split('=')));
-  const sessionId = cookies[COOKIE_NAME];
+  const cookies = {};
+  cookie.split(';').forEach(c => {
+    const [key, ...value] = c.trim().split('=');
+    if (key) cookies[key] = value.join('=');
+  });
+  return cookies[COOKIE_NAME];
+}
+
+function getSession(req) {
+  const sessionId = getSessionId(req);
 
   if (!sessionId) return null;
   const session = sessions[sessionId];
@@ -42,7 +52,8 @@ function getSession(req) {
 
 function isAuthenticated(req) {
   const session = getSession(req);
-  return session && session.status === 'active';
+  // Permite acesso se o status for 'active' ou se não estiver definido (caso de usuários legados/admin)
+  return session && (session.status === 'active' || session.status === undefined);
 }
 
 function isAdmin(req) {
@@ -60,4 +71,4 @@ function clearSessionCookie(res, sessionId) {
   res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
 }
 
-module.exports = { validatePassword, createSession, getSession, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie, sessions };
+module.exports = { validatePassword, createSession, getSession, getSessionId, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie, sessions };

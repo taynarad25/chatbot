@@ -24,17 +24,47 @@ const originalWarn = console.warn;
 
 // Configura a escrita manual em arquivo para substituir a funcionalidade do PM2
 const logFile = path.join(__dirname, 'combined.log');
-const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+let logStream = null;
+
+try {
+  // Verifica se o caminho existe e se é um diretório para evitar erro EISDIR (comum em mounts Docker)
+  if (fs.existsSync(logFile) && fs.lstatSync(logFile).isDirectory()) {
+    originalError(`${getTimestamp()} [Critical] '${logFile}' é um diretório. O log em arquivo será desativado.`);
+  } else {
+    logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    logStream.on('error', (err) => {
+      originalError(`${getTimestamp()} [LogStream Error] ${err.message}`);
+      logStream = null; // Desativa a escrita se houver erro no stream
+    });
+  }
+} catch (err) {
+  originalError(`${getTimestamp()} [LogStream Init Error] ${err.message}`);
+}
 
 const logger = (originalFn, ...args) => {
   const msg = `${getTimestamp()} ${util.format(...args)}`;
   originalFn(msg); // Envia para o stdout/stderr (importante para o comando 'docker logs')
-  logStream.write(msg + '\n'); // Salva no arquivo físico
+  // Escreve no arquivo e lida com possíveis erros de stream
+  if (logStream && logStream.writable) {
+    logStream.write(msg + '\n', 'utf8');
+  }
 };
 
 console.log = (...args) => logger(originalLog, ...args);
 console.error = (...args) => logger(originalError, ...args);
 console.warn = (...args) => logger(originalWarn, ...args);
+
+// Captura de erros que fariam o processo morrer sem logar
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Fatal] Rejeição de promessa não tratada em:', promise, 'motivo:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Fatal] Exceção não capturada:', err);
+  console.error(err.stack);
+  // Dá um tempo para o log gravar antes de sair
+  setTimeout(() => process.exit(1), 500);
+});
 
 // Importamos o web.js APÓS configurar o logger global para capturar seus logs iniciais
 const { startWebServer } = require("./web");
@@ -112,6 +142,7 @@ let isInitializing = false;
 let pendingQr = null;
 let clientId = "bot";
 let isGeneratingQr = false;
+let isCanceling = false;
 
 function criarClient() {
   client = new Client({
@@ -156,6 +187,11 @@ function criarClient() {
 
   client.on("auth_failure", (msg) => {
     console.error("Falha na autenticação:", msg);
+    clientReady = false;
+    pendingQr = null;
+    isGeneratingQr = false;
+    isInitializing = false;
+    saveBotState(false); // Se a sessão no cache falhou, paramos o bot para evitar loops
   });
 
   client.on("disconnected", (reason) => {
@@ -690,6 +726,29 @@ Digite *menu* para voltar ao menu principal.`;
   });
 }
 
+// PERSISTÊNCIA DE ESTADO (ATIVO/PARADO)
+// =====================================
+const STATE_FILE = path.join(__dirname, 'bot_state.json');
+const saveBotState = (active) => {
+  try {
+    if (fs.existsSync(STATE_FILE) && fs.lstatSync(STATE_FILE).isDirectory()) {
+      return console.error(`[Critical] '${STATE_FILE}' é um diretório. Persistência de estado desativada.`);
+    }
+    fs.writeFileSync(STATE_FILE, JSON.stringify({ active }), 'utf8');
+  } catch (err) {
+    console.error(`[State Error] Falha ao salvar estado: ${err.message}`);
+  }
+};
+
+const loadBotState = () => {
+  try {
+    if (!fs.existsSync(STATE_FILE)) return { active: false };
+    if (fs.lstatSync(STATE_FILE).isDirectory()) return { active: false };
+    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+  } 
+  catch (e) { return { active: false }; }
+};
+
 async function startClient() {
   if (clientReady || isInitializing) return;
   console.log("🚀 Iniciando processo de inicialização do cliente...");
@@ -733,6 +792,7 @@ async function startClient() {
   });
 
   isInitializing = true;
+  saveBotState(true); // Salva que o bot DEVE estar rodando
   isGeneratingQr = true;
   pendingQr = null;
   criarClient();
@@ -759,25 +819,30 @@ async function startClient() {
     }
   } finally {
     isInitializing = false;
-    isGeneratingQr = clientReady || !!pendingQr;
   }
 }
 
 async function cancelQr() {
-  console.log("⏹️ Solicitando cancelamento da geração do QR Code...");
-  if (client && !clientReady) {
-    try {
-      await client.destroy();
-    } catch (err) {
-      console.warn("⚠️ Erro ao destruir cliente no cancelamento:", err);
+  isCanceling = true;
+  try {
+    console.log("⏹️ Solicitando cancelamento da geração do QR Code...");
+    if (client && !clientReady) {
+      try {
+        await client.destroy();
+      } catch (err) {
+        console.warn("⚠️ Erro ao destruir cliente no cancelamento:", err);
+      }
     }
+    client = null;
+    saveBotState(false); // Salva que o bot DEVE estar parado
+    clientReady = false;
+    isInitializing = false;
+    isGeneratingQr = false;
+    pendingQr = null;
+    console.log("✅ Solicitação de QR Code cancelada com sucesso.");
+  } finally {
+    isCanceling = false;
   }
-  client = null;
-  clientReady = false;
-  isInitializing = false;
-  isGeneratingQr = false;
-  pendingQr = null;
-  console.log("✅ Solicitação de QR Code cancelada com sucesso.");
 }
 
 async function disconnectClient() {
@@ -805,6 +870,7 @@ async function disconnectClient() {
     return { ok: true, message: "WhatsApp desconectado (com aviso de erro no processo)." };
   } finally {
     client = null;
+    saveBotState(false); // Salva que o bot DEVE estar parado
     clientReady = false;
     isInitializing = false;
     isGeneratingQr = false;
@@ -817,6 +883,7 @@ function getStatus() {
     connected: clientReady,
     initializing: isInitializing,
     generatingQr: isGeneratingQr,
+    canceling: isCanceling,
     hasQr: !!pendingQr,
     qrDataUrl: pendingQr?.dataUrl || null,
     qrCreatedAt: pendingQr?.createdAt || null,
@@ -825,14 +892,12 @@ function getStatus() {
 
 startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
 
-// Verifica se existe uma sessão salva para decidir se inicia o bot automaticamente.
-// Isso evita que o QR Code seja gerado sem que haja alguém logado no painel para ver.
-const sessionPath = path.join(__dirname, ".wwebjs_auth", `session-${clientId}`);
-if (fs.existsSync(sessionPath)) {
-  console.log("[Autostart] Sessão detectada. Conectando ao WhatsApp...");
+const botState = loadBotState();
+if (botState.active) {
+  console.log("[Autostart] O bot estava ativo antes do reinício. Retomando...");
   startClient();
 } else {
-  console.log("[Autostart] Nenhuma sessão detectada. O QR Code só será gerado após solicitação no painel.");
+  console.log("[Autostart] O bot estava parado. Aguardando comando manual no painel.");
 }
 
 // Tratamento de encerramento gracioso para evitar travas residuais no Chromium
