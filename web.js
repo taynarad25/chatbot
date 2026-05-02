@@ -160,7 +160,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           return sendJson(res, 400, { ok: false, message: 'Falha ao processar login.' });
         }
       }
-      if (pathname !== '/login' && !isAuthenticated(req)) {
+      if (pathname !== '/login' && pathname !== '/register' && !isAuthenticated(req)) {
         if (req.method === 'GET') {
           res.writeHead(302, { Location: '/login' });
           return res.end();
