@@ -39,14 +39,20 @@ console.warn = (...args) => logger(originalWarn, ...args);
 // Importamos o web.js APÓS configurar o logger global para capturar seus logs iniciais
 const { startWebServer } = require("./web");
 
-// Configurações sensíveis via Variáveis de Ambiente
-const calendarId = process.env.GOOGLE_CALENDAR_ID; 
-const additionalCalendars = (process.env.GOOGLE_ADDITIONAL_CALENDARS || "")
-  .split(",")
-  .map(id => id.trim())
-  .filter(Boolean);
+// Lista de IDs das Agendas do Google atualizada para resolver erros de credenciais
+const agendasParaLer = [
+  "d336e4e99db8329a2d52b123252a822073e8f23a67784892e68f3476147e694d@group.calendar.google.com", // Diretoria
+  "15141665d120f01b145b6a77603eb2313fac0c0e3073033addc151d9561a79d0@group.calendar.google.com", // Epifania
+  "10e97ba829f906588511279bb65b8ce6c8667d9c548339f04de137f9d8ab8a5d@group.calendar.google.com", // Intercessão
+  "16b2f3baec9c14aba0d43a139b12a04893c33edb9fb45a0b8f081403a3eaa036@group.calendar.google.com", // Outros
+  "10a17be6c05bc778f05dbfbddb0fda8ea1e73d2c2349b806230cc4990a14191a@group.calendar.google.com", // Projeto Social Seeds
+  "fa6cf624289edd4efd67cdd11367d6fd7c15e6d74b319ab579ef378498f5fdd9@group.calendar.google.com", // Rede Code
+  "bd9c2b98016d155d427591ed6c339224516db3724146b5dcd3f94c4fe6c22c84@group.calendar.google.com", // Rede de Casais
+  "b9daab311cb773bd14efd27ce6efbada7aa94ac8a5adce857b5c694b75fe2803@group.calendar.google.com", // Rede de Homens
+  "548839d693663fb3a5854930256f5fd321534a13af3ba67c5a09e6f347992be8@group.calendar.google.com", // Rede de Mulheres
+  "8876e79827d1469f76bcb2758de55158ef3625dba3413ec2c1ea161f5030021b@group.calendar.google.com"  // Rede Kids
+];
 
-const agendasParaLer = [...new Set([calendarId, ...additionalCalendars])].filter(Boolean);
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
 
 const lideres = (process.env.WHATSAPP_LIDERES || "")
@@ -257,7 +263,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           } else if (msg.body === "2") {
             info.etapa = "alterar_departamento";
             console.log(`[Fluxo] Usuário ${numero} iniciou alteração de evento.`);
-            return msg.reply("De qual departamento é o evento que deseja alterar?\n\n1 - Epifania\n2 - Rede Code\n3 - Intercessão\n4 - Rede de Homens\n5 - Rede de Casais\n6 - Rede de mulheres\n7 - Flechas Kids\n8 - Projeto Social Seeds\n9 - Outros");
+            return msg.reply("De qual departamento é o evento que deseja alterar?\n\n1 - Diretoria\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Code\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
           } else {
             return msg.reply("❌ Opção inválida. Digite 1 para Agendar ou 2 para Alterar.");
           }
@@ -265,12 +271,13 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
         if (info.etapa === "alterar_departamento") {
           const deptoMapa = {
-            "1": "Epifania", "2": "Rede Code", "3": "Intercessão",
-            "4": "Rede de Homens", "5": "Rede de Casais", "6": "Rede de mulheres",
-            "7": "Rede Kids", "8": "Projeto Social Seeds", "9": "Outros"
+            "1": "Diretoria", "2": "Epifania", "3": "Intercessão",
+            "4": "Projeto Social Seeds", "5": "Rede Code", "6": "Rede de Casais",
+            "7": "Rede de Homens", "8": "Rede de Mulheres", "9": "Rede Kids",
+            "10": "Outros"
           };
           const depto = deptoMapa[msg.body];
-          if (!depto) return msg.reply("❌ Escolha um departamento da lista (1 a 9).");
+          if (!depto) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
 
           info.departamento = depto;
           await msg.reply(`🔍 Buscando eventos de *${depto}* em ${new Date().getFullYear()}...`);
