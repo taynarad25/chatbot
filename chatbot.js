@@ -180,6 +180,11 @@ function criarClient() {
 
   client.on("auth_failure", (msg) => {
     console.error("Falha na autenticação:", msg);
+    clientReady = false;
+    pendingQr = null;
+    isGeneratingQr = false;
+    isInitializing = false;
+    saveBotState(false); // Se a sessão no cache falhou, paramos o bot para evitar loops
   });
 
   client.on("disconnected", (reason) => {
@@ -713,6 +718,17 @@ Digite *menu* para voltar ao menu principal.`;
   });
 }
 
+// =====================================
+// PERSISTÊNCIA DE ESTADO (ATIVO/PARADO)
+// =====================================
+const STATE_FILE = path.join(__dirname, 'bot_state.json');
+const saveBotState = (active) => fs.writeFileSync(STATE_FILE, JSON.stringify({ active }), 'utf8');
+const loadBotState = () => {
+  if (!fs.existsSync(STATE_FILE)) return { active: false };
+  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
+  catch (e) { return { active: false }; }
+};
+
 async function startClient() {
   if (clientReady || isInitializing) return;
   console.log("🚀 Iniciando processo de inicialização do cliente...");
@@ -756,6 +772,7 @@ async function startClient() {
   });
 
   isInitializing = true;
+  saveBotState(true); // Salva que o bot DEVE estar rodando
   isGeneratingQr = true;
   pendingQr = null;
   criarClient();
@@ -796,6 +813,7 @@ async function cancelQr() {
     }
   }
   client = null;
+  saveBotState(false); // Salva que o bot DEVE estar parado
   clientReady = false;
   isInitializing = false;
   isGeneratingQr = false;
@@ -828,6 +846,7 @@ async function disconnectClient() {
     return { ok: true, message: "WhatsApp desconectado (com aviso de erro no processo)." };
   } finally {
     client = null;
+    saveBotState(false); // Salva que o bot DEVE estar parado
     clientReady = false;
     isInitializing = false;
     isGeneratingQr = false;
@@ -848,14 +867,12 @@ function getStatus() {
 
 startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
 
-// Verifica se existe uma sessão salva para decidir se inicia o bot automaticamente.
-// Isso evita que o QR Code seja gerado sem que haja alguém logado no painel para ver.
-const sessionPath = path.join(__dirname, ".wwebjs_auth", `session-${clientId}`);
-if (fs.existsSync(sessionPath)) {
-  console.log("[Autostart] Sessão detectada. Conectando ao WhatsApp...");
+const botState = loadBotState();
+if (botState.active) {
+  console.log("[Autostart] O bot estava ativo antes do reinício. Retomando...");
   startClient();
 } else {
-  console.log("[Autostart] Nenhuma sessão detectada. O QR Code só será gerado após solicitação no painel.");
+  console.log("[Autostart] O bot estava parado. Aguardando comando manual no painel.");
 }
 
 // Tratamento de encerramento gracioso para evitar travas residuais no Chromium

@@ -10,6 +10,7 @@ services:
       - ./.wwebjs_auth:/usr/src/app/.wwebjs_auth
       - ./combined.log:/usr/src/app/combined.log
       - ./login.json:/usr/src/app/login.json
+      - ./bot_state.json:/usr/src/app/bot_state.json
     networks:
       - bot-bridge
 
