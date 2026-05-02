@@ -9,3 +9,4 @@ login.json
 npm-debug.log*
 .DS_Store
 Thumbs.db
+bot_state.json
