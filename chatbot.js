@@ -136,6 +136,7 @@ let isInitializing = false;
 let pendingQr = null;
 let clientId = "bot";
 let isGeneratingQr = false;
+let isCanceling = false;
 
 function criarClient() {
   client = new Client({
@@ -811,26 +812,30 @@ async function startClient() {
     }
   } finally {
     isInitializing = false;
-    isGeneratingQr = clientReady || !!pendingQr;
   }
 }
 
 async function cancelQr() {
-  console.log("⏹️ Solicitando cancelamento da geração do QR Code...");
-  if (client && !clientReady) {
-    try {
-      await client.destroy();
-    } catch (err) {
-      console.warn("⚠️ Erro ao destruir cliente no cancelamento:", err);
+  isCanceling = true;
+  try {
+    console.log("⏹️ Solicitando cancelamento da geração do QR Code...");
+    if (client && !clientReady) {
+      try {
+        await client.destroy();
+      } catch (err) {
+        console.warn("⚠️ Erro ao destruir cliente no cancelamento:", err);
+      }
     }
+    client = null;
+    saveBotState(false); // Salva que o bot DEVE estar parado
+    clientReady = false;
+    isInitializing = false;
+    isGeneratingQr = false;
+    pendingQr = null;
+    console.log("✅ Solicitação de QR Code cancelada com sucesso.");
+  } finally {
+    isCanceling = false;
   }
-  client = null;
-  saveBotState(false); // Salva que o bot DEVE estar parado
-  clientReady = false;
-  isInitializing = false;
-  isGeneratingQr = false;
-  pendingQr = null;
-  console.log("✅ Solicitação de QR Code cancelada com sucesso.");
 }
 
 async function disconnectClient() {
@@ -871,6 +876,7 @@ function getStatus() {
     connected: clientReady,
     initializing: isInitializing,
     generatingQr: isGeneratingQr,
+    canceling: isCanceling,
     hasQr: !!pendingQr,
     qrDataUrl: pendingQr?.dataUrl || null,
     qrCreatedAt: pendingQr?.createdAt || null,
