@@ -104,11 +104,12 @@ const calendar = google.calendar({
 });
 
 // Funções auxiliares
-async function buscarEventos(inicio, fim) {
+async function buscarEventos(inicio, fim, agendaId = null) {
   let todosEventos = [];
-  console.log(`[Google Calendar] Buscando eventos entre ${inicio} e ${fim}`);
+  const agendas = agendaId ? [agendaId] : agendasParaLer;
+  console.log(`[Google Calendar] Buscando eventos em ${agendas.length} agenda(s) entre ${inicio} e ${fim}`);
   
-  for (const id of agendasParaLer) {
+  for (const id of agendas) {
     try {
       const res = await calendar.events.list({
         calendarId: id,
@@ -308,16 +309,23 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
         }
 
         if (info.etapa === "alterar_departamento") {
-          const deptoMapa = {
-            "1": "Diretoria", "2": "Epifania", "3": "Intercessão",
-            "4": "Projeto Social Seeds", "5": "Rede Code", "6": "Rede de Casais",
-            "7": "Rede de Homens", "8": "Rede de Mulheres", "9": "Rede Kids",
-            "10": "Outros"
+          const mapaConfig = {
+            "1": { nome: "Diretoria", id: agendasParaLer[0] },
+            "2": { nome: "Epifania", id: agendasParaLer[1] },
+            "3": { nome: "Intercessão", id: agendasParaLer[2] },
+            "4": { nome: "Projeto Social Seeds", id: agendasParaLer[4] },
+            "5": { nome: "Rede Code", id: agendasParaLer[5] },
+            "6": { nome: "Rede de Casais", id: agendasParaLer[6] },
+            "7": { nome: "Rede de Homens", id: agendasParaLer[7] },
+            "8": { nome: "Rede de Mulheres", id: agendasParaLer[8] },
+            "9": { nome: "Rede Kids", id: agendasParaLer[9] },
+            "10": { nome: "Outros", id: agendasParaLer[3] }
           };
-          const depto = deptoMapa[msg.body];
-          if (!depto) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
+          const config = mapaConfig[msg.body];
+          if (!config) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
 
-          info.departamento = depto;
+          info.departamento = config.nome;
+          info.calendarIdBusca = config.id;
           await msg.reply(`🔍 Buscando eventos de *${depto}* em ${new Date().getFullYear()}...`);
 
           try {
@@ -326,12 +334,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const inicioAno = agora.clone().startOf('year').subtract(1, 'minute').format();
             const fimAno = agora.clone().endOf('year').format();
             
-            // Busca eventos que contenham o nome do departamento no resumo
-            const eventos = await buscarEventos(inicioAno, fimAno);
-            const filtrados = eventos.filter(ev => 
-              (ev.summary && ev.summary.toLowerCase().includes(depto.toLowerCase())) || 
-              (depto === "Outros")
-            );
+            // Busca eventos especificamente na agenda do departamento selecionado
+            const filtrados = await buscarEventos(inicioAno, fimAno, info.calendarIdBusca);
 
             if (filtrados.length === 0) {
               delete etapas[numero];
@@ -343,8 +347,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             
             let lista = `📋 *Eventos de ${depto}*\nQual você deseja alterar?\n\n`;
             info.eventosEncontrados.forEach((ev, i) => {
-              const d = new Date(ev.start.dateTime || ev.start.date);
-              lista += `${i + 1} - ${d.getDate()}/${d.getMonth()+1}: ${ev.summary}\n`;
+              const d = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo");
+              lista += `${i + 1} - ${d.format("DD/MM")}: ${ev.summary}\n`;
             });
             return msg.reply(lista);
           } catch (e) {
@@ -446,15 +450,19 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             }
 
             let disponiveis = diasPossiveis.filter(dataMsg => {
-              const diaS = dataMsg.getDate();
+              const dTarget = moment(dataMsg).tz("America/Sao_Paulo").startOf('day');
               const eventosNoDia = todosEventos.filter(ev => {
-                const startStr = ev.start.dateTime || ev.start.date;
-                const endStr = ev.end.dateTime || ev.end.date;
-                const evStart = new Date(startStr);
-                const evEnd = new Date(endStr);
-                const diaInicio = startStr.includes('T') ? evStart.getDate() : parseInt(startStr.split('-')[2]);
-                const diaFim = endStr.includes('T') ? evEnd.getDate() : parseInt(endStr.split('-')[2]);
-                return (diaS >= diaInicio && diaS <= diaFim);
+                const evStart = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf('day');
+                let evEnd = moment.tz(ev.end.dateTime || ev.end.date, "America/Sao_Paulo");
+                
+                // Ajuste para eventos de dia inteiro (o Google define o fim como o dia seguinte, exclusivo)
+                if (ev.start.date) {
+                  evEnd.subtract(1, 'ms').startOf('day');
+                } else {
+                  evEnd.endOf('day');
+                }
+                
+                return dTarget.isBetween(evStart, evEnd, 'day', '[]');
               });
 
               if (eventosNoDia.length === 0) return true;
