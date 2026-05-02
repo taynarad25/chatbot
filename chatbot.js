@@ -106,6 +106,8 @@ const calendar = google.calendar({
 // Funções auxiliares
 async function buscarEventos(inicio, fim) {
   let todosEventos = [];
+  console.log(`[Google Calendar] Buscando eventos entre ${inicio} e ${fim}`);
+  
   for (const id of agendasParaLer) {
     try {
       const res = await calendar.events.list({
@@ -319,9 +321,10 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           await msg.reply(`🔍 Buscando eventos de *${depto}* em ${new Date().getFullYear()}...`);
 
           try {
-            const ano = new Date().getFullYear();
-            const inicioAno = new Date(ano, 0, 1).toISOString();
-            const fimAno = new Date(ano, 11, 31, 23, 59, 59).toISOString();
+            const agora = moment.tz("America/Sao_Paulo");
+            const ano = agora.year();
+            const inicioAno = agora.clone().startOf('year').subtract(1, 'minute').format();
+            const fimAno = agora.clone().endOf('year').format();
             
             // Busca eventos que contenham o nome do departamento no resumo
             const eventos = await buscarEventos(inicioAno, fimAno);
@@ -426,9 +429,10 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           console.log(`[Agenda] Consultando disponibilidades para ${numero}...`);
 
           try {
-            const ano = new Date().getFullYear();
-            const inicioBusca = new Date(ano, info.mes - 1, 1).toISOString();
-            const fimBusca = new Date(ano, info.mes, 0, 23, 59, 59).toISOString();
+            const agora = moment.tz("America/Sao_Paulo");
+            const ano = agora.year();
+            const inicioBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
+            const fimBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").endOf('month').format();
 
             const todosEventos = await buscarEventos(inicioBusca, fimBusca);
 
@@ -571,22 +575,21 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
       } else if (info.fluxo === "ver_agenda") {
         // Lógica de consulta de agenda (Opção 2)
         if (info.etapa === "escolha_mes") {
-          const hoje = new Date();
-          const mesAtual = hoje.getMonth() + 1;
+          const agora = moment.tz("America/Sao_Paulo");
+          const mesAtual = agora.month() + 1;
           const escolha = parseInt(msg.body.trim());
 
           if (isNaN(escolha) || escolha < mesAtual || escolha > 12) {
             return msg.reply(`❌ Opção inválida. Por favor, escolha um mês de ${mesAtual} a 12.`);
           }
 
-          let inicioBusca, fimBusca, mesNome;
           const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-          mesNome = meses[escolha - 1];
-          const ano = hoje.getFullYear();
+          const mesNome = meses[escolha - 1];
+          const ano = agora.year();
 
-          // Define o início e fim do mês selecionado usando moment para garantir o fuso horário de SP (UTC-3)
-          inicioBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").startOf('month').toISOString();
-          fimBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").endOf('month').toISOString();
+          // Define o início e fim do mês usando format() para manter o offset -03:00, garantindo que o Google entenda o horário local
+          const inicioBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
+          const fimBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").endOf('month').format();
 
           console.log(`[Agenda] Buscando eventos para ${numero} em ${mesNome}`);
           await msg.reply(`🔍 Consultando eventos de ${mesNome}...`);
