@@ -142,6 +142,7 @@ const etapas = {};
 let client;
 let clientReady = false;
 let isInitializing = false;
+let isAutoStarting = false;
 let pendingQr = null;
 let clientId = "bot";
 let isGeneratingQr = false;
@@ -167,6 +168,13 @@ function criarClient() {
   });
 
   client.on("qr", async (qr) => {
+    if (isAutoStarting) {
+      console.warn("[Autostart] Sessão expirada ou inválida. Cancelando inicialização automática para evitar geração de QR Code órfão.");
+      isAutoStarting = false;
+      await cancelQr();
+      return;
+    }
+
     console.log("✅ QR Code gerado com sucesso.");
     try {
       const dataUrl = await qrcode.toDataURL(qr);
@@ -181,6 +189,8 @@ function criarClient() {
     clientReady = true;
     pendingQr = null;
     isGeneratingQr = false;
+    isAutoStarting = false;
+    saveBotState(true); // Salva como ativo apenas quando a conexão é confirmada
     console.log("✅ Bot conectado!");
   });
 
@@ -194,6 +204,7 @@ function criarClient() {
     pendingQr = null;
     isGeneratingQr = false;
     isInitializing = false;
+    isAutoStarting = false;
     saveBotState(false); // Se a sessão no cache falhou, paramos o bot para evitar loops
   });
 
@@ -202,6 +213,8 @@ function criarClient() {
     pendingQr = null;
     isGeneratingQr = false;
     isInitializing = false;
+    isAutoStarting = false;
+    saveBotState(false); // Salva como inativo ao desconectar
     console.warn(`[WhatsApp] Cliente desconectado. Motivo: ${reason}`);
   });
 
@@ -803,7 +816,6 @@ async function startClient() {
   });
 
   isInitializing = true;
-  saveBotState(true); // Salva que o bot DEVE estar rodando
   isGeneratingQr = true;
   pendingQr = null;
   criarClient();
@@ -849,6 +861,7 @@ async function cancelQr() {
     clientReady = false;
     isInitializing = false;
     isGeneratingQr = false;
+    isAutoStarting = false;
     pendingQr = null;
     console.log("✅ Solicitação de QR Code cancelada com sucesso.");
   } finally {
@@ -906,6 +919,7 @@ startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
 const botState = loadBotState();
 if (botState.active) {
   console.log("[Autostart] O bot estava ativo antes do reinício. Retomando...");
+  isAutoStarting = true;
   startClient();
 } else {
   console.log("[Autostart] O bot estava parado. Aguardando comando manual no painel.");
