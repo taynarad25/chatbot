@@ -326,7 +326,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
           info.departamento = config.nome;
           info.calendarIdBusca = config.id;
-          await msg.reply(`🔍 Buscando eventos de *${depto}* em ${new Date().getFullYear()}...`);
+          await msg.reply(`🔍 Buscando eventos de *${info.departamento}* em ${new Date().getFullYear()}...`);
 
           try {
             const agora = moment.tz("America/Sao_Paulo");
@@ -339,7 +339,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             if (filtrados.length === 0) {
               delete etapas[numero];
-              return msg.reply(`📅 Não encontrei eventos futuros para o departamento ${depto}.`);
+              return msg.reply(`📅 Não encontrei eventos futuros para o departamento ${info.departamento}.`);
             }
 
             info.eventosEncontrados = filtrados.slice(0, 15); // Limita a 15 para não travar o zap
