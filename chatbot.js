@@ -143,6 +143,7 @@ let client;
 let clientReady = false;
 let isInitializing = false;
 let pendingQr = null;
+let isAutoStarting = false;
 let clientId = "bot";
 let isGeneratingQr = false;
 let isCanceling = false;
@@ -167,6 +168,13 @@ function criarClient() {
   });
 
   client.on("qr", async (qr) => {
+    if (isAutoStarting) {
+      console.warn("[Autostart] Sessão expirada ou inválida. Cancelando inicialização automática para evitar geração de QR Code não solicitado.");
+      isAutoStarting = false;
+      await cancelQr();
+      return;
+    }
+
     console.log("✅ QR Code gerado com sucesso.");
     try {
       const dataUrl = await qrcode.toDataURL(qr);
@@ -180,6 +188,7 @@ function criarClient() {
   client.on("ready", () => {
     clientReady = true;
     pendingQr = null;
+    isAutoStarting = false;
     isGeneratingQr = false;
     saveBotState(true); // Salva como ativo apenas quando a conexão é confirmada
     console.log("✅ Bot conectado!");
@@ -194,6 +203,7 @@ function criarClient() {
     clientReady = false;
     pendingQr = null;
     isGeneratingQr = false;
+    isAutoStarting = false;
     isInitializing = false;
     saveBotState(false); // Se a sessão no cache falhou, paramos o bot para evitar loops
   });
@@ -202,6 +212,7 @@ function criarClient() {
     clientReady = false;
     pendingQr = null;
     isGeneratingQr = false;
+    isAutoStarting = false;
     isInitializing = false;
     saveBotState(false); // Salva como inativo ao desconectar
     console.warn(`[WhatsApp] Cliente desconectado. Motivo: ${reason}`);
@@ -855,6 +866,7 @@ async function cancelQr() {
     clientReady = false;
     isInitializing = false;
     isGeneratingQr = false;
+    isAutoStarting = false;
     pendingQr = null;
     console.log("✅ Solicitação de QR Code cancelada com sucesso.");
   } finally {
@@ -862,8 +874,14 @@ async function cancelQr() {
   }
 }
 
-async function disconnectClient() {
-  console.log("🔌 Iniciando processo de desconexão...");
+/**
+ * Desconecta o cliente.
+ * @param {boolean} shouldLogout - Se true, realiza logout (despareia o celular). Se false, apenas fecha o navegador.
+ */
+async function disconnectClient(shouldLogout = true) {
+  const action = shouldLogout ? "logout (desparear)" : "fechamento (manter sessão)";
+  console.log(`🔌 Iniciando processo de desconexão: ${action}...`);
+
   if (!client) {
     console.warn("⚠️ Tentativa de desconexão ignorada: Nenhum cliente ativo.");
     // Garante que o status seja resetado mesmo se o objeto client não existir
@@ -875,12 +893,12 @@ async function disconnectClient() {
   }
 
   try {
-    if (typeof client.logout === "function") {
+    if (shouldLogout && typeof client.logout === "function") {
       await client.logout();
     } else if (typeof client.destroy === "function") {
       await client.destroy();
     }
-    console.log("✅ WhatsApp desconectado e sessão encerrada.");
+    console.log(`✅ WhatsApp desconectado via ${action}.`);
     return { ok: true, message: "WhatsApp desconectado com sucesso." };
   } catch (err) {
     console.error("❌ Erro ao desconectar WhatsApp:", err);
@@ -909,13 +927,20 @@ function getStatus() {
 
 startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
 
-console.log("[Autostart] Inicializando bot automaticamente...");
-startClient();
+const botState = loadBotState();
+if (botState.active) {
+  console.log("[Autostart] O bot estava ativo antes do reinício. Tentando retomar sessão...");
+  isAutoStarting = true;
+  startClient();
+} else {
+  console.log("[Autostart] O bot estava parado. Aguardando comando manual no painel.");
+}
 
 // Tratamento de encerramento gracioso para evitar travas residuais no Chromium
 const gracefulShutdown = async (signal) => {
   console.log(`[Process] Recebido sinal ${signal}. Encerrando bot de forma limpa...`);
-  await disconnectClient();
+  // Aqui usamos false para APENAS fechar o navegador, sem deslogar a conta do WhatsApp
+  await disconnectClient(false);
   process.exit(0);
 };
 
