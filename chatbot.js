@@ -143,7 +143,6 @@ let client;
 let clientReady = false;
 let isInitializing = false;
 let pendingQr = null;
-let isAutoStarting = false;
 let clientId = "bot";
 let isGeneratingQr = false;
 let isCanceling = false;
@@ -168,13 +167,6 @@ function criarClient() {
   });
 
   client.on("qr", async (qr) => {
-    if (isAutoStarting) {
-      console.warn("[Autostart] Sessão expirada ou inválida. Cancelando inicialização automática para evitar geração de QR Code não solicitado.");
-      isAutoStarting = false;
-      await cancelQr();
-      return;
-    }
-
     console.log("✅ QR Code gerado com sucesso.");
     try {
       const dataUrl = await qrcode.toDataURL(qr);
@@ -188,7 +180,6 @@ function criarClient() {
   client.on("ready", () => {
     clientReady = true;
     pendingQr = null;
-    isAutoStarting = false;
     isGeneratingQr = false;
     saveBotState(true); // Salva como ativo apenas quando a conexão é confirmada
     console.log("✅ Bot conectado!");
@@ -203,7 +194,6 @@ function criarClient() {
     clientReady = false;
     pendingQr = null;
     isGeneratingQr = false;
-    isAutoStarting = false;
     isInitializing = false;
     saveBotState(false); // Se a sessão no cache falhou, paramos o bot para evitar loops
   });
@@ -212,7 +202,6 @@ function criarClient() {
     clientReady = false;
     pendingQr = null;
     isGeneratingQr = false;
-    isAutoStarting = false;
     isInitializing = false;
     saveBotState(false); // Salva como inativo ao desconectar
     console.warn(`[WhatsApp] Cliente desconectado. Motivo: ${reason}`);
@@ -866,7 +855,6 @@ async function cancelQr() {
     clientReady = false;
     isInitializing = false;
     isGeneratingQr = false;
-    isAutoStarting = false;
     pendingQr = null;
     console.log("✅ Solicitação de QR Code cancelada com sucesso.");
   } finally {
@@ -927,14 +915,8 @@ function getStatus() {
 
 startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
 
-const botState = loadBotState();
-if (botState.active) {
-  console.log("[Autostart] O bot estava ativo antes do reinício. Tentando retomar sessão...");
-  isAutoStarting = true;
-  startClient();
-} else {
-  console.log("[Autostart] O bot estava parado. Aguardando comando manual no painel.");
-}
+console.log("[Autostart] Iniciando conexão automática...");
+startClient();
 
 // Tratamento de encerramento gracioso para evitar travas residuais no Chromium
 const gracefulShutdown = async (signal) => {
