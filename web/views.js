@@ -281,15 +281,23 @@ function renderIndexHtml() {
     }
 
     async function refresh() {
-      const res = await fetch('/status');
-      if (!res.ok) { window.location.href = '/login'; return; }
-      const json = await res.json();
-      
-      const userRes = await fetch('/api/user-info');
-      const userJson = await userRes.json();
-      const isAdmin = userJson.ok && userJson.user.role === 'admin';
-      document.getElementById('btn-tab-admin').style.display = isAdmin ? 'block' : 'none';
-      document.getElementById('btn-tab-logs').style.display = isAdmin ? 'block' : 'none';
+      try {
+        const res = await fetch('/status');
+        
+        // Se o servidor retornar 401, a sessão expirou ou o servidor reiniciou (limpando a memória)
+        if (res.status === 401) {
+          window.location.href = '/login?message=Sessão expirada ou servidor reiniciado.';
+          return;
+        }
+        if (!res.ok) return;
+        const json = await res.json();
+        
+        const userRes = await fetch('/api/user-info');
+        if (userRes.status === 401) { window.location.href = '/login'; return; }
+        const userJson = await userRes.json();
+        const isAdmin = userJson.ok && userJson.user.role === 'admin';
+        document.getElementById('btn-tab-admin').style.display = isAdmin ? 'block' : 'none';
+        document.getElementById('btn-tab-logs').style.display = isAdmin ? 'block' : 'none';
 
       const actionMessageEl = document.getElementById('actionMessage');
       actionMessageEl.style.display = 'none'; // Hide previous action messages
@@ -323,7 +331,10 @@ function renderIndexHtml() {
               cont.scrollTop = cont.scrollHeight;
             }
           })
-          .catch(err => console.error('Erro ao buscar logs:', err));
+          .catch(err => console.warn('Erro ao buscar logs (sessão pode ter expirado)'));
+      }
+      } catch (err) {
+        console.log('Aguardando reconexão com o servidor...');
       }
     }
 

@@ -3,7 +3,7 @@ const { promisify } = require("util");
 const pbkdf2 = promisify(crypto.pbkdf2);
 
 const COOKIE_NAME = "whatsapp_control_session";
-const SESSION_TTL = 1000 * 60 * 15;
+const SESSION_TTL = 1000 * 60 * 120; // 2 horas de sessão
 const sessions = {};
 
 async function validatePassword(password, salt, hash) {
@@ -15,6 +15,12 @@ async function validatePassword(password, salt, hash) {
   } catch (err) {
     return false;
   }
+}
+
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = (await pbkdf2(password.trim(), salt, 100000, 64, "sha512")).toString("hex");
+  return { salt, hash };
 }
 
 function createSession(username, role, status = 'active') {
@@ -71,4 +77,4 @@ function clearSessionCookie(res, sessionId) {
   res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
 }
 
-module.exports = { validatePassword, createSession, getSession, getSessionId, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie, sessions };
+module.exports = { validatePassword, hashPassword, createSession, getSession, getSessionId, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie, sessions };

@@ -471,6 +471,11 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               if (info.isDiaInteiro && eventosNoDia.length > 0) return false;
 
               const [hDesejada] = info.horario.split(":").map(Number);
+              
+              // Se o horário for inválido (NaN), assumimos que o dia está disponível 
+              // ou tratamos como erro para não causar comportamento indefinido.
+              if (isNaN(hDesejada)) return true; 
+
               return !eventosNoDia.some(ev => {
                 if (ev.start.date) return true;
                 if (ev.summary && ev.summary.toLowerCase().includes("code")) return false;

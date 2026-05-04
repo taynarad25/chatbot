@@ -5,7 +5,7 @@ const { URL } = require("url");
 const crypto = require("crypto"); // Already imported in auth.js, but needed here for addUser
 const { promisify } = require("util");
 const { loadUsers, saveUser, deleteUser } = require("./web/users");
-const { validatePassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
+const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 
 const pbkdf2 = promisify(crypto.pbkdf2);
@@ -30,9 +30,9 @@ async function addUser({ username, password, role = 'user', status = 'active' })
   let userStatus = status;
 
   if (password) {
-    const normalizedPassword = password.trim();
-    salt = crypto.randomBytes(16).toString("hex");
-    hash = (await pbkdf2(normalizedPassword, salt, 100000, 64, "sha512")).toString("hex");
+    const hashedPassword = await hashPassword(password);
+    salt = hashedPassword.salt;
+    hash = hashedPassword.hash;
   } else {
     // Se não veio senha, é criação via admin e fica pendente até o usuário concluir o cadastro
     userStatus = 'pending';
@@ -189,9 +189,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
             return sendJson(res, 400, { ok: false, message: "Este usuário já concluiu o cadastro anteriormente." });
           }
 
-          const salt = crypto.randomBytes(16).toString("hex");
-          const hash = (await pbkdf2(password.trim(), salt, 100000, 64, "sha512")).toString("hex");
-
+          const { salt, hash } = await hashPassword(password);
+          
           saveUser({ ...user, salt, hash, status: 'active', updatedAt: new Date().toISOString() });
           return sendJson(res, 200, { ok: true, message: "Cadastro concluído! Agora você já pode fazer login." });
         } catch (err) {
