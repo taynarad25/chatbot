@@ -131,6 +131,20 @@ async function buscarEventos(inicio, fim, agendaId = null) {
   return todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
 }
 
+function mapearRedeParaAgendaId(nomeRede) {
+  const rede = (nomeRede || "").toLowerCase();
+  if (rede.includes("diretoria")) return agendasParaLer[0];
+  if (rede.includes("epifania")) return agendasParaLer[1];
+  if (rede.includes("intercessao") || rede.includes("intercessão")) return agendasParaLer[2];
+  if (rede.includes("seeds") || rede.includes("projeto")) return agendasParaLer[4];
+  if (rede.includes("ruach")) return agendasParaLer[5];
+  if (rede.includes("casais")) return agendasParaLer[6];
+  if (rede.includes("homens")) return agendasParaLer[7];
+  if (rede.includes("mulheres")) return agendasParaLer[8];
+  if (rede.includes("kids")) return agendasParaLer[9];
+  return agendasParaLer[3]; // Outros
+}
+
 function sabadosDoMes(ano, mes) {
   const sabados = [];
   const data = new Date(ano, mes - 1, 1);
@@ -222,25 +236,71 @@ function criarClient() {
       if (msg.from.endsWith("@g.us")) {
         const chat = await msg.getChat();
         if (chat.name === "Mensagens Secretaria" && msg.hasQuotedMsg) {
-          const texto = msg.body.toLowerCase().trim();
-          if (texto === "agendar" || texto === "não agendar") {
+          const textoMsg = msg.body.toLowerCase().trim();
+          if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o resumo enviado pelo bot
             if (quotedMsg.fromMe && quotedMsg.body.includes("Ref: ")) {
-              const match = quotedMsg.body.match(/Ref: ([\d-]+@c\.us)/);
-              if (match) {
-                const solicitanteId = match[1];
-                const feedback = texto === "agendar"
-                  ? "✅ *Agendamento Confirmado!*\n\nSua solicitação foi aprovada pela secretaria da Casa Forte. Nos vemos lá! 🙏\n\nDigite *menu* para voltar ao menu principal."
-                  : "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
+              const body = quotedMsg.body;
+              const matchRef = body.match(/Ref: ([\d-]+@c\.us)/);
+              if (matchRef) {
+                const solicitanteId = matchRef[1];
+                
+                if (textoMsg === "marcar evento") {
+                  try {
+                    const evento = body.match(/📅 \*Evento:\* (.*)/)?.[1]?.trim();
+                    const rede = body.match(/🌐 \*Rede:\* (.*)/)?.[1]?.trim();
+                    const dataMatch = body.match(/📆 \*Data:\* (\d+)\/(\d+)/);
+                    const horarioRaw = body.match(/⏰ \*Horário:\* (.*)/)?.[1]?.trim();
 
-                try {
-                  await client.sendMessage(solicitanteId, feedback);
-                  console.log(`[Secretaria] Feedback "${texto}" enviado com sucesso para ${solicitanteId}`);
-                } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback para ${solicitanteId}:`, sendErr.message);
+                    if (!evento || !rede || !dataMatch || !horarioRaw) {
+                      return msg.reply("❌ Erro ao extrair dados para o agendamento automático.");
+                    }
+
+                    const dia = dataMatch[1];
+                    const mes = dataMatch[2];
+                    const ano = moment().tz("America/Sao_Paulo").year();
+                    const agendaId = mapearRedeParaAgendaId(rede);
+
+                    const resource = {
+                      summary: evento,
+                      description: `Agendado via Bot - Solicitado pela Rede: ${rede}`,
+                      location: "Comunidade Cristã Casa Forte"
+                    };
+
+                    if (horarioRaw.includes("DIA TODO")) {
+                      const start = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+                      const end = start.clone().add(1, 'day');
+                      resource.start = { date: start.format("YYYY-MM-DD") };
+                      resource.end = { date: end.format("YYYY-MM-DD") };
+                    } else {
+                      const [hInicio, hFim] = horarioRaw.split(" - ").map(s => s.trim());
+                      const start = moment.tz(`${dia}/${mes}/${ano} ${hInicio}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
+                      const end = moment.tz(`${dia}/${mes}/${ano} ${hFim}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
+                      resource.start = { dateTime: start.format(), timeZone: "America/Sao_Paulo" };
+                      resource.end = { dateTime: end.format(), timeZone: "America/Sao_Paulo" };
+                    }
+
+                    await calendar.events.insert({ calendarId: agendaId, resource });
+                    
+                    const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial da Casa Forte. 🙏\n\nDigite *menu* para voltar ao menu principal.";
+                    await client.sendMessage(solicitanteId, feedback);
+                    console.log(`[Secretaria] Agendamento automático realizado para ${solicitanteId}`);
+                    return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
+                  } catch (err) {
+                    console.error("[Secretaria] Erro no agendamento automático:", err);
+                    return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática.");
+                  }
+                } else {
+                  const feedback = "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
+                  try {
+                    await client.sendMessage(solicitanteId, feedback);
+                    console.log(`[Secretaria] Feedback de recusa enviado para ${solicitanteId}`);
+                  } catch (sendErr) {
+                    console.error(`[Secretaria] Erro ao enviar feedback para ${solicitanteId}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Líder notificado sobre a recusa.`);
                 }
-                return msg.reply(`✅ Feedback enviado com sucesso para o solicitante.`);
               }
             }
           }
@@ -308,7 +368,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           } else if (msg.body === "2") {
             info.etapa = "alterar_departamento";
             console.log(`[Fluxo] Usuário ${numero} iniciou alteração de evento.`);
-            return msg.reply("De qual departamento é o evento que deseja alterar?\n\n1 - Diretoria\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Code\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
+            return msg.reply("De qual departamento é o evento que deseja alterar?\n\n1 - Diretoria\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
           } else {
             return msg.reply("❌ Opção inválida. Digite 1 para Agendar ou 2 para Alterar.");
           }
@@ -400,12 +460,27 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           console.log(`[Agendamento] Nome do evento: ${msg.body}`);
           info.nome = msg.body;
           info.etapa = "evento_rede";
-          return msg.reply("Qual rede está organizando? (Ex: Jovens, Mulheres, Ruach)");
+          return msg.reply("Qual rede está organizando?\n\n1 - Diretoria\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
         }
 
         if (info.etapa === "evento_rede") {
-          console.log(`[Agendamento] Rede: ${msg.body}`);
-          info.rede = msg.body;
+          const mapaRedes = {
+            "1": "Diretoria",
+            "2": "Epifania",
+            "3": "Intercessão",
+            "4": "Projeto Social Seeds",
+            "5": "Rede Ruach",
+            "6": "Rede de Casais",
+            "7": "Rede de Homens",
+            "8": "Rede de Mulheres",
+            "9": "Rede Kids",
+            "10": "Outros"
+          };
+          const escolha = msg.body.trim();
+          if (!mapaRedes[escolha]) return msg.reply("❌ Escolha uma opção da lista (1 a 10).");
+
+          info.rede = mapaRedes[escolha];
+          console.log(`[Agendamento] Rede selecionada: ${info.rede}`);
           info.etapa = "evento_mes";
           return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio)");
         }
@@ -495,6 +570,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             const todosEventos = await buscarEventos(inicioBusca, fimBusca);
 
+            let firstConflictDetails = null; // Para armazenar detalhes do primeiro conflito encontrado
+
             // Identificar sábados livres da diretoria para bloqueio
             const sabadosLivresDiretoria = todosEventos.filter(ev =>
               ev.calendarId === agendasParaLer[0] && // ID da agenda da Diretoria
@@ -516,6 +593,12 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
               // Se este dia é um "Sábado LIVRE" da Diretoria, ele não está disponível para outros agendamentos
               if (sabadosLivresDiretoria.includes(dTargetFormatted)) {
+                if (!firstConflictDetails) { // Armazena apenas o primeiro conflito
+                  firstConflictDetails = {
+                    type: "sabado_livre",
+                    date: dTargetFormatted
+                  };
+                }
                 return false;
               }
 
@@ -539,6 +622,16 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
               // Se o novo evento é de dia inteiro, qualquer evento existente no dia o torna indisponível
               if (info.isDiaInteiro) {
+                if (eventosNoDia.length > 0 && !firstConflictDetails) {
+                  const conflictingEv = eventosNoDia[0]; // Pega o primeiro evento que causa conflito
+                  firstConflictDetails = {
+                    type: "day_long_conflict",
+                    date: dTargetFormatted,
+                    summary: conflictingEv.summary || "Evento sem título",
+                    start: conflictingEv.start.dateTime || conflictingEv.start.date,
+                    end: conflictingEv.end.dateTime || conflictingEv.end.date
+                  };
+                }
                 return eventosNoDia.length === 0;
               }
 
@@ -557,7 +650,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 second: 0, millisecond: 0
               });
 
-              const bufferDuration = moment.duration(90, 'minutes'); // Buffer de 1h30
+              const bufferDuration = moment.duration(60, 'minutes'); // Buffer de 1h
 
               for (const ev of eventosNoDia) {
                 // Se um evento existente é de dia inteiro, ele conflita com qualquer novo evento com horário
@@ -575,6 +668,15 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 // Verifica sobreposição: o novo evento se sobrepõe se seu início for antes do fim buffered de um evento existente
                 // E seu fim for depois do início buffered de um evento existente.
                 if (newEventStartMoment.isBefore(bufferedExistingEventEnd) && newEventEndMoment.isAfter(bufferedExistingEventStart)) {
+                  if (!firstConflictDetails) { // Armazena apenas o primeiro conflito
+                    firstConflictDetails = {
+                      type: "time_conflict",
+                      date: dTargetFormatted,
+                      summary: ev.summary || "Evento sem título",
+                      start: ev.start.dateTime,
+                      end: ev.end.dateTime
+                    };
+                  }
                   return false; // Sobreposição encontrada, este dia não está disponível
                 }
               }
@@ -594,7 +696,22 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             if (disponiveis.length === 0) {
               delete etapas[numero];
-              return msg.reply("❌ Não há datas disponíveis para essas condições neste mês.");
+              let conflictMessage = "❌ Não há datas disponíveis para essas condições neste mês.";
+
+              if (firstConflictDetails) {
+                if (firstConflictDetails.type === "sabado_livre") {
+                  conflictMessage = `❌ Não há datas disponíveis para agendamento no dia ${moment(firstConflictDetails.date).format('DD/MM')}. Este sábado está reservado como "Sábado LIVRE" da Diretoria. Por favor, escolha outra data ou mês.`;
+                } else if (firstConflictDetails.type === "day_long_conflict") {
+                  conflictMessage = `❌ Não há datas disponíveis para o seu evento de *DIA TODO* no dia ${moment(firstConflictDetails.date).format('DD/MM')}. Já existe o evento "*${firstConflictDetails.summary}*" agendado para este dia. Por favor, escolha outra data ou mês.`;
+                } else if (firstConflictDetails.type === "time_conflict") {
+                  const conflictingEventStart = moment.tz(firstConflictDetails.start, "America/Sao_Paulo").format("HH:mm");
+                  const conflictingEventEnd = moment.tz(firstConflictDetails.end, "America/Sao_Paulo").format("HH:mm");
+                  conflictMessage = `❌ Não há datas disponíveis para o seu evento com o horário solicitado no dia ${moment(firstConflictDetails.date).format('DD/MM')}.
+Encontramos um conflito com o evento "*${firstConflictDetails.summary}*" que ocorre das *${conflictingEventStart}* às *${conflictingEventEnd}*.
+Por favor, tente agendar seu evento em outro horário ou data.`;
+                }
+              }
+              return msg.reply(conflictMessage);
             }
 
             info.datasEncontradas = disponiveis;
@@ -618,14 +735,14 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           if (isNaN(escolha) || !info.datasEncontradas[escolha]) return msg.reply("❌ Escolha um número da lista.");
 
           const dataFinal = info.datasEncontradas[escolha];
-          const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horario}\n\nAguarde a confirmação da secretaria!\n\n📝 *Enquanto aguarda a confirmação, por favor, já preencha o formulário detalhado com os dados do evento:* \nhttps://forms.gle/LXLGbS3CDxQwxMBf6\n\nDigite *menu* para voltar ao menu principal.`;
+          const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\n📝 *Enquanto aguarda a confirmação, por favor, já preencha o formulário detalhado com os dados do evento:* \nhttps://forms.gle/LXLGbS3CDxQwxMBf6\n\nDigite *menu* para voltar ao menu principal.`;
           
           // Notificar o grupo de agendamento
           try {
             const chats = await client.getChats();
             const grupoAgendamento = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
             if (grupoAgendamento) {
-              const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horario}\n\n_Responda a este resumo com "agendar" ou "não agendar" para notificar o líder._\nRef: ${numero}`;
+              const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\nRef: ${numero}`;
               await grupoAgendamento.sendMessage(resumoGrupo);
               console.log(`[Notificação] Resumo de agendamento enviado ao grupo 'Mensagens Secretaria'.`);
             } else {
@@ -952,6 +1069,81 @@ async function cancelQr() {
     client = null;
     saveBotState(false); // Salva que o bot DEVE estar parado
     clientReady = false;
+    isInitializing = false;
+    isGeneratingQr = false;
+    pendingQr = null;
+    console.log("✅ Solicitação de QR Code cancelada com sucesso.");
+  } finally {
+    isCanceling = false;
+  }
+}
+
+/**
+ * Desconecta o cliente.
+ * @param {boolean} shouldLogout - Se true, realiza logout (despareia o celular). Se false, apenas fecha o navegador.
+ */
+async function disconnectClient(shouldLogout = true) {
+  const action = shouldLogout ? "logout (desparear)" : "fechamento (manter sessão)";
+  console.log(`🔌 Iniciando processo de desconexão: ${action}...`);
+
+  if (!client) {
+    console.warn("⚠️ Tentativa de desconexão ignorada: Nenhum cliente ativo.");
+    // Garante que o status seja resetado mesmo se o objeto client não existir
+    clientReady = false;
+    isInitializing = false;
+    isGeneratingQr = false;
+    pendingQr = null;
+    return { ok: false, message: "Não há cliente ativo para desconectar." };
+  }
+
+  try {
+    if (shouldLogout && typeof client.logout === "function") {
+      await client.logout();
+    } else if (typeof client.destroy === "function") {
+      await client.destroy();
+    }
+    console.log(`✅ WhatsApp desconectado via ${action}.`);
+    return { ok: true, message: "WhatsApp desconectado com sucesso." };
+  } catch (err) {
+    console.error("❌ Erro ao desconectar WhatsApp:", err);
+    return { ok: true, message: "WhatsApp desconectado (com aviso de erro no processo)." };
+  } finally {
+    client = null;
+    saveBotState(false); // Salva que o bot DEVE estar parado
+    clientReady = false;
+    isInitializing = false;
+    isGeneratingQr = false;
+    pendingQr = null;
+  }
+}
+
+function getStatus() {
+  return {
+    connected: clientReady,
+    initializing: isInitializing,
+    generatingQr: isGeneratingQr,
+    canceling: isCanceling,
+    hasQr: !!pendingQr,
+    qrDataUrl: pendingQr?.dataUrl || null,
+    qrCreatedAt: pendingQr?.createdAt || null,
+  };
+}
+
+startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
+
+console.log("[Autostart] Iniciando conexão automática...");
+startClient();
+
+// Tratamento de encerramento gracioso para evitar travas residuais no Chromium
+const gracefulShutdown = async (signal) => {
+  console.log(`[Process] Recebido sinal ${signal}. Encerrando bot de forma limpa...`);
+  // Aqui usamos false para APENAS fechar o navegador, sem deslogar a conta do WhatsApp
+  await disconnectClient(false);
+  process.exit(0);
+};
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
     isInitializing = false;
     isGeneratingQr = false;
     pendingQr = null;
