@@ -76,7 +76,7 @@ const agendasParaLer = [
   "10e97ba829f906588511279bb65b8ce6c8667d9c548339f04de137f9d8ab8a5d@group.calendar.google.com", // Intercessão
   "16b2f3baec9c14aba0d43a139b12a04893c33edb9fb45a0b8f081403a3eaa036@group.calendar.google.com", // Outros
   "10a17be6c05bc778f05dbfbddb0fda8ea1e73d2c2349b806230cc4990a14191a@group.calendar.google.com", // Projeto Social Seeds
-  "fa6cf624289edd4efd67cdd11367d6fd7c15e6d74b319ab579ef378498f5fdd9@group.calendar.google.com", // Rede Code
+  "fa6cf624289edd4efd67cdd11367d6fd7c15e6d74b319ab579ef378498f5fdd9@group.calendar.google.com", // Rede Ruach
   "bd9c2b98016d155d427591ed6c339224516db3724146b5dcd3f94c4fe6c22c84@group.calendar.google.com", // Rede de Casais
   "b9daab311cb773bd14efd27ce6efbada7aa94ac8a5adce857b5c694b75fe2803@group.calendar.google.com", // Rede de Homens
   "548839d693663fb3a5854930256f5fd321534a13af3ba67c5a09e6f347992be8@group.calendar.google.com", // Rede de Mulheres
@@ -119,7 +119,11 @@ async function buscarEventos(inicio, fim, agendaId = null) {
         orderBy: "startTime",
         maxResults: 2500,
       });
-      if (res.data.items) todosEventos = todosEventos.concat(res.data.items);
+      if (res.data.items) {
+        // Anexa o calendarId a cada evento para permitir filtragem posterior
+        const eventsWithCalendarId = res.data.items.map(item => ({ ...item, calendarId: id }));
+        todosEventos = todosEventos.concat(eventsWithCalendarId);
+      }
     } catch (e) {
       console.error(`[Google Calendar] Erro na agenda ${id}:`, e.response?.data || e.message);
     }
@@ -252,12 +256,12 @@ function criarClient() {
 
       console.log(`[Mensagem Recebida] De: ${numero} (${isLider ? 'Líder' : 'Usuário'}) | Texto: "${msg.body}"`);
 
-      const saudacoes = ["oi", "ola", "olá", "paz", "bom dia", "boa tarde", "boa noite", "menu"];
-      const ehSaudacao = saudacoes.some(s => texto.startsWith(s));
-      const opcoesValidas = isLider ? ["1", "2", "3", "4", "5", "6", "7"] : ["1", "2", "3", "4", "5"];
+      // Expressão regular para capturar saudações permitindo letras repetidas e variações
+      // Exemplos: "pazzz", "a pazzz", "oiiiii", "olaaaaa", "diaaa", "olla"
+      const saudacoesRegex = /^(oi+|ol[aá]+|paz+|a\s+paz+|bom\s+dia|boa\s+tarde|boa\s+noite|menu|dia+|olla+)$/i;
+      const ehSaudacao = saudacoesRegex.test(texto);
 
-      // Atende saudações ou qualquer mensagem que não seja uma opção de menu válida (quando fora de um fluxo)
-      if (ehSaudacao || (!etapas[numero] && !opcoesValidas.includes(texto))) {
+      if (ehSaudacao) {
         delete etapas[numero];
       const menu = isLider
         ? `Olá! 👋
@@ -316,7 +320,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             "2": { nome: "Epifania", id: agendasParaLer[1] },
             "3": { nome: "Intercessão", id: agendasParaLer[2] },
             "4": { nome: "Projeto Social Seeds", id: agendasParaLer[4] },
-            "5": { nome: "Rede Code", id: agendasParaLer[5] },
+            "5": { nome: "Rede Ruach", id: agendasParaLer[5] },
             "6": { nome: "Rede de Casais", id: agendasParaLer[6] },
             "7": { nome: "Rede de Homens", id: agendasParaLer[7] },
             "8": { nome: "Rede de Mulheres", id: agendasParaLer[8] },
@@ -396,7 +400,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           console.log(`[Agendamento] Nome do evento: ${msg.body}`);
           info.nome = msg.body;
           info.etapa = "evento_rede";
-          return msg.reply("Qual rede está organizando? (Ex: Jovens, Mulheres, Code)");
+          return msg.reply("Qual rede está organizando? (Ex: Jovens, Mulheres, Ruach)");
         }
 
         if (info.etapa === "evento_rede") {
@@ -412,24 +416,73 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           console.log(`[Agendamento] Mês: ${mes}`);
           info.mes = mes;
           info.etapa = "evento_tipo_dia";
-          return msg.reply("Qual o dia da semana desejado?\n\n1 - Sábados\n2 - Domingos\n3 - Sextas\n4 - Outro dia");
+          return msg.reply("Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Vários dias / Evento longo");
         }
 
         if (info.etapa === "evento_tipo_dia") {
           const escolha = msg.body;
-          const diasMapa = { "1": 6, "2": 0, "3": 5 };
-          info.diaSemanaFiltro = diasMapa[escolha] !== undefined ? diasMapa[escolha] : "OUTRO";
+          // Mapeamento: 1-Seg, 2-Ter, 3-Qua, 4-Qui, 5-Sex, 6-Sáb, 7-Dom, 8-Todos/Vários
+          const diasMapa = { 
+            "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 0, "8": "TODOS"
+          };
+          
+          if (diasMapa[escolha] === undefined) {
+            return msg.reply("❌ Opção inválida. Por favor, escolha um número de 1 a 8.");
+          }
+
+          info.diaSemanaFiltro = diasMapa[escolha];
           console.log(`Dia da semana selecionado por ${numero}: ${escolha} (${info.diaSemanaFiltro})`);
 
           info.etapa = "evento_horario";
-          return msg.reply("⏰ Qual o horário do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração.");
+          return msg.reply("⏰ Qual o *horário de início* do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração ou vários dias.");
         }
 
         if (info.etapa === "evento_horario") {
           const entrada = msg.body.toUpperCase();
-          info.horario = entrada;
+          info.horarioInicio = entrada; // Armazena o horário de início
           info.isDiaInteiro = entrada.includes("DIA");
-          console.log(`[Agendamento] Horário: ${entrada}`);
+          console.log(`[Agendamento] Horário de início: ${entrada}`);
+
+          if (info.isDiaInteiro) {
+            info.horarioFim = "DIA TODO"; // Se for dia inteiro, o fim também é dia todo
+            info.etapa = "consultar_disponibilidade"; // Pula para a consulta
+            // Não retorna aqui, deixa o fluxo cair para a próxima etapa
+          } else {
+            // Valida o formato do horário de início
+            const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            if (!timeRegex.test(info.horarioInicio)) {
+              return msg.reply("❌ Formato de horário de início inválido. Por favor, use HH:MM (ex: 19:30) ou *DIA TODO*.");
+            }
+            info.etapa = "evento_horario_fim";
+            return msg.reply("⏰ Qual o *horário de término* do evento? (Ex: 21:00)");
+          }
+        }
+
+        if (info.etapa === "evento_horario_fim") {
+          const entradaFim = msg.body.toUpperCase();
+          info.horarioFim = entradaFim;
+
+          // Valida o formato do horário de término
+          const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+          if (!timeRegex.test(info.horarioFim)) {
+            return msg.reply("❌ Formato de horário de término inválido. Por favor, use HH:MM (ex: 21:00).");
+          }
+
+          // Compara os horários de início e fim
+          const [hInicio, mInicio] = info.horarioInicio.split(":").map(Number);
+          const [hFim, mFim] = info.horarioFim.split(":").map(Number);
+          const tempStart = moment().set({hour: hInicio, minute: mInicio, second: 0, millisecond: 0});
+          const tempEnd = moment().set({hour: hFim, minute: mFim, second: 0, millisecond: 0});
+          if (tempEnd.isSameOrBefore(tempStart)) {
+            return msg.reply("❌ O horário de término deve ser depois do horário de início.");
+          }
+          console.log(`[Agendamento] Horário de término: ${info.horarioFim}`);
+          info.etapa = "consultar_disponibilidade"; // Prossegue para a consulta
+          // Não retorna aqui, deixa o fluxo cair para a próxima etapa
+        }
+
+        // Nova etapa para centralizar a consulta de disponibilidade
+        if (info.etapa === "consultar_disponibilidade") {
 
           await msg.reply("🔍 Consultando agenda...");
           console.log(`[Agenda] Consultando disponibilidades para ${numero}...`);
@@ -442,10 +495,16 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             const todosEventos = await buscarEventos(inicioBusca, fimBusca);
 
+            // Identificar sábados livres da diretoria para bloqueio
+            const sabadosLivresDiretoria = todosEventos.filter(ev =>
+              ev.calendarId === agendasParaLer[0] && // ID da agenda da Diretoria
+              ev.summary && ev.summary.toLowerCase().includes("sábado livre")
+            ).map(ev => moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf('day').format('YYYY-MM-DD'));
+
             let diasPossiveis = [];
             let dataCursor = new Date(ano, info.mes - 1, 1);
             while (dataCursor.getMonth() === info.mes - 1) {
-              if (info.diaSemanaFiltro === "OUTRO" || dataCursor.getDay() === info.diaSemanaFiltro) {
+              if (info.diaSemanaFiltro === "TODOS" || dataCursor.getDay() === info.diaSemanaFiltro) {
                 diasPossiveis.push(new Date(dataCursor));
               }
               dataCursor.setDate(dataCursor.getDate() + 1);
@@ -453,42 +512,77 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             let disponiveis = diasPossiveis.filter(dataMsg => {
               const dTarget = moment(dataMsg).tz("America/Sao_Paulo").startOf('day');
+              const dTargetFormatted = dTarget.format('YYYY-MM-DD');
+
+              // Se este dia é um "Sábado LIVRE" da Diretoria, ele não está disponível para outros agendamentos
+              if (sabadosLivresDiretoria.includes(dTargetFormatted)) {
+                return false;
+              }
+
               const eventosNoDia = todosEventos.filter(ev => {
+                // Ignorar os próprios eventos "Sábado LIVRE" da Diretoria ao verificar conflitos com outros eventos
+                if (ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre")) {
+                    return false;
+                }
                 const evStart = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf('day');
                 let evEnd = moment.tz(ev.end.dateTime || ev.end.date, "America/Sao_Paulo");
-                
+
                 // Ajuste para eventos de dia inteiro (o Google define o fim como o dia seguinte, exclusivo)
-                if (ev.start.date) {
-                  evEnd.subtract(1, 'ms').startOf('day');
+                if (ev.start.date && !ev.start.dateTime) { // É um evento de dia inteiro
+                  evEnd = moment.tz(ev.end.date, "America/Sao_Paulo").subtract(1, 'day').endOf('day'); // Fim do dia anterior à data de término do Google
                 } else {
                   evEnd.endOf('day');
                 }
-                
+
                 return dTarget.isBetween(evStart, evEnd, 'day', '[]');
               });
 
-              if (eventosNoDia.length === 0) return true;
-              if (info.isDiaInteiro && eventosNoDia.length > 0) return false;
+              // Se o novo evento é de dia inteiro, qualquer evento existente no dia o torna indisponível
+              if (info.isDiaInteiro) {
+                return eventosNoDia.length === 0;
+              }
 
-              const [hDesejada] = info.horario.split(":").map(Number);
-              
-              // Se o horário for inválido (NaN), assumimos que o dia está disponível 
-              // ou tratamos como erro para não causar comportamento indefinido.
-              if (isNaN(hDesejada)) return true; 
+              // Para eventos com horário, verifica sobreposição com buffer
+              const [hInicioNovo, mInicioNovo] = info.horarioInicio.split(":").map(Number);
+              const [hFimNovo, mFimNovo] = info.horarioFim.split(":").map(Number);
 
-              return !eventosNoDia.some(ev => {
-                if (ev.start.date) return true;
-                if (ev.summary && ev.summary.toLowerCase().includes("code")) return false;
-
-                const evStart = new Date(ev.start.dateTime);
-                const evEnd = new Date(ev.end.dateTime);
-                const hIni = evStart.getHours();
-                const hFim = evEnd.getHours() || (hIni + 1);
-                return (hDesejada < hFim && (hDesejada + 3) > hIni);
+              const newEventStartMoment = moment(dataMsg).set({
+                hour: hInicioNovo,
+                minute: mInicioNovo,
+                second: 0, millisecond: 0
               });
+              const newEventEndMoment = moment(dataMsg).set({
+                hour: hFimNovo,
+                minute: mFimNovo,
+                second: 0, millisecond: 0
+              });
+
+              const bufferDuration = moment.duration(90, 'minutes'); // Buffer de 1h30
+
+              for (const ev of eventosNoDia) {
+                // Se um evento existente é de dia inteiro, ele conflita com qualquer novo evento com horário
+                if (ev.start.date && !ev.start.dateTime) {
+                  return false;
+                }
+
+                const existingEventStart = moment.tz(ev.start.dateTime, "America/Sao_Paulo");
+                const existingEventEnd = moment.tz(ev.end.dateTime, "America/Sao_Paulo");
+
+                // Calcula os horários do evento existente com o buffer
+                const bufferedExistingEventStart = existingEventStart.clone().subtract(bufferDuration);
+                const bufferedExistingEventEnd = existingEventEnd.clone().add(bufferDuration);
+
+                // Verifica sobreposição: o novo evento se sobrepõe se seu início for antes do fim buffered de um evento existente
+                // E seu fim for depois do início buffered de um evento existente.
+                if (newEventStartMoment.isBefore(bufferedExistingEventEnd) && newEventEndMoment.isAfter(bufferedExistingEventStart)) {
+                  return false; // Sobreposição encontrada, este dia não está disponível
+                }
+              }
+              return true; // Nenhuma sobreposição encontrada para este dia
             });
 
-            if (info.diaSemanaFiltro === 6 && !info.rede.toLowerCase().includes("code")) {
+            // Lógica específica para "Rede Ruach" em sábados (mantida)
+            if (info.diaSemanaFiltro === 6 && !info.rede.toLowerCase().includes("ruach")) {
               if (disponiveis.length > 1) {
                 disponiveis.pop();
               } else {
@@ -525,7 +619,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
           const dataFinal = info.datasEncontradas[escolha];
           const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horario}\n\nAguarde a confirmação da secretaria!\n\n📝 *Enquanto aguarda a confirmação, por favor, já preencha o formulário detalhado com os dados do evento:* \nhttps://forms.gle/LXLGbS3CDxQwxMBf6\n\nDigite *menu* para voltar ao menu principal.`;
-
+          
           // Notificar o grupo de agendamento
           try {
             const chats = await client.getChats();
@@ -533,7 +627,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             if (grupoAgendamento) {
               const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horario}\n\n_Responda a este resumo com "agendar" ou "não agendar" para notificar o líder._\nRef: ${numero}`;
               await grupoAgendamento.sendMessage(resumoGrupo);
-              console.log(`[Notificação] Resumo enviado ao grupo 'Mensagens Secretaria'.`);
+              console.log(`[Notificação] Resumo de agendamento enviado ao grupo 'Mensagens Secretaria'.`);
             } else {
               console.warn("[Aviso] Grupo 'Mensagens Secretaria' não encontrado para envio da notificação.");
             }
@@ -610,12 +704,16 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           await msg.reply(`🔍 Consultando eventos de ${mesNome}...`);
 
           try {
-            const todosEventos = await buscarEventos(inicioBusca, fimBusca);
+            const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
+            // Filtrar eventos "Sábado LIVRE" da Diretoria para não aparecerem na agenda geral
+            const todosEventos = todosEventosRaw.filter(ev =>
+              !(ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre"))
+            );
             let msgAgenda = `📋 *Agenda Casa Forte - ${mesNome}*\n\n`;
             let encontrou = false;
 
             const agrupados = {};
-            const diasSemanaNomes = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+            const diasSemanaPlural = ["Domingos", "Segundas-feiras", "Terças-feiras", "Quartas-feiras", "Quintas-feiras", "Sextas-feiras", "Sábados"];
 
             todosEventos.forEach(ev => {
               const startStr = ev.start.dateTime || ev.start.date;
@@ -641,7 +739,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               const horaStr = grp.horaFmt ? ` às ${grp.horaFmt}` : "";
               // Se o evento ocorre 3 ou mais vezes no mês, agrupa como "Todas as [Dia da Semana]"
               if (grp.datas.length >= 3) {
-                msgAgenda += `🗓️ *Todas as ${diasSemanaNomes[grp.weekday]}*${horaStr} | ${grp.summary}\n`;
+                const prefixo = (grp.weekday === 0 || grp.weekday === 6) ? "Todos os" : "Todas as";
+                msgAgenda += `🗓️ *${prefixo} ${diasSemanaPlural[grp.weekday]}*${horaStr} | ${grp.summary}\n`;
               } else {
                 grp.datas.forEach(dt => {
                   msgAgenda += `📌 *${dt}*${horaStr} | ${grp.summary}\n`;
