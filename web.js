@@ -117,7 +117,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     };
 
     try {
-      const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      let url;
+      try {
+        url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      } catch (urlErr) {
+        console.warn(`[Web] URL inválida ou malformada recebida de ${ip}: ${req.url}`);
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        return res.end('Bad Request: Invalid URL');
+      }
       const pathname = url.pathname;
 
       if (req.method === 'GET' && pathname === '/login') {
