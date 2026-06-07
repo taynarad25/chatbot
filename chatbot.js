@@ -265,7 +265,7 @@ function criarClient() {
                     const resource = {
                       summary: evento,
                       description: `Agendado via Bot - Solicitado pela Rede: ${rede}`,
-                      location: "Comunidade Cristã Casa Forte"
+                      location: "Comunidade Cristã Curados"
                     };
 
                     if (horarioRaw.includes("DIA TODO")) {
@@ -283,7 +283,7 @@ function criarClient() {
 
                     await calendar.events.insert({ calendarId: agendaId, resource });
                     
-                    const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial da Casa Forte. 🙏\n\nDigite *menu* para voltar ao menu principal.";
+                    const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial da Comunidade Cristã Curados. 🙏\n\nDigite *menu* para voltar ao menu principal.";
                     await client.sendMessage(solicitanteId, feedback);
                     console.log(`[Secretaria] Agendamento automático realizado para ${solicitanteId}`);
                     return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
@@ -325,7 +325,7 @@ function criarClient() {
         delete etapas[numero];
       const menu = isLider
         ? `Olá! 👋
-Secretaria da Comunidade Cristã Casa Forte.
+Secretaria da Comunidade Cristã Curados.
 
 Escolha uma opção:
 
@@ -339,7 +339,7 @@ Escolha uma opção:
 
 Digite *menu* a qualquer momento para voltar ao menu principal.`
         : `Olá! 👋
-Secretaria da Comunidade Cristã Casa Forte.
+Secretaria da Comunidade Cristã Curados.
 
 Escolha uma opção:
 
@@ -826,7 +826,7 @@ Por favor, tente agendar seu evento em outro horário ou data.`;
             const todosEventos = todosEventosRaw.filter(ev =>
               !(ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre"))
             );
-            let msgAgenda = `📋 *Agenda Casa Forte - ${mesNome}*\n\n`;
+            let msgAgenda = `📋 *Agenda Comunidade Cristã Curados - ${mesNome}*\n\n`;
             let encontrou = false;
 
             const agrupados = {};
@@ -1069,81 +1069,6 @@ async function cancelQr() {
     client = null;
     saveBotState(false); // Salva que o bot DEVE estar parado
     clientReady = false;
-    isInitializing = false;
-    isGeneratingQr = false;
-    pendingQr = null;
-    console.log("✅ Solicitação de QR Code cancelada com sucesso.");
-  } finally {
-    isCanceling = false;
-  }
-}
-
-/**
- * Desconecta o cliente.
- * @param {boolean} shouldLogout - Se true, realiza logout (despareia o celular). Se false, apenas fecha o navegador.
- */
-async function disconnectClient(shouldLogout = true) {
-  const action = shouldLogout ? "logout (desparear)" : "fechamento (manter sessão)";
-  console.log(`🔌 Iniciando processo de desconexão: ${action}...`);
-
-  if (!client) {
-    console.warn("⚠️ Tentativa de desconexão ignorada: Nenhum cliente ativo.");
-    // Garante que o status seja resetado mesmo se o objeto client não existir
-    clientReady = false;
-    isInitializing = false;
-    isGeneratingQr = false;
-    pendingQr = null;
-    return { ok: false, message: "Não há cliente ativo para desconectar." };
-  }
-
-  try {
-    if (shouldLogout && typeof client.logout === "function") {
-      await client.logout();
-    } else if (typeof client.destroy === "function") {
-      await client.destroy();
-    }
-    console.log(`✅ WhatsApp desconectado via ${action}.`);
-    return { ok: true, message: "WhatsApp desconectado com sucesso." };
-  } catch (err) {
-    console.error("❌ Erro ao desconectar WhatsApp:", err);
-    return { ok: true, message: "WhatsApp desconectado (com aviso de erro no processo)." };
-  } finally {
-    client = null;
-    saveBotState(false); // Salva que o bot DEVE estar parado
-    clientReady = false;
-    isInitializing = false;
-    isGeneratingQr = false;
-    pendingQr = null;
-  }
-}
-
-function getStatus() {
-  return {
-    connected: clientReady,
-    initializing: isInitializing,
-    generatingQr: isGeneratingQr,
-    canceling: isCanceling,
-    hasQr: !!pendingQr,
-    qrDataUrl: pendingQr?.dataUrl || null,
-    qrCreatedAt: pendingQr?.createdAt || null,
-  };
-}
-
-startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
-
-console.log("[Autostart] Iniciando conexão automática...");
-startClient();
-
-// Tratamento de encerramento gracioso para evitar travas residuais no Chromium
-const gracefulShutdown = async (signal) => {
-  console.log(`[Process] Recebido sinal ${signal}. Encerrando bot de forma limpa...`);
-  // Aqui usamos false para APENAS fechar o navegador, sem deslogar a conta do WhatsApp
-  await disconnectClient(false);
-  process.exit(0);
-};
-
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
     isInitializing = false;
     isGeneratingQr = false;
     pendingQr = null;
