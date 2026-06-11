@@ -71,16 +71,16 @@ const { startWebServer } = require("./web");
 
 // Lista de IDs das Agendas do Google atualizada para resolver erros de credenciais
 const agendasParaLer = [
-  "d336e4e99db8329a2d52b123252a822073e8f23a67784892e68f3476147e694d@group.calendar.google.com", // Diretoria
-  "15141665d120f01b145b6a77603eb2313fac0c0e3073033addc151d9561a79d0@group.calendar.google.com", // Epifania
-  "10e97ba829f906588511279bb65b8ce6c8667d9c548339f04de137f9d8ab8a5d@group.calendar.google.com", // Intercessão
-  "16b2f3baec9c14aba0d43a139b12a04893c33edb9fb45a0b8f081403a3eaa036@group.calendar.google.com", // Outros
-  "10a17be6c05bc778f05dbfbddb0fda8ea1e73d2c2349b806230cc4990a14191a@group.calendar.google.com", // Projeto Social Seeds
-  "fa6cf624289edd4efd67cdd11367d6fd7c15e6d74b319ab579ef378498f5fdd9@group.calendar.google.com", // Rede Ruach
-  "bd9c2b98016d155d427591ed6c339224516db3724146b5dcd3f94c4fe6c22c84@group.calendar.google.com", // Rede de Casais
-  "b9daab311cb773bd14efd27ce6efbada7aa94ac8a5adce857b5c694b75fe2803@group.calendar.google.com", // Rede de Homens
-  "548839d693663fb3a5854930256f5fd321534a13af3ba67c5a09e6f347992be8@group.calendar.google.com", // Rede de Mulheres
-  "8876e79827d1469f76bcb2758de55158ef3625dba3413ec2c1ea161f5030021b@group.calendar.google.com"  // Rede Kids
+  "7c15ec7a18a7c6a4eb8438f8e7155e9696e8c33b48eac7eabc95a43edc87d7c1@group.calendar.google.com", // Diretoria
+  "692b7e0551c4113b02838eadaf1d60873587a956000b7b1932c4575c3a00ddd2@group.calendar.google.com", // Epifania
+  "f4625f5738f62b443b1f6279b5f124b37dffec23b9a56e3bb0dff064dc30e057@group.calendar.google.com", // Intercessão
+  "9f1ee711c5b270aed77f50597c3fbdcf7bd33775707f4def5c82cc3794810ca4@group.calendar.google.com", // Outros
+  "2ebaead80554da51744895e38dc117c3b43e0982e95d75ef64193702f9811bbd@group.calendar.google.com", // Projeto Social Seeds
+  "3839992a12d4695f87a19e9cfa3257f9ca60fab24e96549160e94c8603862b45@group.calendar.google.com", // Rede Ruach
+  "8eae57daa28963736c7ab1c343e2d8e973b4c5caecf78caa8f38255662aa9f17@group.calendar.google.com", // Rede de Casais
+  "384215b0335082cfde0c5f5f98b75ca59612a77a5123544f15bd41dd60d238d4@group.calendar.google.com", // Rede de Homens
+  "b02048ebc98f7504e086cf4b2a54881a4e645189b565c90b5f7c477a4d0de10f@group.calendar.google.com", // Rede de Mulheres
+  "b0aae19433652d50d04ae2290889cf7f905cc226ae103eb839ff3ca511acd6af@group.calendar.google.com"  // Rede Kids
 ];
 
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
@@ -264,7 +264,7 @@ function criarClient() {
 
                     const resource = {
                       summary: evento,
-                      description: `Agendado via Bot - Solicitado pela Rede: ${rede}`,
+                      description: `Agendado via Bot - Solicitado pela Rede: ${rede}`, // Altere aqui o nome se necessário
                       location: "Comunidade Cristã Curados"
                     };
 
@@ -283,7 +283,7 @@ function criarClient() {
 
                     await calendar.events.insert({ calendarId: agendaId, resource });
                     
-                    const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial da Comunidade Cristã Curados. 🙏\n\nDigite *menu* para voltar ao menu principal.";
+                    const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏\n\nDigite *menu* para voltar ao menu principal.";
                     await client.sendMessage(solicitanteId, feedback);
                     console.log(`[Secretaria] Agendamento automático realizado para ${solicitanteId}`);
                     return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
