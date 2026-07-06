@@ -71,7 +71,7 @@ const { startWebServer } = require("./web");
 
 // Lista de IDs das Agendas do Google atualizada para resolver erros de credenciais
 const agendasParaLer = [
-  "7c15ec7a18a7c6a4eb8438f8e7155e9696e8c33b48eac7eabc95a43edc87d7c1@group.calendar.google.com", // Diretoria
+  "694d1388f8f961bdbefed402fab5d498b44e0a489ec5fbcb3a40a5d1c3eda011@group.calendar.google.com", // Evangelismo
   "692b7e0551c4113b02838eadaf1d60873587a956000b7b1932c4575c3a00ddd2@group.calendar.google.com", // Epifania
   "f4625f5738f62b443b1f6279b5f124b37dffec23b9a56e3bb0dff064dc30e057@group.calendar.google.com", // Intercessão
   "9f1ee711c5b270aed77f50597c3fbdcf7bd33775707f4def5c82cc3794810ca4@group.calendar.google.com", // Outros
@@ -133,7 +133,7 @@ async function buscarEventos(inicio, fim, agendaId = null) {
 
 function mapearRedeParaAgendaId(nomeRede) {
   const rede = (nomeRede || "").toLowerCase();
-  if (rede.includes("diretoria")) return agendasParaLer[0];
+  if (rede.includes("evangelismo")) return agendasParaLer[0];
   if (rede.includes("epifania")) return agendasParaLer[1];
   if (rede.includes("intercessao") || rede.includes("intercessão")) return agendasParaLer[2];
   if (rede.includes("seeds") || rede.includes("projeto")) return agendasParaLer[4];
@@ -368,7 +368,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           } else if (msg.body === "2") {
             info.etapa = "alterar_departamento";
             console.log(`[Fluxo] Usuário ${numero} iniciou alteração de evento.`);
-            return msg.reply("De qual departamento é o evento que deseja alterar?\n\n1 - Diretoria\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
+            return msg.reply("De qual departamento é o evento que deseja alterar?\n\n1 - Evangelismo\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
           } else {
             return msg.reply("❌ Opção inválida. Digite 1 para Agendar ou 2 para Alterar.");
           }
@@ -376,7 +376,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
         if (info.etapa === "alterar_departamento") {
           const mapaConfig = {
-            "1": { nome: "Diretoria", id: agendasParaLer[0] },
+            "1": { nome: "Evangelismo", id: agendasParaLer[0] },
             "2": { nome: "Epifania", id: agendasParaLer[1] },
             "3": { nome: "Intercessão", id: agendasParaLer[2] },
             "4": { nome: "Projeto Social Seeds", id: agendasParaLer[4] },
@@ -460,12 +460,12 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           console.log(`[Agendamento] Nome do evento: ${msg.body}`);
           info.nome = msg.body;
           info.etapa = "evento_rede";
-          return msg.reply("Qual rede está organizando?\n\n1 - Diretoria\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
+          return msg.reply("Qual rede está organizando?\n\n1 - Evangelismo\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
         }
 
         if (info.etapa === "evento_rede") {
           const mapaRedes = {
-            "1": "Diretoria",
+            "1": "Evangelismo",
             "2": "Epifania",
             "3": "Intercessão",
             "4": "Projeto Social Seeds",
@@ -572,9 +572,9 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             let firstConflictDetails = null; // Para armazenar detalhes do primeiro conflito encontrado
 
-            // Identificar sábados livres da diretoria para bloqueio
-            const sabadosLivresDiretoria = todosEventos.filter(ev =>
-              ev.calendarId === agendasParaLer[0] && // ID da agenda da Diretoria
+            // Identificar sábados livres do evangelismo para bloqueio
+            const sabadosLivresEvangelismo = todosEventos.filter(ev =>
+              ev.calendarId === agendasParaLer[0] && // ID da agenda do Evangelismo
               ev.summary && ev.summary.toLowerCase().includes("sábado livre")
             ).map(ev => moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf('day').format('YYYY-MM-DD'));
 
@@ -591,8 +591,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               const dTarget = moment(dataMsg).tz("America/Sao_Paulo").startOf('day');
               const dTargetFormatted = dTarget.format('YYYY-MM-DD');
 
-              // Se este dia é um "Sábado LIVRE" da Diretoria, ele não está disponível para outros agendamentos
-              if (sabadosLivresDiretoria.includes(dTargetFormatted)) {
+              // Se este dia é um "Sábado LIVRE" do Evangelismo, ele não está disponível para outros agendamentos
+              if (sabadosLivresEvangelismo.includes(dTargetFormatted)) {
                 if (!firstConflictDetails) { // Armazena apenas o primeiro conflito
                   firstConflictDetails = {
                     type: "sabado_livre",
@@ -603,7 +603,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               }
 
               const eventosNoDia = todosEventos.filter(ev => {
-                // Ignorar os próprios eventos "Sábado LIVRE" da Diretoria ao verificar conflitos com outros eventos
+                // Ignorar os próprios eventos "Sábado LIVRE" do Evangelismo ao verificar conflitos com outros eventos
                 if (ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre")) {
                     return false;
                 }
@@ -700,7 +700,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
               if (firstConflictDetails) {
                 if (firstConflictDetails.type === "sabado_livre") {
-                  conflictMessage = `❌ Não há datas disponíveis para agendamento no dia ${moment(firstConflictDetails.date).format('DD/MM')}. Este sábado está reservado como "Sábado LIVRE" da Diretoria. Por favor, escolha outra data ou mês.`;
+                  conflictMessage = `❌ Não há datas disponíveis para agendamento no dia ${moment(firstConflictDetails.date).format('DD/MM')}. Este sábado está reservado como "Sábado LIVRE" do Evangelismo. Por favor, escolha outra data ou mês.`;
                 } else if (firstConflictDetails.type === "day_long_conflict") {
                   conflictMessage = `❌ Não há datas disponíveis para o seu evento de *DIA TODO* no dia ${moment(firstConflictDetails.date).format('DD/MM')}. Já existe o evento "*${firstConflictDetails.summary}*" agendado para este dia. Por favor, escolha outra data ou mês.`;
                 } else if (firstConflictDetails.type === "time_conflict") {
@@ -822,7 +822,7 @@ Por favor, tente agendar seu evento em outro horário ou data.`;
 
           try {
             const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
-            // Filtrar eventos "Sábado LIVRE" da Diretoria para não aparecerem na agenda geral
+            // Filtrar eventos "Sábado LIVRE" do Evangelismo para não aparecerem na agenda geral
             const todosEventos = todosEventosRaw.filter(ev =>
               !(ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre"))
             );
@@ -887,11 +887,18 @@ Estamos esperando por você e sua família em nossos encontros:
 ⛪ *Culto de Celebração*
 🗓️ Todos os Domingos
 ⏰ Às *18h*
+📍 *Endereço temporário:* Rua Orlando Telles, 225, Cidade Saúde - Itapevi
+⚠️ _Nota: Devido à transição para o nosso novo salão, os cultos de domingo à noite temporariamente continuam sendo realizados neste endereço._
 
-🍞 *Santa Ceia + Sala de Oração*
+🍞 *Santa Ceia*
 🗓️ Todo 1º Domingo do Mês
 ⏰ Às *08h30*
-⚠️ _Neste dia, não temos culto à noite._
+📍 *Local:* Salão Novo (Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi)
+⚠️ _Nota: Nossas Santa Ceias já estão sendo realizadas diretamente no salão novo. Lembrando que, neste domingo de Santa Ceia, não temos culto à noite._
+
+📢 *Aviso Importante (Mudança de Salão):*
+*A partir de Agosto*, TODOS os nossos cultos (incluindo os cultos de domingo à noite) serão realizados definitivamente em nosso novo endereço:
+📍 *Endereço:* Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi
 
 Venha viver um tempo precioso na presença de Deus! 🙏🙌
 
