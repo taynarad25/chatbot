@@ -166,22 +166,27 @@ let isGeneratingQr = false;
 let isCanceling = false;
 
 function criarClient() {
+  const puppeteerOpts = {
+    headless: true,
+    timeout: 60000, // Aumenta o tempo limite para abrir o Chrome na VM
+    args: [
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-setuid-sandbox',
+      '--disable-gpu',
+      '--disable-extensions',
+      '--no-zygote',
+    ]
+  };
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    puppeteerOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
   client = new Client({
     authStrategy: new LocalAuth({ clientId, dataPath: path.join(__dirname, ".wwebjs_auth") }),
     authTimeoutMs: 60000, // Aumenta tempo de espera da autenticação
-    puppeteer: {
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-      headless: true,
-      timeout: 60000, // Aumenta o tempo limite para abrir o Chrome na VM
-      args: [
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-setuid-sandbox',
-        '--disable-gpu',
-        '--disable-extensions',
-        '--no-zygote',
-      ]
-    }
+    puppeteer: puppeteerOpts
   });
 
   client.on("qr", async (qr) => {
