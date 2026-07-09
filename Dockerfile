@@ -1,7 +1,8 @@
 FROM node:20-slim
 
-# Instala dependências do Chromium
+# Instala o Chromium e suas dependências
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
     procps \
     libgbm1 \
     libasound2 \
@@ -10,7 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libatk-bridge2.0-0 \
     libgtk-3-0 \
     fonts-liberation \
-    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app

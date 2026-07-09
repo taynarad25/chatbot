@@ -8,7 +8,9 @@ function renderLoginHtml(message = "") {
     body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
+    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
+    button:hover { background-color: #0056b3; }
+    button:active { background-color: #004085; transform: scale(0.98); }
     .password-wrapper { position: relative; }
     .toggle-password { position: absolute; right: 12px; top: 18px; cursor: pointer; user-select: none; font-size: 1.2rem; }
     .error { color: #dc3545; margin-bottom: 1rem; }
@@ -81,7 +83,9 @@ function renderRegisterHtml(message = "") {
     body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #28a745; color: #fff; font-size: 1rem; cursor: pointer; }
+    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #28a745; color: #fff; font-size: 1rem; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
+    button:hover { background-color: #218838; }
+    button:active { background-color: #1e7e34; transform: scale(0.98); }
     .password-wrapper { position: relative; }
     .toggle-password { position: absolute; right: 12px; top: 18px; cursor: pointer; user-select: none; font-size: 1.2rem; }
     .error { color: #dc3545; margin-bottom: 1rem; }
@@ -157,7 +161,9 @@ function renderSetPasswordHtml(username, message = "") {
     body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
     input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; }
+    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
+    button:hover { background-color: #0056b3; }
+    button:active { background-color: #004085; transform: scale(0.98); }
     .error { color: #dc3545; margin-bottom: 1rem; }
     .info { color: #004085; background-color: #cce5ff; border-color: #b8daff; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
   </style>
@@ -216,14 +222,23 @@ function renderIndexHtml() {
     body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 1rem; background: #f0f2f5; }
     .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.1); }
     .tabs { display: flex; border-bottom: 2px solid #e4e6eb; margin-bottom: 1.5rem; }
-    .tab-btn { padding: 1rem; cursor: pointer; border: none; background: none; font-weight: 600; color: #65676b; }
-    .tab-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
+    .tab-btn { padding: 1rem; cursor: pointer; border: none; background: none; font-weight: 600; color: #65676b; border-radius: 0; margin-right: 0; }
+    .tab-btn:hover { color: #050505; background: rgba(0,0,0,0.05); transform: none; }
+    .tab-btn:active { background: rgba(0,0,0,0.08); transform: none; }
+    .tab-btn.active { color: #007bff; border-bottom: 3px solid #007bff; background: none; }
+    .tab-btn.active:hover { background: none; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .message-box { padding: 10px; margin-bottom: 10px; border-radius: 5px; }
-    button { padding: .8rem; border-radius: 8px; border: none; cursor: pointer; margin-right: 5px; }
+    button { padding: .8rem; border-radius: 8px; border: none; cursor: pointer; margin-right: 5px; transition: background-color 0.2s, transform 0.1s, color 0.2s; background: #e4e6eb; color: #050505; }
+    button:hover { background-color: #d8dadf; }
+    button:active { background-color: #ccd0d5; transform: scale(0.98); }
     .primary { background: #007bff; color: white; }
+    .primary:hover { background-color: #0056b3; }
+    .primary:active { background-color: #004085; }
     .danger { background: #dc3545; color: white; }
+    .danger:hover { background-color: #c82333; }
+    .danger:active { background-color: #bd2130; }
     #logsContainer { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; height: 300px; overflow-y: auto; font-family: monospace; }
     li { background: #f9f9f9; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; border-radius: 5px; }
   </style>
