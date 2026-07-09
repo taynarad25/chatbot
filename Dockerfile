@@ -15,15 +15,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /usr/src/app
 
-# Ajuste de permissões para o usuário node
-COPY package*.json ./
+# Garante que a pasta de trabalho pertence ao usuário node
+RUN chown node:node /usr/src/app
+
+# Roda como usuário node por segurança e boas práticas
+USER node
+
+# Copia arquivos de dependências com a permissão correta
+COPY --chown=node:node package*.json ./
 RUN npm install --omit=dev && npm cache clean --force
 
-COPY . .
-RUN chown -R node:node /usr/src/app
-
-# Roda como usuário node por segurança
-USER node
+# Copia os demais arquivos do projeto com a permissão correta
+COPY --chown=node:node . .
 
 EXPOSE 3000
 CMD [ "node", "chatbot.js" ]
