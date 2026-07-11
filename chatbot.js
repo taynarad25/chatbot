@@ -297,6 +297,37 @@ function criarClient() {
                 return msg.reply(`✅ Líder notificado sobre a recusa.`);
               }
             }
+          } else if (textoMsg === "agendar" || textoMsg === "não agendar") {
+            const quotedMsg = await msg.getQuotedMessage();
+            // Verifica se a mensagem respondida é o pedido de alteração enviado pelo bot
+            if (quotedMsg.fromMe) {
+              const dados = decodificarDadosAgendamento(quotedMsg.body);
+              if (!dados) {
+                return msg.reply("❌ Erro ao extrair dados para o registro da alteração.");
+              }
+
+              const { solicitanteId, evento } = dados;
+
+              if (textoMsg === "agendar") {
+                const feedback = `✅ *Alteração Aprovada!*\n\nSua solicitação de alteração para o evento "*${evento}*" foi aprovada pela secretaria. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
+                try {
+                  await client.sendMessage(solicitanteId, feedback);
+                  console.log(`[Secretaria] Feedback de alteração aprovada enviado para ${solicitanteId}`);
+                } catch (sendErr) {
+                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${solicitanteId}:`, sendErr.message);
+                }
+                return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração.`);
+              } else {
+                const feedback = `❌ *Alteração Não Aprovada*\n\nInfelizmente sua solicitação de alteração para o evento "*${evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria para mais detalhes.\n\nDigite *menu* para voltar ao menu principal.`;
+                try {
+                  await client.sendMessage(solicitanteId, feedback);
+                  console.log(`[Secretaria] Feedback de alteração recusada enviado para ${solicitanteId}`);
+                } catch (sendErr) {
+                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${solicitanteId}:`, sendErr.message);
+                }
+                return msg.reply(`✅ Solicitante notificado sobre a recusa da alteração.`);
+              }
+            }
           }
         }
         return; // Ignora outras mensagens em grupos
@@ -421,7 +452,11 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           
           const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde o retorno da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
           
-          const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\nRef: ${numero}`;
+          const dadosAlteracao = {
+            solicitanteId: numero,
+            evento: info.eventoParaAlterar.summary,
+          };
+          const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\n\n_${codificarDadosAgendamento(dadosAlteracao)}_`;
           await notificarSecretaria(client, resumoGrupo);
 
           await msg.reply(resumo);
