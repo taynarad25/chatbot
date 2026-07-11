@@ -13,6 +13,7 @@ const { execSync } = require('child_process');
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const moment = require("moment-timezone");
 const { google } = require("googleapis");
+const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento } = require("./agenda");
 
 // =====================================
 // CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
@@ -129,6 +130,32 @@ async function buscarEventos(inicio, fim, agendaId = null) {
     }
   }
   return todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
+}
+
+// Busca, filtra e entrega a listagem de agenda para um período, deixando o
+// fluxo pronto para receber o número de um item na próxima mensagem.
+async function entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg) {
+  try {
+    const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
+    const todosEventos = todosEventosRaw.filter(ev =>
+      !(ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre"))
+    );
+
+    if (todosEventos.length === 0) {
+      delete etapas[numero];
+      return msg.reply(`📅 Não há eventos programados para ${tituloPeriodo}.\n\nDigite *menu* para voltar ao menu principal.`);
+    }
+
+    const itens = agruparEventosAgenda(todosEventos);
+    info.itensAgenda = itens;
+    info.etapa = "detalhe_evento";
+
+    return msg.reply(montarMensagemAgenda(itens, tituloPeriodo));
+  } catch (e) {
+    console.error(`Erro ao buscar agenda para ${numero}:`, e);
+    delete etapas[numero];
+    return msg.reply("⚠️ Erro ao carregar agenda.");
+  }
 }
 
 function mapearRedeParaAgendaId(nomeRede) {
@@ -806,12 +833,19 @@ Por favor, tente agendar seu evento em outro horário ou data.`;
       } else if (info.fluxo === "ver_agenda") {
         // Lógica de consulta de agenda (Opção 2)
         if (info.etapa === "escolha_mes") {
+          const escolhaRaw = msg.body.trim();
+
+          if (escolhaRaw === "0") {
+            info.etapa = "periodo_personalizado";
+            return msg.reply("🗓️ Digite as datas de início e fim que deseja consultar.\n\nExemplo: *10/07 a 20/07*");
+          }
+
           const agora = moment.tz("America/Sao_Paulo");
           const mesAtual = agora.month() + 1;
-          const escolha = parseInt(msg.body.trim());
+          const escolha = parseInt(escolhaRaw);
 
           if (isNaN(escolha) || escolha < mesAtual || escolha > 12) {
-            return msg.reply(`❌ Opção inválida. Por favor, escolha um mês de ${mesAtual} a 12.`);
+            return msg.reply(`❌ Opção inválida. Escolha um mês de ${mesAtual} a 12, ou 0 para um período específico.`);
           }
 
           const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -825,59 +859,58 @@ Por favor, tente agendar seu evento em outro horário ou data.`;
           console.log(`[Agenda] Buscando eventos para ${numero} em ${mesNome}`);
           await msg.reply(`🔍 Consultando eventos de ${mesNome}...`);
 
-          try {
-            const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
-            // Filtrar eventos "Sábado LIVRE" do Evangelismo para não aparecerem na agenda geral
-            const todosEventos = todosEventosRaw.filter(ev =>
-              !(ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre"))
-            );
-            let msgAgenda = `📋 *Agenda Comunidade Cristã Curados - ${mesNome}*\n\n`;
-            let encontrou = false;
+          return await entregarAgenda(numero, info, inicioBusca, fimBusca, mesNome, msg);
+        }
 
-            const agrupados = {};
-            const diasSemanaPlural = ["Domingos", "Segundas-feiras", "Terças-feiras", "Quartas-feiras", "Quintas-feiras", "Sextas-feiras", "Sábados"];
+        if (info.etapa === "periodo_personalizado") {
+          const entrada = msg.body.trim();
+          const erroFormato = "❌ Não consegui entender as datas. Use o formato DD/MM a DD/MM (ex: 10/07 a 20/07).";
 
-            todosEventos.forEach(ev => {
-              const startStr = ev.start.dateTime || ev.start.date;
-              // Usa moment-timezone para evitar que eventos "pulem" de dia por causa do fuso horário
-              const d = moment.tz(startStr, "America/Sao_Paulo");
-              const weekday = d.day();
-
-              const summary = ev.summary || "Evento sem título";
-              const horaFmt = ev.start.dateTime ? d.format("HH:mm") : "";
-              const diaNum = d.date();
-              const dataFmt = d.format("DD/MM");
-
-              const chave = `${summary}|${horaFmt}|${weekday}`;
-              if (!agrupados[chave]) {
-                agrupados[chave] = { summary, horaFmt, weekday, datas: [], primeiroDia: diaNum };
-              }
-              agrupados[chave].datas.push(dataFmt);
-            });
-
-            const listaOrdenada = Object.values(agrupados).sort((a, b) => a.primeiroDia - b.primeiroDia);
-
-            listaOrdenada.forEach(grp => {
-              const horaStr = grp.horaFmt ? ` às ${grp.horaFmt}` : "";
-              // Se o evento ocorre 3 ou mais vezes no mês, agrupa como "Todas as [Dia da Semana]"
-              if (grp.datas.length >= 3) {
-                const prefixo = (grp.weekday === 0 || grp.weekday === 6) ? "Todos os" : "Todas as";
-                msgAgenda += `🗓️ *${prefixo} ${diasSemanaPlural[grp.weekday]}*${horaStr} | ${grp.summary}\n`;
-              } else {
-                grp.datas.forEach(dt => {
-                  msgAgenda += `📌 *${dt}*${horaStr} | ${grp.summary}\n`;
-                });
-              }
-              encontrou = true;
-            });
-
-            delete etapas[numero];
-            return msg.reply((encontrou ? msgAgenda : `📅 Não há eventos programados para ${mesNome}.`) + "\n\nDigite *menu* para voltar ao menu principal.");
-          } catch (e) {
-            console.error(`Erro ao buscar agenda para ${numero}:`, e);
-            delete etapas[numero];
-            return msg.reply("⚠️ Erro ao carregar agenda.");
+          const match = entrada.match(/^(\d{1,2})\/(\d{1,2})\s*(?:a|até|ate|-)\s*(\d{1,2})\/(\d{1,2})$/i);
+          if (!match) {
+            return msg.reply(erroFormato);
           }
+
+          const [diaIni, mesIni, diaFim, mesFim] = match.slice(1).map(Number);
+          if (mesIni < 1 || mesIni > 12 || mesFim < 1 || mesFim > 12 || diaIni < 1 || diaIni > 31 || diaFim < 1 || diaFim > 31) {
+            return msg.reply(erroFormato);
+          }
+
+          const ano = moment.tz("America/Sao_Paulo").year();
+          const inicio = moment.tz(`${diaIni}/${mesIni}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+          const fim = moment.tz(`${diaFim}/${mesFim}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+
+          if (!inicio.isValid() || !fim.isValid()) {
+            return msg.reply(erroFormato);
+          }
+
+          if (fim.isBefore(inicio, "day")) {
+            return msg.reply("❌ A data final deve ser igual ou depois da data inicial. Digite novamente (ex: 10/07 a 20/07).");
+          }
+
+          if (fim.diff(inicio, "days") > 90) {
+            return msg.reply("❌ Esse período é muito longo (mais de 90 dias). Tente um intervalo menor.");
+          }
+
+          const inicioBusca = inicio.clone().startOf("day").subtract(1, "minute").format();
+          const fimBusca = fim.clone().endOf("day").format();
+          const tituloPeriodo = `${inicio.format("DD/MM")} a ${fim.format("DD/MM")}`;
+
+          console.log(`[Agenda] Buscando eventos para ${numero} no período ${tituloPeriodo}`);
+          await msg.reply(`🔍 Consultando eventos de ${tituloPeriodo}...`);
+
+          return await entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg);
+        }
+
+        if (info.etapa === "detalhe_evento") {
+          const index = parseInt(msg.body.trim()) - 1;
+          const itens = info.itensAgenda || [];
+
+          if (isNaN(index) || !itens[index]) {
+            return msg.reply("❌ Número inválido. Digite o número de um dos eventos da lista, ou *menu* para voltar.");
+          }
+
+          return msg.reply(montarDetalheEvento(itens[index]));
         }
       }
       return;
@@ -921,9 +954,10 @@ Digite *menu* para voltar ao menu principal.`;
       for (let i = mesAtual; i < 12; i++) {
         listaMeses += `${i + 1} - ${meses[i]}\n`;
       }
+      listaMeses += "\n0 - Escolher um período específico";
 
       etapas[numero] = { fluxo: "ver_agenda", etapa: "escolha_mes" };
-      return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
+      return msg.reply(listaMeses + "\n\nDigite o número do mês desejado, ou 0 para outro período:");
     }
 
     if (texto === "3") {
