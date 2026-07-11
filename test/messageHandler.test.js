@@ -126,9 +126,15 @@ test("saudação: líder recebe o menu completo, com as opções 6 e 7", async (
   assert.match(respostas[0], /7️⃣ Comunicados e Avisos/);
 });
 
-test("mensagem não reconhecida sem fluxo ativo: bot responde pedindo para digitar 'menu' (antes ficava em silêncio)", async () => {
+test("texto livre sem fluxo ativo: bot fica em silêncio (pode ser conversa com a secretaria fora do menu)", async () => {
   const { handleMessage } = criarContexto();
-  const respostas = await enviar(handleMessage, NUMERO_COMUM, "blablabla");
+  const respostas = await enviar(handleMessage, NUMERO_COMUM, "hoje não vou conseguir ir");
+  assert.equal(respostas.length, 0);
+});
+
+test("número fora das opções sem fluxo ativo: bot orienta a digitar 'menu'", async () => {
+  const { handleMessage } = criarContexto();
+  const respostas = await enviar(handleMessage, NUMERO_COMUM, "9");
   assert.equal(respostas.length, 1);
   assert.match(respostas[0], /Não entendi sua mensagem/);
 });

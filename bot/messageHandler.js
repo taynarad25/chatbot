@@ -609,9 +609,16 @@ Digite *menu* para voltar ao menu principal.`;
         return msg.reply("📢 *Comunicados e Avisos*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
       }
 
-      // Nenhuma opção reconhecida e nenhum fluxo ativo: antes a mensagem era
-      // silenciosamente ignorada (sem resposta nenhuma), inconsistente com o
-      // resto do bot, que sempre orienta o usuário sobre o próximo passo.
+      // Nenhuma opção reconhecida e nenhum fluxo ativo. Se a mensagem for só
+      // números, é provavelmente uma tentativa de usar o menu (ex: "9"), então
+      // orientamos a digitar *menu*. Já texto livre (ex: "hoje não vou
+      // conseguir ir") pode ser parte de uma conversa com a secretaria fora do
+      // fluxo do bot, então é melhor não interromper com uma mensagem de erro.
+      if (!/^\d+$/.test(texto)) {
+        console.log(`[Mensagem ignorada] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
+        return;
+      }
+
       console.log(`[Mensagem não reconhecida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
       return msg.reply("❓ Não entendi sua mensagem. Digite *menu* para ver as opções disponíveis.");
     } catch (err) {
