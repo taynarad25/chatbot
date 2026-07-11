@@ -16,6 +16,7 @@ const { google } = require("googleapis");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis } = require("./disponibilidade");
 const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
+const { notificarSecretaria } = require("./secretaria");
 
 // =====================================
 // CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
@@ -447,17 +448,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           
           const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde o retorno da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
           
-          // Notificar o grupo
-          try {
-            const chats = await client.getChats();
-            const grupo = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
-            if (grupo) {
-              const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\nRef: ${numero}`;
-              await grupo.sendMessage(resumoGrupo);
-            }
-          } catch (error) {
-            console.error("Erro ao notificar grupo:", error);
-          }
+          const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\nRef: ${numero}`;
+          await notificarSecretaria(client, resumoGrupo);
 
           await msg.reply(resumo);
           delete etapas[numero];
@@ -603,20 +595,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           const dataFinal = info.datasEncontradas[escolha];
           const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\n📝 *Enquanto aguarda a confirmação, por favor, já preencha o formulário detalhado com os dados do evento:* \nhttps://forms.gle/LXLGbS3CDxQwxMBf6\n\nDigite *menu* para voltar ao menu principal.`;
           
-          // Notificar o grupo de agendamento
-          try {
-            const chats = await client.getChats();
-            const grupoAgendamento = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
-            if (grupoAgendamento) {
-              const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\nRef: ${numero}`;
-              await grupoAgendamento.sendMessage(resumoGrupo);
-              console.log(`[Notificação] Resumo de agendamento enviado ao grupo 'Mensagens Secretaria'.`);
-            } else {
-              console.warn("[Aviso] Grupo 'Mensagens Secretaria' não encontrado para envio da notificação.");
-            }
-          } catch (error) {
-            console.error("[Erro] Falha ao enviar notificação para o grupo:", error);
-          }
+          const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\nRef: ${numero}`;
+          await notificarSecretaria(client, resumoGrupo);
 
           console.log(`Agendamento solicitado por ${numero}: ${resumo.replace(/\n/g, ' | ')}`);
           await msg.reply(resumo);
@@ -629,20 +609,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           const comunicado = msg.body;
           const resumoUsuario = `📢 *Solicitação de Comunicado Enviada!*\n\nSua mensagem foi encaminhada para a secretaria analisar e incluir nos avisos do culto.\n\nDigite *menu* para voltar ao menu principal.`;
 
-          // Notificar o grupo
-          try {
-            const chats = await client.getChats();
-            const grupo = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
-            if (grupo) {
-              const resumoGrupo = `📢 *NOVO COMUNICADO PARA O CULTO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📝 *Mensagem:* ${comunicado}`;
-              await grupo.sendMessage(resumoGrupo);
-              console.log(`[Comunicado] Enviado ao grupo por ${numero}`);
-            } else {
-              console.warn("[Aviso] Grupo 'Mensagens Secretaria' não encontrado para o comunicado.");
-            }
-          } catch (error) {
-            console.error("Erro ao notificar grupo sobre comunicado:", error);
-          }
+          const resumoGrupo = `📢 *NOVO COMUNICADO PARA O CULTO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📝 *Mensagem:* ${comunicado}`;
+          await notificarSecretaria(client, resumoGrupo);
 
           await msg.reply(resumoUsuario);
           delete etapas[numero];
@@ -786,18 +754,8 @@ Digite *menu* para voltar ao menu principal.`;
 
     if (texto === "5") {
       console.log(`Opção 5 selecionada por ${numero}`);
-      // Notificar o grupo
-      try {
-        const chats = await client.getChats();
-        const grupo = chats.find(chat => chat.isGroup && chat.name === "Mensagens Secretaria");
-        if (grupo) {
-          const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n\nO usuário solicitou falar com a secretaria.`;
-          await grupo.sendMessage(avisoSecretaria);
-          console.log(`[Atendimento] Aviso enviado ao grupo por ${numero}`);
-        }
-      } catch (error) {
-        console.error("Erro ao notificar grupo sobre atendimento:", error);
-      }
+      const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n\nO usuário solicitou falar com a secretaria.`;
+      await notificarSecretaria(client, avisoSecretaria);
       return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
     }
 
