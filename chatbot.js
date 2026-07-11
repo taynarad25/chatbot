@@ -14,6 +14,7 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const moment = require("moment-timezone");
 const { google } = require("googleapis");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
+const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis } = require("./disponibilidade");
 
 // =====================================
 // CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
@@ -602,158 +603,28 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             const todosEventos = await buscarEventos(inicioBusca, fimBusca);
 
-            let firstConflictDetails = null; // Para armazenar detalhes do primeiro conflito encontrado
-
-            // Identificar sábados livres do evangelismo para bloqueio
-            const sabadosLivresEvangelismo = todosEventos.filter(ev =>
-              ev.calendarId === agendasParaLer[0] && // ID da agenda do Evangelismo
-              ev.summary && ev.summary.toLowerCase().includes("sábado livre")
-            ).map(ev => moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf('day').format('YYYY-MM-DD'));
-
-            let diasPossiveis = [];
-            let dataCursor = new Date(ano, info.mes - 1, 1);
-            while (dataCursor.getMonth() === info.mes - 1) {
-              if (info.diaSemanaFiltro === "TODOS" || dataCursor.getDay() === info.diaSemanaFiltro) {
-                diasPossiveis.push(new Date(dataCursor));
-              }
-              dataCursor.setDate(dataCursor.getDate() + 1);
-            }
-
-            let disponiveis = diasPossiveis.filter(dataMsg => {
-              const dTarget = moment(dataMsg).tz("America/Sao_Paulo").startOf('day');
-              const dTargetFormatted = dTarget.format('YYYY-MM-DD');
-
-              // Se este dia é um "Sábado LIVRE" do Evangelismo, ele não está disponível para outros agendamentos
-              if (sabadosLivresEvangelismo.includes(dTargetFormatted)) {
-                if (!firstConflictDetails) { // Armazena apenas o primeiro conflito
-                  firstConflictDetails = {
-                    type: "sabado_livre",
-                    date: dTargetFormatted
-                  };
-                }
-                return false;
-              }
-
-              const eventosNoDia = todosEventos.filter(ev => {
-                // Ignorar os próprios eventos "Sábado LIVRE" do Evangelismo ao verificar conflitos com outros eventos
-                if (ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre")) {
-                    return false;
-                }
-                const evStart = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf('day');
-                let evEnd = moment.tz(ev.end.dateTime || ev.end.date, "America/Sao_Paulo");
-
-                // Ajuste para eventos de dia inteiro (o Google define o fim como o dia seguinte, exclusivo)
-                if (ev.start.date && !ev.start.dateTime) { // É um evento de dia inteiro
-                  evEnd = moment.tz(ev.end.date, "America/Sao_Paulo").subtract(1, 'day').endOf('day'); // Fim do dia anterior à data de término do Google
-                } else {
-                  evEnd.endOf('day');
-                }
-
-                return dTarget.isBetween(evStart, evEnd, 'day', '[]');
-              });
-
-              // Se o novo evento é de dia inteiro, qualquer evento existente no dia o torna indisponível
-              if (info.isDiaInteiro) {
-                if (eventosNoDia.length > 0 && !firstConflictDetails) {
-                  const conflictingEv = eventosNoDia[0]; // Pega o primeiro evento que causa conflito
-                  firstConflictDetails = {
-                    type: "day_long_conflict",
-                    date: dTargetFormatted,
-                    summary: conflictingEv.summary || "Evento sem título",
-                    start: conflictingEv.start.dateTime || conflictingEv.start.date,
-                    end: conflictingEv.end.dateTime || conflictingEv.end.date
-                  };
-                }
-                return eventosNoDia.length === 0;
-              }
-
-              // Para eventos com horário, verifica sobreposição com buffer
-              const [hInicioNovo, mInicioNovo] = info.horarioInicio.split(":").map(Number);
-              const [hFimNovo, mFimNovo] = info.horarioFim.split(":").map(Number);
-
-              const newEventStartMoment = moment(dataMsg).set({
-                hour: hInicioNovo,
-                minute: mInicioNovo,
-                second: 0, millisecond: 0
-              });
-              const newEventEndMoment = moment(dataMsg).set({
-                hour: hFimNovo,
-                minute: mFimNovo,
-                second: 0, millisecond: 0
-              });
-
-              const bufferDuration = moment.duration(60, 'minutes'); // Buffer de 1h
-
-              for (const ev of eventosNoDia) {
-                // Se um evento existente é de dia inteiro, ele conflita com qualquer novo evento com horário
-                if (ev.start.date && !ev.start.dateTime) {
-                  return false;
-                }
-
-                const existingEventStart = moment.tz(ev.start.dateTime, "America/Sao_Paulo");
-                const existingEventEnd = moment.tz(ev.end.dateTime, "America/Sao_Paulo");
-
-                // Calcula os horários do evento existente com o buffer
-                const bufferedExistingEventStart = existingEventStart.clone().subtract(bufferDuration);
-                const bufferedExistingEventEnd = existingEventEnd.clone().add(bufferDuration);
-
-                // Verifica sobreposição: o novo evento se sobrepõe se seu início for antes do fim buffered de um evento existente
-                // E seu fim for depois do início buffered de um evento existente.
-                if (newEventStartMoment.isBefore(bufferedExistingEventEnd) && newEventEndMoment.isAfter(bufferedExistingEventStart)) {
-                  if (!firstConflictDetails) { // Armazena apenas o primeiro conflito
-                    firstConflictDetails = {
-                      type: "time_conflict",
-                      date: dTargetFormatted,
-                      summary: ev.summary || "Evento sem título",
-                      start: ev.start.dateTime,
-                      end: ev.end.dateTime
-                    };
-                  }
-                  return false; // Sobreposição encontrada, este dia não está disponível
-                }
-              }
-              return true; // Nenhuma sobreposição encontrada para este dia
+            const { disponiveis, conflito } = calcularDisponibilidade({
+              eventos: todosEventos,
+              evangelismoCalendarId: agendasParaLer[0],
+              ano,
+              mes: info.mes,
+              diaSemanaFiltro: info.diaSemanaFiltro,
+              isDiaInteiro: info.isDiaInteiro,
+              horarioInicio: info.horarioInicio,
+              horarioFim: info.horarioFim,
+              rede: info.rede,
             });
-
-            // Lógica específica para "Rede Ruach" em sábados (mantida)
-            if (info.diaSemanaFiltro === 6 && !info.rede.toLowerCase().includes("ruach")) {
-              if (disponiveis.length > 1) {
-                disponiveis.pop();
-              } else {
-                disponiveis = [];
-              }
-            }
 
             console.log(`Datas disponíveis para ${numero}: ${disponiveis.length}`);
 
             if (disponiveis.length === 0) {
               delete etapas[numero];
-              let conflictMessage = "❌ Não há datas disponíveis para essas condições neste mês.";
-
-              if (firstConflictDetails) {
-                if (firstConflictDetails.type === "sabado_livre") {
-                  conflictMessage = `❌ Não há datas disponíveis para agendamento no dia ${moment(firstConflictDetails.date).format('DD/MM')}. Este sábado está reservado como "Sábado LIVRE" do Evangelismo. Por favor, escolha outra data ou mês.`;
-                } else if (firstConflictDetails.type === "day_long_conflict") {
-                  conflictMessage = `❌ Não há datas disponíveis para o seu evento de *DIA TODO* no dia ${moment(firstConflictDetails.date).format('DD/MM')}. Já existe o evento "*${firstConflictDetails.summary}*" agendado para este dia. Por favor, escolha outra data ou mês.`;
-                } else if (firstConflictDetails.type === "time_conflict") {
-                  const conflictingEventStart = moment.tz(firstConflictDetails.start, "America/Sao_Paulo").format("HH:mm");
-                  const conflictingEventEnd = moment.tz(firstConflictDetails.end, "America/Sao_Paulo").format("HH:mm");
-                  conflictMessage = `❌ Não há datas disponíveis para o seu evento com o horário solicitado no dia ${moment(firstConflictDetails.date).format('DD/MM')}.
-Encontramos um conflito com o evento "*${firstConflictDetails.summary}*" que ocorre das *${conflictingEventStart}* às *${conflictingEventEnd}*.
-Por favor, tente agendar seu evento em outro horário ou data.`;
-                }
-              }
-              return msg.reply(conflictMessage);
+              return msg.reply(montarMensagemConflito(conflito));
             }
 
             info.datasEncontradas = disponiveis;
             info.etapa = "evento_finalizar";
-            let lista = "📅 *Datas Disponíveis:*\n\n";
-            disponiveis.forEach((d, i) => {
-              const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-              lista += `${i + 1} - ${d.getDate()}/${info.mes} (${diasSemana[d.getDay()]})\n`;
-            });
-            return msg.reply(lista + "\nDigite o número da opção desejada:");
+            return msg.reply(montarMensagemDatasDisponiveis(disponiveis, info.mes));
 
           } catch (e) {
             console.error(`Erro ao consultar agendas para ${numero}:`, e);
