@@ -29,4 +29,4 @@ RUN npm install --omit=dev && npm cache clean --force
 COPY --chown=node:node . .
 
 EXPOSE 3000
-CMD [ "node", "chatbot.js" ]
+CMD [ "node", "bot/chatbot.js" ]

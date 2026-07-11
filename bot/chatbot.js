@@ -14,6 +14,13 @@ const moment = require("moment-timezone");
 const { google } = require("googleapis");
 const { createMessageHandler } = require("./messageHandler");
 
+// Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
+// estado persistido e a sessão do WhatsApp (.wwebjs_auth) sempre viveram na
+// raiz — o docker-compose.bot.yml monta os volumes nesses caminhos exatos —
+// então essa referência precisa ficar explícita para não depender de onde
+// dentro do projeto o processo Node foi iniciado.
+const ROOT_DIR = path.join(__dirname, "..");
+
 // =====================================
 // CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
 // =====================================
@@ -23,7 +30,7 @@ const originalError = console.error;
 const originalWarn = console.warn;
 
 // Configura a escrita manual em arquivo para substituir a funcionalidade do PM2
-const logFile = path.join(__dirname, 'combined.log');
+const logFile = path.join(ROOT_DIR, 'combined.log');
 let logStream = null;
 
 try {
@@ -67,7 +74,7 @@ process.on('uncaughtException', (err) => {
 });
 
 // Importamos o web.js APÓS configurar o logger global para capturar seus logs iniciais
-const { startWebServer } = require("./web");
+const { startWebServer } = require("../web");
 
 // Lista de IDs das Agendas do Google atualizada para resolver erros de credenciais
 const agendasParaLer = [
@@ -94,7 +101,7 @@ if (lideres.length > 0) {
 }
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: "credenciais-google.json",
+  keyFile: path.join(ROOT_DIR, "credenciais-google.json"),
   scopes: ["https://www.googleapis.com/auth/calendar"],
 });
 
@@ -167,7 +174,7 @@ function criarClient() {
   }
 
   client = new Client({
-    authStrategy: new LocalAuth({ clientId, dataPath: path.join(__dirname, ".wwebjs_auth") }),
+    authStrategy: new LocalAuth({ clientId, dataPath: path.join(ROOT_DIR, ".wwebjs_auth") }),
     authTimeoutMs: 60000, // Aumenta tempo de espera da autenticação
     puppeteer: puppeteerOpts
   });
@@ -226,7 +233,7 @@ function criarClient() {
 
 // PERSISTÊNCIA DE ESTADO (ATIVO/PARADO)
 // =====================================
-const STATE_FILE = path.join(__dirname, 'bot_state.json');
+const STATE_FILE = path.join(ROOT_DIR, 'bot_state.json');
 const saveBotState = (active) => {
   try {
     if (fs.existsSync(STATE_FILE) && fs.lstatSync(STATE_FILE).isDirectory()) {
@@ -265,7 +272,7 @@ async function startClient() {
 
   // Remove o arquivo SingletonLock do Chromium se ele existir. 
   // Isso previne o erro "Code 21" (Profile in use) comum em ambientes Docker/PM2.
-  const sessionDir = path.join(__dirname, ".wwebjs_auth", `session-${clientId}`);
+  const sessionDir = path.join(ROOT_DIR, ".wwebjs_auth", `session-${clientId}`);
   const profileDir = path.join(sessionDir, "Default");
   const locks = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
   

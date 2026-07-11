@@ -7,8 +7,8 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
-const { createMessageHandler } = require("../messageHandler");
-const { decodificarDadosAgendamento } = require("../agendamentoAutomatico");
+const { createMessageHandler } = require("../bot/messageHandler");
+const { decodificarDadosAgendamento } = require("../bot/agendamentoAutomatico");
 
 const AGENDAS = [
   "cal-evangelismo", "cal-epifania", "cal-intercessao", "cal-outros",
