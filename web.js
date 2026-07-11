@@ -8,6 +8,7 @@ const { loadUsers, saveUser, deleteUser } = require("./web/users");
 const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 const { createRateLimiter } = require("./web/rateLimiter");
+const { getClientIp } = require("./web/clientIp");
 
 const pbkdf2 = promisify(crypto.pbkdf2);
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
@@ -50,16 +51,6 @@ async function addUser({ username, password, role = 'user', status = 'active' })
     updatedAt: new Date().toISOString()
   });
   return { ok: true, message: userStatus === 'pending' ? "Usuário pré-cadastrado. O líder deve agora acessar a tela de cadastro para definir sua senha." : "Usuário criado com sucesso." };
-}
-
-/**
- * Obtém o IP real do cliente, considerando proxies/Docker
- */
-function getClientIp(req) {
-  return req.headers['cf-connecting-ip'] ||
-         req.headers['x-forwarded-for']?.split(',')[0].trim() || 
-         req.headers['x-real-ip'] || 
-         req.socket.remoteAddress;
 }
 
 function sendJson(res, status, data) {
