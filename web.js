@@ -223,9 +223,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 
       // API: Deletar Usuário (Apenas Admin)
       if (req.method === 'DELETE' && pathname.startsWith('/api/admin/users/') && isAdmin(req)) {
-        const target = pathname.replace('/api/admin/users/', '');
-        deleteUser(target);
-        return sendJson(res, 200, { ok: true, message: `Usuário ${target} excluído.` });
+        const target = decodeURIComponent(pathname.replace('/api/admin/users/', ''));
+        const result = deleteUser(target);
+        return sendJson(res, result.ok ? 200 : 404, result);
       }
 
       // API: Listar Usuários (Apenas Admin)

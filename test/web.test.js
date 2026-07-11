@@ -157,6 +157,26 @@ test("DELETE /api/admin/users/:username (como admin): remove o usuário", async 
   assert.ok(!listaJson.users.some((u) => u.username === "lider-novo"));
 });
 
+test("DELETE /api/admin/users/:username: usuário inexistente retorna 404 (não finge sucesso)", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+  const del = await fetch(`${baseUrl}/api/admin/users/ninguem-com-esse-nome`, { method: "DELETE", headers: { Cookie: cookie } });
+  assert.equal(del.status, 404);
+});
+
+test("DELETE /api/admin/users/:username: nome com acentuação é decodificado da URL corretamente antes de excluir", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+  await addUser({ username: "Joãozinho", password: "senha123456", role: "user", status: "active" });
+
+  // O front-end chama encodeURIComponent(name) — reproduz isso aqui para garantir
+  // que o servidor decodifica antes de procurar o usuário.
+  const del = await fetch(`${baseUrl}/api/admin/users/${encodeURIComponent("Joãozinho")}`, { method: "DELETE", headers: { Cookie: cookie } });
+  assert.equal(del.status, 200);
+
+  const lista = await fetch(`${baseUrl}/api/admin/users`, { headers: { Cookie: cookie } });
+  const listaJson = await lista.json();
+  assert.ok(!listaJson.users.some((u) => u.username === "joãozinho"));
+});
+
 test("GET /api/admin/lideres (como admin): lista vazia quando não há líderes cadastrados", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
   const res = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
