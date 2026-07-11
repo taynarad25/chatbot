@@ -225,7 +225,7 @@ function renderIndexHtml() {
       <div id="lideresMessage" class="message-box" style="display:none;"></div>
       <form id="addLiderForm">
         <input name="nome" placeholder="Nome do líder" required />
-        <input name="telefone" placeholder="Telefone (ex: 5511999999999)" required />
+        <input id="liderTelefone" name="telefone" placeholder="+55 (11) 94308-6727" inputmode="numeric" maxlength="19" required />
         <button type="submit" class="primary">Adicionar</button>
       </form>
     </div>
@@ -342,6 +342,21 @@ function renderIndexHtml() {
       }
     }
 
+    function formatarTelefone(valor) {
+      const digitos = valor.replace(/\D/g, '').slice(0, 13);
+      let resultado = '';
+      if (digitos.length > 0) resultado += '+' + digitos.slice(0, 2);
+      if (digitos.length > 2) resultado += ' (' + digitos.slice(2, 4);
+      if (digitos.length >= 4) resultado += ')';
+      if (digitos.length > 4) resultado += ' ' + digitos.slice(4, 9);
+      if (digitos.length > 9) resultado += '-' + digitos.slice(9, 13);
+      return resultado;
+    }
+
+    document.getElementById('liderTelefone').addEventListener('input', (e) => {
+      e.target.value = formatarTelefone(e.target.value);
+    });
+
     async function fetchLideres() {
       fetch('/api/admin/lideres')
         .then(r => r.ok ? r.json() : Promise.reject('Erro ao carregar líderes'))
@@ -352,7 +367,7 @@ function renderIndexHtml() {
             json.lideres.forEach(l => {
               const li = document.createElement('li');
               const span = document.createElement('span');
-              span.textContent = (l.nome || '(sem nome)') + ' — ' + l.telefone;
+              span.textContent = (l.nome || '(sem nome)') + ' — ' + formatarTelefone(l.telefone);
               li.appendChild(span);
               const btn = document.createElement('button');
               btn.className = 'danger';
