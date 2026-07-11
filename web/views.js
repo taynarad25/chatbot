@@ -221,12 +221,13 @@ function renderIndexHtml() {
       <h3>Líderes</h3>
       <ul id="liderList"></ul>
       <hr>
-      <h4>Novo Líder</h4>
+      <h4 id="liderFormTitle">Novo Líder</h4>
       <div id="lideresMessage" class="message-box" style="display:none;"></div>
       <form id="addLiderForm">
         <input name="nome" placeholder="Nome do líder" required />
-        <input name="telefone" placeholder="Telefone (ex: 5511999999999)" required />
-        <button type="submit" class="primary">Adicionar</button>
+        <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" required />
+        <button type="submit" id="liderSubmitBtn" class="primary">Adicionar</button>
+        <button type="button" id="cancelarEdicaoLider" style="display:none;">Cancelar</button>
       </form>
     </div>
 
@@ -342,6 +343,23 @@ function renderIndexHtml() {
       }
     }
 
+    function formatarTelefone(valor) {
+      const digitos = valor.replace(/\D/g, '').slice(0, 13);
+      let resultado = '';
+      if (digitos.length > 0) resultado += '+' + digitos.slice(0, 2);
+      if (digitos.length > 2) resultado += ' (' + digitos.slice(2, 4);
+      if (digitos.length >= 4) resultado += ')';
+      if (digitos.length > 4) resultado += ' ' + digitos.slice(4, 9);
+      if (digitos.length > 9) resultado += '-' + digitos.slice(9, 13);
+      return resultado;
+    }
+
+    document.getElementById('liderTelefone').addEventListener('input', (e) => {
+      e.target.value = formatarTelefone(e.target.value);
+    });
+
+    let liderEmEdicao = null; // telefone (normalizado) do líder sendo editado, ou null quando é um cadastro novo
+
     async function fetchLideres() {
       fetch('/api/admin/lideres')
         .then(r => r.ok ? r.json() : Promise.reject('Erro ao carregar líderes'))
@@ -352,13 +370,20 @@ function renderIndexHtml() {
             json.lideres.forEach(l => {
               const li = document.createElement('li');
               const span = document.createElement('span');
-              span.textContent = (l.nome || '(sem nome)') + ' — ' + l.telefone;
+              span.textContent = (l.nome || '(sem nome)') + ' — ' + formatarTelefone(l.telefone);
               li.appendChild(span);
-              const btn = document.createElement('button');
-              btn.className = 'danger';
-              btn.textContent = 'Remover';
-              btn.addEventListener('click', () => deleteLider(l.telefone));
-              li.appendChild(btn);
+
+              const btnEditar = document.createElement('button');
+              btnEditar.textContent = 'Editar';
+              btnEditar.addEventListener('click', () => iniciarEdicaoLider(l));
+              li.appendChild(btnEditar);
+
+              const btnRemover = document.createElement('button');
+              btnRemover.className = 'danger';
+              btnRemover.textContent = 'Remover';
+              btnRemover.addEventListener('click', () => deleteLider(l.telefone));
+              li.appendChild(btnRemover);
+
               list.appendChild(li);
             });
           }
@@ -370,9 +395,30 @@ function renderIndexHtml() {
       if (confirm('Tem certeza que deseja remover o líder ' + telefone + '?')) {
         console.log('Solicitando remoção do líder:', telefone);
         await fetch('/api/admin/lideres/'+encodeURIComponent(telefone), { method: 'DELETE' });
+        if (liderEmEdicao === telefone) cancelarEdicaoLider();
         fetchLideres();
       }
     }
+
+    function iniciarEdicaoLider(lider) {
+      liderEmEdicao = lider.telefone;
+      const form = document.getElementById('addLiderForm');
+      form.nome.value = lider.nome;
+      form.telefone.value = formatarTelefone(lider.telefone);
+      document.getElementById('liderFormTitle').textContent = 'Editar Líder';
+      document.getElementById('liderSubmitBtn').textContent = 'Salvar';
+      document.getElementById('cancelarEdicaoLider').style.display = 'inline-block';
+    }
+
+    function cancelarEdicaoLider() {
+      liderEmEdicao = null;
+      document.getElementById('addLiderForm').reset();
+      document.getElementById('liderFormTitle').textContent = 'Novo Líder';
+      document.getElementById('liderSubmitBtn').textContent = 'Adicionar';
+      document.getElementById('cancelarEdicaoLider').style.display = 'none';
+    }
+
+    document.getElementById('cancelarEdicaoLider').addEventListener('click', cancelarEdicaoLider);
 
     document.getElementById('addUserForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -404,9 +450,12 @@ function renderIndexHtml() {
     document.getElementById('addLiderForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target));
-      console.log('Tentando adicionar novo líder:', data.nome);
-      const res = await fetch('/api/admin/lideres', {
-        method: 'POST',
+      const editando = !!liderEmEdicao;
+      const url = editando ? '/api/admin/lideres/' + encodeURIComponent(liderEmEdicao) : '/api/admin/lideres';
+      const method = editando ? 'PUT' : 'POST';
+      console.log((editando ? 'Editando líder:' : 'Tentando adicionar novo líder:'), data.nome);
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
@@ -416,13 +465,13 @@ function renderIndexHtml() {
       msgEl.textContent = json.message;
 
       if (res.ok) {
-        console.log('Líder adicionado com sucesso.');
+        console.log(editando ? 'Líder atualizado com sucesso.' : 'Líder adicionado com sucesso.');
         msgEl.style.backgroundColor = '#d4edda';
         msgEl.style.color = '#155724';
-        e.target.reset();
+        cancelarEdicaoLider();
         fetchLideres();
       } else {
-        console.error('Erro ao adicionar líder:', json.message);
+        console.error((editando ? 'Erro ao editar líder:' : 'Erro ao adicionar líder:'), json.message);
         msgEl.style.backgroundColor = '#f8d7da';
         msgEl.style.color = '#721c24';
       }

@@ -51,8 +51,13 @@ function saveUser(user) {
 function deleteUser(username) {
   const users = loadUsers();
   const normalized = username?.toLowerCase().trim();
-  if (users[normalized]) delete users[normalized];
+  if (!users[normalized]) {
+    console.warn(`[Users] Tentativa de excluir usuário inexistente: '${normalized}'`);
+    return { ok: false, message: "Usuário não encontrado." };
+  }
+  delete users[normalized];
   fs.writeFileSync(LOGIN_FILE, JSON.stringify(users, null, 2), "utf8");
   console.log(`[Users] Usuário '${normalized}' removido.`);
+  return { ok: true, message: "Usuário excluído com sucesso." };
 }
 module.exports = { loadUsers, saveUser, deleteUser };

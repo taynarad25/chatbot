@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const { loadUsers, saveUser, deleteUser } = require("./web/users");
-const { listLideres, addLider, removeLider } = require("./web/lideres");
+const { listLideres, addLider, updateLider, removeLider } = require("./web/lideres");
 const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 const { createRateLimiter } = require("./web/rateLimiter");
@@ -223,9 +223,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 
       // API: Deletar Usuário (Apenas Admin)
       if (req.method === 'DELETE' && pathname.startsWith('/api/admin/users/') && isAdmin(req)) {
-        const target = pathname.replace('/api/admin/users/', '');
-        deleteUser(target);
-        return sendJson(res, 200, { ok: true, message: `Usuário ${target} excluído.` });
+        const target = decodeURIComponent(pathname.replace('/api/admin/users/', ''));
+        const result = deleteUser(target);
+        return sendJson(res, result.ok ? 200 : 404, result);
       }
 
       // API: Listar Usuários (Apenas Admin)
@@ -261,6 +261,19 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           return sendJson(res, result.ok ? 200 : 400, result);
         } catch (err) {
           console.error(`[Web] Erro ao adicionar líder via Admin: ${err.message}`);
+          return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+        }
+      }
+
+      // API: Editar Líder (Apenas Admin)
+      if (req.method === 'PUT' && pathname.startsWith('/api/admin/lideres/') && isAdmin(req)) {
+        try {
+          const target = decodeURIComponent(pathname.replace('/api/admin/lideres/', ''));
+          const body = await parseRequestBody(req);
+          const result = updateLider(target, body);
+          return sendJson(res, result.ok ? 200 : 400, result);
+        } catch (err) {
+          console.error(`[Web] Erro ao editar líder via Admin: ${err.message}`);
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
         }
       }

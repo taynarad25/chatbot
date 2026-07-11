@@ -157,6 +157,26 @@ test("DELETE /api/admin/users/:username (como admin): remove o usuário", async 
   assert.ok(!listaJson.users.some((u) => u.username === "lider-novo"));
 });
 
+test("DELETE /api/admin/users/:username: usuário inexistente retorna 404 (não finge sucesso)", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+  const del = await fetch(`${baseUrl}/api/admin/users/ninguem-com-esse-nome`, { method: "DELETE", headers: { Cookie: cookie } });
+  assert.equal(del.status, 404);
+});
+
+test("DELETE /api/admin/users/:username: nome com acentuação é decodificado da URL corretamente antes de excluir", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+  await addUser({ username: "Joãozinho", password: "senha123456", role: "user", status: "active" });
+
+  // O front-end chama encodeURIComponent(name) — reproduz isso aqui para garantir
+  // que o servidor decodifica antes de procurar o usuário.
+  const del = await fetch(`${baseUrl}/api/admin/users/${encodeURIComponent("Joãozinho")}`, { method: "DELETE", headers: { Cookie: cookie } });
+  assert.equal(del.status, 200);
+
+  const lista = await fetch(`${baseUrl}/api/admin/users`, { headers: { Cookie: cookie } });
+  const listaJson = await lista.json();
+  assert.ok(!listaJson.users.some((u) => u.username === "joãozinho"));
+});
+
 test("GET /api/admin/lideres (como admin): lista vazia quando não há líderes cadastrados", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
   const res = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
@@ -194,6 +214,59 @@ test("POST /api/admin/lideres: telefone duplicado é rejeitado", async () => {
   assert.equal(res.status, 400);
   const json = await res.json();
   assert.equal(json.ok, false);
+});
+
+test("PUT /api/admin/lideres/:telefone (como admin): edita o nome mantendo o telefone", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+
+  const res = await fetch(`${baseUrl}/api/admin/lideres/5511946593056`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Taynara D. Silva", telefone: "5511946593056" }),
+  });
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.equal(json.ok, true);
+
+  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const listaJson = await lista.json();
+  assert.ok(listaJson.lideres.some((l) => l.nome === "Taynara D. Silva" && l.telefone === "5511946593056"));
+});
+
+test("PUT /api/admin/lideres/:telefone: também troca o telefone do líder", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+
+  await fetch(`${baseUrl}/api/admin/lideres`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Temporário", telefone: "5511900000000" }),
+  });
+
+  const res = await fetch(`${baseUrl}/api/admin/lideres/5511900000000`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Temporário", telefone: "5511911111111" }),
+  });
+  assert.equal(res.status, 200);
+
+  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const listaJson = await lista.json();
+  assert.ok(!listaJson.lideres.some((l) => l.telefone === "5511900000000"));
+  assert.ok(listaJson.lideres.some((l) => l.telefone === "5511911111111"));
+
+  // Limpeza: remove o líder temporário criado só para este teste, para não
+  // interferir nos testes seguintes.
+  await fetch(`${baseUrl}/api/admin/lideres/5511911111111`, { method: "DELETE", headers: { Cookie: cookie } });
+});
+
+test("PUT /api/admin/lideres/:telefone: líder inexistente retorna 400", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+  const res = await fetch(`${baseUrl}/api/admin/lideres/0000000000000`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Ninguem", telefone: "0000000000000" }),
+  });
+  assert.equal(res.status, 400);
 });
 
 test("usuário comum (não-admin) não consegue acessar rotas de líderes", async () => {
