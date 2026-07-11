@@ -1000,12 +1000,15 @@ const saveBotState = (active) => {
 };
 
 const loadBotState = () => {
+  // Sem estado salvo (primeira instalação) ou erro de leitura: assume que deve tentar
+  // conectar, igual ao comportamento histórico. Só fica "false" quando alguém realmente
+  // pediu para desconectar (ver disconnectClient).
   try {
-    if (!fs.existsSync(STATE_FILE)) return { active: false };
-    if (fs.lstatSync(STATE_FILE).isDirectory()) return { active: false };
+    if (!fs.existsSync(STATE_FILE)) return { active: true };
+    if (fs.lstatSync(STATE_FILE).isDirectory()) return { active: true };
     return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-  } 
-  catch (e) { return { active: false }; }
+  }
+  catch (e) { return { active: true }; }
 };
 
 async function startClient() {
@@ -1134,7 +1137,13 @@ async function disconnectClient(shouldLogout = true) {
     return { ok: true, message: "WhatsApp desconectado (com aviso de erro no processo)." };
   } finally {
     client = null;
-    saveBotState(false); // Salva que o bot DEVE estar parado
+    // Só marca o bot como "deve ficar parado" em logout de verdade (ação explícita do
+    // admin). No fechamento gracioso (shouldLogout=false, usado no SIGTERM/SIGINT) a
+    // sessão do WhatsApp continua válida, então o estado persistido é preservado para
+    // que o próximo boot reconecte sozinho sem exigir um novo QR Code.
+    if (shouldLogout) {
+      saveBotState(false);
+    }
     clientReady = false;
     isInitializing = false;
     isGeneratingQr = false;
@@ -1156,8 +1165,17 @@ function getStatus() {
 
 startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
 
-console.log("[Autostart] Iniciando conexão automática...");
-startClient();
+// Só inicia automaticamente se o bot não foi explicitamente desconectado antes de
+// desligar (ver disconnectClient). Assim, um restart/redeploy com o WhatsApp já
+// conectado reconecta sozinho usando a sessão salva, mas um logout manual não fica
+// gerando QR Code (e log) a cada reinício até alguém pedir de novo pelo painel.
+const estadoPersistido = loadBotState();
+if (estadoPersistido.active === false) {
+  console.log("[Autostart] Bot foi desconectado manualmente antes do último desligamento. Aguardando solicitação de QR Code pelo painel.");
+} else {
+  console.log("[Autostart] Iniciando conexão automática...");
+  startClient();
+}
 
 // Tratamento de encerramento gracioso para evitar travas residuais no Chromium
 const gracefulShutdown = async (signal) => {
