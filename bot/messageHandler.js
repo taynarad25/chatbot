@@ -13,6 +13,27 @@ function nomeContato(contato, numero) {
   return contato.pushname || contato.name || numero;
 }
 
+// Mascara o número de telefone para uso em logs, preservando apenas o DDI, o DDD
+// e os 4 últimos dígitos (ex: "5511987654321@c.us" -> "+55 (11) *****-4321").
+function mascararTelefone(numero) {
+  const digitos = String(numero).replace(/\D/g, "");
+  if (digitos.length < 8) return numero;
+
+  const ddi = digitos.slice(0, 2);
+  const ddd = digitos.slice(2, 4);
+  const resto = digitos.slice(4);
+  const ultimosQuatro = resto.slice(-4);
+  const mascara = "*".repeat(Math.max(resto.length - 4, 0));
+
+  return `+${ddi} (${ddd}) ${mascara}-${ultimosQuatro}`;
+}
+
+// Monta a identificação padrão usada nos logs: nome do contato + telefone
+// mascarado + papel do usuário (ex: "Taynara Diniz | +55 (11) *****-6727 (Usuário)").
+function identificarUsuario(contato, numero, isLider) {
+  return `${nomeContato(contato, numero)} | ${mascararTelefone(numero)} (${isLider ? "Líder" : "Usuário"})`;
+}
+
 /**
  * Monta o handler de mensagens do bot (menu principal + fluxos de conversa).
  * Todas as dependências que envolvem I/O real (WhatsApp, Google Calendar) são
@@ -48,7 +69,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
       return msg.reply(montarMensagemAgenda(itens, tituloPeriodo));
     } catch (e) {
-      console.error(`Erro ao buscar agenda para ${numero}:`, e);
+      console.error(`Erro ao buscar agenda para ${mascararTelefone(numero)}:`, e);
       delete etapas[numero];
       return msg.reply("⚠️ Erro ao carregar agenda.");
     }
@@ -87,7 +108,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
                   const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏\n\nDigite *menu* para voltar ao menu principal.";
                   await client.sendMessage(solicitanteId, feedback);
-                  console.log(`[Secretaria] Agendamento automático realizado para ${solicitanteId}`);
+                  console.log(`[Secretaria] Agendamento automático realizado para ${mascararTelefone(solicitanteId)}`);
                   return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
                 } catch (err) {
                   console.error("[Secretaria] Erro no agendamento automático:", err);
@@ -97,9 +118,9 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 const feedback = "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
                 try {
                   await client.sendMessage(solicitanteId, feedback);
-                  console.log(`[Secretaria] Feedback de recusa enviado para ${solicitanteId}`);
+                  console.log(`[Secretaria] Feedback de recusa enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback para ${solicitanteId}:`, sendErr.message);
+                  console.error(`[Secretaria] Erro ao enviar feedback para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Líder notificado sobre a recusa.`);
               }
@@ -119,18 +140,18 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 const feedback = `✅ *Alteração Aprovada!*\n\nSua solicitação de alteração para o evento "*${evento}*" foi aprovada pela secretaria. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
                 try {
                   await client.sendMessage(solicitanteId, feedback);
-                  console.log(`[Secretaria] Feedback de alteração aprovada enviado para ${solicitanteId}`);
+                  console.log(`[Secretaria] Feedback de alteração aprovada enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${solicitanteId}:`, sendErr.message);
+                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração.`);
               } else {
                 const feedback = `❌ *Alteração Não Aprovada*\n\nInfelizmente sua solicitação de alteração para o evento "*${evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria para mais detalhes.\n\nDigite *menu* para voltar ao menu principal.`;
                 try {
                   await client.sendMessage(solicitanteId, feedback);
-                  console.log(`[Secretaria] Feedback de alteração recusada enviado para ${solicitanteId}`);
+                  console.log(`[Secretaria] Feedback de alteração recusada enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${solicitanteId}:`, sendErr.message);
+                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a recusa da alteração.`);
               }
@@ -146,7 +167,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       // Verificação mais flexível para o número de líder
       const isLider = lideres.some(l => numero.includes(l));
 
-      console.log(`[Mensagem Recebida] De: ${numero} (${isLider ? 'Líder' : 'Usuário'}) | Texto: "${msg.body}"`);
+      console.log(`[Mensagem Recebida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
 
       const ehSaudacao = SAUDACOES_REGEX.test(texto);
 
@@ -185,18 +206,18 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
       if (etapas[numero]) {
         const info = etapas[numero];
-        console.log(`[Fluxo Ativo] Usuário: ${numero} | Fluxo: ${info.fluxo} | Etapa: ${info.etapa}`);
+        console.log(`[Fluxo Ativo] ${identificarUsuario(contato, numero, isLider)} | Fluxo: ${info.fluxo} | Etapa: ${info.etapa}`);
 
         if (info.fluxo === "agendamento") {
           // Lógica de agendamento (Opção 6)
           if (info.etapa === "evento_acao") {
             if (msg.body === "1") {
               info.etapa = "evento_nome";
-              console.log(`[Fluxo] Usuário ${numero} iniciou novo agendamento.`);
+              console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou novo agendamento.`);
               return msg.reply("📅 *Novo Agendamento*\nQual o nome do evento?");
             } else if (msg.body === "2") {
               info.etapa = "alterar_departamento";
-              console.log(`[Fluxo] Usuário ${numero} iniciou alteração de evento.`);
+              console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou alteração de evento.`);
               return msg.reply(`De qual departamento é o evento que deseja alterar?\n\n${montarListaRedes()}`);
             } else {
               return msg.reply("❌ Opção inválida. Digite 1 para Agendar ou 2 para Alterar.");
@@ -305,7 +326,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             }
 
             info.diaSemanaFiltro = diasMapa[escolha];
-            console.log(`Dia da semana selecionado por ${numero}: ${escolha} (${info.diaSemanaFiltro})`);
+            console.log(`Dia da semana selecionado por ${identificarUsuario(contato, numero, isLider)}: ${escolha} (${info.diaSemanaFiltro})`);
 
             info.etapa = "evento_horario";
             return msg.reply("⏰ Qual o *horário de início* do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração ou vários dias.");
@@ -357,7 +378,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           if (info.etapa === "consultar_disponibilidade") {
 
             await msg.reply("🔍 Consultando agenda...");
-            console.log(`[Agenda] Consultando disponibilidades para ${numero}...`);
+            console.log(`[Agenda] Consultando disponibilidades para ${identificarUsuario(contato, numero, isLider)}...`);
 
             try {
               const agora = moment.tz("America/Sao_Paulo");
@@ -379,7 +400,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 rede: info.rede,
               });
 
-              console.log(`Datas disponíveis para ${numero}: ${disponiveis.length}`);
+              console.log(`Datas disponíveis para ${identificarUsuario(contato, numero, isLider)}: ${disponiveis.length}`);
 
               if (disponiveis.length === 0) {
                 delete etapas[numero];
@@ -391,7 +412,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               return msg.reply(montarMensagemDatasDisponiveis(disponiveis, info.mes));
 
             } catch (e) {
-              console.error(`Erro ao consultar agendas para ${numero}:`, e);
+              console.error(`Erro ao consultar agendas para ${identificarUsuario(contato, numero, isLider)}:`, e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao acessar a agenda.");
             }
@@ -417,7 +438,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_${codificarDadosAgendamento(dadosAgendamento)}_`;
             await notificarSecretaria(client, resumoGrupo);
 
-            console.log(`Agendamento solicitado por ${numero}: ${resumo.replace(/\n/g, ' | ')}`);
+            console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
             await msg.reply(resumo);
             delete etapas[numero];
             return;
@@ -440,13 +461,13 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           if (info.etapa === "nome") {
             info.nome = msg.body;
             info.etapa = "disponibilidade";
-            console.log(`[Pastoral] Nome recebido: ${info.nome} (${numero}). Solicitando disponibilidade.`);
+            console.log(`[Pastoral] Nome recebido: ${info.nome} (${mascararTelefone(numero)}). Solicitando disponibilidade.`);
             return msg.reply(`Obrigado, ${info.nome}. 🙏\nAgora, por favor, informe quais os *dias e horários* você tem disponível para o atendimento.`);
           }
 
           if (info.etapa === "disponibilidade") {
             info.disponibilidade = msg.body;
-            console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${numero}). Disponibilidade: ${info.disponibilidade}`);
+            console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${mascararTelefone(numero)}). Disponibilidade: ${info.disponibilidade}`);
             await msg.reply(`Perfeito! Sua solicitação de atendimento pastoral foi registrada.\n\n👤 *Nome:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\nA secretaria entrará em contato em breve para confirmar o agendamento. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
             delete etapas[numero];
             return;
@@ -476,7 +497,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const inicioBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
             const fimBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").endOf('month').format();
 
-            console.log(`[Agenda] Buscando eventos para ${numero} em ${mesNome}`);
+            console.log(`[Agenda] Buscando eventos para ${identificarUsuario(contato, numero, isLider)} em ${mesNome}`);
             await msg.reply(`🔍 Consultando eventos de ${mesNome}...`);
 
             return await entregarAgenda(numero, info, inicioBusca, fimBusca, mesNome, msg);
@@ -495,7 +516,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const fimBusca = fim.clone().endOf("day").format();
             const tituloPeriodo = `${inicio.format("DD/MM")} a ${fim.format("DD/MM")}`;
 
-            console.log(`[Agenda] Buscando eventos para ${numero} no período ${tituloPeriodo}`);
+            console.log(`[Agenda] Buscando eventos para ${identificarUsuario(contato, numero, isLider)} no período ${tituloPeriodo}`);
             await msg.reply(`🔍 Consultando eventos de ${tituloPeriodo}...`);
 
             return await entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg);
@@ -516,7 +537,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
       }
 
       if (texto === "1") {
-        console.log(`Opção 1 selecionada por ${numero}`);
+        console.log(`Opção 1 selecionada por ${identificarUsuario(contato, numero, isLider)}`);
         const mensagemCultos = `✨ *Celebre Conosco!* ✨
 
 Estamos esperando por você e sua família em nossos encontros:
@@ -544,7 +565,7 @@ Digite *menu* para voltar ao menu principal.`;
       }
 
       if (texto === "2") {
-        console.log(`Opção 2 selecionada por ${numero}`);
+        console.log(`Opção 2 selecionada por ${identificarUsuario(contato, numero, isLider)}`);
         const hoje = new Date();
         const mesAtual = hoje.getMonth();
 
@@ -559,31 +580,31 @@ Digite *menu* para voltar ao menu principal.`;
       }
 
       if (texto === "3") {
-        console.log(`Opção 3 selecionada por ${numero}, iniciando atendimento pastoral`);
+        console.log(`Opção 3 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando atendimento pastoral`);
         etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
         return msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?");
       }
 
       if (texto === "4") {
-        console.log(`Opção 4 selecionada por ${numero}`);
+        console.log(`Opção 4 selecionada por ${identificarUsuario(contato, numero, isLider)}`);
         return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\n*Em breve abriremos novas inscrições!* Fique atento aos avisos.\n\nDigite *menu* para voltar ao menu principal.`);
       }
 
       if (texto === "5") {
-        console.log(`Opção 5 selecionada por ${numero}`);
+        console.log(`Opção 5 selecionada por ${identificarUsuario(contato, numero, isLider)}`);
         const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO usuário solicitou falar com a secretaria.`;
         await notificarSecretaria(client, avisoSecretaria);
         return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
       }
 
       if (texto === "6" && isLider) {
-        console.log(`Opção 6 selecionada por ${numero}, iniciando agendamento`);
+        console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando agendamento`);
         etapas[numero] = { fluxo: "agendamento", etapa: "evento_acao" };
         return msg.reply("O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente");
       }
 
       if (texto === "7" && isLider) {
-        console.log(`Opção 7 selecionada por ${numero}`);
+        console.log(`Opção 7 selecionada por ${identificarUsuario(contato, numero, isLider)}`);
         etapas[numero] = { fluxo: "comunicados", etapa: "texto_comunicado" };
         return msg.reply("📢 *Comunicados e Avisos*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
       }
@@ -591,7 +612,7 @@ Digite *menu* para voltar ao menu principal.`;
       // Nenhuma opção reconhecida e nenhum fluxo ativo: antes a mensagem era
       // silenciosamente ignorada (sem resposta nenhuma), inconsistente com o
       // resto do bot, que sempre orienta o usuário sobre o próximo passo.
-      console.log(`[Mensagem não reconhecida] De: ${numero} | Texto: "${msg.body}"`);
+      console.log(`[Mensagem não reconhecida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
       return msg.reply("❓ Não entendi sua mensagem. Digite *menu* para ver as opções disponíveis.");
     } catch (err) {
       console.error("[Erro Fatal no Listener de Mensagens]:", err);
