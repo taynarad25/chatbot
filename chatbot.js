@@ -17,6 +17,7 @@ const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpr
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis } = require("./disponibilidade");
 const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
 const { notificarSecretaria } = require("./secretaria");
+const { codificarDadosAgendamento, decodificarDadosAgendamento, montarResourceEvento } = require("./agendamentoAutomatico");
 
 // =====================================
 // CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
@@ -261,67 +262,39 @@ function criarClient() {
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o resumo enviado pelo bot
-            if (quotedMsg.fromMe && quotedMsg.body.includes("Ref: ")) {
-              const body = quotedMsg.body;
-              const matchRef = body.match(/Ref: ([\d-]+@c\.us)/);
-              if (matchRef) {
-                const solicitanteId = matchRef[1];
-                
-                if (textoMsg === "marcar evento") {
-                  try {
-                    const evento = body.match(/📅 \*Evento:\* (.*)/)?.[1]?.trim();
-                    const rede = body.match(/🌐 \*Rede:\* (.*)/)?.[1]?.trim();
-                    const dataMatch = body.match(/📆 \*Data:\* (\d+)\/(\d+)/);
-                    const horarioRaw = body.match(/⏰ \*Horário:\* (.*)/)?.[1]?.trim();
+            if (quotedMsg.fromMe) {
+              const dados = decodificarDadosAgendamento(quotedMsg.body);
+              if (!dados) {
+                return msg.reply("❌ Erro ao extrair dados para o agendamento automático.");
+              }
 
-                    if (!evento || !rede || !dataMatch || !horarioRaw) {
-                      return msg.reply("❌ Erro ao extrair dados para o agendamento automático.");
-                    }
+              const { solicitanteId, rede } = dados;
 
-                    const dia = dataMatch[1];
-                    const mes = dataMatch[2];
-                    const ano = moment().tz("America/Sao_Paulo").year();
-                    const agendaId = agendasParaLer[mapearRedeParaAgendaIndex(rede)];
+              if (textoMsg === "marcar evento") {
+                try {
+                  const ano = moment().tz("America/Sao_Paulo").year();
+                  const agendaId = agendasParaLer[mapearRedeParaAgendaIndex(rede)];
+                  const resource = montarResourceEvento(dados, ano);
 
-                    const resource = {
-                      summary: evento,
-                      description: `Agendado via Bot - Solicitado pela Rede: ${rede}`, // Altere aqui o nome se necessário
-                      location: "Comunidade Cristã Curados"
-                    };
+                  await calendar.events.insert({ calendarId: agendaId, resource });
 
-                    if (horarioRaw.includes("DIA TODO")) {
-                      const start = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
-                      const end = start.clone().add(1, 'day');
-                      resource.start = { date: start.format("YYYY-MM-DD") };
-                      resource.end = { date: end.format("YYYY-MM-DD") };
-                    } else {
-                      const [hInicio, hFim] = horarioRaw.split(" - ").map(s => s.trim());
-                      const start = moment.tz(`${dia}/${mes}/${ano} ${hInicio}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
-                      const end = moment.tz(`${dia}/${mes}/${ano} ${hFim}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
-                      resource.start = { dateTime: start.format(), timeZone: "America/Sao_Paulo" };
-                      resource.end = { dateTime: end.format(), timeZone: "America/Sao_Paulo" };
-                    }
-
-                    await calendar.events.insert({ calendarId: agendaId, resource });
-                    
-                    const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏\n\nDigite *menu* para voltar ao menu principal.";
-                    await client.sendMessage(solicitanteId, feedback);
-                    console.log(`[Secretaria] Agendamento automático realizado para ${solicitanteId}`);
-                    return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
-                  } catch (err) {
-                    console.error("[Secretaria] Erro no agendamento automático:", err);
-                    return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática.");
-                  }
-                } else {
-                  const feedback = "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
-                  try {
-                    await client.sendMessage(solicitanteId, feedback);
-                    console.log(`[Secretaria] Feedback de recusa enviado para ${solicitanteId}`);
-                  } catch (sendErr) {
-                    console.error(`[Secretaria] Erro ao enviar feedback para ${solicitanteId}:`, sendErr.message);
-                  }
-                  return msg.reply(`✅ Líder notificado sobre a recusa.`);
+                  const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏\n\nDigite *menu* para voltar ao menu principal.";
+                  await client.sendMessage(solicitanteId, feedback);
+                  console.log(`[Secretaria] Agendamento automático realizado para ${solicitanteId}`);
+                  return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
+                } catch (err) {
+                  console.error("[Secretaria] Erro no agendamento automático:", err);
+                  return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática.");
                 }
+              } else {
+                const feedback = "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
+                try {
+                  await client.sendMessage(solicitanteId, feedback);
+                  console.log(`[Secretaria] Feedback de recusa enviado para ${solicitanteId}`);
+                } catch (sendErr) {
+                  console.error(`[Secretaria] Erro ao enviar feedback para ${solicitanteId}:`, sendErr.message);
+                }
+                return msg.reply(`✅ Líder notificado sobre a recusa.`);
               }
             }
           }
@@ -595,7 +568,17 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           const dataFinal = info.datasEncontradas[escolha];
           const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\n📝 *Enquanto aguarda a confirmação, por favor, já preencha o formulário detalhado com os dados do evento:* \nhttps://forms.gle/LXLGbS3CDxQwxMBf6\n\nDigite *menu* para voltar ao menu principal.`;
           
-          const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\nRef: ${numero}`;
+          const dadosAgendamento = {
+            solicitanteId: numero,
+            evento: info.nome,
+            rede: info.rede,
+            dia: dataFinal.getDate(),
+            mes: info.mes,
+            horarioInicio: info.horarioInicio,
+            horarioFim: info.horarioFim,
+            isDiaInteiro: info.isDiaInteiro,
+          };
+          const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${contato.pushname || contato.name || numero}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_${codificarDadosAgendamento(dadosAgendamento)}_`;
           await notificarSecretaria(client, resumoGrupo);
 
           console.log(`Agendamento solicitado por ${numero}: ${resumo.replace(/\n/g, ' | ')}`);
