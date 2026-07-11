@@ -15,6 +15,7 @@ const moment = require("moment-timezone");
 const { google } = require("googleapis");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis } = require("./disponibilidade");
+const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
 
 // =====================================
 // CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
@@ -159,20 +160,6 @@ async function entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo
   }
 }
 
-function mapearRedeParaAgendaId(nomeRede) {
-  const rede = (nomeRede || "").toLowerCase();
-  if (rede.includes("evangelismo")) return agendasParaLer[0];
-  if (rede.includes("epifania")) return agendasParaLer[1];
-  if (rede.includes("intercessao") || rede.includes("intercessão")) return agendasParaLer[2];
-  if (rede.includes("seeds") || rede.includes("projeto")) return agendasParaLer[4];
-  if (rede.includes("ruach")) return agendasParaLer[5];
-  if (rede.includes("casais")) return agendasParaLer[6];
-  if (rede.includes("homens")) return agendasParaLer[7];
-  if (rede.includes("mulheres")) return agendasParaLer[8];
-  if (rede.includes("kids")) return agendasParaLer[9];
-  return agendasParaLer[3]; // Outros
-}
-
 function sabadosDoMes(ano, mes) {
   const sabados = [];
   const data = new Date(ano, mes - 1, 1);
@@ -293,7 +280,7 @@ function criarClient() {
                     const dia = dataMatch[1];
                     const mes = dataMatch[2];
                     const ano = moment().tz("America/Sao_Paulo").year();
-                    const agendaId = mapearRedeParaAgendaId(rede);
+                    const agendaId = agendasParaLer[mapearRedeParaAgendaIndex(rede)];
 
                     const resource = {
                       summary: evento,
@@ -401,30 +388,18 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           } else if (msg.body === "2") {
             info.etapa = "alterar_departamento";
             console.log(`[Fluxo] Usuário ${numero} iniciou alteração de evento.`);
-            return msg.reply("De qual departamento é o evento que deseja alterar?\n\n1 - Evangelismo\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
+            return msg.reply(`De qual departamento é o evento que deseja alterar?\n\n${montarListaRedes()}`);
           } else {
             return msg.reply("❌ Opção inválida. Digite 1 para Agendar ou 2 para Alterar.");
           }
         }
 
         if (info.etapa === "alterar_departamento") {
-          const mapaConfig = {
-            "1": { nome: "Evangelismo", id: agendasParaLer[0] },
-            "2": { nome: "Epifania", id: agendasParaLer[1] },
-            "3": { nome: "Intercessão", id: agendasParaLer[2] },
-            "4": { nome: "Projeto Social Seeds", id: agendasParaLer[4] },
-            "5": { nome: "Rede Ruach", id: agendasParaLer[5] },
-            "6": { nome: "Rede de Casais", id: agendasParaLer[6] },
-            "7": { nome: "Rede de Homens", id: agendasParaLer[7] },
-            "8": { nome: "Rede de Mulheres", id: agendasParaLer[8] },
-            "9": { nome: "Rede Kids", id: agendasParaLer[9] },
-            "10": { nome: "Outros", id: agendasParaLer[3] }
-          };
-          const config = mapaConfig[msg.body];
-          if (!config) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
+          const rede = obterRedePorNumero(msg.body);
+          if (!rede) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
 
-          info.departamento = config.nome;
-          info.calendarIdBusca = config.id;
+          info.departamento = rede.nome;
+          info.calendarIdBusca = agendasParaLer[rede.agendaIndex];
           await msg.reply(`🔍 Buscando eventos de *${info.departamento}* em ${new Date().getFullYear()}...`);
 
           try {
@@ -493,26 +468,14 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           console.log(`[Agendamento] Nome do evento: ${msg.body}`);
           info.nome = msg.body;
           info.etapa = "evento_rede";
-          return msg.reply("Qual rede está organizando?\n\n1 - Evangelismo\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros");
+          return msg.reply(`Qual rede está organizando?\n\n${montarListaRedes()}`);
         }
 
         if (info.etapa === "evento_rede") {
-          const mapaRedes = {
-            "1": "Evangelismo",
-            "2": "Epifania",
-            "3": "Intercessão",
-            "4": "Projeto Social Seeds",
-            "5": "Rede Ruach",
-            "6": "Rede de Casais",
-            "7": "Rede de Homens",
-            "8": "Rede de Mulheres",
-            "9": "Rede Kids",
-            "10": "Outros"
-          };
-          const escolha = msg.body.trim();
-          if (!mapaRedes[escolha]) return msg.reply("❌ Escolha uma opção da lista (1 a 10).");
+          const rede = obterRedePorNumero(msg.body.trim());
+          if (!rede) return msg.reply("❌ Escolha uma opção da lista (1 a 10).");
 
-          info.rede = mapaRedes[escolha];
+          info.rede = rede.nome;
           console.log(`[Agendamento] Rede selecionada: ${info.rede}`);
           info.etapa = "evento_mes";
           return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio)");
