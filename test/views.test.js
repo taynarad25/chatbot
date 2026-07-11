@@ -6,7 +6,7 @@ const { renderIndexHtml } = require("../web/views");
 // Extrai o código-fonte real de uma função declarada dentro do <script> renderizado,
 // para testar o código de produção (não uma reimplementação) contra XSS.
 function extractFunction(source, name) {
-  const re = new RegExp(`async\\s+function\\s+${name}\\s*\\([^)]*\\)\\s*\\{`);
+  const re = new RegExp(`(?:async\\s+)?function\\s+${name}\\s*\\([^)]*\\)\\s*\\{`);
   const match = source.match(re);
   assert.ok(match, `função ${name} não encontrada no <script> renderizado por renderIndexHtml()`);
 
@@ -109,4 +109,74 @@ test("deleteUser: clique no botão dispara exclusão via addEventListener (sem l
     calls.some((c) => c.url === "/api/admin/users/fulano" && c.method === "DELETE"),
     "o clique deveria disparar uma chamada DELETE para o usuário correto"
   );
+});
+
+// A máscara de telefone vive dentro de uma template literal gigante (todo o HTML de
+// renderIndexHtml). \D e \d não são sequências de escape reconhecidas por template
+// literals do JS, então o parser descarta a barra invertida silenciosamente — o bug
+// não aparece lendo o código-fonte, só rodando o <script> de fato como o navegador
+// faria. Por isso estes testes extraem e executam o código real, em vez de
+// reimplementar a lógica da máscara.
+function buildTelefoneSandbox() {
+  const html = renderIndexHtml();
+  const scriptMatch = html.match(/<script>([\s\S]*)<\/script>/);
+  assert.ok(scriptMatch, "não encontrei o bloco <script> em renderIndexHtml()");
+  const scriptSrc = scriptMatch[1];
+
+  const fnsSrc = ["extrairDigitosTelefone", "formatarTelefone", "digitosAteIndice", "indiceAposNDigitos", "ativarMascaraTelefone"]
+    .map((name) => extractFunction(scriptSrc, name))
+    .join("\n");
+
+  const dom = new JSDOM(html, { runScripts: "outside-only", url: "http://localhost/whatsappcontrol" });
+  const { window } = dom;
+  window.eval(fnsSrc);
+  return { window, document: window.document };
+}
+
+function dispararInput(window, input, valor, inputType) {
+  input.value = valor;
+  const ev = new window.Event("input", { bubbles: true });
+  Object.defineProperty(ev, "inputType", { value: inputType });
+  input.dispatchEvent(ev);
+}
+
+test("extrairDigitosTelefone: remove símbolos de formatação, mantendo só os dígitos", () => {
+  const { window } = buildTelefoneSandbox();
+  assert.equal(window.extrairDigitosTelefone("+55 (11) 94659-3056"), "5511946593056");
+  assert.equal(window.extrairDigitosTelefone("+55 11 94659-3056"), "5511946593056");
+});
+
+test("formatarTelefone: formata os dígitos como +55 (11) 94659-3056", () => {
+  const { window } = buildTelefoneSandbox();
+  assert.equal(window.formatarTelefone("5511946593056"), "+55 (11) 94659-3056");
+});
+
+test("ativarMascaraTelefone: colar um telefone com máscara formata corretamente o campo", () => {
+  const { window, document } = buildTelefoneSandbox();
+  const input = document.getElementById("liderTelefone");
+  window.ativarMascaraTelefone(input);
+
+  dispararInput(window, input, "+55 11 94659-3056", "insertFromPaste");
+
+  assert.equal(input.value, "+55 (11) 94659-3056");
+});
+
+test("ativarMascaraTelefone: apagar repetidamente a partir do fim nunca corrompe o campo", () => {
+  const { window, document } = buildTelefoneSandbox();
+  const input = document.getElementById("liderTelefone");
+  window.ativarMascaraTelefone(input);
+
+  dispararInput(window, input, "5511946593056", "insertFromPaste");
+  assert.equal(input.value, "+55 (11) 94659-3056");
+
+  for (let i = 0; i < 13; i++) {
+    const cursor = input.value.length;
+    const novoValor = input.value.slice(0, cursor - 1) + input.value.slice(cursor);
+    input.setSelectionRange(cursor - 1, cursor - 1);
+    dispararInput(window, input, novoValor, "deleteContentBackward");
+    // Nunca deveria sobrar um "+" fora da primeira posição, nem parênteses vazios —
+    // sintoma exato do bug relatado (campo "travado" mostrando algo como "+++ (+ ) (+ )").
+    assert.doesNotMatch(input.value, /\+.*\+/, `valor corrompido após ${i + 1} backspace(s): "${input.value}"`);
+  }
+  assert.equal(input.value, "", "depois de apagar todos os dígitos o campo deveria ficar vazio");
 });
