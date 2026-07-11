@@ -1,0 +1,156 @@
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const moment = require("moment-timezone");
+const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento } = require("../agenda");
+
+function evento({ data, hora, horaFim, summary, location, description, diaTodo = false }) {
+  if (diaTodo) {
+    return { summary, location, description, start: { date: data }, end: { date: data } };
+  }
+  const start = moment.tz(`${data} ${hora}`, "YYYY-MM-DD HH:mm", "America/Sao_Paulo").format();
+  const end = moment.tz(`${data} ${horaFim}`, "YYYY-MM-DD HH:mm", "America/Sao_Paulo").format();
+  return { summary, location, description, start: { dateTime: start }, end: { dateTime: end } };
+}
+
+test("agruparEventosAgenda: 3+ ocorrências do mesmo nome/horário/dia da semana viram um item recorrente", () => {
+  const eventos = [
+    evento({ data: "2026-07-02", hora: "19:30", horaFim: "21:00", summary: "Reunião de Intercessão" }),
+    evento({ data: "2026-07-09", hora: "19:30", horaFim: "21:00", summary: "Reunião de Intercessão" }),
+    evento({ data: "2026-07-16", hora: "19:30", horaFim: "21:00", summary: "Reunião de Intercessão" }),
+  ];
+
+  const itens = agruparEventosAgenda(eventos);
+  assert.equal(itens.length, 1);
+  assert.equal(itens[0].tipo, "recorrente");
+  assert.equal(itens[0].eventos.length, 3);
+});
+
+test("agruparEventosAgenda: menos de 3 ocorrências viram itens únicos separados", () => {
+  const eventos = [
+    evento({ data: "2026-07-05", hora: "18:00", horaFim: "20:00", summary: "Culto de Celebração" }),
+    evento({ data: "2026-07-12", hora: "08:30", horaFim: "09:30", summary: "Santa Ceia" }),
+  ];
+
+  const itens = agruparEventosAgenda(eventos);
+  assert.equal(itens.length, 2);
+  assert.ok(itens.every(i => i.tipo === "unico"));
+});
+
+test("agruparEventosAgenda: ordena os itens cronologicamente", () => {
+  const eventos = [
+    evento({ data: "2026-07-20", hora: "15:00", horaFim: "17:00", summary: "Encontro Rede de Mulheres" }),
+    evento({ data: "2026-07-05", hora: "18:00", horaFim: "20:00", summary: "Culto de Celebração" }),
+  ];
+
+  const itens = agruparEventosAgenda(eventos);
+  assert.equal(itens[0].summary, "Culto de Celebração");
+  assert.equal(itens[1].summary, "Encontro Rede de Mulheres");
+});
+
+test("montarMensagemAgenda: numera os itens e usa 'Todas as' para dia de semana, 'Todos os' para fim de semana", () => {
+  const recorrenteQuinta = agruparEventosAgenda([
+    evento({ data: "2026-07-02", hora: "19:30", horaFim: "21:00", summary: "Intercessão" }),
+    evento({ data: "2026-07-09", hora: "19:30", horaFim: "21:00", summary: "Intercessão" }),
+    evento({ data: "2026-07-16", hora: "19:30", horaFim: "21:00", summary: "Intercessão" }),
+  ]);
+  const msgQuinta = montarMensagemAgenda(recorrenteQuinta, "Julho");
+  assert.match(msgQuinta, /1 - 🗓️ \*Todas as Quintas-feiras\* às 19:30 \| Intercessão/);
+
+  const recorrenteSabado = agruparEventosAgenda([
+    evento({ data: "2026-07-04", hora: "15:00", horaFim: "17:00", summary: "Encontro" }),
+    evento({ data: "2026-07-11", hora: "15:00", horaFim: "17:00", summary: "Encontro" }),
+    evento({ data: "2026-07-18", hora: "15:00", horaFim: "17:00", summary: "Encontro" }),
+  ]);
+  const msgSabado = montarMensagemAgenda(recorrenteSabado, "Julho");
+  assert.match(msgSabado, /1 - 🗓️ \*Todos os Sábados\* às 15:00 \| Encontro/);
+});
+
+test("montarMensagemAgenda: item único usa 📌 com a data e inclui o rodapé de instrução", () => {
+  const itens = agruparEventosAgenda([
+    evento({ data: "2026-07-12", hora: "08:30", horaFim: "09:30", summary: "Santa Ceia" }),
+  ]);
+  const msg = montarMensagemAgenda(itens, "Julho");
+  assert.match(msg, /1 - 📌 \*12\/07\* às 08:30 \| Santa Ceia/);
+  assert.match(msg, /Digite o número dele/);
+  assert.match(msg, /Digite \*menu\* para voltar ao menu principal\./);
+});
+
+test("montarDetalheEvento: item único mostra data, horário, local e descrição", () => {
+  const itens = agruparEventosAgenda([
+    evento({
+      data: "2026-07-18", hora: "15:00", horaFim: "17:00",
+      summary: "Encontro Rede de Mulheres",
+      location: "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi",
+      description: "Traga uma amiga!",
+    }),
+  ]);
+  const detalhe = montarDetalheEvento(itens[0]);
+  assert.match(detalhe, /📌 \*Encontro Rede de Mulheres\*/);
+  assert.match(detalhe, /📆 Data: 18\/07 \(Sábado\)/);
+  assert.match(detalhe, /⏰ Horário: 15:00 às 17:00/);
+  assert.match(detalhe, /📍 Local: Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi/);
+  assert.match(detalhe, /📝 Descrição: Traga uma amiga!/);
+});
+
+test("montarDetalheEvento: omite as linhas de local e descrição quando ausentes no Google Agenda", () => {
+  const itens = agruparEventosAgenda([
+    evento({ data: "2026-07-18", hora: "15:00", horaFim: "17:00", summary: "Encontro" }),
+  ]);
+  const detalhe = montarDetalheEvento(itens[0]);
+  assert.doesNotMatch(detalhe, /📍 Local:/);
+  assert.doesNotMatch(detalhe, /📝 Descrição:/);
+});
+
+test("montarDetalheEvento: trunca descrições muito longas em 500 caracteres", () => {
+  const descricaoLonga = "x".repeat(800);
+  const itens = agruparEventosAgenda([
+    evento({ data: "2026-07-18", hora: "15:00", horaFim: "17:00", summary: "Encontro", description: descricaoLonga }),
+  ]);
+  const detalhe = montarDetalheEvento(itens[0]);
+  const linhaDescricao = detalhe.split("\n").find(l => l.startsWith("📝 Descrição:"));
+  assert.ok(linhaDescricao.endsWith("…"));
+  assert.equal(linhaDescricao.replace("📝 Descrição: ", "").length, 501); // 500 chars + reticências
+});
+
+test("montarDetalheEvento: evento de dia inteiro mostra 'Dia todo' como horário", () => {
+  const itens = agruparEventosAgenda([
+    evento({ data: "2026-07-18", summary: "Retiro", diaTodo: true }),
+  ]);
+  const detalhe = montarDetalheEvento(itens[0]);
+  assert.match(detalhe, /⏰ Horário: Dia todo/);
+});
+
+test("montarDetalheEvento: item recorrente mostra a próxima ocorrência a partir de hoje", () => {
+  // Offsets múltiplos de 7 dias garantem o mesmo dia da semana, condição para agrupar como recorrente
+  const passada = moment.tz("America/Sao_Paulo").subtract(14, "day");
+  const proxima = moment.tz("America/Sao_Paulo").add(7, "day");
+  const futuraDistante = moment.tz("America/Sao_Paulo").add(14, "day");
+
+  const eventos = [
+    evento({ data: passada.format("YYYY-MM-DD"), hora: "19:30", horaFim: "21:00", summary: "Intercessão", location: "Local Passado" }),
+    evento({ data: proxima.format("YYYY-MM-DD"), hora: "19:30", horaFim: "21:00", summary: "Intercessão", location: "Local Próximo" }),
+    evento({ data: futuraDistante.format("YYYY-MM-DD"), hora: "19:30", horaFim: "21:00", summary: "Intercessão", location: "Local Futuro" }),
+  ];
+
+  const itens = agruparEventosAgenda(eventos);
+  assert.equal(itens[0].tipo, "recorrente");
+  const detalhe = montarDetalheEvento(itens[0]);
+  assert.match(detalhe, /Local Próximo/);
+});
+
+test("montarDetalheEvento: item recorrente cujas ocorrências já passaram mostra a última disponível", () => {
+  const ha21dias = moment.tz("America/Sao_Paulo").subtract(21, "day");
+  const ha14dias = moment.tz("America/Sao_Paulo").subtract(14, "day");
+  const ha7dias = moment.tz("America/Sao_Paulo").subtract(7, "day");
+
+  const eventos = [
+    evento({ data: ha21dias.format("YYYY-MM-DD"), hora: "19:30", horaFim: "21:00", summary: "Intercessão", location: "Mais antigo" }),
+    evento({ data: ha14dias.format("YYYY-MM-DD"), hora: "19:30", horaFim: "21:00", summary: "Intercessão", location: "Meio" }),
+    evento({ data: ha7dias.format("YYYY-MM-DD"), hora: "19:30", horaFim: "21:00", summary: "Intercessão", location: "Mais recente" }),
+  ];
+
+  const itens = agruparEventosAgenda(eventos);
+  assert.equal(itens[0].tipo, "recorrente");
+  const detalhe = montarDetalheEvento(itens[0]);
+  assert.match(detalhe, /Mais recente/);
+});
