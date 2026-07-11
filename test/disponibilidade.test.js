@@ -2,7 +2,7 @@ process.env.TZ = "America/Sao_Paulo";
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis } = require("../disponibilidade");
+const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis } = require("../bot/disponibilidade");
 
 const EVANGELISMO_ID = "evangelismo-cal-id";
 const ANO = 2026;

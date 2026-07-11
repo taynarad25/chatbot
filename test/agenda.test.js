@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
-const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("../agenda");
+const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("../bot/agenda");
 
 function evento({ data, hora, horaFim, summary, location, description, diaTodo = false }) {
   if (diaTodo) {

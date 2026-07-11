@@ -48,16 +48,6 @@ function saveUser(user) {
   }
 }
 
-function updateUserPassword(username, salt, hash) {
-  const users = loadUsers();
-  const normalized = username?.toLowerCase().trim();
-  if (users[normalized]) {
-    users[normalized] = { ...users[normalized], salt, hash, status: 'active' };
-    fs.writeFileSync(LOGIN_FILE, JSON.stringify(users, null, 2), "utf8");
-    console.log(`[Users] Senha atualizada para '${normalized}'.`);
-  }
-}
-
 function deleteUser(username) {
   const users = loadUsers();
   const normalized = username?.toLowerCase().trim();
@@ -65,4 +55,4 @@ function deleteUser(username) {
   fs.writeFileSync(LOGIN_FILE, JSON.stringify(users, null, 2), "utf8");
   console.log(`[Users] Usuário '${normalized}' removido.`);
 }
-module.exports = { loadUsers, saveUser, deleteUser, updateUserPassword };
+module.exports = { loadUsers, saveUser, deleteUser };

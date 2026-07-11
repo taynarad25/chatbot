@@ -11,9 +11,9 @@
   "name": "chatbot",
   "version": "1.0.0",
   "description": "",
-  "main": "chatbot.js",
+  "main": "bot/chatbot.js",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   },
   "repository": {
     "type": "git",

@@ -2,7 +2,7 @@ process.env.TZ = "America/Sao_Paulo";
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { codificarDadosAgendamento, decodificarDadosAgendamento, montarResourceEvento } = require("../agendamentoAutomatico");
+const { codificarDadosAgendamento, decodificarDadosAgendamento, montarResourceEvento } = require("../bot/agendamentoAutomatico");
 
 function dadosExemplo(overrides = {}) {
   return {

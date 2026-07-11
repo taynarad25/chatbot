@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("../redes");
+const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("../bot/redes");
 
 test("REDES: tem exatamente 10 entradas com números únicos de 1 a 10", () => {
   assert.equal(REDES.length, 10);

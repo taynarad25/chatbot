@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { encontrarGrupoSecretaria, notificarSecretaria } = require("../secretaria");
+const { encontrarGrupoSecretaria, notificarSecretaria } = require("../bot/secretaria");
 
 function fakeChat({ isGroup, name }) {
   return { isGroup, name, sendMessage: async () => {} };
