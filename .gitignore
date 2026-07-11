@@ -5,6 +5,7 @@ node_modules/
 credenciais-google.json
 .env
 login.json
+lideres.json
 *.log
 npm-debug.log*
 .DS_Store

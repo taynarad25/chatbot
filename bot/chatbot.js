@@ -13,6 +13,7 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const moment = require("moment-timezone");
 const { google } = require("googleapis");
 const { createMessageHandler } = require("./messageHandler");
+const { telefonesLideres, loadLideres } = require("../web/lideres");
 
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
 // estado persistido e a sessão do WhatsApp (.wwebjs_auth) sempre viveram na
@@ -92,10 +93,12 @@ const agendasParaLer = [
 
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
 
-const lideres = (process.env.WHATSAPP_LIDERES || "")
-  .split(",")
-  .map(num => num.trim())
-  .filter(Boolean);
+// A lista de líderes agora é gerenciada pelo painel web (aba "Líderes") e
+// persistida em lideres.json. `telefonesLideres` é a mesma referência de array
+// usada pelo módulo web/lideres.js, então uma edição feita no painel já reflete
+// aqui sem precisar reiniciar o bot.
+loadLideres();
+const lideres = telefonesLideres;
 if (lideres.length > 0) {
   console.log(`[Config] ${lideres.length} número(s) de líder(es) carregado(s).`);
 }
