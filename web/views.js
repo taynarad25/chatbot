@@ -219,6 +219,10 @@ function renderIndexHtml() {
 
     <div id="tab-lideres" class="tab-content">
       <h3>Líderes</h3>
+      <div style="display:flex; gap:10px; margin-bottom:1rem;">
+        <input id="filtroLiderNome" placeholder="Buscar por nome" style="flex:1;" />
+        <input id="filtroLiderTelefone" placeholder="Buscar por telefone" inputmode="numeric" style="flex:1;" />
+      </div>
       <ul id="liderList"></ul>
       <hr>
       <h4 id="liderFormTitle">Novo Líder</h4>
@@ -359,34 +363,63 @@ function renderIndexHtml() {
     });
 
     let liderEmEdicao = null; // telefone (normalizado) do líder sendo editado, ou null quando é um cadastro novo
+    let lideresCache = []; // última lista carregada da API, usada para filtrar sem precisar buscar de novo a cada tecla
+
+    // Remove acentos para a busca por nome encontrar "joao" mesmo quando o líder está cadastrado como "João"
+    function normalizarBusca(texto) {
+      return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function renderLideres() {
+      const filtroNome = normalizarBusca(document.getElementById('filtroLiderNome').value);
+      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\D/g, '');
+
+      const filtrados = lideresCache.filter(l => {
+        const nomeOk = !filtroNome || normalizarBusca(l.nome).includes(filtroNome);
+        const telefoneOk = !filtroTelefone || l.telefone.includes(filtroTelefone);
+        return nomeOk && telefoneOk;
+      });
+
+      const list = document.getElementById('liderList');
+      list.innerHTML = '';
+
+      if (filtrados.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = lideresCache.length === 0 ? 'Nenhum líder cadastrado.' : 'Nenhum líder encontrado com esse filtro.';
+        list.appendChild(li);
+        return;
+      }
+
+      filtrados.forEach(l => {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.textContent = (l.nome || '(sem nome)') + ' — ' + formatarTelefone(l.telefone);
+        li.appendChild(span);
+
+        const btnEditar = document.createElement('button');
+        btnEditar.textContent = 'Editar';
+        btnEditar.addEventListener('click', () => iniciarEdicaoLider(l));
+        li.appendChild(btnEditar);
+
+        const btnRemover = document.createElement('button');
+        btnRemover.className = 'danger';
+        btnRemover.textContent = 'Remover';
+        btnRemover.addEventListener('click', () => deleteLider(l.telefone));
+        li.appendChild(btnRemover);
+
+        list.appendChild(li);
+      });
+    }
+
+    document.getElementById('filtroLiderNome').addEventListener('input', renderLideres);
+    document.getElementById('filtroLiderTelefone').addEventListener('input', renderLideres);
 
     async function fetchLideres() {
       fetch('/api/admin/lideres')
         .then(r => r.ok ? r.json() : Promise.reject('Erro ao carregar líderes'))
         .then(json => {
-          const list = document.getElementById('liderList');
-          list.innerHTML = '';
-          if (json.lideres) {
-            json.lideres.forEach(l => {
-              const li = document.createElement('li');
-              const span = document.createElement('span');
-              span.textContent = (l.nome || '(sem nome)') + ' — ' + formatarTelefone(l.telefone);
-              li.appendChild(span);
-
-              const btnEditar = document.createElement('button');
-              btnEditar.textContent = 'Editar';
-              btnEditar.addEventListener('click', () => iniciarEdicaoLider(l));
-              li.appendChild(btnEditar);
-
-              const btnRemover = document.createElement('button');
-              btnRemover.className = 'danger';
-              btnRemover.textContent = 'Remover';
-              btnRemover.addEventListener('click', () => deleteLider(l.telefone));
-              li.appendChild(btnRemover);
-
-              list.appendChild(li);
-            });
-          }
+          lideresCache = json.lideres || [];
+          renderLideres();
         })
         .catch(err => console.error(err));
     }
