@@ -7,9 +7,11 @@ const { promisify } = require("util");
 const { loadUsers, saveUser, deleteUser } = require("./web/users");
 const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
+const { createRateLimiter } = require("./web/rateLimiter");
 
 const pbkdf2 = promisify(crypto.pbkdf2);
-const loginAttempts = {}; // Simples rate limiting em memória
+// Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
+const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
 
 
 function findUser(username) {
@@ -136,7 +138,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           const username = body.username?.trim();
           const password = body.password?.trim();
 
-          if (loginAttempts[ip] && loginAttempts[ip] > 10) {
+          if (loginRateLimiter.isBlocked(ip)) {
               console.warn(`[Web] Rate limit atingido para o IP: ${ip}`);
               return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
           }
@@ -150,7 +152,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
             if (isPasswordValid && isActive) {
               const token = createSession(username, user.role, user.status);
-              delete loginAttempts[ip];
+              loginRateLimiter.reset(ip);
               setSessionCookie(res, token);
               console.log(`[Web] Login bem-sucedido: ${username} (IP: ${ip})`);
               return sendJson(res, 200, { ok: true });
@@ -160,7 +162,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
               console.warn(`[Web] Login falhou: Usuário '${username}' está com status inativo (${user.status}) (IP: ${ip})`);
             }
           }
-          loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
+          loginRateLimiter.registerFailure(ip);
           return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
         } catch (err) {
           console.error(`[Web] Erro ao processar login: ${err.message}`);
