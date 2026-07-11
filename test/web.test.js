@@ -196,6 +196,59 @@ test("POST /api/admin/lideres: telefone duplicado é rejeitado", async () => {
   assert.equal(json.ok, false);
 });
 
+test("PUT /api/admin/lideres/:telefone (como admin): edita o nome mantendo o telefone", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+
+  const res = await fetch(`${baseUrl}/api/admin/lideres/5511946593056`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Taynara D. Silva", telefone: "5511946593056" }),
+  });
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.equal(json.ok, true);
+
+  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const listaJson = await lista.json();
+  assert.ok(listaJson.lideres.some((l) => l.nome === "Taynara D. Silva" && l.telefone === "5511946593056"));
+});
+
+test("PUT /api/admin/lideres/:telefone: também troca o telefone do líder", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+
+  await fetch(`${baseUrl}/api/admin/lideres`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Temporário", telefone: "5511900000000" }),
+  });
+
+  const res = await fetch(`${baseUrl}/api/admin/lideres/5511900000000`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Temporário", telefone: "5511911111111" }),
+  });
+  assert.equal(res.status, 200);
+
+  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const listaJson = await lista.json();
+  assert.ok(!listaJson.lideres.some((l) => l.telefone === "5511900000000"));
+  assert.ok(listaJson.lideres.some((l) => l.telefone === "5511911111111"));
+
+  // Limpeza: remove o líder temporário criado só para este teste, para não
+  // interferir nos testes seguintes.
+  await fetch(`${baseUrl}/api/admin/lideres/5511911111111`, { method: "DELETE", headers: { Cookie: cookie } });
+});
+
+test("PUT /api/admin/lideres/:telefone: líder inexistente retorna 400", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+  const res = await fetch(`${baseUrl}/api/admin/lideres/0000000000000`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Ninguem", telefone: "0000000000000" }),
+  });
+  assert.equal(res.status, 400);
+});
+
 test("usuário comum (não-admin) não consegue acessar rotas de líderes", async () => {
   // Cria um usuário próprio para este teste (em vez de reusar "lider-novo", já
   // removido pelo teste de DELETE /api/admin/users anterior), evitando depender

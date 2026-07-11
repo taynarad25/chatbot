@@ -88,6 +88,32 @@ function addLider({ nome, telefone }) {
   return { ok: true, message: "Líder adicionado com sucesso." };
 }
 
+function updateLider(telefoneAtual, { nome, telefone }) {
+  const telefoneAtualNormalizado = normalizarTelefone(telefoneAtual);
+  const novoTelefoneNormalizado = normalizarTelefone(telefone);
+  if (!novoTelefoneNormalizado) return { ok: false, message: "Telefone inválido." };
+  if (!nome || !nome.trim()) return { ok: false, message: "Nome é obrigatório." };
+
+  const lideres = loadLideres();
+  const liderExistente = lideres[telefoneAtualNormalizado];
+  if (!liderExistente) return { ok: false, message: "Líder não encontrado." };
+
+  if (novoTelefoneNormalizado !== telefoneAtualNormalizado && lideres[novoTelefoneNormalizado]) {
+    return { ok: false, message: "Já existe um líder com esse telefone." };
+  }
+
+  delete lideres[telefoneAtualNormalizado];
+  lideres[novoTelefoneNormalizado] = {
+    nome: nome.trim(),
+    telefone: novoTelefoneNormalizado,
+    createdAt: liderExistente.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
+  salvar(lideres);
+  console.log(`[Lideres] Líder editado: ${telefoneAtualNormalizado} -> ${nome.trim()} (${novoTelefoneNormalizado})`);
+  return { ok: true, message: "Líder atualizado com sucesso." };
+}
+
 function removeLider(telefone) {
   const telefoneNormalizado = normalizarTelefone(telefone);
   const lideres = loadLideres();
@@ -99,4 +125,4 @@ function removeLider(telefone) {
   return { ok: true, message: "Líder removido com sucesso." };
 }
 
-module.exports = { telefonesLideres, loadLideres, listLideres, addLider, removeLider };
+module.exports = { telefonesLideres, loadLideres, listLideres, addLider, updateLider, removeLider };
