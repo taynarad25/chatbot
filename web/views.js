@@ -180,6 +180,11 @@ function renderIndexHtml() {
     .danger:active { background-color: #bd2130; }
     #logsContainer { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; height: 300px; overflow-y: auto; font-family: monospace; }
     li { background: #f9f9f9; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; border-radius: 5px; }
+    .filtros-lideres { display: flex; gap: 10px; margin-bottom: 1rem; }
+    .filtros-lideres input { flex: 1; }
+    @media (max-width: 480px) {
+      .filtros-lideres { flex-direction: column; gap: 0; }
+    }
   </style>
 </head>
 <body>
@@ -219,9 +224,9 @@ function renderIndexHtml() {
 
     <div id="tab-lideres" class="tab-content">
       <h3>Líderes</h3>
-      <div style="display:flex; gap:10px; margin-bottom:1rem;">
-        <input id="filtroLiderNome" placeholder="Buscar por nome" style="flex:1;" />
-        <input id="filtroLiderTelefone" placeholder="Buscar por telefone" inputmode="numeric" style="flex:1;" />
+      <div class="filtros-lideres">
+        <input id="filtroLiderNome" placeholder="Buscar por nome" />
+        <input id="filtroLiderTelefone" placeholder="Buscar por telefone" inputmode="numeric" />
       </div>
       <ul id="liderList"></ul>
       <hr>
