@@ -210,3 +210,25 @@ test("interpretarPeriodoPersonalizado: rejeita período maior que 90 dias", () =
   assert.equal(r.ok, false);
   assert.match(r.mensagem, /muito longo/);
 });
+
+test("interpretarPeriodoPersonalizado: período que cruza o ano novo (mês final menor que o inicial) é aceito", () => {
+  const hojeDezembro = moment.tz("2026-12-20", "YYYY-MM-DD", "America/Sao_Paulo");
+  const r = interpretarPeriodoPersonalizado("28/12 a 05/01", hojeDezembro);
+  assert.equal(r.ok, true);
+  assert.equal(r.inicio.format("DD/MM/YYYY"), "28/12/2026");
+  assert.equal(r.fim.format("DD/MM/YYYY"), "05/01/2027");
+  assert.ok(r.fim.isAfter(r.inicio));
+});
+
+test("interpretarPeriodoPersonalizado: mesmo mês com dia final menor não é tratado como virada de ano (continua erro de data invertida)", () => {
+  const r = interpretarPeriodoPersonalizado("20/07 a 10/07", HOJE_REF);
+  assert.equal(r.ok, false);
+  assert.match(r.mensagem, /data final deve ser igual ou depois/);
+});
+
+test("interpretarPeriodoPersonalizado: período que cruza o ano novo ainda respeita o limite de 90 dias", () => {
+  const hojeDezembro = moment.tz("2026-12-01", "YYYY-MM-DD", "America/Sao_Paulo");
+  const r = interpretarPeriodoPersonalizado("01/12 a 15/04", hojeDezembro);
+  assert.equal(r.ok, false);
+  assert.match(r.mensagem, /muito longo/);
+});

@@ -3,3 +3,6 @@ node_modules
 .wwebjs_cache
 .git
 *.log
+credenciais-google.json
+login.json
+bot_state.json

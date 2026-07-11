@@ -127,7 +127,10 @@ function interpretarPeriodoPersonalizado(entrada, agora) {
 
   const ano = agora.year();
   const inicio = moment.tz(`${diaIni}/${mesIni}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
-  const fim = moment.tz(`${diaFim}/${mesFim}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+  // Se o mês final é numericamente menor que o inicial (ex: 28/12 a 05/01), o período
+  // cruza o ano novo — a data final pertence ao ano seguinte.
+  const anoFim = mesFim < mesIni ? ano + 1 : ano;
+  const fim = moment.tz(`${diaFim}/${mesFim}/${anoFim}`, "D/M/YYYY", "America/Sao_Paulo");
 
   if (!inicio.isValid() || !fim.isValid()) {
     return { ok: false, mensagem: ERRO_FORMATO_PERIODO };

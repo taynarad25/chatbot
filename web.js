@@ -7,9 +7,14 @@ const { promisify } = require("util");
 const { loadUsers, saveUser, deleteUser } = require("./web/users");
 const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
+const { createRateLimiter } = require("./web/rateLimiter");
+const { getClientIp } = require("./web/clientIp");
 
 const pbkdf2 = promisify(crypto.pbkdf2);
-const loginAttempts = {}; // Simples rate limiting em memória
+// Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
+const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
+// Sobrescrevível via env var (usado pelos testes, para nunca ler/limpar o log real de produção).
+const LOG_FILE = process.env.COMBINED_LOG_PATH || path.join(__dirname, "combined.log");
 
 
 function findUser(username) {
@@ -48,16 +53,6 @@ async function addUser({ username, password, role = 'user', status = 'active' })
     updatedAt: new Date().toISOString()
   });
   return { ok: true, message: userStatus === 'pending' ? "Usuário pré-cadastrado. O líder deve agora acessar a tela de cadastro para definir sua senha." : "Usuário criado com sucesso." };
-}
-
-/**
- * Obtém o IP real do cliente, considerando proxies/Docker
- */
-function getClientIp(req) {
-  return req.headers['cf-connecting-ip'] ||
-         req.headers['x-forwarded-for']?.split(',')[0].trim() || 
-         req.headers['x-real-ip'] || 
-         req.socket.remoteAddress;
 }
 
 function sendJson(res, status, data) {
@@ -104,7 +99,7 @@ async function parseRequestBody(req) {
   });
 }
 
-function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) {
+function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, port = 3000 }) {
   const server = http.createServer(async (req, res) => {
     const start = Date.now();
     const ip = getClientIp(req);
@@ -136,7 +131,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
           const username = body.username?.trim();
           const password = body.password?.trim();
 
-          if (loginAttempts[ip] && loginAttempts[ip] > 10) {
+          if (loginRateLimiter.isBlocked(ip)) {
               console.warn(`[Web] Rate limit atingido para o IP: ${ip}`);
               return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
           }
@@ -150,7 +145,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
             if (isPasswordValid && isActive) {
               const token = createSession(username, user.role, user.status);
-              delete loginAttempts[ip];
+              loginRateLimiter.reset(ip);
               setSessionCookie(res, token);
               console.log(`[Web] Login bem-sucedido: ${username} (IP: ${ip})`);
               return sendJson(res, 200, { ok: true });
@@ -160,7 +155,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
               console.warn(`[Web] Login falhou: Usuário '${username}' está com status inativo (${user.status}) (IP: ${ip})`);
             }
           }
-          loginAttempts[ip] = (loginAttempts[ip] || 0) + 1;
+          loginRateLimiter.registerFailure(ip);
           return sendJson(res, 401, { ok: false, message: 'Usuário ou senha inválidos.' });
         } catch (err) {
           console.error(`[Web] Erro ao processar login: ${err.message}`);
@@ -256,9 +251,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
 
       // API: Ler Logs (Apenas Admin)
       if (req.method === 'GET' && pathname === '/api/logs' && isAdmin(req)) {
-        const logFile = path.join(__dirname, 'combined.log');
         try {
-          const content = fs.readFileSync(logFile, 'utf8');
+          const content = fs.readFileSync(LOG_FILE, 'utf8');
           return sendJson(res, 200, { ok: true, logs: content });
         } catch (e) {
           return sendJson(res, 500, { ok: false, message: 'Erro ao ler arquivo de log' });
@@ -268,8 +262,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
       // API: Limpar Logs (Apenas Admin)
       if (req.method === 'DELETE' && pathname === '/api/logs' && isAdmin(req)) {
         try {
-          const logFile = path.join(__dirname, 'combined.log');
-          fs.writeFileSync(logFile, '');
+          fs.writeFileSync(LOG_FILE, '');
           return sendJson(res, 200, { ok: true });
         } catch (e) {
           return sendJson(res, 500, { ok: false });
@@ -316,9 +309,11 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient }) 
     console.error(`[Web] Erro crítico no servidor:`, err);
   });
 
-  server.listen(3000, '0.0.0.0', () => {
-    console.log('✅ Site de controle rodando em http://0.0.0.0:3000');
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`✅ Site de controle rodando em http://0.0.0.0:${server.address().port}`);
   });
+
+  return server;
 }
 
 // Removido getUsers que não estava definido e corrigido exportação
