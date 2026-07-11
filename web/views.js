@@ -191,6 +191,7 @@ function renderIndexHtml() {
     <div class="tabs">
       <button class="tab-btn active" onclick="openTab(event, 'tab-whatsapp')">Whatsapp</button>
       <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">Perfil de acesso</button>
+      <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">Líderes</button>
       <button class="tab-btn" id="btn-tab-logs" style="display:none;" onclick="openTab(event, 'tab-logs')">Logs</button>
     </div>
     
@@ -216,6 +217,19 @@ function renderIndexHtml() {
       </form>
     </div>
 
+    <div id="tab-lideres" class="tab-content">
+      <h3>Líderes</h3>
+      <ul id="liderList"></ul>
+      <hr>
+      <h4>Novo Líder</h4>
+      <div id="lideresMessage" class="message-box" style="display:none;"></div>
+      <form id="addLiderForm">
+        <input name="nome" placeholder="Nome do líder" required />
+        <input name="telefone" placeholder="Telefone (ex: 5511999999999)" required />
+        <button type="submit" class="primary">Adicionar</button>
+      </form>
+    </div>
+
     <div id="tab-logs" class="tab-content">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
         <h3 style="margin:0;">Logs</h3>
@@ -232,6 +246,7 @@ function renderIndexHtml() {
       document.getElementById(name).classList.add('active');
       evt.currentTarget.classList.add('active');
       if(name === 'tab-admin') fetchUsers();
+      if(name === 'tab-lideres') fetchLideres();
     }
 
     async function refresh() {
@@ -251,6 +266,7 @@ function renderIndexHtml() {
         const userJson = await userRes.json();
         const isAdmin = userJson.ok && userJson.user.role === 'admin';
         document.getElementById('btn-tab-admin').style.display = isAdmin ? 'block' : 'none';
+        document.getElementById('btn-tab-lideres').style.display = isAdmin ? 'block' : 'none';
         document.getElementById('btn-tab-logs').style.display = isAdmin ? 'block' : 'none';
 
       const actionMessageEl = document.getElementById('actionMessage');
@@ -326,6 +342,38 @@ function renderIndexHtml() {
       }
     }
 
+    async function fetchLideres() {
+      fetch('/api/admin/lideres')
+        .then(r => r.ok ? r.json() : Promise.reject('Erro ao carregar líderes'))
+        .then(json => {
+          const list = document.getElementById('liderList');
+          list.innerHTML = '';
+          if (json.lideres) {
+            json.lideres.forEach(l => {
+              const li = document.createElement('li');
+              const span = document.createElement('span');
+              span.textContent = (l.nome || '(sem nome)') + ' — ' + l.telefone;
+              li.appendChild(span);
+              const btn = document.createElement('button');
+              btn.className = 'danger';
+              btn.textContent = 'Remover';
+              btn.addEventListener('click', () => deleteLider(l.telefone));
+              li.appendChild(btn);
+              list.appendChild(li);
+            });
+          }
+        })
+        .catch(err => console.error(err));
+    }
+
+    async function deleteLider(telefone) {
+      if (confirm('Tem certeza que deseja remover o líder ' + telefone + '?')) {
+        console.log('Solicitando remoção do líder:', telefone);
+        await fetch('/api/admin/lideres/'+encodeURIComponent(telefone), { method: 'DELETE' });
+        fetchLideres();
+      }
+    }
+
     document.getElementById('addUserForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target));
@@ -346,8 +394,35 @@ function renderIndexHtml() {
         msgEl.style.color = '#155724';
         e.target.reset();
         fetchUsers();
-      } else { 
+      } else {
         console.error('Erro ao criar usuário:', json.message);
+        msgEl.style.backgroundColor = '#f8d7da';
+        msgEl.style.color = '#721c24';
+      }
+    });
+
+    document.getElementById('addLiderForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target));
+      console.log('Tentando adicionar novo líder:', data.nome);
+      const res = await fetch('/api/admin/lideres', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      const msgEl = document.getElementById('lideresMessage');
+      msgEl.style.display = 'block';
+      msgEl.textContent = json.message;
+
+      if (res.ok) {
+        console.log('Líder adicionado com sucesso.');
+        msgEl.style.backgroundColor = '#d4edda';
+        msgEl.style.color = '#155724';
+        e.target.reset();
+        fetchLideres();
+      } else {
+        console.error('Erro ao adicionar líder:', json.message);
         msgEl.style.backgroundColor = '#f8d7da';
         msgEl.style.color = '#721c24';
       }

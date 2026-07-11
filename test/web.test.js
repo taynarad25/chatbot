@@ -8,6 +8,7 @@ const fs = require("fs");
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-web-test-"));
 process.env.LOGIN_FILE_PATH = path.join(tmpDir, "login.json");
+process.env.LIDERES_FILE_PATH = path.join(tmpDir, "lideres.json");
 process.env.COMBINED_LOG_PATH = path.join(tmpDir, "combined.log");
 fs.writeFileSync(process.env.COMBINED_LOG_PATH, "linha de log de teste\n");
 
@@ -154,6 +155,72 @@ test("DELETE /api/admin/users/:username (como admin): remove o usuário", async 
   const lista = await fetch(`${baseUrl}/api/admin/users`, { headers: { Cookie: cookie } });
   const listaJson = await lista.json();
   assert.ok(!listaJson.users.some((u) => u.username === "lider-novo"));
+});
+
+test("GET /api/admin/lideres (como admin): lista vazia quando não há líderes cadastrados", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+  const res = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.deepEqual(json.lideres, []);
+});
+
+test("POST /api/admin/lideres (como admin): adiciona um líder novo", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+
+  const res = await fetch(`${baseUrl}/api/admin/lideres`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Taynara Diniz", telefone: "+55 (11) 94659-3056" }),
+  });
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.equal(json.ok, true);
+
+  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const listaJson = await lista.json();
+  // O telefone é normalizado (só dígitos) na hora de salvar
+  assert.ok(listaJson.lideres.some((l) => l.nome === "Taynara Diniz" && l.telefone === "5511946593056"));
+});
+
+test("POST /api/admin/lideres: telefone duplicado é rejeitado", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+
+  const res = await fetch(`${baseUrl}/api/admin/lideres`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ nome: "Outro Nome", telefone: "5511946593056" }),
+  });
+  assert.equal(res.status, 400);
+  const json = await res.json();
+  assert.equal(json.ok, false);
+});
+
+test("usuário comum (não-admin) não consegue acessar rotas de líderes", async () => {
+  // Cria um usuário próprio para este teste (em vez de reusar "lider-novo", já
+  // removido pelo teste de DELETE /api/admin/users anterior), evitando depender
+  // da ordem de execução dos testes.
+  await addUser({ username: "usuario-comum-lideres", password: "senha123456", role: "user", status: "active" });
+  const { cookie } = await fazerLogin("usuario-comum-lideres", "senha123456");
+  const res = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  assert.equal(res.status, 404);
+});
+
+test("DELETE /api/admin/lideres/:telefone (como admin): remove o líder", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+
+  const del = await fetch(`${baseUrl}/api/admin/lideres/5511946593056`, { method: "DELETE", headers: { Cookie: cookie } });
+  assert.equal(del.status, 200);
+
+  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const listaJson = await lista.json();
+  assert.ok(!listaJson.lideres.some((l) => l.telefone === "5511946593056"));
+});
+
+test("DELETE /api/admin/lideres/:telefone: líder inexistente retorna 404", async () => {
+  const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
+  const del = await fetch(`${baseUrl}/api/admin/lideres/0000000000000`, { method: "DELETE", headers: { Cookie: cookie } });
+  assert.equal(del.status, 404);
 });
 
 test("GET /api/logs (como admin): lê o arquivo de log isolado do teste", async () => {

@@ -6,7 +6,7 @@ Bot de WhatsApp para a secretaria da igreja, com integração à Google Agenda e
 
 ### Menu principal
 
-Qualquer saudação ("oi", "olá", "paz", "bom dia", "boa tarde", "boa noite", "menu"...) reseta a conversa e mostra o menu. O menu tem duas versões: uma para o público geral e outra, com opções extras, para números cadastrados como líder (variável `WHATSAPP_LIDERES`).
+Qualquer saudação ("oi", "olá", "paz", "bom dia", "boa tarde", "boa noite", "menu"...) reseta a conversa e mostra o menu. O menu tem duas versões: uma para o público geral e outra, com opções extras, para números cadastrados como líder (aba "Líderes" do painel web, veja abaixo).
 
 | Opção | Disponível para | O que faz |
 |---|---|---|
@@ -62,6 +62,7 @@ Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao se
 - **Login** com sessão em cookie (`HttpOnly`, `SameSite=Strict`) e rate limiting de tentativas por IP.
 - **Status da conexão:** mostra se o WhatsApp está conectado, gera QR Code para parear, permite cancelar ou desconectar.
 - **Gestão de usuários** (admin): criar usuário (com senha definida na hora, ou como "pendente" para a pessoa definir a própria senha depois via `/register`), listar e excluir.
+- **Gestão de líderes** (admin): cadastrar líder (nome + telefone), listar e remover — sem edição, já que são poucos dados e é mais simples remover e recadastrar. Persistido em `lideres.json`, aplicado ao bot imediatamente, sem precisar reiniciar.
 - **Logs** (admin): visualizar e limpar o arquivo de log combinado do bot.
 
 ## Como funciona por baixo dos panos
@@ -94,15 +95,17 @@ Variáveis de ambiente (arquivo `.env`, veja `docker-compose.bot.yml`):
 
 | Variável | Uso |
 |---|---|
-| `WHATSAPP_LIDERES` | Números de telefone (separados por vírgula) com acesso às opções de líder |
+| `WHATSAPP_LIDERES` | Números de telefone (separados por vírgula) usados apenas para semear `lideres.json` na primeira execução (se o arquivo ainda não existir). Depois disso, o cadastro de líderes é feito pela aba "Líderes" do painel web |
 | `PUPPETEER_EXECUTABLE_PATH` | Caminho de um Chromium já instalado (opcional, usado no Docker) |
 | `LOGIN_FILE_PATH` | Sobrescreve o caminho de `login.json` (usado pelos testes, para nunca tocar no arquivo real) |
+| `LIDERES_FILE_PATH` | Sobrescreve o caminho de `lideres.json` (idem) |
 | `COMBINED_LOG_PATH` | Sobrescreve o caminho do log combinado (idem) |
 
 Arquivos necessários (não versionados, veja `.gitignore`):
 
 - `credenciais-google.json` — chave de conta de serviço do Google com acesso às 10 agendas.
 - `login.json` — usuários do painel web (veja `login.json.example`).
+- `lideres.json` — líderes com acesso às opções extras do bot (nome + telefone); criado automaticamente na primeira execução, a partir de `WHATSAPP_LIDERES` se ela estiver definida, ou vazio caso contrário — dá pra cadastrar todo mundo depois pela aba "Líderes" do painel.
 
 ## Rodando
 

@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const { loadUsers, saveUser, deleteUser } = require("./web/users");
+const { listLideres, addLider, removeLider } = require("./web/lideres");
 const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 const { createRateLimiter } = require("./web/rateLimiter");
@@ -244,6 +245,31 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           console.error(`[Web] Erro ao criar usuário via Admin: ${err.message}`);
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
         }
+      }
+
+      // API: Listar Líderes (Apenas Admin)
+      if (req.method === 'GET' && pathname === '/api/admin/lideres' && isAdmin(req)) {
+        const lideres = listLideres();
+        return sendJson(res, 200, { ok: true, lideres });
+      }
+
+      // API: Adicionar Líder (Apenas Admin)
+      if (req.method === 'POST' && pathname === '/api/admin/lideres' && isAdmin(req)) {
+        try {
+          const body = await parseRequestBody(req);
+          const result = addLider(body);
+          return sendJson(res, result.ok ? 200 : 400, result);
+        } catch (err) {
+          console.error(`[Web] Erro ao adicionar líder via Admin: ${err.message}`);
+          return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+        }
+      }
+
+      // API: Remover Líder (Apenas Admin)
+      if (req.method === 'DELETE' && pathname.startsWith('/api/admin/lideres/') && isAdmin(req)) {
+        const target = decodeURIComponent(pathname.replace('/api/admin/lideres/', ''));
+        const result = removeLider(target);
+        return sendJson(res, result.ok ? 200 : 404, result);
       }
 
       // API: Ler Logs (Apenas Admin)
