@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
-const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento } = require("../agenda");
+const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("../agenda");
 
 function evento({ data, hora, horaFim, summary, location, description, diaTodo = false }) {
   if (diaTodo) {
@@ -153,4 +153,60 @@ test("montarDetalheEvento: item recorrente cujas ocorrências já passaram mostr
   assert.equal(itens[0].tipo, "recorrente");
   const detalhe = montarDetalheEvento(itens[0]);
   assert.match(detalhe, /Mais recente/);
+});
+
+// "Hoje" fixo para tornar os testes de período determinísticos, independente da data real de execução
+const HOJE_REF = moment.tz("2026-07-15", "YYYY-MM-DD", "America/Sao_Paulo");
+
+test("interpretarPeriodoPersonalizado: aceita um período futuro válido", () => {
+  const r = interpretarPeriodoPersonalizado("20/07 a 25/07", HOJE_REF);
+  assert.equal(r.ok, true);
+  assert.equal(r.inicio.format("DD/MM"), "20/07");
+  assert.equal(r.fim.format("DD/MM"), "25/07");
+});
+
+test("interpretarPeriodoPersonalizado: aceita 'até' e '-' como separador, além de 'a'", () => {
+  assert.equal(interpretarPeriodoPersonalizado("20/07 até 25/07", HOJE_REF).ok, true);
+  assert.equal(interpretarPeriodoPersonalizado("20/07 - 25/07", HOJE_REF).ok, true);
+});
+
+test("interpretarPeriodoPersonalizado: aceita o dia de hoje como data inicial", () => {
+  const r = interpretarPeriodoPersonalizado("15/07 a 20/07", HOJE_REF);
+  assert.equal(r.ok, true);
+});
+
+test("interpretarPeriodoPersonalizado: rejeita data inicial no passado", () => {
+  const r = interpretarPeriodoPersonalizado("10/07 a 20/07", HOJE_REF);
+  assert.equal(r.ok, false);
+  assert.match(r.mensagem, /não pode estar no passado/);
+});
+
+test("interpretarPeriodoPersonalizado: rejeita período inteiramente no passado", () => {
+  const r = interpretarPeriodoPersonalizado("01/07 a 05/07", HOJE_REF);
+  assert.equal(r.ok, false);
+  assert.match(r.mensagem, /não pode estar no passado/);
+});
+
+test("interpretarPeriodoPersonalizado: rejeita texto em formato não reconhecido", () => {
+  const r = interpretarPeriodoPersonalizado("qualquer coisa", HOJE_REF);
+  assert.equal(r.ok, false);
+  assert.match(r.mensagem, /Não consegui entender as datas/);
+});
+
+test("interpretarPeriodoPersonalizado: rejeita dia/mês fora do intervalo válido", () => {
+  const r = interpretarPeriodoPersonalizado("35/13 a 40/13", HOJE_REF);
+  assert.equal(r.ok, false);
+  assert.match(r.mensagem, /Não consegui entender as datas/);
+});
+
+test("interpretarPeriodoPersonalizado: rejeita data final antes da inicial", () => {
+  const r = interpretarPeriodoPersonalizado("25/07 a 20/07", HOJE_REF);
+  assert.equal(r.ok, false);
+  assert.match(r.mensagem, /data final deve ser igual ou depois/);
+});
+
+test("interpretarPeriodoPersonalizado: rejeita período maior que 90 dias", () => {
+  const r = interpretarPeriodoPersonalizado("15/07 a 30/11", HOJE_REF);
+  assert.equal(r.ok, false);
+  assert.match(r.mensagem, /muito longo/);
 });

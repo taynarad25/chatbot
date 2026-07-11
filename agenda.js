@@ -108,10 +108,52 @@ function montarDetalheEvento(item) {
   return detalhe;
 }
 
+const ERRO_FORMATO_PERIODO = "❌ Não consegui entender as datas. Use o formato DD/MM a DD/MM (ex: 10/07 a 20/07).";
+
+// Interpreta o texto livre "DD/MM a DD/MM" digitado para o período personalizado
+// da consulta de agenda. Recebe "agora" como parâmetro (em vez de lê-lo internamente)
+// para permitir testes determinísticos. Retorna { ok: true, inicio, fim } ou
+// { ok: false, mensagem } com o motivo da rejeição.
+function interpretarPeriodoPersonalizado(entrada, agora) {
+  const match = (entrada || "").trim().match(/^(\d{1,2})\/(\d{1,2})\s*(?:a|até|ate|-)\s*(\d{1,2})\/(\d{1,2})$/i);
+  if (!match) {
+    return { ok: false, mensagem: ERRO_FORMATO_PERIODO };
+  }
+
+  const [diaIni, mesIni, diaFim, mesFim] = match.slice(1).map(Number);
+  if (mesIni < 1 || mesIni > 12 || mesFim < 1 || mesFim > 12 || diaIni < 1 || diaIni > 31 || diaFim < 1 || diaFim > 31) {
+    return { ok: false, mensagem: ERRO_FORMATO_PERIODO };
+  }
+
+  const ano = agora.year();
+  const inicio = moment.tz(`${diaIni}/${mesIni}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+  const fim = moment.tz(`${diaFim}/${mesFim}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+
+  if (!inicio.isValid() || !fim.isValid()) {
+    return { ok: false, mensagem: ERRO_FORMATO_PERIODO };
+  }
+
+  const hoje = agora.clone().startOf("day");
+  if (inicio.isBefore(hoje, "day")) {
+    return { ok: false, mensagem: "❌ A data inicial não pode estar no passado. Escolha uma data a partir de hoje." };
+  }
+
+  if (fim.isBefore(inicio, "day")) {
+    return { ok: false, mensagem: "❌ A data final deve ser igual ou depois da data inicial. Digite novamente (ex: 10/07 a 20/07)." };
+  }
+
+  if (fim.diff(inicio, "days") > 90) {
+    return { ok: false, mensagem: "❌ Esse período é muito longo (mais de 90 dias). Tente um intervalo menor." };
+  }
+
+  return { ok: true, inicio, fim };
+}
+
 module.exports = {
   DIAS_SEMANA_PLURAL,
   DIAS_SEMANA,
   agruparEventosAgenda,
   montarMensagemAgenda,
   montarDetalheEvento,
+  interpretarPeriodoPersonalizado,
 };

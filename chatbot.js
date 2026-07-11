@@ -13,7 +13,7 @@ const { execSync } = require('child_process');
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const moment = require("moment-timezone");
 const { google } = require("googleapis");
-const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento } = require("./agenda");
+const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 
 // =====================================
 // CONFIGURAÇÃO DE LOGS (TIMESTAMP UTC-3)
@@ -863,35 +863,14 @@ Por favor, tente agendar seu evento em outro horário ou data.`;
         }
 
         if (info.etapa === "periodo_personalizado") {
-          const entrada = msg.body.trim();
-          const erroFormato = "❌ Não consegui entender as datas. Use o formato DD/MM a DD/MM (ex: 10/07 a 20/07).";
+          const agora = moment.tz("America/Sao_Paulo");
+          const resultado = interpretarPeriodoPersonalizado(msg.body, agora);
 
-          const match = entrada.match(/^(\d{1,2})\/(\d{1,2})\s*(?:a|até|ate|-)\s*(\d{1,2})\/(\d{1,2})$/i);
-          if (!match) {
-            return msg.reply(erroFormato);
+          if (!resultado.ok) {
+            return msg.reply(resultado.mensagem);
           }
 
-          const [diaIni, mesIni, diaFim, mesFim] = match.slice(1).map(Number);
-          if (mesIni < 1 || mesIni > 12 || mesFim < 1 || mesFim > 12 || diaIni < 1 || diaIni > 31 || diaFim < 1 || diaFim > 31) {
-            return msg.reply(erroFormato);
-          }
-
-          const ano = moment.tz("America/Sao_Paulo").year();
-          const inicio = moment.tz(`${diaIni}/${mesIni}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
-          const fim = moment.tz(`${diaFim}/${mesFim}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
-
-          if (!inicio.isValid() || !fim.isValid()) {
-            return msg.reply(erroFormato);
-          }
-
-          if (fim.isBefore(inicio, "day")) {
-            return msg.reply("❌ A data final deve ser igual ou depois da data inicial. Digite novamente (ex: 10/07 a 20/07).");
-          }
-
-          if (fim.diff(inicio, "days") > 90) {
-            return msg.reply("❌ Esse período é muito longo (mais de 90 dias). Tente um intervalo menor.");
-          }
-
+          const { inicio, fim } = resultado;
           const inicioBusca = inicio.clone().startOf("day").subtract(1, "minute").format();
           const fimBusca = fim.clone().endOf("day").format();
           const tituloPeriodo = `${inicio.format("DD/MM")} a ${fim.format("DD/MM")}`;
