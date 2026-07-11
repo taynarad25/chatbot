@@ -1,7 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 
-const LOGIN_FILE = path.join(__dirname, "..", "login.json");
+// Sobrescrevível via env var (usado pelos testes, para nunca ler/escrever no
+// login.json real de produção).
+const LOGIN_FILE = process.env.LOGIN_FILE_PATH || path.join(__dirname, "..", "login.json");
 
 function loadUsers() {
   try {

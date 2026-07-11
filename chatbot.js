@@ -6,7 +6,6 @@ require('dotenv').config();
 // =====================================
 const fs = require('fs');
 const path = require('path');
-const qrcodeTerminal = require("qrcode-terminal");
 const qrcode = require("qrcode");
 const util = require('util');
 const { execSync } = require('child_process');
@@ -116,19 +115,26 @@ async function buscarEventos(inicio, fim, agendaId = null) {
   
   for (const id of agendas) {
     try {
-      const res = await calendar.events.list({
-        calendarId: id,
-        timeMin: inicio,
-        timeMax: fim,
-        singleEvents: true,
-        orderBy: "startTime",
-        maxResults: 2500,
-      });
-      if (res.data.items) {
-        // Anexa o calendarId a cada evento para permitir filtragem posterior
-        const eventsWithCalendarId = res.data.items.map(item => ({ ...item, calendarId: id }));
-        todosEventos = todosEventos.concat(eventsWithCalendarId);
-      }
+      let pageToken;
+      do {
+        const res = await calendar.events.list({
+          calendarId: id,
+          timeMin: inicio,
+          timeMax: fim,
+          singleEvents: true,
+          orderBy: "startTime",
+          maxResults: 2500,
+          pageToken,
+        });
+        if (res.data.items) {
+          // Anexa o calendarId a cada evento para permitir filtragem posterior
+          const eventsWithCalendarId = res.data.items.map(item => ({ ...item, calendarId: id }));
+          todosEventos = todosEventos.concat(eventsWithCalendarId);
+        }
+        // Segue paginando enquanto o Google indicar que há mais resultados
+        // (agendas com mais de 2500 eventos no período não ficavam truncadas)
+        pageToken = res.data.nextPageToken;
+      } while (pageToken);
     } catch (e) {
       console.error(`[Google Calendar] Erro na agenda ${id}:`, e.response?.data || e.message);
     }
@@ -160,16 +166,6 @@ async function entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo
     delete etapas[numero];
     return msg.reply("⚠️ Erro ao carregar agenda.");
   }
-}
-
-function sabadosDoMes(ano, mes) {
-  const sabados = [];
-  const data = new Date(ano, mes - 1, 1);
-  while (data.getMonth() === mes - 1) {
-    if (data.getDay() === 6) sabados.push(new Date(data));
-    data.setDate(data.getDate() + 1);
-  }
-  return sabados;
 }
 
 const etapas = {};
@@ -542,8 +538,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           // Compara os horários de início e fim
           const [hInicio, mInicio] = info.horarioInicio.split(":").map(Number);
           const [hFim, mFim] = info.horarioFim.split(":").map(Number);
-          const tempStart = moment().set({hour: hInicio, minute: mInicio, second: 0, millisecond: 0});
-          const tempEnd = moment().set({hour: hFim, minute: mFim, second: 0, millisecond: 0});
+          const tempStart = moment.tz("America/Sao_Paulo").set({hour: hInicio, minute: mInicio, second: 0, millisecond: 0});
+          const tempEnd = moment.tz("America/Sao_Paulo").set({hour: hFim, minute: mFim, second: 0, millisecond: 0});
           if (tempEnd.isSameOrBefore(tempStart)) {
             return msg.reply("❌ O horário de término deve ser depois do horário de início.");
           }
