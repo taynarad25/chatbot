@@ -11,6 +11,7 @@ services:
       - ./combined.log:/usr/src/app/combined.log
       - ./login.json:/usr/src/app/login.json
       - ./bot_state.json:/usr/src/app/bot_state.json
+      - ./credenciais-google.json:/usr/src/app/credenciais-google.json
     networks:
       - bot-bridge
 
