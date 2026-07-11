@@ -8,10 +8,14 @@ const sessions = {};
 
 async function validatePassword(password, salt, hash) {
   try {
+    if (!salt || !hash) return false;
     const derivedKey = await pbkdf2(password, salt, 100000, 64, "sha512");
-    const derivedKeyHex = derivedKey.toString("hex");
     console.log(`[Auth] Validating password.`);
-    return derivedKeyHex === hash;
+    const derivedBuffer = derivedKey;
+    const hashBuffer = Buffer.from(hash, "hex");
+    // timingSafeEqual exige buffers do mesmo tamanho; tamanhos diferentes já indicam senha inválida
+    if (derivedBuffer.length !== hashBuffer.length) return false;
+    return crypto.timingSafeEqual(derivedBuffer, hashBuffer);
   } catch (err) {
     return false;
   }
