@@ -321,7 +321,7 @@ function renderIndexHtml() {
     async function deleteUser(name) {
       if (confirm('Tem certeza que deseja excluir o usuário ' + name + '?')) {
         console.log('Solicitando exclusão do usuário:', name);
-        await fetch('/api/admin/users/'+name, { method: 'DELETE' });
+        await fetch('/api/admin/users/'+encodeURIComponent(name), { method: 'DELETE' });
         fetchUsers();
       }
     }

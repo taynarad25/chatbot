@@ -73,7 +73,8 @@ Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao se
 ## Estrutura do projeto
 
 ```
-chatbot.js               ponto de entrada: cliente WhatsApp, menu e fluxos de conversa
+chatbot.js               ponto de entrada: cliente WhatsApp, integração com o Google Calendar e o painel web
+messageHandler.js        menu e fluxos de conversa (todo o roteamento de mensagens do bot)
 agenda.js                consulta/formatação da agenda (Opção 2)
 disponibilidade.js        cálculo de disponibilidade para agendamento (Opção 6)
 redes.js                  mapeamento único "rede -> agenda do Google"

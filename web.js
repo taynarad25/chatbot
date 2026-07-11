@@ -2,15 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
-const crypto = require("crypto"); // Already imported in auth.js, but needed here for addUser
-const { promisify } = require("util");
 const { loadUsers, saveUser, deleteUser } = require("./web/users");
 const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 const { createRateLimiter } = require("./web/rateLimiter");
 const { getClientIp } = require("./web/clientIp");
 
-const pbkdf2 = promisify(crypto.pbkdf2);
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
 const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
 // Sobrescrevível via env var (usado pelos testes, para nunca ler/limpar o log real de produção).
