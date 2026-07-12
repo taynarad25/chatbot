@@ -40,12 +40,19 @@ Pergunta nome e dias/horários disponíveis, depois envia um resumo para o grupo
    - **Evento de dia inteiro:** bloqueia (e é bloqueado por) qualquer outro evento no mesmo dia.
    - **Conflito de horário:** eventos com hora marcada têm uma margem de segurança de **1 hora** antes e depois — um evento que termina às 20h bloqueia novos agendamentos até as 21h no mesmo local de calendário.
    - **Exceção da Rede Ruach:** entre os sábados livres do mês, o último fica automaticamente reservado só para a Rede Ruach.
-3. O líder escolhe uma das datas livres. O bot notifica o grupo **"Mensagens Secretaria"** com um resumo e pede que respondam **"marcar evento"** (grava automaticamente na agenda do Google certa, e avisa o solicitante) ou **"não marcar"** (só avisa o solicitante da recusa).
+3. O líder escolhe uma das datas livres. O bot notifica o grupo **"Mensagens Secretaria"** com um resumo e pede que respondam, **como resposta (reply) a essa mensagem**, **"marcar evento"** (grava automaticamente na agenda do Google certa, e avisa o solicitante) ou **"não marcar"** (só avisa o solicitante da recusa).
 
 #### Alterar evento existente
 
-1. Escolhe o departamento/rede → o bot lista até 15 próximos eventos daquela agenda no ano corrente → escolhe o evento → descreve em texto livre o que precisa mudar.
-2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde **"agendar"** (aprova) ou **"não agendar"** (recusa) — o solicitante é notificado da decisão. Como a mudança é uma descrição em texto livre, a edição em si na Google Agenda é feita manualmente pela secretaria.
+1. Escolhe o departamento/rede → o bot lista até 15 próximos eventos daquela agenda no ano corrente → escolhe o evento → escolhe **o que mudar**: Horário, Data, Nome do evento, Local, ou "Outra alteração" (texto livre, para o que não encaixar nas opções estruturadas).
+2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde, **como resposta (reply) a essa mensagem**, **"agendar"** (aprova) ou **"não agendar"** (recusa) — o solicitante é notificado da decisão.
+   - Para as 4 opções estruturadas (horário/data/nome/local), a aprovação **já aplica a mudança automaticamente** na Google Agenda (via `calendar.events.patch`), sem precisar editar manualmente.
+   - Para "Outra alteração" (texto livre), como o bot não interpreta o texto com segurança, a edição continua sendo feita manualmente pela secretaria depois de aprovar.
+
+#### Cancelar evento existente
+
+1. Escolhe o departamento/rede → escolhe o evento na lista → confirma digitando **SIM**.
+2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde, **como resposta (reply) a essa mensagem**, **"cancelar evento"** (remove o evento da Google Agenda automaticamente, via `calendar.events.delete`, e avisa o solicitante) ou **"manter evento"** (nega o cancelamento, o evento continua marcado).
 
 ### 📢 Comunicados e avisos (Opção 7, só líderes)
 
@@ -53,7 +60,9 @@ Texto livre que é encaminhado para o grupo da secretaria incluir nos avisos do 
 
 ### Grupo "Mensagens Secretaria"
 
-Esse grupo do WhatsApp é o canal central de aprovação: toda solicitação (agendamento, alteração, atendimento pastoral, comunicado, "falar com a secretaria") gera uma notificação nele. As respostas **"marcar evento"/"não marcar"** e **"agendar"/"não agendar"** só funcionam quando enviadas *como resposta* (reply) à mensagem original do bot — os dados da solicitação viajam embutidos na própria mensagem (não dependem do texto visível, então mudar a formatação da mensagem não quebra o processamento).
+Esse grupo do WhatsApp é o canal central de aprovação: toda solicitação (agendamento, alteração, atendimento pastoral, comunicado, "falar com a secretaria") gera uma notificação nele.
+
+⚠️ **As respostas "marcar evento"/"não marcar", "agendar"/"não agendar" e "cancelar evento"/"manter evento" só funcionam quando enviadas como resposta (reply/citação) à mensagem original do bot** — segure/deslize na mensagem do bot no grupo e escolha "Responder" antes de digitar. Digitar como uma mensagem solta, sem responder, é ignorado silenciosamente (o bot não avisa que não entendeu). Isso acontece porque os dados da solicitação viajam embutidos na própria mensagem do bot (não dependem do texto visível, então mudar a formatação da mensagem não quebra o processamento) — e só dá pra recuperá-los citando essa mensagem.
 
 ### Painel de controle web
 
