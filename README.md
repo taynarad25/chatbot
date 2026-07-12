@@ -109,6 +109,13 @@ Arquivos necessários (não versionados, veja `.gitignore`):
 
 ⚠️ **`login.json` e `lideres.json` precisam existir na raiz do projeto *antes* do primeiro `docker compose up`** (copie os `.example` correspondentes, ex: `cp lideres.json.example lideres.json`). O `docker-compose.bot.yml` monta os dois como bind mount de arquivo — se o arquivo não existir no host nesse momento, o Docker cria um **diretório** vazio no lugar dele dentro do container, e o painel nunca mais consegue ler/gravar nada ali (as edições parecem "sumir" a cada redeploy, porque o container é recriado do zero e o "arquivo" nunca foi de fato o volume persistido). Se você já rodou o bot antes desse mount existir, confira se `lideres.json` na raiz é mesmo um arquivo (`ls -la lideres.json`) antes de subir de novo.
 
+⚠️ **Permissão de escrita**: o container roda como usuário `node` (não-root, veja `Dockerfile`), então `login.json` e `lideres.json` no host precisam ser graváveis por ele. Se você criou o arquivo como root (`sudo`, ou logado como root no servidor), o container pode não conseguir gravar nele. Se aparecer erro de permissão ao editar líderes/usuários pelo painel:
+```bash
+ls -la lideres.json login.json   # confere o dono/permissão atual
+chmod 664 lideres.json login.json   # ou 666, se o dono não puder ser trocado para o usuário do container
+docker compose -f docker-compose.bot.yml restart
+```
+
 ## Rodando
 
 ```bash
