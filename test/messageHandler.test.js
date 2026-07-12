@@ -319,6 +319,7 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   assert.match(escolha[0], /Solicitação de Agendamento/);
   assert.match(escolha[0], /Culto de Jovens/);
   assert.match(escolha[0], /Rua Benedicto de Abreu Júnior/);
+  assert.doesNotMatch(escolha[0], /forms\.gle/, "o link do formulário não deveria aparecer antes da confirmação");
 
   assert.equal(gruposEnviados.length, 1);
   assert.match(gruposEnviados[0], /Novo Agendamento Solicitado/);
@@ -347,6 +348,7 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   assert.equal(diretasEnviadas.length, 1);
   assert.equal(diretasEnviadas[0].to, NUMERO_LIDER);
   assert.match(diretasEnviadas[0].texto, /Agendamento Confirmado e Gravado/);
+  assert.match(diretasEnviadas[0].texto, /forms\.gle\/paug7A1kx5eyA2zr6/);
   assert.match(aprovacao.respostas[0], /Evento gravado na agenda/);
 });
 
