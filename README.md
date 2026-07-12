@@ -15,7 +15,7 @@ Qualquer saudação ("oi", "olá", "paz", "bom dia", "boa tarde", "boa noite", "
 | 3️⃣ Atendimento pastoral | Todos | Coleta nome e disponibilidade, encaminha para a secretaria |
 | 4️⃣ Aulas de música | Todos | Mensagem estática sobre as aulas oferecidas |
 | 5️⃣ Falar com a secretaria | Todos | Avisa o grupo interno que alguém quer atendimento |
-| 6️⃣ Agendar ou alterar evento | Só líderes | Agendamento de evento novo ou alteração de um existente |
+| 6️⃣ Agendar, alterar ou cancelar evento | Só líderes | Agendamento de evento novo, alteração ou cancelamento de um existente |
 | 7️⃣ Comunicados e avisos nos cultos | Só líderes | Envia um comunicado em texto livre para a secretaria incluir nos avisos |
 
 ### 📅 Ver agenda (Opção 2)
@@ -76,7 +76,7 @@ Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao se
 - **Login** com sessão em cookie (`HttpOnly`, `SameSite=Strict`) e rate limiting de tentativas por IP.
 - **Status da conexão:** mostra se o WhatsApp está conectado, gera QR Code para parear, permite cancelar ou desconectar.
 - **Gestão de usuários** (admin): criar usuário (com senha definida na hora, ou como "pendente" para a pessoa definir a própria senha depois via `/register`), listar e excluir.
-- **Gestão de líderes** (admin): cadastrar, listar, editar e remover líderes (nome + telefone). Persistido em `lideres.json`, aplicado ao bot imediatamente, sem precisar reiniciar.
+- **Gestão de líderes** (admin): cadastrar, listar, editar e remover líderes (nome + telefone), com filtros de busca por nome (ignora acentos/maiúsculas) e por telefone (aceita um trecho parcial do número). Persistido em `lideres.json`, aplicado ao bot imediatamente, sem precisar reiniciar.
 - **Logs** (admin): visualizar e limpar o arquivo de log combinado do bot.
 
 ## Como funciona por baixo dos panos
@@ -84,6 +84,7 @@ Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao se
 - **WhatsApp:** [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) controlando uma instância headless do Chromium via Puppeteer. A sessão fica persistida em `.wwebjs_auth`, então reconectar depois de um restart normal não pede um novo QR Code — só volta a pedir se alguém desconectar explicitamente pelo painel.
 - **Google Agenda:** 10 agendas do Google Calendar (uma por rede/departamento), lidas e escritas via `googleapis`, usando uma conta de serviço (`credenciais-google.json`).
 - **Estado da conversa:** guardado em memória por número de telefone — não sobrevive a um restart do processo (a pessoa precisa mandar "menu" de novo).
+- **Logs:** todo log que menciona um número de telefone mostra o nome do contato + o telefone mascarado (ex: `Taynara Diniz | +55 (11) *****-6727 (Usuário)`), nunca o número completo — visível na aba "Logs" do painel.
 
 ## Estrutura do projeto
 

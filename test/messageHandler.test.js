@@ -154,7 +154,7 @@ test("saudação: variações de texto (paz, bom dia, MENU, oiii) ativam o menu"
 test("saudação: líder recebe o menu completo, com as opções 6 e 7", async () => {
   const { handleMessage } = criarContexto();
   const respostas = await enviar(handleMessage, NUMERO_LIDER, "oi");
-  assert.match(respostas[0], /6️⃣ Agendar ou alterar evento/);
+  assert.match(respostas[0], /6️⃣ Agendar, alterar ou cancelar evento/);
   assert.match(respostas[0], /7️⃣ Comunicados e Avisos/);
 });
 

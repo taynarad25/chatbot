@@ -291,7 +291,7 @@ Escolha uma opção:
 3️⃣ Atendimento pastoral
 4️⃣ Aulas de música
 5️⃣ Falar com a secretaria
-6️⃣ Agendar ou alterar evento (líderes)
+6️⃣ Agendar, alterar ou cancelar evento (líderes)
 7️⃣ Comunicados e Avisos nos Cultos
 
 Digite *menu* a qualquer momento para voltar ao menu principal.`
