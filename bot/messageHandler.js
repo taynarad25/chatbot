@@ -1,6 +1,6 @@
 const moment = require("moment-timezone");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
-const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis } = require("./disponibilidade");
+const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
 const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
 const { notificarSecretaria } = require("./secretaria");
 const { codificarDadosAgendamento, decodificarDadosAgendamento, montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
@@ -85,6 +85,31 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       delete etapas[numero];
       return msg.reply("⚠️ Erro ao carregar agenda.");
     }
+  }
+
+  // Monta e envia o resumo de "novo evento" pro solicitante e o pedido de
+  // aprovação pro grupo da secretaria. Compartilhado pelos dois caminhos de
+  // busca de data (por dia da semana + horário, ou por data específica).
+  async function finalizarNovoAgendamento({ msg, numero, contato, info, dataFinal, isLider }) {
+    const dataFormatada = moment(dataFinal).format("DD/MM");
+    const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nLocal: ${info.local}\nRede: ${info.rede}\nData: ${dataFormatada}\nHorário: ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+
+    const dadosAgendamento = {
+      solicitanteId: numero,
+      evento: info.nome,
+      local: info.local,
+      rede: info.rede,
+      dia: dataFinal.getDate(),
+      mes: dataFinal.getMonth() + 1,
+      horarioInicio: info.horarioInicio,
+      horarioFim: info.horarioFim,
+      isDiaInteiro: info.isDiaInteiro,
+    };
+    const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_${codificarDadosAgendamento(dadosAgendamento)}_`;
+    await notificarSecretaria(client, resumoGrupo);
+
+    console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
+    await msg.reply(resumo);
   }
 
   return async function handleMessage(msg) {
@@ -497,15 +522,16 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
           if (info.etapa === "alterar_detalhes") {
             info.detalhesAlteracao = msg.body;
-            const dataOriginal = new Date(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date);
+            const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
+            const dataOriginalFmt = dataOriginal.format("DD/MM");
 
-            const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde o retorno da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+            const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginalFmt}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde o retorno da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
 
             const dadosAlteracao = {
               solicitanteId: numero,
               evento: info.eventoParaAlterar.summary,
             };
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.getDate()}/${dataOriginal.getMonth()+1}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\n\n_${codificarDadosAgendamento(dadosAlteracao)}_`;
+            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\n\n_${codificarDadosAgendamento(dadosAlteracao)}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             await msg.reply(resumo);
@@ -542,8 +568,133 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             if (isNaN(mes) || mes < 1 || mes > 12) return msg.reply("❌ Mês inválido. Digite um número de 1 a 12.");
             console.log(`[Agendamento] Mês: ${mes}`);
             info.mes = mes;
-            info.etapa = "evento_tipo_dia";
-            return msg.reply("Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Vários dias / Evento longo");
+            info.etapa = "evento_modo_busca";
+            return msg.reply("📅 Como você quer escolher a data?\n\n1 - Já tenho uma data específica em mente\n2 - Quero ver as datas disponíveis baseado no dia da semana e horário");
+          }
+
+          if (info.etapa === "evento_modo_busca") {
+            const opcao = msg.body.trim();
+            if (opcao === "1") {
+              info.etapa = "evento_dia_especifico";
+              return msg.reply(`Qual o dia do mês? (Ex: 25, para o dia 25/${String(info.mes).padStart(2, "0")})`);
+            }
+            if (opcao === "2") {
+              info.etapa = "evento_tipo_dia";
+              return msg.reply("Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Vários dias / Evento longo");
+            }
+            return msg.reply("❌ Opção inválida. Digite 1 para escolher uma data específica, ou 2 para ver as datas disponíveis.");
+          }
+
+          if (info.etapa === "evento_dia_especifico") {
+            const dia = parseInt(msg.body.trim());
+            const ano = moment.tz("America/Sao_Paulo").year();
+            const dataTeste = moment.tz(`${dia}/${info.mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+
+            if (isNaN(dia) || !dataTeste.isValid() || dataTeste.date() !== dia) {
+              return msg.reply(`❌ Dia inválido para o mês ${MESES[info.mes - 1]}. Digite um número de dia válido.`);
+            }
+
+            info.diaEspecifico = dia;
+            info.anoEspecifico = ano;
+            await msg.reply("🔍 Verificando esse dia na agenda...");
+
+            try {
+              const inicioBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
+              const fimBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").endOf('month').format();
+              const todosEventos = await buscarEventos(inicioBusca, fimBusca);
+
+              const resultado = verificarDataEspecifica({
+                eventos: todosEventos,
+                evangelismoCalendarId: agendasParaLer[0],
+                ano, mes: info.mes, dia,
+                rede: info.rede,
+              });
+
+              if (!resultado.disponivel) {
+                delete etapas[numero];
+                return msg.reply(montarMensagemDataEspecificaBloqueada(resultado));
+              }
+
+              info.eventosNoDiaEspecifico = resultado.eventosNoDia || [];
+              info.etapa = "evento_horario_especifico";
+
+              const janelas = calcularJanelasLivres({ eventosNoDia: info.eventosNoDiaEspecifico, ano, mes: info.mes, dia });
+              const listaJanelas = janelas.length > 0
+                ? janelas.map((j) => `${j.inicio} às ${j.fim}`).join("\n")
+                : "(nenhum horário livre entre 07:00 e 22:00 nesse dia — considere outra data)";
+
+              return msg.reply(`✅ O dia ${resultado.dataFormatada} está livre!\n\n⏰ *Horários livres nesse dia* (considerando 1h de intervalo antes/depois de outros eventos):\n${listaJanelas}\n\nQual o *horário de início* do seu evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração.`);
+            } catch (e) {
+              console.error(`Erro ao verificar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              delete etapas[numero];
+              return msg.reply("⚠️ Erro ao acessar a agenda.");
+            }
+          }
+
+          if (info.etapa === "evento_horario_especifico") {
+            const entrada = msg.body.toUpperCase().trim();
+            info.horarioInicio = entrada;
+            info.isDiaInteiro = entrada.includes("DIA");
+            console.log(`[Agendamento] Horário de início (data específica): ${entrada}`);
+
+            if (info.isDiaInteiro) {
+              info.horarioFim = "DIA TODO";
+              info.etapa = "confirmar_data_especifica";
+              // Não retorna aqui, deixa o fluxo cair para a próxima etapa
+            } else {
+              if (!HORARIO_REGEX.test(info.horarioInicio)) {
+                return msg.reply("❌ Formato de horário de início inválido. Use HH:MM (ex: 19:30) ou *DIA TODO*.");
+              }
+              info.etapa = "evento_horario_fim_especifico";
+              return msg.reply("⏰ Qual o *horário de término* do evento? (Ex: 21:00)");
+            }
+          }
+
+          if (info.etapa === "evento_horario_fim_especifico") {
+            const entradaFim = msg.body.toUpperCase().trim();
+            if (!HORARIO_REGEX.test(entradaFim)) return msg.reply("❌ Formato de horário de término inválido. Use HH:MM (ex: 21:00).");
+
+            const [hInicio, mInicio] = info.horarioInicio.split(":").map(Number);
+            const [hFim, mFim] = entradaFim.split(":").map(Number);
+            const tempInicio = moment.tz("America/Sao_Paulo").set({ hour: hInicio, minute: mInicio, second: 0, millisecond: 0 });
+            const tempFim = moment.tz("America/Sao_Paulo").set({ hour: hFim, minute: mFim, second: 0, millisecond: 0 });
+            if (tempFim.isSameOrBefore(tempInicio)) return msg.reply("❌ O horário de término deve ser depois do horário de início.");
+
+            info.horarioFim = entradaFim;
+            info.etapa = "confirmar_data_especifica";
+            // Não retorna aqui, deixa o fluxo cair para a próxima etapa
+          }
+
+          if (info.etapa === "confirmar_data_especifica") {
+            try {
+              const inicioBusca = moment.tz([info.anoEspecifico, info.mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
+              const fimBusca = moment.tz([info.anoEspecifico, info.mes - 1], "America/Sao_Paulo").endOf('month').format();
+              const todosEventos = await buscarEventos(inicioBusca, fimBusca);
+
+              const resultado = verificarDataEspecifica({
+                eventos: todosEventos,
+                evangelismoCalendarId: agendasParaLer[0],
+                ano: info.anoEspecifico, mes: info.mes, dia: info.diaEspecifico,
+                rede: info.rede,
+                isDiaInteiro: info.isDiaInteiro,
+                horarioInicio: info.isDiaInteiro ? undefined : info.horarioInicio,
+                horarioFim: info.isDiaInteiro ? undefined : info.horarioFim,
+              });
+
+              if (!resultado.disponivel) {
+                delete etapas[numero];
+                return msg.reply(montarMensagemDataEspecificaBloqueada(resultado));
+              }
+
+              const dataFinal = new Date(info.anoEspecifico, info.mes - 1, info.diaEspecifico);
+              await finalizarNovoAgendamento({ msg, numero, contato, info, dataFinal, isLider });
+              delete etapas[numero];
+              return;
+            } catch (e) {
+              console.error(`Erro ao confirmar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              delete etapas[numero];
+              return msg.reply("⚠️ Erro ao acessar a agenda.");
+            }
           }
 
           if (info.etapa === "evento_tipo_dia") {
@@ -655,24 +806,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             if (isNaN(escolha) || !info.datasEncontradas[escolha]) return msg.reply("❌ Escolha um número da lista.");
 
             const dataFinal = info.datasEncontradas[escolha];
-            const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nLocal: ${info.local}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
-
-            const dadosAgendamento = {
-              solicitanteId: numero,
-              evento: info.nome,
-              local: info.local,
-              rede: info.rede,
-              dia: dataFinal.getDate(),
-              mes: info.mes,
-              horarioInicio: info.horarioInicio,
-              horarioFim: info.horarioFim,
-              isDiaInteiro: info.isDiaInteiro,
-            };
-            const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_${codificarDadosAgendamento(dadosAgendamento)}_`;
-            await notificarSecretaria(client, resumoGrupo);
-
-            console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
-            await msg.reply(resumo);
+            await finalizarNovoAgendamento({ msg, numero, contato, info, dataFinal, isLider });
             delete etapas[numero];
             return;
           }

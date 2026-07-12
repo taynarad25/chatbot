@@ -309,6 +309,7 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   await enviar(handleMessage, NUMERO_LIDER, "Igreja"); // local
   await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
   await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
   await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
   await enviar(handleMessage, NUMERO_LIDER, "19:30");
   const finalResp = await enviar(handleMessage, NUMERO_LIDER, "21:00");
@@ -361,6 +362,7 @@ test("opção 6 (líder): endereço customizado (evento fora da igreja) é usado
   await enviar(handleMessage, NUMERO_LIDER, "Rua das Flores, 123 - Jardim Primavera");
   await enviar(handleMessage, NUMERO_LIDER, "6"); // Rede de Casais
   await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
   await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
   await enviar(handleMessage, NUMERO_LIDER, "19:30");
   await enviar(handleMessage, NUMERO_LIDER, "21:00");
@@ -379,10 +381,113 @@ test("opção 6 (líder): evento de DIA TODO pula a pergunta de horário de tér
   await enviar(handleMessage, NUMERO_LIDER, "Sítio da Família Silva"); // local
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Evangelismo
   await enviar(handleMessage, NUMERO_LIDER, "11"); // Novembro
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
   await enviar(handleMessage, NUMERO_LIDER, "8"); // Vários dias / evento longo
   const resp = await enviar(handleMessage, NUMERO_LIDER, "DIA TODO");
 
   assert.match(resp[resp.length - 1], /Datas Disponíveis/);
+});
+
+// ---------------------------------------------------------------------------
+// Opção 6 (líder) — Agendar por data específica ("1" no menu de modo de busca)
+// ---------------------------------------------------------------------------
+
+test("opção 6 (líder): agenda por data específica — dia livre sugere horários e completa o fluxo", async () => {
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({ eventos: [] });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
+  await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
+  const modoResp = await enviar(handleMessage, NUMERO_LIDER, "1"); // já tenho uma data específica
+  assert.match(modoResp[0], /Qual o dia do mês/);
+
+  const diaResp = await enviar(handleMessage, NUMERO_LIDER, "10"); // 10/12, quinta-feira, sem eventos
+  assert.match(diaResp[diaResp.length - 1], /está livre/);
+  assert.match(diaResp[diaResp.length - 1], /07:00 às 22:00/);
+
+  await enviar(handleMessage, NUMERO_LIDER, "19:00");
+  const finalResp = await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  assert.match(finalResp[0], /Solicitação de Agendamento/);
+  assert.match(finalResp[0], /10\/12/);
+
+  assert.equal(gruposEnviados.length, 1);
+  const dados = decodificarDadosAgendamento(gruposEnviados[0]);
+  assert.equal(dados.dia, 10);
+  assert.equal(dados.mes, 12);
+
+  const aprovacao = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "marcar evento", quotedBody: gruposEnviados[0] });
+  await handleMessage(aprovacao);
+
+  assert.equal(eventosGravados.length, 1);
+  assert.match(diretasEnviadas[0].texto, /Agendamento Confirmado e Gravado/);
+});
+
+test("opção 6 (líder): agenda por data específica — dia de Sábado LIVRE é recusado com motivo claro", async () => {
+  const eventos = [{
+    calendarId: AGENDAS[0],
+    summary: "Sábado LIVRE",
+    start: { date: "2026-12-05" },
+    end: { date: "2026-12-06" },
+  }];
+  const { handleMessage, etapas } = criarContexto({ eventos });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "12");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+
+  const diaResp = await enviar(handleMessage, NUMERO_LIDER, "5"); // sábado marcado como Sábado LIVRE
+  assert.match(diaResp[diaResp.length - 1], /Sábado LIVRE/);
+  assert.equal(etapas[NUMERO_LIDER], undefined, "o fluxo deveria ser encerrado após o bloqueio");
+});
+
+test("opção 6 (líder): agenda por data específica — horário pedido conflita com evento existente no dia", async () => {
+  const eventos = [{
+    calendarId: AGENDAS[7],
+    summary: "Culto de Homens",
+    start: { dateTime: "2026-12-10T19:00:00-03:00" },
+    end: { dateTime: "2026-12-10T20:00:00-03:00" },
+  }];
+  const { handleMessage } = criarContexto({ eventos });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "12");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+
+  const diaResp = await enviar(handleMessage, NUMERO_LIDER, "10");
+  assert.match(diaResp[diaResp.length - 1], /07:00 às 18:00/); // livre até 18h (buffer de 1h antes do evento das 19h)
+  assert.match(diaResp[diaResp.length - 1], /21:00 às 22:00/); // livre depois do buffer de 1h após o evento das 20h
+
+  await enviar(handleMessage, NUMERO_LIDER, "20:15"); // dentro do buffer de 1h do evento das 19h-20h
+  const conflitoResp = await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  assert.match(conflitoResp[0], /Culto de Homens/);
+  assert.match(conflitoResp[0], /19:00/);
+});
+
+test("opção 6 (líder): agenda por data específica — dia inválido para o mês pede pra tentar de novo", async () => {
+  const { handleMessage, etapas } = criarContexto({ eventos: [] });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // Fevereiro
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+
+  const diaResp = await enviar(handleMessage, NUMERO_LIDER, "30"); // fevereiro não tem dia 30
+  assert.match(diaResp[0], /Dia inválido/);
+  assert.equal(etapas[NUMERO_LIDER].etapa, "evento_dia_especifico", "deveria continuar esperando um dia válido");
 });
 
 test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — solicitante é avisado e nada é gravado", async () => {
@@ -394,6 +499,7 @@ test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — 
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "12");
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
   await enviar(handleMessage, NUMERO_LIDER, "3");
   await enviar(handleMessage, NUMERO_LIDER, "19:30");
   await enviar(handleMessage, NUMERO_LIDER, "21:00");

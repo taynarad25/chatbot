@@ -34,13 +34,16 @@ Pergunta nome e dias/horários disponíveis, depois envia um resumo para o grupo
 
 #### Agendar novo evento
 
-1. Nome do evento → rede responsável (uma de 10: Evangelismo, Epifania, Intercessão, Projeto Social Seeds, Rede Ruach, Rede de Casais, Rede de Homens, Rede de Mulheres, Rede Kids, Outros) → mês → dia da semana (ou "vários dias/evento longo") → horário (ou `DIA TODO`).
-2. O bot verifica a disponibilidade no mês inteiro, aplicando todas as regras:
+1. Nome do evento → local → rede responsável (uma de 10: Evangelismo, Epifania, Intercessão, Projeto Social Seeds, Rede Ruach, Rede de Casais, Rede de Homens, Rede de Mulheres, Rede Kids, Outros) → mês.
+2. O bot pergunta **como o líder prefere escolher a data**, pra atender dois jeitos de pensar diferentes:
+   - **"1 - Já tenho uma data específica"**: digita o dia do mês diretamente. O bot verifica se aquele dia está disponível e, se estiver, **sugere os horários livres** (considerando 1h de intervalo antes/depois de outros eventos, dentro de uma janela comercial de 07h-22h) antes de perguntar o horário desejado.
+   - **"2 - Baseado no dia da semana e horário"**: fluxo tradicional — escolhe o dia da semana (ou "vários dias/evento longo") e o horário (ou `DIA TODO`), e o bot lista todas as datas livres do mês que batem com esses critérios.
+3. Nos dois caminhos, o bot aplica as mesmas regras de disponibilidade:
    - **Sábado LIVRE:** um sábado marcado assim na agenda de Evangelismo bloqueia qualquer outro agendamento naquele dia.
    - **Evento de dia inteiro:** bloqueia (e é bloqueado por) qualquer outro evento no mesmo dia.
    - **Conflito de horário:** eventos com hora marcada têm uma margem de segurança de **1 hora** antes e depois — um evento que termina às 20h bloqueia novos agendamentos até as 21h no mesmo local de calendário.
    - **Exceção da Rede Ruach:** entre os sábados livres do mês, o último fica automaticamente reservado só para a Rede Ruach.
-3. O líder escolhe uma das datas livres. O bot notifica o grupo **"Mensagens Secretaria"** com um resumo e pede que respondam, **como resposta (reply) a essa mensagem**, **"marcar evento"** (grava automaticamente na agenda do Google certa, e avisa o solicitante) ou **"não marcar"** (só avisa o solicitante da recusa).
+4. O bot notifica o grupo **"Mensagens Secretaria"** com um resumo e pede que respondam, **como resposta (reply) a essa mensagem**, **"marcar evento"** (grava automaticamente na agenda do Google certa, e avisa o solicitante) ou **"não marcar"** (só avisa o solicitante da recusa).
 
 #### Alterar evento existente
 

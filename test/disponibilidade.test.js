@@ -2,7 +2,14 @@ process.env.TZ = "America/Sao_Paulo";
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis } = require("../bot/disponibilidade");
+const {
+  calcularDisponibilidade,
+  montarMensagemConflito,
+  montarMensagemDatasDisponiveis,
+  verificarDataEspecifica,
+  calcularJanelasLivres,
+  montarMensagemDataEspecificaBloqueada,
+} = require("../bot/disponibilidade");
 
 const EVANGELISMO_ID = "evangelismo-cal-id";
 const ANO = 2026;
@@ -202,10 +209,154 @@ test("montarMensagemConflito: mensagem específica para conflito de horário mos
   assert.match(msg, /20:00/);
 });
 
-test("montarMensagemDatasDisponiveis: lista numerada com dia da semana abreviado", () => {
+test("montarMensagemDatasDisponiveis: lista numerada com dia da semana abreviado, dia e mês com 2 dígitos", () => {
   const disponiveis = [new Date(2026, 6, 4), new Date(2026, 6, 11)]; // sábados
   const msg = montarMensagemDatasDisponiveis(disponiveis, 7);
-  assert.match(msg, /1 - 4\/7 \(Sáb\)/);
-  assert.match(msg, /2 - 11\/7 \(Sáb\)/);
+  assert.match(msg, /1 - 04\/07 \(Sáb\)/);
+  assert.match(msg, /2 - 11\/07 \(Sáb\)/);
   assert.match(msg, /Digite o número da opção desejada/);
+});
+
+// ---------------------------------------------------------------------------
+// verificarDataEspecifica / calcularJanelasLivres / montarMensagemDataEspecificaBloqueada
+// ---------------------------------------------------------------------------
+
+function baseParamsData(overrides = {}) {
+  return {
+    eventos: [],
+    evangelismoCalendarId: EVANGELISMO_ID,
+    ano: ANO,
+    mes: MES,
+    dia: 10, // 10/07/2026 é uma sexta-feira
+    rede: "Rede de Casais",
+    ...overrides,
+  };
+}
+
+test("verificarDataEspecifica: dia livre sem eventos fica disponível", () => {
+  const resultado = verificarDataEspecifica(baseParamsData());
+  assert.equal(resultado.disponivel, true);
+  assert.equal(resultado.dataFormatada, "10/07");
+});
+
+test("verificarDataEspecifica: 'Sábado LIVRE' do Evangelismo bloqueia o dia", () => {
+  const eventos = [eventoDiaTodo({ dataInicio: "2026-07-04", dataFimExclusiva: "2026-07-05", summary: "Sábado LIVRE", calendarId: EVANGELISMO_ID })];
+  const resultado = verificarDataEspecifica(baseParamsData({ eventos, dia: 4 }));
+  assert.equal(resultado.disponivel, false);
+  assert.equal(resultado.motivo, "sabado_livre");
+});
+
+test("verificarDataEspecifica: exceção Ruach bloqueia o último sábado disponível do mês para outras redes", () => {
+  // sábados de julho/2026: 4, 11, 18, 25 — o último (25) é reservado para a Ruach
+  const resultado = verificarDataEspecifica(baseParamsData({ dia: 25, rede: "Rede de Casais" }));
+  assert.equal(resultado.disponivel, false);
+  assert.equal(resultado.motivo, "ruach_reservado");
+});
+
+test("verificarDataEspecifica: exceção Ruach não bloqueia a própria Rede Ruach", () => {
+  const resultado = verificarDataEspecifica(baseParamsData({ dia: 25, rede: "Rede Ruach" }));
+  assert.equal(resultado.disponivel, true);
+});
+
+test("verificarDataEspecifica: sábado que não é o último do mês não é afetado pela exceção Ruach", () => {
+  const resultado = verificarDataEspecifica(baseParamsData({ dia: 18, rede: "Rede de Casais" }));
+  assert.equal(resultado.disponivel, true);
+});
+
+test("verificarDataEspecifica: evento de dia inteiro já existente bloqueia o dia mesmo sem pedir dia inteiro", () => {
+  const eventos = [eventoDiaTodo({ dataInicio: "2026-07-10", dataFimExclusiva: "2026-07-11", summary: "Retiro" })];
+  const resultado = verificarDataEspecifica(baseParamsData({ eventos }));
+  assert.equal(resultado.disponivel, false);
+  assert.equal(resultado.motivo, "dia_ocupado");
+  assert.equal(resultado.conflito.summary, "Retiro");
+});
+
+test("verificarDataEspecifica: pedir dia inteiro é bloqueado por qualquer evento existente no dia", () => {
+  const eventos = [eventoHorario({ data: "2026-07-10", horaInicio: "10:00", horaFim: "11:00", summary: "Reunião" })];
+  const resultado = verificarDataEspecifica(baseParamsData({ eventos, isDiaInteiro: true }));
+  assert.equal(resultado.disponivel, false);
+  assert.equal(resultado.motivo, "dia_ocupado");
+});
+
+test("verificarDataEspecifica: sem horarioInicio/horarioFim, só verifica o dia como um todo (retorna eventosNoDia)", () => {
+  const eventos = [eventoHorario({ data: "2026-07-10", horaInicio: "09:00", horaFim: "10:00", summary: "Culto A" })];
+  const resultado = verificarDataEspecifica(baseParamsData({ eventos }));
+  assert.equal(resultado.disponivel, true);
+  assert.equal(resultado.eventosNoDia.length, 1);
+});
+
+test("verificarDataEspecifica: horário pedido dentro do buffer de 1h de um evento existente conflita", () => {
+  const eventos = [eventoHorario({ data: "2026-07-10", horaInicio: "19:00", horaFim: "20:00", summary: "Culto" })];
+  const resultado = verificarDataEspecifica(baseParamsData({ eventos, horarioInicio: "20:30", horarioFim: "21:30" }));
+  assert.equal(resultado.disponivel, false);
+  assert.equal(resultado.motivo, "horario_conflito");
+  assert.equal(resultado.conflito.summary, "Culto");
+});
+
+test("verificarDataEspecifica: horário pedido fora do buffer de 1h não conflita", () => {
+  const eventos = [eventoHorario({ data: "2026-07-10", horaInicio: "19:00", horaFim: "20:00", summary: "Culto" })];
+  const resultado = verificarDataEspecifica(baseParamsData({ eventos, horarioInicio: "21:05", horarioFim: "22:00" }));
+  assert.equal(resultado.disponivel, true);
+});
+
+test("calcularJanelasLivres: dia sem eventos fica livre o dia comercial inteiro (07h-22h)", () => {
+  const janelas = calcularJanelasLivres({ eventosNoDia: [], ano: ANO, mes: MES, dia: 10 });
+  assert.deepEqual(janelas, [{ inicio: "07:00", fim: "22:00" }]);
+});
+
+test("calcularJanelasLivres: eventos no meio do dia abrem janelas antes/depois, com buffer de 1h", () => {
+  const eventos = [
+    eventoHorario({ data: "2026-07-10", horaInicio: "09:00", horaFim: "11:00", summary: "Culto A" }),
+    eventoHorario({ data: "2026-07-10", horaInicio: "18:00", horaFim: "20:00", summary: "Culto B" }),
+  ];
+  const janelas = calcularJanelasLivres({ eventosNoDia: eventos, ano: ANO, mes: MES, dia: 10 });
+  assert.deepEqual(janelas, [
+    { inicio: "07:00", fim: "08:00" },
+    { inicio: "12:00", fim: "17:00" },
+    { inicio: "21:00", fim: "22:00" },
+  ]);
+});
+
+test("calcularJanelasLivres: eventos próximos o suficiente se mesclam num único bloco ocupado", () => {
+  const eventos = [
+    eventoHorario({ data: "2026-07-10", horaInicio: "09:00", horaFim: "10:00", summary: "Culto A" }),
+    eventoHorario({ data: "2026-07-10", horaInicio: "10:30", horaFim: "11:00", summary: "Culto B" }), // dentro do buffer de A
+  ];
+  const janelas = calcularJanelasLivres({ eventosNoDia: eventos, ano: ANO, mes: MES, dia: 10 });
+  // Bloco ocupado mesclado: 08:00 (buffer antes de A) até 12:00 (buffer depois de B)
+  assert.deepEqual(janelas, [
+    { inicio: "07:00", fim: "08:00" },
+    { inicio: "12:00", fim: "22:00" },
+  ]);
+});
+
+test("calcularJanelasLivres: janelas menores que 30 minutos são descartadas", () => {
+  const eventos = [
+    eventoHorario({ data: "2026-07-10", horaInicio: "08:15", horaFim: "09:00", summary: "Culto A" }), // buffer deixa 07:00-07:15 (15min)
+  ];
+  const janelas = calcularJanelasLivres({ eventosNoDia: eventos, ano: ANO, mes: MES, dia: 10 });
+  assert.ok(!janelas.some((j) => j.inicio === "07:00" && j.fim === "07:15"), "janela de 15min não deveria aparecer");
+});
+
+test("montarMensagemDataEspecificaBloqueada: mensagens específicas por motivo", () => {
+  assert.match(
+    montarMensagemDataEspecificaBloqueada({ motivo: "sabado_livre", dataFormatada: "04/07" }),
+    /04\/07.*Sábado LIVRE.*Evangelismo/s
+  );
+  assert.match(
+    montarMensagemDataEspecificaBloqueada({ motivo: "ruach_reservado", dataFormatada: "25/07" }),
+    /25\/07.*Rede Ruach/s
+  );
+  assert.match(
+    montarMensagemDataEspecificaBloqueada({ motivo: "dia_ocupado", dataFormatada: "10/07", conflito: { summary: "Retiro" } }),
+    /10\/07.*Retiro/s
+  );
+  assert.match(
+    montarMensagemDataEspecificaBloqueada({
+      motivo: "horario_conflito",
+      dataFormatada: "10/07",
+      conflito: { summary: "Culto", start: { dateTime: "2026-07-10T19:00:00-03:00" }, end: { dateTime: "2026-07-10T20:00:00-03:00" } },
+    }),
+    /Culto.*19:00.*20:00.*10\/07/s
+  );
 });
