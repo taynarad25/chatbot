@@ -87,7 +87,7 @@ web/                            autenticação, usuários, rate limiter, IP do c
 test/                           suíte de testes (node --test)
 ```
 
-`bot/chatbot.js` é o único arquivo do projeto que ainda depende de onde fica em relação à raiz: `credenciais-google.json`, `login.json`, `combined.log`, `bot_state.json` e a sessão do WhatsApp (`.wwebjs_auth/`) sempre viveram na raiz do projeto (é lá que o `docker-compose.bot.yml` monta os volumes), então ele resolve esses caminhos explicitamente a partir de `bot/../` em vez de assumir que o processo foi iniciado da raiz.
+`bot/chatbot.js` é o único arquivo do projeto que ainda depende de onde fica em relação à raiz: `credenciais-google.json`, `login.json`, `lideres.json`, `combined.log`, `bot_state.json` e a sessão do WhatsApp (`.wwebjs_auth/`) sempre viveram na raiz do projeto (é lá que o `docker-compose.bot.yml` monta os volumes), então ele resolve esses caminhos explicitamente a partir de `bot/../` em vez de assumir que o processo foi iniciado da raiz.
 
 ## Configuração
 
@@ -105,7 +105,9 @@ Arquivos necessários (não versionados, veja `.gitignore`):
 
 - `credenciais-google.json` — chave de conta de serviço do Google com acesso às 10 agendas.
 - `login.json` — usuários do painel web (veja `login.json.example`).
-- `lideres.json` — líderes com acesso às opções extras do bot (nome + telefone); criado automaticamente na primeira execução, a partir de `WHATSAPP_LIDERES` se ela estiver definida, ou vazio caso contrário — dá pra cadastrar todo mundo depois pela aba "Líderes" do painel.
+- `lideres.json` — líderes com acesso às opções extras do bot (nome + telefone); veja `lideres.json.example`.
+
+⚠️ **`login.json` e `lideres.json` precisam existir na raiz do projeto *antes* do primeiro `docker compose up`** (copie os `.example` correspondentes, ex: `cp lideres.json.example lideres.json`). O `docker-compose.bot.yml` monta os dois como bind mount de arquivo — se o arquivo não existir no host nesse momento, o Docker cria um **diretório** vazio no lugar dele dentro do container, e o painel nunca mais consegue ler/gravar nada ali (as edições parecem "sumir" a cada redeploy, porque o container é recriado do zero e o "arquivo" nunca foi de fato o volume persistido). Se você já rodou o bot antes desse mount existir, confira se `lideres.json` na raiz é mesmo um arquivo (`ls -la lideres.json`) antes de subir de novo.
 
 ## Rodando
 
