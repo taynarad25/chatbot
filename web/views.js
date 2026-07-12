@@ -226,7 +226,7 @@ function renderIndexHtml() {
       <h3>Líderes</h3>
       <div class="filtros-lideres">
         <input id="filtroLiderNome" placeholder="Buscar por nome" />
-        <input id="filtroLiderTelefone" placeholder="Buscar por telefone" inputmode="numeric" />
+        <input id="filtroLiderTelefone" placeholder="Buscar por telefone" inputmode="numeric" autocomplete="off" />
       </div>
       <ul id="liderList"></ul>
       <hr>
@@ -234,7 +234,7 @@ function renderIndexHtml() {
       <div id="lideresMessage" class="message-box" style="display:none;"></div>
       <form id="addLiderForm">
         <input name="nome" placeholder="Nome do líder" required />
-        <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" required />
+        <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" autocomplete="off" required />
         <button type="submit" id="liderSubmitBtn" class="primary">Adicionar</button>
         <button type="button" id="cancelarEdicaoLider" style="display:none;">Cancelar</button>
       </form>
@@ -352,8 +352,13 @@ function renderIndexHtml() {
       }
     }
 
-    function formatarTelefone(valor) {
-      const digitos = valor.replace(/\D/g, '').slice(0, 13);
+    function extrairDigitosTelefone(valor) {
+      return (valor || '').replace(/\\D/g, '').slice(0, 13);
+    }
+
+    // Recebe só dígitos (já extraídos) e monta "+55 (11) 94308-6727".
+    function formatarTelefone(digitos) {
+      digitos = extrairDigitosTelefone(digitos);
       let resultado = '';
       if (digitos.length > 0) resultado += '+' + digitos.slice(0, 2);
       if (digitos.length > 2) resultado += ' (' + digitos.slice(2, 4);
@@ -363,21 +368,65 @@ function renderIndexHtml() {
       return resultado;
     }
 
-    document.getElementById('liderTelefone').addEventListener('input', (e) => {
-      e.target.value = formatarTelefone(e.target.value);
-    });
+    function digitosAteIndice(valor, indice) {
+      return valor.slice(0, indice).replace(/\\D/g, '').length;
+    }
+
+    function indiceAposNDigitos(formatado, n) {
+      if (n <= 0) return 0;
+      let contados = 0;
+      for (let i = 0; i < formatado.length; i++) {
+        if (/\\d/.test(formatado[i])) {
+          contados++;
+          if (contados === n) return i + 1;
+        }
+      }
+      return formatado.length;
+    }
+
+    // Aplica a máscara +55 (11) 94308-6727 em tempo real (inclusive ao colar),
+    // mantendo o cursor na posição certa depois de reformatar. Sem isso, colar
+    // ou apagar um caractere de formatação (espaço, parênteses, traço) fazia o
+    // campo "travar", já que reformatar do zero sempre produzia o mesmo texto.
+    function ativarMascaraTelefone(input) {
+      let digitosAnteriores = extrairDigitosTelefone(input.value);
+
+      input.addEventListener('input', (e) => {
+        const cursorAntes = input.selectionStart ?? input.value.length;
+        let nDigitosAteCursor = digitosAteIndice(input.value, cursorAntes);
+        let digitos = extrairDigitosTelefone(input.value);
+
+        const apagando = e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward';
+        if (apagando && digitos === digitosAnteriores && digitos.length > 0 && nDigitosAteCursor > 0) {
+          // O caractere apagado foi de formatação, não um dígito — remove
+          // manualmente o dígito anterior ao cursor.
+          digitos = digitos.slice(0, nDigitosAteCursor - 1) + digitos.slice(nDigitosAteCursor);
+          nDigitosAteCursor -= 1;
+        }
+
+        digitosAnteriores = digitos;
+        const formatado = formatarTelefone(digitos);
+        input.value = formatado;
+
+        const novoCursor = indiceAposNDigitos(formatado, nDigitosAteCursor);
+        input.setSelectionRange(novoCursor, novoCursor);
+      });
+    }
+
+    ativarMascaraTelefone(document.getElementById('liderTelefone'));
+    ativarMascaraTelefone(document.getElementById('filtroLiderTelefone'));
 
     let liderEmEdicao = null; // telefone (normalizado) do líder sendo editado, ou null quando é um cadastro novo
     let lideresCache = []; // última lista carregada da API, usada para filtrar sem precisar buscar de novo a cada tecla
 
     // Remove acentos para a busca por nome encontrar "joao" mesmo quando o líder está cadastrado como "João"
     function normalizarBusca(texto) {
-      return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return (texto || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
     }
 
     function renderLideres() {
       const filtroNome = normalizarBusca(document.getElementById('filtroLiderNome').value);
-      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\D/g, '');
+      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\\D/g, '');
 
       const filtrados = lideresCache.filter(l => {
         const nomeOk = !filtroNome || normalizarBusca(l.nome).includes(filtroNome);
