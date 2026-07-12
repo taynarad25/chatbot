@@ -93,7 +93,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
   // busca de data (por dia da semana + horário, ou por data específica).
   async function finalizarNovoAgendamento({ msg, numero, contato, info, dataFinal, isLider }) {
     const dataFormatada = moment(dataFinal).format("DD/MM");
-    const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nLocal: ${info.local}\nRede: ${info.rede}\nData: ${dataFormatada}\nHorário: ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+    const resumo = `✅ *Solicitação de Agendamento*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}\n*Data:* ${dataFormatada}\n*Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
 
     const dadosAgendamento = {
       solicitanteId: numero,
@@ -107,7 +107,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       isDiaInteiro: info.isDiaInteiro,
     };
     const codigo = salvarPendente(dadosAgendamento);
-    const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
+    const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
     await notificarSecretaria(client, resumoGrupo);
 
     console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
@@ -201,7 +201,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                     return msg.reply(`✅ Alteração aplicada na agenda e líder notificado.`);
                   } catch (err) {
                     console.error("[Secretaria] Erro ao aplicar alteração automática:", err);
-                    return msg.reply("❌ Erro ao aplicar a alteração na agenda do Google. A permissão ou conflito impediu a gravação automática — responda de novo a esta mesma mensagem depois de resolvido.");
+                    return msg.reply("❌ Erro ao aplicar a alteração na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                   }
                 }
 
@@ -249,7 +249,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   return msg.reply(`✅ Evento cancelado na agenda e líder notificado.`);
                 } catch (err) {
                   console.error("[Secretaria] Erro no cancelamento automático:", err);
-                  return msg.reply("❌ Erro ao cancelar o evento na agenda do Google. Responda de novo a esta mesma mensagem depois de resolvido.");
+                  return msg.reply("❌ Erro ao cancelar o evento na agenda do Google. A permissão ou conflito impediu a exclusão automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                 }
               } else {
                 removerPendente(codigo);
@@ -404,7 +404,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               calendarId: info.calendarIdBusca,
             };
 
-            const resumo = `🗑️ *Solicitação de Cancelamento*\n\nEvento: ${info.eventoParaAlterar.summary}\nData: ${dataOriginal.format("DD/MM")}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+            const resumo = `🗑️ *Solicitação de Cancelamento*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data:* ${dataOriginal.format("DD/MM")}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
             const codigoCancelamento = salvarPendente(dadosCancelamento);
             const resumoGrupo = `🗑️ *PEDIDO DE CANCELAMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data:* ${dataOriginal.format("DD/MM")}\n\n_Responda a este resumo com "cancelar evento" para confirmar o cancelamento, ou "manter evento" para negar._\n\n_Código: ${codigoCancelamento}_`;
             await notificarSecretaria(client, resumoGrupo);
@@ -539,7 +539,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
             const dataOriginalFmt = dataOriginal.format("DD/MM");
 
-            const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginalFmt}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde o retorno da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+            const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginalFmt}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
 
             const dadosAlteracao = {
               solicitanteId: numero,
@@ -565,12 +565,12 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             info.local = resolverLocalEvento(msg.body);
             console.log(`[Agendamento] Local do evento: ${info.local}`);
             info.etapa = "evento_rede";
-            return msg.reply(`Qual rede está organizando?\n\n${montarListaRedes()}`);
+            return msg.reply(`Qual departamento está organizando?\n\n${montarListaRedes()}`);
           }
 
           if (info.etapa === "evento_rede") {
             const rede = obterRedePorNumero(msg.body.trim());
-            if (!rede) return msg.reply("❌ Escolha uma opção da lista (1 a 10).");
+            if (!rede) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
 
             info.rede = rede.nome;
             console.log(`[Agendamento] Rede selecionada: ${info.rede}`);

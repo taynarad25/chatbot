@@ -94,15 +94,15 @@ function montarDetalheEvento(item) {
   }
 
   let detalhe = `📌 *${item.summary}*\n\n`;
-  detalhe += `📆 Data: ${dataFmt}\n`;
-  detalhe += `⏰ Horário: ${horarioFmt}\n`;
+  detalhe += `📆 *Data:* ${dataFmt}\n`;
+  detalhe += `⏰ *Horário:* ${horarioFmt}\n`;
   if (evento.location) {
-    detalhe += `📍 Local: ${evento.location}\n`;
+    detalhe += `📍 *Local:* ${evento.location}\n`;
   }
   if (evento.description) {
     let desc = evento.description.trim();
     if (desc.length > 500) desc = desc.slice(0, 500).trim() + "…";
-    detalhe += `📝 Descrição: ${desc}\n`;
+    detalhe += `📝 *Descrição:* ${desc}\n`;
   }
   detalhe += `\nDigite outro número para ver mais detalhes, ou *menu* para voltar.`;
   return detalhe;

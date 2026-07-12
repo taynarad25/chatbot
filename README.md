@@ -34,7 +34,7 @@ Pergunta nome e dias/horários disponíveis, depois envia um resumo para o grupo
 
 #### Agendar novo evento
 
-1. Nome do evento → local → rede responsável (uma de 10: Evangelismo, Epifania, Intercessão, Projeto Social Seeds, Rede Ruach, Rede de Casais, Rede de Homens, Rede de Mulheres, Rede Kids, Outros) → mês.
+1. Nome do evento → local → departamento responsável (um de 10: Evangelismo, Epifania, Intercessão, Projeto Social Seeds, Rede Ruach, Rede de Casais, Rede de Homens, Rede de Mulheres, Rede Kids, Outros) → mês.
 2. O bot pergunta **como o líder prefere escolher a data**, pra atender dois jeitos de pensar diferentes:
    - **"1 - Já tenho uma data específica"**: digita o dia do mês diretamente. O bot verifica se aquele dia está disponível e, se estiver, **sugere os horários livres** (considerando 1h de intervalo antes/depois de outros eventos, dentro de uma janela comercial de 07h-22h) antes de perguntar o horário desejado.
    - **"2 - Baseado no dia da semana e horário"**: fluxo tradicional — escolhe o dia da semana (ou "vários dias/evento longo") e o horário (ou `DIA TODO`), e o bot lista todas as datas livres do mês que batem com esses critérios.
@@ -47,14 +47,14 @@ Pergunta nome e dias/horários disponíveis, depois envia um resumo para o grupo
 
 #### Alterar evento existente
 
-1. Escolhe o departamento/rede → o bot lista até 15 próximos eventos daquela agenda no ano corrente → escolhe o evento → escolhe **o que mudar**: Horário, Data, Nome do evento, Local, ou "Outra alteração" (texto livre, para o que não encaixar nas opções estruturadas).
+1. Escolhe o departamento → o bot lista até 15 próximos eventos daquela agenda no ano corrente → escolhe o evento → escolhe **o que mudar**: Horário, Data, Nome do evento, Local, ou "Outra alteração" (texto livre, para o que não encaixar nas opções estruturadas).
 2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde, **como resposta (reply) a essa mensagem**, **"alterar evento"** (aprova) ou **"não alterar"** (recusa) — o solicitante é notificado da decisão.
    - Para as 4 opções estruturadas (horário/data/nome/local), a aprovação **já aplica a mudança automaticamente** na Google Agenda (via `calendar.events.patch`), sem precisar editar manualmente.
    - Para "Outra alteração" (texto livre), como o bot não interpreta o texto com segurança, a edição continua sendo feita manualmente pela secretaria depois de aprovar.
 
 #### Cancelar evento existente
 
-1. Escolhe o departamento/rede → escolhe o evento na lista → confirma digitando **SIM**.
+1. Escolhe o departamento → escolhe o evento na lista → confirma digitando **SIM**.
 2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde, **como resposta (reply) a essa mensagem**, **"cancelar evento"** (remove o evento da Google Agenda automaticamente, via `calendar.events.delete`, e avisa o solicitante) ou **"manter evento"** (nega o cancelamento, o evento continua marcado).
 
 ### 📢 Comunicados e avisos (Opção 7, só líderes)
@@ -82,7 +82,7 @@ Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao se
 ## Como funciona por baixo dos panos
 
 - **WhatsApp:** [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) controlando uma instância headless do Chromium via Puppeteer. A sessão fica persistida em `.wwebjs_auth`, então reconectar depois de um restart normal não pede um novo QR Code — só volta a pedir se alguém desconectar explicitamente pelo painel.
-- **Google Agenda:** 10 agendas do Google Calendar (uma por rede/departamento), lidas e escritas via `googleapis`, usando uma conta de serviço (`credenciais-google.json`).
+- **Google Agenda:** 10 agendas do Google Calendar (uma por departamento), lidas e escritas via `googleapis`, usando uma conta de serviço (`credenciais-google.json`).
 - **Estado da conversa:** guardado em memória por número de telefone — não sobrevive a um restart do processo (a pessoa precisa mandar "menu" de novo).
 - **Logs:** todo log que menciona um número de telefone mostra o nome do contato + o telefone mascarado (ex: `Taynara Diniz | +55 (11) *****-6727 (Usuário)`), nunca o número completo — visível na aba "Logs" do painel.
 

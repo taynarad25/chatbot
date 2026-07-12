@@ -343,7 +343,7 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   assert.doesNotMatch(escolha[0], /forms\.gle/, "o link do formulário não deveria aparecer antes da confirmação");
 
   assert.equal(gruposEnviados.length, 1);
-  assert.match(gruposEnviados[0], /Novo Agendamento Solicitado/);
+  assert.match(gruposEnviados[0], /NOVO AGENDAMENTO SOLICITADO/);
   assert.match(gruposEnviados[0], /Culto de Jovens/);
   assert.match(gruposEnviados[0], /Rua Benedicto de Abreu Júnior/);
   assert.match(gruposEnviados[0], /Código: [A-Z0-9]{4}/, "a mensagem deveria trazer um código curto, não o blob de dados cru");
