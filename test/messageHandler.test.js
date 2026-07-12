@@ -25,6 +25,8 @@ function criarContexto({ eventos = [] } = {}) {
   const gruposEnviados = []; // mensagens que o bot mandou para "Mensagens Secretaria"
   const diretasEnviadas = []; // client.sendMessage(solicitanteId, texto)
   const eventosGravados = []; // calendar.events.insert(...)
+  const eventosAlterados = []; // calendar.events.patch(...)
+  const eventosCancelados = []; // calendar.events.delete(...)
   let eventosAtuais = eventos;
 
   const client = {
@@ -44,6 +46,14 @@ function criarContexto({ eventos = [] } = {}) {
         eventosGravados.push({ calendarId, resource });
         return { data: {} };
       },
+      patch: async ({ calendarId, eventId, resource }) => {
+        eventosAlterados.push({ calendarId, eventId, resource });
+        return { data: {} };
+      },
+      delete: async ({ calendarId, eventId }) => {
+        eventosCancelados.push({ calendarId, eventId });
+        return { data: {} };
+      },
     },
   };
 
@@ -59,6 +69,8 @@ function criarContexto({ eventos = [] } = {}) {
     gruposEnviados,
     diretasEnviadas,
     eventosGravados,
+    eventosAlterados,
+    eventosCancelados,
     setEventos: (novos) => { eventosAtuais = novos; },
   };
 }
@@ -394,13 +406,14 @@ test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — 
   assert.match(recusa.respostas[0], /Líder notificado sobre a recusa/);
 });
 
-test("opção 6 (líder): alterar evento existente, do início ao fim, com aprovação da secretaria", async () => {
+test("opção 6 (líder): alterar evento existente (texto livre), do início ao fim, com aprovação manual da secretaria", async () => {
   const eventoExistente = {
+    id: "evt-culto-mulheres",
     summary: "Culto de Mulheres",
     start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").format() },
     end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").add(2, "hours").format() },
   };
-  const { handleMessage, gruposEnviados, diretasEnviadas, setEventos } = criarContexto({ eventos: [eventoExistente] });
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosAlterados, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "2"); // Alterar evento existente
@@ -410,6 +423,10 @@ test("opção 6 (líder): alterar evento existente, do início ao fim, com aprov
 
   const escolhaResp = await enviar(handleMessage, NUMERO_LIDER, "1");
   assert.match(escolhaResp[0], /Você selecionou.*Culto de Mulheres/s);
+  assert.match(escolhaResp[0], /O que você deseja alterar/);
+
+  const submenuResp = await enviar(handleMessage, NUMERO_LIDER, "5"); // Outra alteração (texto livre)
+  assert.match(submenuResp[0], /Descreva a alteração/);
 
   const finalResp = await enviar(handleMessage, NUMERO_LIDER, "Mudar horário para 20h");
   assert.match(finalResp[0], /Solicitação de Alteração/);
@@ -420,13 +437,17 @@ test("opção 6 (líder): alterar evento existente, do início ao fim, com aprov
   const aprovacao = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "agendar", quotedBody: gruposEnviados[0] });
   await handleMessage(aprovacao);
 
+  // Texto livre não tem como ser aplicado automaticamente: fica só no aviso, sem chamar o patch.
+  assert.equal(eventosAlterados.length, 0);
   assert.equal(diretasEnviadas.length, 1);
   assert.match(diretasEnviadas[0].texto, /Alteração Aprovada/);
+  assert.doesNotMatch(diretasEnviadas[0].texto, /Aplicada/);
   assert.match(aprovacao.respostas[0], /aprovação da alteração/);
 });
 
-test("opção 6 (líder): alterar evento — secretaria recusa ('não agendar')", async () => {
+test("opção 6 (líder): alterar evento (texto livre) — secretaria recusa ('não agendar')", async () => {
   const eventoExistente = {
+    id: "evt-culto-mulheres",
     summary: "Culto de Mulheres",
     start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").format() },
     end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").add(2, "hours").format() },
@@ -437,6 +458,7 @@ test("opção 6 (líder): alterar evento — secretaria recusa ('não agendar')"
   await enviar(handleMessage, NUMERO_LIDER, "2");
   await enviar(handleMessage, NUMERO_LIDER, "9");
   await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "5"); // Outra alteração (texto livre)
   await enviar(handleMessage, NUMERO_LIDER, "Mudar horário para 20h");
 
   const recusa = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "não agendar", quotedBody: gruposEnviados[0] });
@@ -444,6 +466,96 @@ test("opção 6 (líder): alterar evento — secretaria recusa ('não agendar')"
 
   assert.match(diretasEnviadas[0].texto, /não pôde ser aprovada/);
   assert.match(recusa.respostas[0], /recusa da alteração/);
+});
+
+test("opção 6 (líder): alterar horário de evento existente, aplicado automaticamente na aprovação", async () => {
+  const eventoExistente = {
+    id: "evt-culto-jovens",
+    summary: "Culto de Jovens",
+    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").set({ hour: 19, minute: 0 }).format() },
+    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").set({ hour: 21, minute: 0 }).format() },
+  };
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosAlterados, setEventos } = criarContexto({ eventos: [eventoExistente] });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "2");
+  setEventos([eventoExistente]);
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // seleciona o evento
+
+  const submenuResp = await enviar(handleMessage, NUMERO_LIDER, "1"); // Horário
+  assert.match(submenuResp[0], /horário de início/);
+
+  await enviar(handleMessage, NUMERO_LIDER, "20:00");
+  const finalResp = await enviar(handleMessage, NUMERO_LIDER, "22:00");
+  assert.match(finalResp[0], /Solicitação de Alteração/);
+  assert.match(finalResp[0], /20:00 - 22:00/);
+
+  const aprovacao = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "agendar", quotedBody: gruposEnviados[0] });
+  await handleMessage(aprovacao);
+
+  assert.equal(eventosAlterados.length, 1);
+  assert.equal(eventosAlterados[0].eventId, "evt-culto-jovens");
+  assert.match(eventosAlterados[0].resource.start.dateTime, /20:00:00/);
+  assert.match(eventosAlterados[0].resource.end.dateTime, /22:00:00/);
+  assert.match(diretasEnviadas[0].texto, /Aprovada e Aplicada/);
+  assert.match(aprovacao.respostas[0], /Alteração aplicada na agenda/);
+});
+
+test("opção 6 (líder): cancelar evento existente — aprovado pela secretaria remove da agenda", async () => {
+  const eventoExistente = {
+    id: "evt-retiro",
+    summary: "Retiro Espiritual",
+    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").format() },
+    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").add(2, "hours").format() },
+  };
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosCancelados, setEventos } = criarContexto({ eventos: [eventoExistente] });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "3"); // Cancelar evento existente
+  setEventos([eventoExistente]);
+  const listaResp = await enviar(handleMessage, NUMERO_LIDER, "1"); // Evangelismo
+  assert.match(listaResp[1], /Retiro Espiritual/);
+
+  const confirmarResp = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(confirmarResp[0], /certeza.*cancelar/is);
+
+  const finalResp = await enviar(handleMessage, NUMERO_LIDER, "SIM");
+  assert.match(finalResp[0], /Solicitação de Cancelamento/);
+
+  assert.equal(gruposEnviados.length, 1);
+  assert.match(gruposEnviados[0], /PEDIDO DE CANCELAMENTO/);
+
+  const aprovacao = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "cancelar evento", quotedBody: gruposEnviados[0] });
+  await handleMessage(aprovacao);
+
+  assert.equal(eventosCancelados.length, 1);
+  assert.equal(eventosCancelados[0].eventId, "evt-retiro");
+  assert.match(diretasEnviadas[0].texto, /Evento Cancelado/);
+  assert.match(aprovacao.respostas[0], /Evento cancelado na agenda/);
+});
+
+test("opção 6 (líder): cancelar evento — secretaria nega ('manter evento')", async () => {
+  const eventoExistente = {
+    id: "evt-retiro-2",
+    summary: "Retiro Espiritual",
+    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").format() },
+    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").add(2, "hours").format() },
+  };
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosCancelados } = criarContexto({ eventos: [eventoExistente] });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "3");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "SIM");
+
+  const negativa = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "manter evento", quotedBody: gruposEnviados[0] });
+  await handleMessage(negativa);
+
+  assert.equal(eventosCancelados.length, 0);
+  assert.match(diretasEnviadas[0].texto, /Evento Mantido/);
+  assert.match(negativa.respostas[0], /evento foi mantido/);
 });
 
 test("opção 6 (líder): departamento sem eventos futuros encerra o fluxo de alteração", async () => {

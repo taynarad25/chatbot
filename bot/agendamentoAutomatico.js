@@ -51,4 +51,53 @@ function montarResourceEvento(dados, ano) {
   return resource;
 }
 
-module.exports = { codificarDadosAgendamento, decodificarDadosAgendamento, montarResourceEvento };
+// Monta o "resource" de patch para aplicar automaticamente uma alteração
+// estruturada (horário, data, nome ou local) aprovada pela secretaria.
+// `campo` indica qual dado foi alterado; os demais campos do evento não são
+// tocados. Alterações em texto livre ("outro") não têm como ser aplicadas
+// automaticamente, então retorna null nesse caso (o fluxo antigo, manual,
+// continua valendo).
+function montarResourcePatchAlteracao(dados) {
+  const { campo } = dados;
+
+  if (campo === "nome") return { summary: dados.novoNome };
+  if (campo === "local") return { location: dados.novoLocal };
+  if (campo !== "data" && campo !== "horario") return null;
+
+  const { isDiaInteiroOriginal, inicioOriginal, fimOriginal } = dados;
+
+  if (isDiaInteiroOriginal) {
+    // Evento de dia inteiro não tem horário pra mudar — só faz sentido mudar a data.
+    if (campo !== "data") return null;
+
+    const ano = moment.tz(inicioOriginal, "America/Sao_Paulo").year();
+    const duracaoDias = moment(fimOriginal).diff(moment(inicioOriginal), "days");
+    const novoInicio = moment.tz(`${dados.novoDia}/${dados.novoMes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+
+    return {
+      start: { date: novoInicio.format("YYYY-MM-DD") },
+      end: { date: novoInicio.clone().add(duracaoDias, "days").format("YYYY-MM-DD") },
+    };
+  }
+
+  const duracaoMinutos = moment(fimOriginal).diff(moment(inicioOriginal), "minutes");
+  let novoInicio = moment.tz(inicioOriginal, "America/Sao_Paulo");
+  let novoFim;
+
+  if (campo === "data") {
+    novoInicio = novoInicio.clone().set({ date: dados.novoDia, month: dados.novoMes - 1 });
+    novoFim = novoInicio.clone().add(duracaoMinutos, "minutes");
+  } else {
+    const [hInicio, mInicio] = dados.novoHorarioInicio.split(":").map(Number);
+    const [hFim, mFim] = dados.novoHorarioFim.split(":").map(Number);
+    novoInicio = novoInicio.clone().set({ hour: hInicio, minute: mInicio, second: 0, millisecond: 0 });
+    novoFim = novoInicio.clone().set({ hour: hFim, minute: mFim, second: 0, millisecond: 0 });
+  }
+
+  return {
+    start: { dateTime: novoInicio.format(), timeZone: "America/Sao_Paulo" },
+    end: { dateTime: novoFim.format(), timeZone: "America/Sao_Paulo" },
+  };
+}
+
+module.exports = { codificarDadosAgendamento, decodificarDadosAgendamento, montarResourceEvento, montarResourcePatchAlteracao };
