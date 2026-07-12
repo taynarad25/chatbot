@@ -86,10 +86,10 @@ test("montarDetalheEvento: item único mostra data, horário, local e descriçã
   ]);
   const detalhe = montarDetalheEvento(itens[0]);
   assert.match(detalhe, /📌 \*Encontro Rede de Mulheres\*/);
-  assert.match(detalhe, /📆 Data: 18\/07 \(Sábado\)/);
-  assert.match(detalhe, /⏰ Horário: 15:00 às 17:00/);
-  assert.match(detalhe, /📍 Local: Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi/);
-  assert.match(detalhe, /📝 Descrição: Traga uma amiga!/);
+  assert.match(detalhe, /📆 \*Data:\* 18\/07 \(Sábado\)/);
+  assert.match(detalhe, /⏰ \*Horário:\* 15:00 às 17:00/);
+  assert.match(detalhe, /📍 \*Local:\* Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi/);
+  assert.match(detalhe, /📝 \*Descrição:\* Traga uma amiga!/);
 });
 
 test("montarDetalheEvento: omite as linhas de local e descrição quando ausentes no Google Agenda", () => {
@@ -97,8 +97,8 @@ test("montarDetalheEvento: omite as linhas de local e descrição quando ausente
     evento({ data: "2026-07-18", hora: "15:00", horaFim: "17:00", summary: "Encontro" }),
   ]);
   const detalhe = montarDetalheEvento(itens[0]);
-  assert.doesNotMatch(detalhe, /📍 Local:/);
-  assert.doesNotMatch(detalhe, /📝 Descrição:/);
+  assert.doesNotMatch(detalhe, /📍 \*Local:\*/);
+  assert.doesNotMatch(detalhe, /📝 \*Descrição:\*/);
 });
 
 test("montarDetalheEvento: trunca descrições muito longas em 500 caracteres", () => {
@@ -107,9 +107,9 @@ test("montarDetalheEvento: trunca descrições muito longas em 500 caracteres", 
     evento({ data: "2026-07-18", hora: "15:00", horaFim: "17:00", summary: "Encontro", description: descricaoLonga }),
   ]);
   const detalhe = montarDetalheEvento(itens[0]);
-  const linhaDescricao = detalhe.split("\n").find(l => l.startsWith("📝 Descrição:"));
+  const linhaDescricao = detalhe.split("\n").find(l => l.startsWith("📝 *Descrição:*"));
   assert.ok(linhaDescricao.endsWith("…"));
-  assert.equal(linhaDescricao.replace("📝 Descrição: ", "").length, 501); // 500 chars + reticências
+  assert.equal(linhaDescricao.replace("📝 *Descrição:* ", "").length, 501); // 500 chars + reticências
 });
 
 test("montarDetalheEvento: evento de dia inteiro mostra 'Dia todo' como horário", () => {
@@ -117,7 +117,7 @@ test("montarDetalheEvento: evento de dia inteiro mostra 'Dia todo' como horário
     evento({ data: "2026-07-18", summary: "Retiro", diaTodo: true }),
   ]);
   const detalhe = montarDetalheEvento(itens[0]);
-  assert.match(detalhe, /⏰ Horário: Dia todo/);
+  assert.match(detalhe, /⏰ \*Horário:\* Dia todo/);
 });
 
 test("montarDetalheEvento: item recorrente mostra a próxima ocorrência a partir de hoje", () => {
