@@ -65,7 +65,9 @@ Texto livre que é encaminhado para o grupo da secretaria incluir nos avisos do 
 
 Esse grupo do WhatsApp é o canal central de aprovação: toda solicitação (agendamento, alteração, atendimento pastoral, comunicado, "falar com a secretaria") gera uma notificação nele.
 
-⚠️ **As respostas "marcar evento"/"não marcar", "agendar"/"não agendar" e "cancelar evento"/"manter evento" só funcionam quando enviadas como resposta (reply/citação) à mensagem original do bot** — segure/deslize na mensagem do bot no grupo e escolha "Responder" antes de digitar. Digitar como uma mensagem solta, sem responder, é ignorado silenciosamente (o bot não avisa que não entendeu). Isso acontece porque os dados da solicitação viajam embutidos na própria mensagem do bot (não dependem do texto visível, então mudar a formatação da mensagem não quebra o processamento) — e só dá pra recuperá-los citando essa mensagem.
+⚠️ **As respostas "marcar evento"/"não marcar", "agendar"/"não agendar" e "cancelar evento"/"manter evento" só funcionam quando enviadas como resposta (reply/citação) à mensagem original do bot** — segure/deslize na mensagem do bot no grupo e escolha "Responder" antes de digitar. Digitar como uma mensagem solta, sem responder, é ignorado silenciosamente (o bot não avisa que não entendeu).
+
+Cada mensagem de pedido termina com um código curto (ex: `_Código: A3F9_`), que é como o bot sabe qual solicitação está sendo respondida — os dados completos ficam guardados em `pendentes.json` (veja abaixo), não na mensagem em si, então o texto visível pode mudar livremente sem afetar o processamento. Isso também é o que permite ter **várias solicitações pendentes ao mesmo tempo**: cada uma tem seu próprio código, e a secretaria responde à mensagem específica que quer decidir. Depois de aprovada ou recusada, a solicitação é removida de `pendentes.json` — responder de novo à mesma mensagem (exceto logo após um erro ao gravar no Google Calendar, quando a solicitação é mantida de propósito pra permitir tentar de novo) avisa que não encontrou mais nada pendente ali.
 
 ### Painel de controle web
 
@@ -93,13 +95,14 @@ bot/                            domínio do bot de WhatsApp
   disponibilidade.js            cálculo de disponibilidade para agendamento (Opção 6)
   redes.js                      mapeamento único "rede -> agenda do Google"
   secretaria.js                 notificação do grupo "Mensagens Secretaria"
-  agendamentoAutomatico.js      codificação/decodificação dos dados de agendamento embutidos nas mensagens do grupo
+  agendamentoAutomatico.js      monta o "resource" (criação/patch) enviado à API do Google Calendar
+  pendentesAprovacao.js         solicitações aguardando aprovação da secretaria (pendentes.json), identificadas por um código curto na mensagem do grupo
 web.js                          servidor HTTP do painel de controle
 web/                            autenticação, usuários, rate limiter, IP do cliente, views HTML
 test/                           suíte de testes (node --test)
 ```
 
-`bot/chatbot.js` é o único arquivo do projeto que ainda depende de onde fica em relação à raiz: `credenciais-google.json`, `login.json`, `lideres.json`, `combined.log`, `bot_state.json` e a sessão do WhatsApp (`.wwebjs_auth/`) sempre viveram na raiz do projeto (é lá que o `docker-compose.bot.yml` monta os volumes), então ele resolve esses caminhos explicitamente a partir de `bot/../` em vez de assumir que o processo foi iniciado da raiz.
+`bot/chatbot.js` é o único arquivo do projeto que ainda depende de onde fica em relação à raiz: `credenciais-google.json`, `login.json`, `lideres.json`, `pendentes.json`, `combined.log`, `bot_state.json` e a sessão do WhatsApp (`.wwebjs_auth/`) sempre viveram na raiz do projeto (é lá que o `docker-compose.bot.yml` monta os volumes), então ele resolve esses caminhos explicitamente a partir de `bot/../` em vez de assumir que o processo foi iniciado da raiz.
 
 ## Configuração
 
@@ -111,6 +114,7 @@ Variáveis de ambiente (arquivo `.env`, veja `docker-compose.bot.yml`):
 | `PUPPETEER_EXECUTABLE_PATH` | Caminho de um Chromium já instalado (opcional, usado no Docker) |
 | `LOGIN_FILE_PATH` | Sobrescreve o caminho de `login.json` (usado pelos testes, para nunca tocar no arquivo real) |
 | `LIDERES_FILE_PATH` | Sobrescreve o caminho de `lideres.json` (idem) |
+| `PENDENTES_FILE_PATH` | Sobrescreve o caminho de `pendentes.json` (idem) |
 | `COMBINED_LOG_PATH` | Sobrescreve o caminho do log combinado (idem) |
 
 Arquivos necessários (não versionados, veja `.gitignore`):
@@ -118,13 +122,14 @@ Arquivos necessários (não versionados, veja `.gitignore`):
 - `credenciais-google.json` — chave de conta de serviço do Google com acesso às 10 agendas.
 - `login.json` — usuários do painel web (veja `login.json.example`).
 - `lideres.json` — líderes com acesso às opções extras do bot (nome + telefone); veja `lideres.json.example`.
+- `pendentes.json` — solicitações aguardando aprovação da secretaria (veja "Grupo Mensagens Secretaria" acima); veja `pendentes.json.example`.
 
-⚠️ **`login.json` e `lideres.json` precisam existir na raiz do projeto *antes* do primeiro `docker compose up`** (copie os `.example` correspondentes, ex: `cp lideres.json.example lideres.json`). O `docker-compose.bot.yml` monta os dois como bind mount de arquivo — se o arquivo não existir no host nesse momento, o Docker cria um **diretório** vazio no lugar dele dentro do container, e o painel nunca mais consegue ler/gravar nada ali (as edições parecem "sumir" a cada redeploy, porque o container é recriado do zero e o "arquivo" nunca foi de fato o volume persistido). Se você já rodou o bot antes desse mount existir, confira se `lideres.json` na raiz é mesmo um arquivo (`ls -la lideres.json`) antes de subir de novo.
+⚠️ **`login.json`, `lideres.json` e `pendentes.json` precisam existir na raiz do projeto *antes* do primeiro `docker compose up`** (copie os `.example` correspondentes, ex: `cp pendentes.json.example pendentes.json`). O `docker-compose.bot.yml` monta os três como bind mount de arquivo — se o arquivo não existir no host nesse momento, o Docker cria um **diretório** vazio no lugar dele dentro do container, e o bot nunca mais consegue ler/gravar nada ali (as edições/solicitações parecem "sumir" a cada redeploy, porque o container é recriado do zero e o "arquivo" nunca foi de fato o volume persistido). Se você já rodou o bot antes desse mount existir, confira se cada um é mesmo um arquivo (`ls -la pendentes.json`) antes de subir de novo.
 
-⚠️ **Permissão de escrita**: o container roda como usuário `node` (não-root, veja `Dockerfile`), então `login.json` e `lideres.json` no host precisam ser graváveis por ele. Se você criou o arquivo como root (`sudo`, ou logado como root no servidor), o container pode não conseguir gravar nele. Se aparecer erro de permissão ao editar líderes/usuários pelo painel:
+⚠️ **Permissão de escrita**: o container roda como usuário `node` (não-root, veja `Dockerfile`), então `login.json`, `lideres.json` e `pendentes.json` no host precisam ser graváveis por ele. Se você criou o arquivo como root (`sudo`, ou logado como root no servidor), o container pode não conseguir gravar nele. Se aparecer erro de permissão ao editar líderes/usuários pelo painel, ou ao aprovar/recusar uma solicitação no grupo:
 ```bash
-ls -la lideres.json login.json   # confere o dono/permissão atual
-chmod 664 lideres.json login.json   # ou 666, se o dono não puder ser trocado para o usuário do container
+ls -la lideres.json login.json pendentes.json   # confere o dono/permissão atual
+chmod 664 lideres.json login.json pendentes.json   # ou 666, se o dono não puder ser trocado para o usuário do container
 docker compose -f docker-compose.bot.yml restart
 ```
 

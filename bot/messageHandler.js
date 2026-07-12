@@ -3,7 +3,8 @@ const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpr
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
 const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
 const { notificarSecretaria } = require("./secretaria");
-const { codificarDadosAgendamento, decodificarDadosAgendamento, montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
+const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
+const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
 
 const SAUDACOES_REGEX = /^(oi+|ol[aá]+|paz+|a\s+paz+|bom\s+dia|boa\s+tarde|boa\s+noite|menu|dia+|olla+)$/i;
 const HORARIO_REGEX = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
@@ -105,7 +106,8 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       horarioFim: info.horarioFim,
       isDiaInteiro: info.isDiaInteiro,
     };
-    const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_${codificarDadosAgendamento(dadosAgendamento)}_`;
+    const codigo = salvarPendente(dadosAgendamento);
+    const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
     await notificarSecretaria(client, resumoGrupo);
 
     console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
@@ -133,9 +135,10 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o resumo enviado pelo bot
             if (quotedMsg.fromMe) {
-              const dados = decodificarDadosAgendamento(quotedMsg.body);
+              const codigo = extrairCodigo(quotedMsg.body);
+              const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
-                return msg.reply("❌ Erro ao extrair dados para o agendamento automático.");
+                return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
 
               const { solicitanteId, rede } = dados;
@@ -147,6 +150,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   const resource = montarResourceEvento(dados, ano);
 
                   await calendar.events.insert({ calendarId: agendaId, resource });
+                  removerPendente(codigo);
 
                   const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏\n\n📝 *Para mais detalhes do evento, preencha o formulário:* \nhttps://forms.gle/paug7A1kx5eyA2zr6\n\nDigite *menu* para voltar ao menu principal.";
                   await client.sendMessage(solicitanteId, feedback);
@@ -154,9 +158,10 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
                 } catch (err) {
                   console.error("[Secretaria] Erro no agendamento automático:", err);
-                  return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática.");
+                  return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                 }
               } else {
+                removerPendente(codigo);
                 const feedback = "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
                 try {
                   await client.sendMessage(solicitanteId, feedback);
@@ -171,9 +176,10 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o pedido de alteração enviado pelo bot
             if (quotedMsg.fromMe) {
-              const dados = decodificarDadosAgendamento(quotedMsg.body);
+              const codigo = extrairCodigo(quotedMsg.body);
+              const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
-                return msg.reply("❌ Erro ao extrair dados para o registro da alteração.");
+                return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
 
               const { solicitanteId, evento } = dados;
@@ -187,6 +193,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 if (resourcePatch) {
                   try {
                     await calendar.events.patch({ calendarId: dados.calendarId, eventId: dados.eventId, resource: resourcePatch });
+                    removerPendente(codigo);
 
                     const feedback = `✅ *Alteração Aprovada e Aplicada!*\n\nSua solicitação de alteração para o evento "*${evento}*" foi aprovada e já foi atualizada na agenda oficial. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
                     await client.sendMessage(solicitanteId, feedback);
@@ -194,10 +201,11 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                     return msg.reply(`✅ Alteração aplicada na agenda e líder notificado.`);
                   } catch (err) {
                     console.error("[Secretaria] Erro ao aplicar alteração automática:", err);
-                    return msg.reply("❌ Erro ao aplicar a alteração na agenda do Google. A permissão ou conflito impediu a gravação automática — será preciso ajustar manualmente.");
+                    return msg.reply("❌ Erro ao aplicar a alteração na agenda do Google. A permissão ou conflito impediu a gravação automática — responda de novo a esta mesma mensagem depois de resolvido.");
                   }
                 }
 
+                removerPendente(codigo);
                 const feedback = `✅ *Alteração Aprovada!*\n\nSua solicitação de alteração para o evento "*${evento}*" foi aprovada pela secretaria. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
                 try {
                   await client.sendMessage(solicitanteId, feedback);
@@ -207,6 +215,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração.`);
               } else {
+                removerPendente(codigo);
                 const feedback = `❌ *Alteração Não Aprovada*\n\nInfelizmente sua solicitação de alteração para o evento "*${evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria para mais detalhes.\n\nDigite *menu* para voltar ao menu principal.`;
                 try {
                   await client.sendMessage(solicitanteId, feedback);
@@ -221,9 +230,10 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o pedido de cancelamento enviado pelo bot
             if (quotedMsg.fromMe) {
-              const dados = decodificarDadosAgendamento(quotedMsg.body);
+              const codigo = extrairCodigo(quotedMsg.body);
+              const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
-                return msg.reply("❌ Erro ao extrair dados para o cancelamento.");
+                return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
 
               const { solicitanteId, evento, calendarId, eventId } = dados;
@@ -231,6 +241,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               if (textoMsg === "cancelar evento") {
                 try {
                   await calendar.events.delete({ calendarId, eventId });
+                  removerPendente(codigo);
 
                   const feedback = `❌ *Evento Cancelado*\n\nSua solicitação de cancelamento do evento "*${evento}*" foi aprovada e o evento foi removido da agenda oficial.\n\nDigite *menu* para voltar ao menu principal.`;
                   await client.sendMessage(solicitanteId, feedback);
@@ -238,9 +249,10 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   return msg.reply(`✅ Evento cancelado na agenda e líder notificado.`);
                 } catch (err) {
                   console.error("[Secretaria] Erro no cancelamento automático:", err);
-                  return msg.reply("❌ Erro ao cancelar o evento na agenda do Google. Verifique manualmente.");
+                  return msg.reply("❌ Erro ao cancelar o evento na agenda do Google. Responda de novo a esta mesma mensagem depois de resolvido.");
                 }
               } else {
+                removerPendente(codigo);
                 const feedback = `✅ *Evento Mantido*\n\nSua solicitação de cancelamento do evento "*${evento}*" não foi aprovada — o evento continua marcado normalmente.\n\nDigite *menu* para voltar ao menu principal.`;
                 try {
                   await client.sendMessage(solicitanteId, feedback);
@@ -393,7 +405,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             };
 
             const resumo = `🗑️ *Solicitação de Cancelamento*\n\nEvento: ${info.eventoParaAlterar.summary}\nData: ${dataOriginal.format("DD/MM")}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
-            const resumoGrupo = `🗑️ *PEDIDO DE CANCELAMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data:* ${dataOriginal.format("DD/MM")}\n\n_Responda a este resumo com "cancelar evento" para confirmar o cancelamento, ou "manter evento" para negar._\n\n_${codificarDadosAgendamento(dadosCancelamento)}_`;
+            const codigoCancelamento = salvarPendente(dadosCancelamento);
+            const resumoGrupo = `🗑️ *PEDIDO DE CANCELAMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data:* ${dataOriginal.format("DD/MM")}\n\n_Responda a este resumo com "cancelar evento" para confirmar o cancelamento, ou "manter evento" para negar._\n\n_Código: ${codigoCancelamento}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             console.log(`Cancelamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
@@ -511,7 +524,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             }
 
             const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.format("DD/MM")}\n*Mudança:* ${descricaoMudanca}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.format("DD/MM")}\n📝 *Mudança:* ${descricaoMudanca}\n\n_Responda a este resumo com "agendar" para aplicar automaticamente na agenda, ou "não agendar" para recusar._\n\n_${codificarDadosAgendamento(dadosAlteracao)}_`;
+            const codigoAlteracao = salvarPendente(dadosAlteracao);
+            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.format("DD/MM")}\n📝 *Mudança:* ${descricaoMudanca}\n\n_Responda a este resumo com "agendar" para aplicar automaticamente na agenda, ou "não agendar" para recusar._\n\n_Código: ${codigoAlteracao}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             console.log(`Alteração estruturada solicitada por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
@@ -531,7 +545,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               solicitanteId: numero,
               evento: info.eventoParaAlterar.summary,
             };
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\n\n_${codificarDadosAgendamento(dadosAlteracao)}_`;
+            const codigoAlteracaoLivre = salvarPendente(dadosAlteracao);
+            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\n\n_Código: ${codigoAlteracaoLivre}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             await msg.reply(resumo);

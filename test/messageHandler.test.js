@@ -4,11 +4,31 @@
 // um usuário de verdade pelo WhatsApp: cada teste manda uma sequência de
 // mensagens e verifica as respostas, exatamente como o README descreve cada
 // funcionalidade do bot.
-const { test } = require("node:test");
+
+// Isola completamente do pendentes.json real de produção ANTES de exigir o
+// messageHandler (que usa bot/pendentesAprovacao.js internamente).
+const os = require("os");
+const path = require("path");
+const fs = require("fs");
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-messagehandler-test-"));
+process.env.PENDENTES_FILE_PATH = path.join(tmpDir, "pendentes.json");
+
+const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
 const { createMessageHandler } = require("../bot/messageHandler");
-const { decodificarDadosAgendamento } = require("../bot/agendamentoAutomatico");
+const { buscarPendente, extrairCodigo } = require("../bot/pendentesAprovacao");
+
+after(() => {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+// Extrai o código embutido na mensagem do bot pro grupo e busca a solicitação
+// pendente correspondente — substitui o antigo decodificarDadosAgendamento().
+function decodificarDadosAgendamento(mensagem) {
+  const codigo = extrairCodigo(mensagem);
+  return codigo ? buscarPendente(codigo) : null;
+}
 
 const AGENDAS = [
   "cal-evangelismo", "cal-epifania", "cal-intercessao", "cal-outros",
@@ -326,6 +346,8 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   assert.match(gruposEnviados[0], /Novo Agendamento Solicitado/);
   assert.match(gruposEnviados[0], /Culto de Jovens/);
   assert.match(gruposEnviados[0], /Rua Benedicto de Abreu Júnior/);
+  assert.match(gruposEnviados[0], /Código: [A-Z0-9]{4}/, "a mensagem deveria trazer um código curto, não o blob de dados cru");
+  assert.doesNotMatch(gruposEnviados[0], /DADOS:/, "não deveria mais existir o blob base64 antigo na mensagem");
 
   const dados = decodificarDadosAgendamento(gruposEnviados[0]);
   assert.equal(dados.solicitanteId, NUMERO_LIDER);
@@ -351,6 +373,62 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   assert.match(diretasEnviadas[0].texto, /Agendamento Confirmado e Gravado/);
   assert.match(diretasEnviadas[0].texto, /forms\.gle\/paug7A1kx5eyA2zr6/);
   assert.match(aprovacao.respostas[0], /Evento gravado na agenda/);
+
+  // Depois de já aprovado, responder de novo à mesma mensagem não grava outra vez
+  const segundaResposta = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "marcar evento", quotedBody: gruposEnviados[0] });
+  await handleMessage(segundaResposta);
+  assert.equal(eventosGravados.length, 1, "não deveria gravar o evento duas vezes");
+  assert.match(segundaResposta.respostas[0], /Não encontrei essa solicitação/);
+});
+
+test("opção 6 (líder): duas solicitações pendentes ao mesmo tempo não se confundem — cada código resolve o pedido certo", async () => {
+  const { handleMessage, gruposEnviados, eventosGravados } = criarContexto({ eventos: [] });
+
+  // Primeira solicitação
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Culto A");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
+  await enviar(handleMessage, NUMERO_LIDER, "12");
+  await enviar(handleMessage, NUMERO_LIDER, "2");
+  await enviar(handleMessage, NUMERO_LIDER, "3");
+  await enviar(handleMessage, NUMERO_LIDER, "19:30");
+  await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+
+  // Segunda solicitação, de outro líder, antes da primeira ser respondida
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Culto B");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "6"); // Rede de Casais
+  await enviar(handleMessage, NUMERO_LIDER, "12");
+  await enviar(handleMessage, NUMERO_LIDER, "2");
+  await enviar(handleMessage, NUMERO_LIDER, "3");
+  await enviar(handleMessage, NUMERO_LIDER, "19:30");
+  await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+
+  assert.equal(gruposEnviados.length, 2);
+  const dadosA = decodificarDadosAgendamento(gruposEnviados[0]);
+  const dadosB = decodificarDadosAgendamento(gruposEnviados[1]);
+  assert.equal(dadosA.evento, "Culto A");
+  assert.equal(dadosB.evento, "Culto B");
+
+  // Aprova só a segunda solicitação (Culto B) — a primeira (Culto A) continua pendente
+  const aprovacaoB = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "marcar evento", quotedBody: gruposEnviados[1] });
+  await handleMessage(aprovacaoB);
+
+  assert.equal(eventosGravados.length, 1);
+  assert.equal(eventosGravados[0].resource.summary, "Culto B");
+
+  // A primeira (Culto A) ainda deve estar pendente e resolvível normalmente
+  const aprovacaoA = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "marcar evento", quotedBody: gruposEnviados[0] });
+  await handleMessage(aprovacaoA);
+
+  assert.equal(eventosGravados.length, 2);
+  assert.equal(eventosGravados[1].resource.summary, "Culto A");
 });
 
 test("opção 6 (líder): endereço customizado (evento fora da igreja) é usado como informado, sem substituição", async () => {
@@ -726,11 +804,11 @@ test("grupo: 'marcar evento' respondendo a uma mensagem que não é do bot é ig
   assert.equal(msg.respostas.length, 0);
 });
 
-test("grupo: 'marcar evento' respondendo a uma mensagem do bot sem o blob de dados avisa do erro de extração", async () => {
+test("grupo: 'marcar evento' respondendo a uma mensagem do bot sem código embutido avisa que não encontrou a solicitação", async () => {
   const { handleMessage } = criarContexto();
-  const msg = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "marcar evento", quotedBody: "resumo sem o marcador DADOS:" });
+  const msg = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "marcar evento", quotedBody: "resumo sem código embutido" });
   await handleMessage(msg);
-  assert.match(msg.respostas[0], /Erro ao extrair dados/);
+  assert.match(msg.respostas[0], /Não encontrei essa solicitação/);
 });
 
 // ---------------------------------------------------------------------------
