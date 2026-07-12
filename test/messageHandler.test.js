@@ -819,6 +819,18 @@ test("opção 7 (líder): encaminha o comunicado em texto livre para a secretari
   assert.equal(etapas[NUMERO_LIDER], undefined);
 });
 
+test("opção 7 (líder): resumo do comunicado também usa o nome cadastrado no painel de líderes", async () => {
+  const { handleMessage, gruposEnviados } = criarContexto({
+    lideresCadastrados: [{ nome: "Pastor Marcos", telefone: "5511999999999" }],
+  });
+
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "Não haverá culto no dia 20.", { pushname: "celular do Pastor" });
+
+  assert.match(gruposEnviados[0], /Solicitante:\* Pastor Marcos/);
+  assert.doesNotMatch(gruposEnviados[0], /celular do Pastor/);
+});
+
 // ---------------------------------------------------------------------------
 // Grupo "Mensagens Secretaria" — casos de borda
 // ---------------------------------------------------------------------------

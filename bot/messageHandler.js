@@ -844,7 +844,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const comunicado = msg.body;
             const resumoUsuario = `📢 *Solicitação de Comunicado Enviada!*\n\nSua mensagem foi encaminhada para a secretaria analisar e incluir nos avisos do culto.\n\nDigite *menu* para voltar ao menu principal.`;
 
-            const resumoGrupo = `📢 *NOVO COMUNICADO PARA O CULTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📝 *Mensagem:* ${comunicado}`;
+            const resumoGrupo = `📢 *NOVO COMUNICADO PARA O CULTO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📝 *Mensagem:* ${comunicado}`;
             await notificarSecretaria(client, resumoGrupo);
 
             await msg.reply(resumoUsuario);
