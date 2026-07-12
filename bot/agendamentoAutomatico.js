@@ -28,12 +28,12 @@ function decodificarDadosAgendamento(texto) {
 // `ano` é calculado pelo chamador no momento da aprovação (não fica salvo no blob),
 // preservando o comportamento já existente antes desta extração.
 function montarResourceEvento(dados, ano) {
-  const { evento, rede, dia, mes, horarioInicio, horarioFim, isDiaInteiro } = dados;
+  const { evento, rede, local, dia, mes, horarioInicio, horarioFim, isDiaInteiro } = dados;
 
   const resource = {
     summary: evento,
     description: `Agendado via Bot - Solicitado pela Rede: ${rede}`,
-    location: "Comunidade Cristã Curados",
+    location: local || "Comunidade Cristã Curados",
   };
 
   if (isDiaInteiro) {

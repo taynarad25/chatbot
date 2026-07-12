@@ -294,6 +294,7 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar novo evento
   await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja"); // local
   await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
   await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
   await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
@@ -305,15 +306,18 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   const escolha = await enviar(handleMessage, NUMERO_LIDER, "1");
   assert.match(escolha[0], /Solicitação de Agendamento/);
   assert.match(escolha[0], /Culto de Jovens/);
+  assert.match(escolha[0], /Rua Benedicto de Abreu Júnior/);
 
   assert.equal(gruposEnviados.length, 1);
   assert.match(gruposEnviados[0], /Novo Agendamento Solicitado/);
   assert.match(gruposEnviados[0], /Culto de Jovens/);
+  assert.match(gruposEnviados[0], /Rua Benedicto de Abreu Júnior/);
 
   const dados = decodificarDadosAgendamento(gruposEnviados[0]);
   assert.equal(dados.solicitanteId, NUMERO_LIDER);
   assert.equal(dados.evento, "Culto de Jovens");
   assert.equal(dados.rede, "Rede de Homens");
+  assert.match(dados.local, /Rua Benedicto de Abreu Júnior/);
 
   // A secretaria responde ("reply") à mensagem do bot no grupo com "marcar evento"
   const aprovacao = criarMsgGrupo({
@@ -326,11 +330,30 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   assert.equal(eventosGravados.length, 1, "deveria ter gravado o evento na Google Agenda");
   assert.equal(eventosGravados[0].calendarId, AGENDAS[7]); // índice da Rede de Homens
   assert.equal(eventosGravados[0].resource.summary, "Culto de Jovens");
+  assert.match(eventosGravados[0].resource.location, /Rua Benedicto de Abreu Júnior/);
 
   assert.equal(diretasEnviadas.length, 1);
   assert.equal(diretasEnviadas[0].to, NUMERO_LIDER);
   assert.match(diretasEnviadas[0].texto, /Agendamento Confirmado e Gravado/);
   assert.match(aprovacao.respostas[0], /Evento gravado na agenda/);
+});
+
+test("opção 6 (líder): endereço customizado (evento fora da igreja) é usado como informado, sem substituição", async () => {
+  const { handleMessage } = criarContexto({ eventos: [] });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Reunião de Casais");
+  await enviar(handleMessage, NUMERO_LIDER, "Rua das Flores, 123 - Jardim Primavera");
+  await enviar(handleMessage, NUMERO_LIDER, "6"); // Rede de Casais
+  await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
+  await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
+  await enviar(handleMessage, NUMERO_LIDER, "19:30");
+  await enviar(handleMessage, NUMERO_LIDER, "21:00");
+
+  const escolha = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(escolha[0], /Rua das Flores, 123 - Jardim Primavera/);
+  assert.doesNotMatch(escolha[0], /Rua Benedicto de Abreu Júnior/);
 });
 
 test("opção 6 (líder): evento de DIA TODO pula a pergunta de horário de término", async () => {
@@ -339,6 +362,7 @@ test("opção 6 (líder): evento de DIA TODO pula a pergunta de horário de tér
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Retiro Espiritual");
+  await enviar(handleMessage, NUMERO_LIDER, "Sítio da Família Silva"); // local
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Evangelismo
   await enviar(handleMessage, NUMERO_LIDER, "11"); // Novembro
   await enviar(handleMessage, NUMERO_LIDER, "8"); // Vários dias / evento longo
@@ -353,6 +377,7 @@ test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "12");
   await enviar(handleMessage, NUMERO_LIDER, "3");

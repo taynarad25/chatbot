@@ -9,8 +9,19 @@ const SAUDACOES_REGEX = /^(oi+|ol[aá]+|paz+|a\s+paz+|bom\s+dia|boa\s+tarde|boa\
 const HORARIO_REGEX = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
+const ENDERECO_IGREJA = "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi";
+const LOCAL_IGREJA_REGEX = /\bigreja\b|\btemplo\b|\bsal[aã]o\b/i;
+
 function nomeContato(contato, numero) {
   return contato.pushname || contato.name || numero;
+}
+
+// Se o líder disser que o evento é "na igreja"/"no templo"/"no salão", assume o
+// endereço oficial. Qualquer outro texto é usado como o endereço informado
+// (ex: a casa de alguém).
+function resolverLocalEvento(texto) {
+  const informado = (texto || "").trim();
+  return LOCAL_IGREJA_REGEX.test(informado) ? ENDERECO_IGREJA : informado;
 }
 
 // Mascara o número de telefone para uso em logs, preservando apenas o DDI, o DDD
@@ -291,6 +302,13 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           if (info.etapa === "evento_nome") {
             console.log(`[Agendamento] Nome do evento: ${msg.body}`);
             info.nome = msg.body;
+            info.etapa = "evento_local";
+            return msg.reply(`📍 Onde será o evento?\n\nDigite o endereço completo, ou apenas *igreja* se for no templo.`);
+          }
+
+          if (info.etapa === "evento_local") {
+            info.local = resolverLocalEvento(msg.body);
+            console.log(`[Agendamento] Local do evento: ${info.local}`);
             info.etapa = "evento_rede";
             return msg.reply(`Qual rede está organizando?\n\n${montarListaRedes()}`);
           }
@@ -423,11 +441,12 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             if (isNaN(escolha) || !info.datasEncontradas[escolha]) return msg.reply("❌ Escolha um número da lista.");
 
             const dataFinal = info.datasEncontradas[escolha];
-            const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\n📝 *Enquanto aguarda a confirmação, por favor, já preencha o formulário detalhado com os dados do evento:* \nhttps://forms.gle/LXLGbS3CDxQwxMBf6\n\nDigite *menu* para voltar ao menu principal.`;
+            const resumo = `✅ *Solicitação de Agendamento*\n\nEvento: ${info.nome}\nLocal: ${info.local}\nRede: ${info.rede}\nData: ${dataFinal.getDate()}/${info.mes}\nHorário: ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\n📝 *Enquanto aguarda a confirmação, por favor, já preencha o formulário detalhado com os dados do evento:* \nhttps://forms.gle/LXLGbS3CDxQwxMBf6\n\nDigite *menu* para voltar ao menu principal.`;
 
             const dadosAgendamento = {
               solicitanteId: numero,
               evento: info.nome,
+              local: info.local,
               rede: info.rede,
               dia: dataFinal.getDate(),
               mes: info.mes,
@@ -435,7 +454,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               horarioFim: info.horarioFim,
               isDiaInteiro: info.isDiaInteiro,
             };
-            const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_${codificarDadosAgendamento(dadosAgendamento)}_`;
+            const resumoGrupo = `🔔 *Novo Agendamento Solicitado*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🌐 *Rede:* ${info.rede}\n📆 *Data:* ${dataFinal.getDate()}/${info.mes}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_${codificarDadosAgendamento(dadosAgendamento)}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
