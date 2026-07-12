@@ -67,6 +67,8 @@ Esse grupo do WhatsApp é o canal central de aprovação: toda solicitação (ag
 
 ⚠️ **As respostas "marcar evento"/"não marcar", "alterar evento"/"não alterar" e "cancelar evento"/"manter evento" só funcionam quando enviadas como resposta (reply/citação) à mensagem original do bot** — segure/deslize na mensagem do bot no grupo e escolha "Responder" antes de digitar. Digitar como uma mensagem solta, sem responder, é ignorado silenciosamente (o bot não avisa que não entendeu).
 
+Nas solicitações de **agendar, alterar ou cancelar evento**, o campo "Solicitante" mostra o nome cadastrado do líder na aba "Líderes" do painel (não o nome/apelido salvo no celular dele) — evita depender de como cada líder configurou o próprio perfil do WhatsApp. Sem um líder cadastrado com esse telefone (ou com o nome em branco), cai de volta no nome do contato salvo no celular do próprio bot.
+
 Cada mensagem de pedido termina com um código curto (ex: `_Código: A3F9_`), que é como o bot sabe qual solicitação está sendo respondida — os dados completos ficam guardados em `pendentes.json` (veja abaixo), não na mensagem em si, então o texto visível pode mudar livremente sem afetar o processamento. Isso também é o que permite ter **várias solicitações pendentes ao mesmo tempo**: cada uma tem seu próprio código, e a secretaria responde à mensagem específica que quer decidir. Depois de aprovada ou recusada, a solicitação é removida de `pendentes.json` — responder de novo à mesma mensagem (exceto logo após um erro ao gravar no Google Calendar, quando a solicitação é mantida de propósito pra permitir tentar de novo) avisa que não encontrou mais nada pendente ali.
 
 ### Painel de controle web

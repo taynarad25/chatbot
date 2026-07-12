@@ -13,7 +13,7 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const moment = require("moment-timezone");
 const { google } = require("googleapis");
 const { createMessageHandler } = require("./messageHandler");
-const { telefonesLideres, loadLideres } = require("../web/lideres");
+const { telefonesLideres, loadLideres, listLideres } = require("../web/lideres");
 
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
 // estado persistido e a sessão do WhatsApp (.wwebjs_auth) sempre viveram na
@@ -230,6 +230,7 @@ function criarClient() {
     lideres,
     etapas,
     buscarEventos,
+    listLideres,
   });
   client.on("message", handleMessage);
 }

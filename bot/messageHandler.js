@@ -60,8 +60,21 @@ function identificarUsuario(contato, numero, isLider) {
  * @param {string[]} deps.lideres - números de telefone com acesso às opções de líder
  * @param {object} deps.etapas - mapa mutável "número -> estado da conversa", compartilhado entre reconexões
  * @param {(inicio: string, fim: string, agendaId?: string) => Promise<object[]>} deps.buscarEventos
+ * @param {() => object[]} [deps.listLideres] - retorna os líderes cadastrados no painel ({ nome, telefone }),
+ *   usado para identificar o solicitante nos resumos de evento pelo nome cadastrado (não o nome do contato salvo no celular)
  */
-function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapas, buscarEventos }) {
+function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapas, buscarEventos, listLideres = () => [] }) {
+  // Identifica o solicitante de um evento (criar/alterar/cancelar) pelo nome
+  // cadastrado no painel de líderes, já que o nome salvo no celular do líder
+  // (nomeContato) pode divergir do nome oficial usado pela secretaria. Sem
+  // correspondência (ou nome cadastrado vazio), cai de volta no nome do contato.
+  function nomeSolicitante(contato, numero) {
+    const numeroDigitos = String(numero).replace(/\D/g, "");
+    const lider = listLideres().find((l) => numeroDigitos.includes(l.telefone));
+    if (lider && lider.nome && lider.nome.trim()) return lider.nome.trim();
+    return nomeContato(contato, numero);
+  }
+
   // Busca, filtra e entrega a listagem de agenda para um período, deixando o
   // fluxo pronto para receber o número de um item na próxima mensagem.
   async function entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg) {
@@ -107,7 +120,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       isDiaInteiro: info.isDiaInteiro,
     };
     const codigo = salvarPendente(dadosAgendamento);
-    const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
+    const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
     await notificarSecretaria(client, resumoGrupo);
 
     console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
@@ -406,7 +419,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             const resumo = `🗑️ *Solicitação de Cancelamento*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data:* ${dataOriginal.format("DD/MM")}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
             const codigoCancelamento = salvarPendente(dadosCancelamento);
-            const resumoGrupo = `🗑️ *PEDIDO DE CANCELAMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data:* ${dataOriginal.format("DD/MM")}\n\n_Responda a este resumo com "cancelar evento" para confirmar o cancelamento, ou "manter evento" para negar._\n\n_Código: ${codigoCancelamento}_`;
+            const resumoGrupo = `🗑️ *PEDIDO DE CANCELAMENTO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data:* ${dataOriginal.format("DD/MM")}\n\n_Responda a este resumo com "cancelar evento" para confirmar o cancelamento, ou "manter evento" para negar._\n\n_Código: ${codigoCancelamento}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             console.log(`Cancelamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
@@ -525,7 +538,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.format("DD/MM")}\n*Mudança:* ${descricaoMudanca}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
             const codigoAlteracao = salvarPendente(dadosAlteracao);
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.format("DD/MM")}\n📝 *Mudança:* ${descricaoMudanca}\n\n_Responda a este resumo com "alterar evento" para aplicar automaticamente na agenda, ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracao}_`;
+            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.format("DD/MM")}\n📝 *Mudança:* ${descricaoMudanca}\n\n_Responda a este resumo com "alterar evento" para aplicar automaticamente na agenda, ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracao}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             console.log(`Alteração estruturada solicitada por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
@@ -546,7 +559,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               evento: info.eventoParaAlterar.summary,
             };
             const codigoAlteracaoLivre = salvarPendente(dadosAlteracao);
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "alterar evento" para confirmar ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracaoLivre}_`;
+            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "alterar evento" para confirmar ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracaoLivre}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             await msg.reply(resumo);

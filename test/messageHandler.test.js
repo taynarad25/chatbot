@@ -40,7 +40,7 @@ const NUMERO_COMUM = "5511888888888@c.us";
 
 // Monta um novo "servidor" de teste: handler + espiões de tudo que ele chamaria
 // de verdade (mensagens de grupo, mensagens diretas, gravação na Google Agenda).
-function criarContexto({ eventos = [] } = {}) {
+function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
   const etapas = {};
   const gruposEnviados = []; // mensagens que o bot mandou para "Mensagens Secretaria"
   const diretasEnviadas = []; // client.sendMessage(solicitanteId, texto)
@@ -81,6 +81,7 @@ function criarContexto({ eventos = [] } = {}) {
 
   const handleMessage = createMessageHandler({
     client, calendar, agendasParaLer: AGENDAS, lideres: LIDERES, etapas, buscarEventos,
+    listLideres: () => lideresCadastrados,
   });
 
   return {
@@ -379,6 +380,46 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   await handleMessage(segundaResposta);
   assert.equal(eventosGravados.length, 1, "não deveria gravar o evento duas vezes");
   assert.match(segundaResposta.respostas[0], /Não encontrei essa solicitação/);
+});
+
+test("opção 6 (líder): resumo do grupo usa o nome cadastrado no painel de líderes, não o nome do contato salvo no celular", async () => {
+  const { handleMessage, gruposEnviados } = criarContexto({
+    eventos: [],
+    lideresCadastrados: [{ nome: "Pastor Marcos", telefone: "5511999999999" }],
+  });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar novo evento
+  await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
+  await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
+  await enviar(handleMessage, NUMERO_LIDER, "2");
+  await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
+  await enviar(handleMessage, NUMERO_LIDER, "19:30");
+  await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  await enviar(handleMessage, NUMERO_LIDER, "1", { pushname: "celular do Pastor" });
+
+  assert.match(gruposEnviados[0], /Solicitante:\* Pastor Marcos/);
+  assert.doesNotMatch(gruposEnviados[0], /celular do Pastor/);
+});
+
+test("opção 6 (líder): sem nome cadastrado no painel, o resumo do grupo cai de volta pro nome do contato", async () => {
+  const { handleMessage, gruposEnviados } = criarContexto({ eventos: [], lideresCadastrados: [] });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "12");
+  await enviar(handleMessage, NUMERO_LIDER, "2");
+  await enviar(handleMessage, NUMERO_LIDER, "3");
+  await enviar(handleMessage, NUMERO_LIDER, "19:30");
+  await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  await enviar(handleMessage, NUMERO_LIDER, "1", { pushname: "celular do Pastor" });
+
+  assert.match(gruposEnviados[0], /Solicitante:\* celular do Pastor/);
 });
 
 test("opção 6 (líder): duas solicitações pendentes ao mesmo tempo não se confundem — cada código resolve o pedido certo", async () => {
