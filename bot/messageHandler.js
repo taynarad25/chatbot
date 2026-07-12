@@ -96,6 +96,11 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       // Lógica para mensagens em grupo (Confirmação da Secretaria)
       if (msg.from.endsWith("@g.us")) {
         const chat = await msg.getChat();
+        // Loga toda mensagem de grupo processada aqui, incluindo se é uma resposta
+        // (hasQuotedMsg) — sem isso, uma mensagem solta "marcar evento" (sem usar o
+        // "Responder" do WhatsApp) ou um grupo com nome diferente do esperado eram
+        // ignorados em silêncio, sem deixar rastro nenhum no log pra diagnosticar.
+        console.log(`[Grupo] "${chat.name}" | Resposta a outra mensagem: ${msg.hasQuotedMsg} | Texto: "${msg.body}"`);
         if (chat.name === "Mensagens Secretaria" && msg.hasQuotedMsg) {
           const textoMsg = msg.body.toLowerCase().trim();
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
