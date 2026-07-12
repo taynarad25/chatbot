@@ -48,7 +48,7 @@ Pergunta nome e dias/horários disponíveis, depois envia um resumo para o grupo
 #### Alterar evento existente
 
 1. Escolhe o departamento/rede → o bot lista até 15 próximos eventos daquela agenda no ano corrente → escolhe o evento → escolhe **o que mudar**: Horário, Data, Nome do evento, Local, ou "Outra alteração" (texto livre, para o que não encaixar nas opções estruturadas).
-2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde, **como resposta (reply) a essa mensagem**, **"agendar"** (aprova) ou **"não agendar"** (recusa) — o solicitante é notificado da decisão.
+2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde, **como resposta (reply) a essa mensagem**, **"alterar evento"** (aprova) ou **"não alterar"** (recusa) — o solicitante é notificado da decisão.
    - Para as 4 opções estruturadas (horário/data/nome/local), a aprovação **já aplica a mudança automaticamente** na Google Agenda (via `calendar.events.patch`), sem precisar editar manualmente.
    - Para "Outra alteração" (texto livre), como o bot não interpreta o texto com segurança, a edição continua sendo feita manualmente pela secretaria depois de aprovar.
 
@@ -65,7 +65,7 @@ Texto livre que é encaminhado para o grupo da secretaria incluir nos avisos do 
 
 Esse grupo do WhatsApp é o canal central de aprovação: toda solicitação (agendamento, alteração, atendimento pastoral, comunicado, "falar com a secretaria") gera uma notificação nele.
 
-⚠️ **As respostas "marcar evento"/"não marcar", "agendar"/"não agendar" e "cancelar evento"/"manter evento" só funcionam quando enviadas como resposta (reply/citação) à mensagem original do bot** — segure/deslize na mensagem do bot no grupo e escolha "Responder" antes de digitar. Digitar como uma mensagem solta, sem responder, é ignorado silenciosamente (o bot não avisa que não entendeu).
+⚠️ **As respostas "marcar evento"/"não marcar", "alterar evento"/"não alterar" e "cancelar evento"/"manter evento" só funcionam quando enviadas como resposta (reply/citação) à mensagem original do bot** — segure/deslize na mensagem do bot no grupo e escolha "Responder" antes de digitar. Digitar como uma mensagem solta, sem responder, é ignorado silenciosamente (o bot não avisa que não entendeu).
 
 Cada mensagem de pedido termina com um código curto (ex: `_Código: A3F9_`), que é como o bot sabe qual solicitação está sendo respondida — os dados completos ficam guardados em `pendentes.json` (veja abaixo), não na mensagem em si, então o texto visível pode mudar livremente sem afetar o processamento. Isso também é o que permite ter **várias solicitações pendentes ao mesmo tempo**: cada uma tem seu próprio código, e a secretaria responde à mensagem específica que quer decidir. Depois de aprovada ou recusada, a solicitação é removida de `pendentes.json` — responder de novo à mesma mensagem (exceto logo após um erro ao gravar no Google Calendar, quando a solicitação é mantida de propósito pra permitir tentar de novo) avisa que não encontrou mais nada pendente ali.
 

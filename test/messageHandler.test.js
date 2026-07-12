@@ -620,7 +620,7 @@ test("opção 6 (líder): alterar evento existente (texto livre), do início ao 
   assert.equal(gruposEnviados.length, 1);
   assert.match(gruposEnviados[0], /PEDIDO DE ALTERAÇÃO/);
 
-  const aprovacao = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "agendar", quotedBody: gruposEnviados[0] });
+  const aprovacao = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "alterar evento", quotedBody: gruposEnviados[0] });
   await handleMessage(aprovacao);
 
   // Texto livre não tem como ser aplicado automaticamente: fica só no aviso, sem chamar o patch.
@@ -631,7 +631,7 @@ test("opção 6 (líder): alterar evento existente (texto livre), do início ao 
   assert.match(aprovacao.respostas[0], /aprovação da alteração/);
 });
 
-test("opção 6 (líder): alterar evento (texto livre) — secretaria recusa ('não agendar')", async () => {
+test("opção 6 (líder): alterar evento (texto livre) — secretaria recusa ('não alterar')", async () => {
   const eventoExistente = {
     id: "evt-culto-mulheres",
     summary: "Culto de Mulheres",
@@ -647,7 +647,7 @@ test("opção 6 (líder): alterar evento (texto livre) — secretaria recusa ('n
   await enviar(handleMessage, NUMERO_LIDER, "5"); // Outra alteração (texto livre)
   await enviar(handleMessage, NUMERO_LIDER, "Mudar horário para 20h");
 
-  const recusa = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "não agendar", quotedBody: gruposEnviados[0] });
+  const recusa = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "não alterar", quotedBody: gruposEnviados[0] });
   await handleMessage(recusa);
 
   assert.match(diretasEnviadas[0].texto, /não pôde ser aprovada/);
@@ -677,7 +677,7 @@ test("opção 6 (líder): alterar horário de evento existente, aplicado automat
   assert.match(finalResp[0], /Solicitação de Alteração/);
   assert.match(finalResp[0], /20:00 - 22:00/);
 
-  const aprovacao = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "agendar", quotedBody: gruposEnviados[0] });
+  const aprovacao = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "alterar evento", quotedBody: gruposEnviados[0] });
   await handleMessage(aprovacao);
 
   assert.equal(eventosAlterados.length, 1);

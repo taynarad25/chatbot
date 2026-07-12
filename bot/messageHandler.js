@@ -172,7 +172,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 return msg.reply(`✅ Líder notificado sobre a recusa.`);
               }
             }
-          } else if (textoMsg === "agendar" || textoMsg === "não agendar") {
+          } else if (textoMsg === "alterar evento" || textoMsg === "não alterar") {
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o pedido de alteração enviado pelo bot
             if (quotedMsg.fromMe) {
@@ -184,7 +184,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
               const { solicitanteId, evento } = dados;
 
-              if (textoMsg === "agendar") {
+              if (textoMsg === "alterar evento") {
                 // Alterações estruturadas (horário/data/nome/local) carregam "campo" e
                 // conseguem ser aplicadas automaticamente. O texto livre ("outro") não
                 // tem como ser interpretado com segurança, então continua manual.
@@ -525,7 +525,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.format("DD/MM")}\n*Mudança:* ${descricaoMudanca}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
             const codigoAlteracao = salvarPendente(dadosAlteracao);
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.format("DD/MM")}\n📝 *Mudança:* ${descricaoMudanca}\n\n_Responda a este resumo com "agendar" para aplicar automaticamente na agenda, ou "não agendar" para recusar._\n\n_Código: ${codigoAlteracao}_`;
+            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.format("DD/MM")}\n📝 *Mudança:* ${descricaoMudanca}\n\n_Responda a este resumo com "alterar evento" para aplicar automaticamente na agenda, ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracao}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             console.log(`Alteração estruturada solicitada por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
@@ -546,7 +546,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               evento: info.eventoParaAlterar.summary,
             };
             const codigoAlteracaoLivre = salvarPendente(dadosAlteracao);
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "agendar" para confirmar ou "não agendar" para recusar._\n\n_Código: ${codigoAlteracaoLivre}_`;
+            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "alterar evento" para confirmar ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracaoLivre}_`;
             await notificarSecretaria(client, resumoGrupo);
 
             await msg.reply(resumo);
