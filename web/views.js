@@ -447,7 +447,7 @@ function renderIndexHtml() {
       filtrados.forEach(l => {
         const li = document.createElement('li');
         const span = document.createElement('span');
-        span.textContent = (l.nome || '(sem nome)') + ' — ' + formatarTelefone(l.telefone);
+        span.textContent = (l.nome || '(sem nome)') + ' | ' + formatarTelefone(l.telefone);
         li.appendChild(span);
 
         const btnEditar = document.createElement('button');
