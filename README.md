@@ -43,6 +43,7 @@ Pergunta nome e dias/horários disponíveis, depois envia um resumo para o grupo
    - **Evento de dia inteiro:** bloqueia (e é bloqueado por) qualquer outro evento no mesmo dia.
    - **Conflito de horário:** eventos com hora marcada têm uma margem de segurança de **1 hora** antes e depois — um evento que termina às 20h bloqueia novos agendamentos até as 21h no mesmo local de calendário.
    - **Exceção da Rede Ruach:** entre os sábados livres do mês, o último fica automaticamente reservado só para a Rede Ruach.
+   - **Data no passado:** um dia anterior a hoje nunca aparece como disponível (caminho "2") nem é aceito como data específica (caminho "1") — mesma regra já aplicada à busca de agenda por período personalizado (opção 2).
 4. O bot notifica o grupo **"Mensagens Secretaria"** com um resumo e pede que respondam, **como resposta (reply) a essa mensagem**, **"marcar evento"** (grava automaticamente na agenda do Google certa, e avisa o solicitante) ou **"não marcar"** (só avisa o solicitante da recusa).
 
 #### Alterar evento existente

@@ -2,6 +2,7 @@ process.env.TZ = "America/Sao_Paulo";
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const moment = require("moment-timezone");
 const {
   calcularDisponibilidade,
   montarMensagemConflito,
@@ -14,6 +15,11 @@ const {
 const EVANGELISMO_ID = "evangelismo-cal-id";
 const ANO = 2026;
 const MES = 7; // julho/2026: sábados em 4, 11, 18 e 25; quintas em 2, 9, 16, 23, 30
+
+// "Hoje" fixo, anterior a todas as datas usadas nos testes abaixo — evita que os
+// testes comecem a falhar sozinhos no futuro por causa da regra de "não pode
+// agendar em data passada" (que compara contra o relógio real por padrão).
+const AGORA_FIXO = moment.tz("01/07/2026", "D/M/YYYY", "America/Sao_Paulo");
 
 function eventoHorario({ data, horaInicio, horaFim, summary, calendarId = "outro-calendario" }) {
   return {
@@ -44,6 +50,7 @@ function baseParams(overrides = {}) {
     horarioInicio: "19:00",
     horarioFim: "20:00",
     rede: "Rede de Casais",
+    agora: AGORA_FIXO,
     ...overrides,
   };
 }
@@ -58,6 +65,20 @@ test("calcularDisponibilidade: filtra só o dia da semana pedido (ex: só quinta
   const { disponiveis } = calcularDisponibilidade(baseParams({ diaSemanaFiltro: 4 })); // 4 = quinta
   assert.equal(disponiveis.length, 5); // 2, 9, 16, 23, 30 de julho/2026
   disponiveis.forEach((d) => assert.equal(d.getDay(), 4));
+});
+
+test("calcularDisponibilidade: dias antes de 'hoje' não entram na lista de disponíveis", () => {
+  // "Hoje" no meio do mês: dias 1 a 9 já passaram, dia 10 em diante ainda vale.
+  const agora = moment.tz("10/07/2026", "D/M/YYYY", "America/Sao_Paulo");
+  const { disponiveis } = calcularDisponibilidade(baseParams({ agora }));
+  assert.equal(disponiveis.length, 22); // 31 - 9 dias já passados
+  disponiveis.forEach((d) => assert.ok(d.getDate() >= 10));
+});
+
+test("calcularDisponibilidade: o próprio dia de hoje ainda conta como disponível", () => {
+  const agora = moment.tz("10/07/2026", "D/M/YYYY", "America/Sao_Paulo");
+  const { disponiveis } = calcularDisponibilidade(baseParams({ agora, diaSemanaFiltro: 5 })); // 5 = sexta, 10/07 é sexta
+  assert.ok(disponiveis.some((d) => d.getDate() === 10));
 });
 
 test("calcularDisponibilidade: 'Sábado LIVRE' do Evangelismo bloqueia aquele sábado", () => {
@@ -229,6 +250,7 @@ function baseParamsData(overrides = {}) {
     mes: MES,
     dia: 10, // 10/07/2026 é uma sexta-feira
     rede: "Rede de Casais",
+    agora: AGORA_FIXO,
     ...overrides,
   };
 }
@@ -237,6 +259,26 @@ test("verificarDataEspecifica: dia livre sem eventos fica disponível", () => {
   const resultado = verificarDataEspecifica(baseParamsData());
   assert.equal(resultado.disponivel, true);
   assert.equal(resultado.dataFormatada, "10/07");
+});
+
+test("verificarDataEspecifica: dia antes de 'hoje' é recusado como data passada", () => {
+  const agora = moment.tz("15/07/2026", "D/M/YYYY", "America/Sao_Paulo");
+  const resultado = verificarDataEspecifica(baseParamsData({ agora, dia: 10 }));
+  assert.equal(resultado.disponivel, false);
+  assert.equal(resultado.motivo, "data_passada");
+  assert.equal(resultado.dataFormatada, "10/07");
+});
+
+test("verificarDataEspecifica: o próprio dia de hoje não é considerado passado", () => {
+  const agora = moment.tz("10/07/2026", "D/M/YYYY", "America/Sao_Paulo");
+  const resultado = verificarDataEspecifica(baseParamsData({ agora, dia: 10 }));
+  assert.notEqual(resultado.motivo, "data_passada");
+});
+
+test("montarMensagemDataEspecificaBloqueada: mensagem clara para data passada", () => {
+  const mensagem = montarMensagemDataEspecificaBloqueada({ motivo: "data_passada", dataFormatada: "10/07" });
+  assert.match(mensagem, /10\/07 já passou/);
+  assert.match(mensagem, /a partir de hoje/);
 });
 
 test("verificarDataEspecifica: 'Sábado LIVRE' do Evangelismo bloqueia o dia", () => {

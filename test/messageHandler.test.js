@@ -609,6 +609,24 @@ test("opção 6 (líder): agenda por data específica — dia inválido para o m
   assert.equal(etapas[NUMERO_LIDER].etapa, "evento_dia_especifico", "deveria continuar esperando um dia válido");
 });
 
+test("opção 6 (líder): agenda por data específica — não deixa escolher um dia que já passou", async () => {
+  const { handleMessage, gruposEnviados } = criarContexto({ eventos: [] });
+  const ontem = moment.tz("America/Sao_Paulo").subtract(1, "day");
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
+  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, String(ontem.month() + 1));
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // já tenho uma data específica
+
+  const diaResp = await enviar(handleMessage, NUMERO_LIDER, String(ontem.date()));
+  assert.match(diaResp[diaResp.length - 1], /já passou/);
+  assert.match(diaResp[diaResp.length - 1], /a partir de hoje/);
+  assert.equal(gruposEnviados.length, 0, "não deveria notificar a secretaria de uma data que já passou");
+});
+
 test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — solicitante é avisado e nada é gravado", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({ eventos: [] });
 
