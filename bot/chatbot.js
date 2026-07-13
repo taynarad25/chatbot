@@ -283,12 +283,15 @@ async function startClient() {
   console.log("🚀 Iniciando processo de inicialização do cliente...");
   console.time("client_init");
 
-  // Força o encerramento de processos zumbis do Chromium antes de iniciar
+  // Força o encerramento de processos zumbis do Chromium antes de iniciar.
+  // Caminho absoluto (não "pkill" solto) para não depender da resolução via
+  // PATH — é onde o pacote "procps" instala o binário na imagem node:20-slim
+  // usada pelo Dockerfile.
   try {
     console.log("[Browser] Limpando processos antigos do Chromium...");
-    execSync("pkill -9 -f chromium", { stdio: 'ignore' });
+    execSync("/usr/bin/pkill -9 -f chromium", { stdio: 'ignore' });
   } catch (e) {
-    // Silencia o erro se o pkill não encontrar nada
+    // Silencia o erro se o pkill não encontrar nada (ou não existir nesse caminho, fora do Docker)
   }
 
   // Remove o arquivo SingletonLock do Chromium se ele existir. 
