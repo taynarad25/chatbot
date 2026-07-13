@@ -344,12 +344,12 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               info.acaoEvento = "alterar";
               info.etapa = "alterar_departamento";
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou alteração de evento.`);
-              return msg.reply(`De qual departamento é o evento que deseja alterar?\n\n${montarListaRedes()}`);
+              return msg.reply(`🏢 De qual departamento é o evento que deseja alterar?\n\n${montarListaRedes()}`);
             } else if (msg.body === "3") {
               info.acaoEvento = "cancelar";
               info.etapa = "alterar_departamento";
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou cancelamento de evento.`);
-              return msg.reply(`De qual departamento é o evento que deseja cancelar?\n\n${montarListaRedes()}`);
+              return msg.reply(`🏢 De qual departamento é o evento que deseja cancelar?\n\n${montarListaRedes()}`);
             } else {
               return msg.reply("❌ Opção inválida. Digite 1 para Agendar, 2 para Alterar ou 3 para Cancelar.");
             }
@@ -467,7 +467,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             }
             if (opcao === "5") {
               info.etapa = "alterar_detalhes";
-              return msg.reply(`Descreva a alteração que você precisa (Ex: Mudar horário para 20h, alterar data para o dia seguinte, etc):`);
+              return msg.reply(`📝 Descreva a alteração que você precisa (Ex: Mudar horário para 20h, alterar data para o dia seguinte, etc):`);
             }
             return msg.reply("❌ Opção inválida. Escolha um número de 1 a 5.");
           }
@@ -615,7 +615,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             info.local = resolverLocalEvento(msg.body);
             console.log(`[Agendamento] Local do evento: ${info.local}`);
             info.etapa = "evento_rede";
-            return msg.reply(`Qual departamento está organizando?\n\n${montarListaRedes()}`);
+            return msg.reply(`🏢 Qual departamento está organizando?\n\n${montarListaRedes()}`);
           }
 
           if (info.etapa === "evento_rede") {
@@ -641,11 +641,11 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const opcao = msg.body.trim();
             if (opcao === "1") {
               info.etapa = "evento_dia_especifico";
-              return msg.reply(`Qual o dia do mês? (Ex: 25, para o dia 25/${String(info.mes).padStart(2, "0")})`);
+              return msg.reply(`📅 Qual o dia do mês? (Ex: 25, para o dia 25/${String(info.mes).padStart(2, "0")})`);
             }
             if (opcao === "2") {
               info.etapa = "evento_tipo_dia";
-              return msg.reply("Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Vários dias / Evento longo");
+              return msg.reply("📅 Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Vários dias / Evento longo");
             }
             return msg.reply("❌ Opção inválida. Digite 1 para escolher uma data específica, ou 2 para ver as datas disponíveis.");
           }
@@ -1032,7 +1032,7 @@ Digite *menu* para voltar ao menu principal.`;
       if (texto === "6" && isLider) {
         console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando agendamento`);
         etapas[numero] = { fluxo: "agendamento", etapa: "evento_acao" };
-        return msg.reply("O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente\n3 - Cancelar evento existente");
+        return msg.reply("📅 O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente\n3 - Cancelar evento existente");
       }
 
       if (texto === "7" && isLider) {
