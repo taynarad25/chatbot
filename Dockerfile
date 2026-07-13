@@ -25,8 +25,12 @@ USER node
 COPY --chown=node:node package*.json ./
 RUN npm install --omit=dev && npm cache clean --force
 
-# Copia os demais arquivos do projeto com a permissão correta
-COPY --chown=node:node . .
+# Copia só o que o bot precisa em runtime, explicitamente — em vez de "COPY . .",
+# que copiaria o contexto de build inteiro (incluindo test/, .git/ se não fosse
+# ignorado, etc.) pra dentro da imagem.
+COPY --chown=node:node bot/ ./bot/
+COPY --chown=node:node web/ ./web/
+COPY --chown=node:node web.js ./
 
 EXPOSE 3000
 CMD [ "node", "bot/chatbot.js" ]

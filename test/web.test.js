@@ -14,7 +14,7 @@ fs.writeFileSync(process.env.COMBINED_LOG_PATH, "linha de log de teste\n");
 
 const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
-const { startWebServer, addUser } = require("../web");
+const { startWebServer, addUser, sanitizarParaLog } = require("../web");
 const { sessions } = require("../web/auth");
 
 const getStatus = () => ({ connected: false, initializing: false, generatingQr: false, canceling: false, hasQr: false });
@@ -77,6 +77,35 @@ test("POST /login: credenciais de usuário inexistente retorna 401", async () =>
   assert.equal(res.status, 401);
   const json = await res.json();
   assert.equal(json.ok, false);
+});
+
+test("POST /login: username com quebra de linha não injeta uma linha de log falsa (log injection)", async () => {
+  const payloadInjecao = "admin\n[Web] Login bem-sucedido: forjado (IP: 1.2.3.4)";
+  const chamadas = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => chamadas.push(args.join(" "));
+  try {
+    const { res } = await fazerLogin(payloadInjecao, "qualquercoisa");
+    assert.equal(res.status, 401);
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.ok(chamadas.length > 0, "esperava pelo menos um console.warn (usuário não encontrado)");
+  chamadas.forEach((linha) => {
+    assert.doesNotMatch(linha, /\n/, "a quebra de linha do username não deveria sobreviver sem tratamento no log");
+  });
+});
+
+test("sanitizarParaLog: remove quebras de linha e caracteres de controle", () => {
+  assert.equal(sanitizarParaLog("admin\n[Web] linha forjada"), "admin [Web] linha forjada");
+  assert.equal(sanitizarParaLog("a\r\nb\tc"), "a  b c");
+});
+
+test("sanitizarParaLog: valores vazios/ausentes viram string vazia, sem lançar erro", () => {
+  assert.equal(sanitizarParaLog(undefined), "");
+  assert.equal(sanitizarParaLog(null), "");
+  assert.equal(sanitizarParaLog(""), "");
 });
 
 test("fluxo completo: cria admin, faz login, acessa rota autenticada e rota admin", async () => {

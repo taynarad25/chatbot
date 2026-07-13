@@ -14,11 +14,19 @@ const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 
 // Sobrescrevível via env var (usado pelos testes, para nunca ler/limpar o log real de produção).
 const LOG_FILE = process.env.COMBINED_LOG_PATH || path.join(__dirname, "combined.log");
 
+// Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
+// URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
+// "Login bem-sucedido" que nunca aconteceu) em combined.log ou num alerta do WhatsApp.
+// Verificado por teste (ver test/web.test.js). O SonarCloud não reconhece sanitizadores
+// próprios nesse rastreamento de dado sensível — por isso os usos abaixo têm // NOSONAR.
+function sanitizarParaLog(valor) {
+  return String(valor ?? "").replace(/[\x00-\x1f\x7f]/g, " ");
+}
 
 function findUser(username) {
   const users = loadUsers();
   const normalized = username?.toLowerCase().trim();
-  console.log(`[Web] Buscando usuário: '${normalized}' dentro das chaves: [${Object.keys(users).join(", ")}]`);
+  console.log(`[Web] Buscando usuário: '${sanitizarParaLog(normalized)}' dentro das chaves: [${Object.keys(users).join(", ")}]`); // NOSONAR
   return users[normalized] || null;
 }
 
@@ -114,7 +122,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       try {
         url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       } catch (urlErr) {
-        console.warn(`[Web] URL inválida ou malformada recebida de ${ip}: ${req.url}`);
+        console.warn(`[Web] URL inválida ou malformada recebida de ${ip}: ${sanitizarParaLog(req.url)}`); // NOSONAR
         res.writeHead(400, { 'Content-Type': 'text/plain' });
         return res.end('Bad Request: Invalid URL');
       }
@@ -136,7 +144,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 
           const user = findUser(username);
           if (!user) {
-            console.warn(`[Web] Login falhou: Usuário '${username}' não encontrado (IP: ${ip})`);
+            console.warn(`[Web] Login falhou: Usuário '${sanitizarParaLog(username)}' não encontrado (IP: ${ip})`); // NOSONAR
           } else {
             const isPasswordValid = await validatePassword(password, user.salt, user.hash);
             const isActive = (user.status === 'active' || user.status === undefined);
@@ -145,12 +153,12 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
               const token = createSession(username, user.role, user.status);
               loginRateLimiter.reset(ip);
               setSessionCookie(res, token);
-              console.log(`[Web] Login bem-sucedido: ${username} (IP: ${ip})`);
+              console.log(`[Web] Login bem-sucedido: ${sanitizarParaLog(username)} (IP: ${ip})`); // NOSONAR
               return sendJson(res, 200, { ok: true });
             } else if (!isPasswordValid) {
-              console.warn(`[Web] Login falhou: Senha incorreta para o usuário '${username}' (IP: ${ip}). Verifique o hash no log de Auth.`);
+              console.warn(`[Web] Login falhou: Senha incorreta para o usuário '${sanitizarParaLog(username)}' (IP: ${ip}). Verifique o hash no log de Auth.`); // NOSONAR
             } else {
-              console.warn(`[Web] Login falhou: Usuário '${username}' está com status inativo (${user.status}) (IP: ${ip})`);
+              console.warn(`[Web] Login falhou: Usuário '${sanitizarParaLog(username)}' está com status inativo (${user.status}) (IP: ${ip})`); // NOSONAR
             }
           }
           loginRateLimiter.registerFailure(ip);
@@ -165,7 +173,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           res.writeHead(302, { Location: '/login' });
           return res.end();
         }
-        console.warn(`[Web] 401 Acesso negado para ${pathname} | IP: ${ip}`);
+        console.warn(`[Web] 401 Acesso negado para ${sanitizarParaLog(pathname)} | IP: ${ip}`); // NOSONAR
         return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
       }
       if (req.method === 'GET' && pathname === '/register') {
@@ -328,11 +336,11 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         return sendJson(res, 200, { ok: true });
       }
       // Rota não encontrada
-      console.warn(`[Web] 404 Not Found: ${req.method} ${pathname}`);
+      console.warn(`[Web] 404 Not Found: ${req.method} ${sanitizarParaLog(pathname)}`); // NOSONAR
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not found');
     } catch (globalErr) {
-      console.error(`[ALERTA:web] 500 Internal Server Error em ${req.url}:`, globalErr);
+      console.error(`[ALERTA:web] 500 Internal Server Error em ${sanitizarParaLog(req.url)}:`, globalErr); // NOSONAR
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, message: 'Erro interno no servidor.' }));
@@ -353,4 +361,4 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 }
 
 // Removido getUsers que não estava definido e corrigido exportação
-module.exports = { startWebServer, addUser };
+module.exports = { startWebServer, addUser, sanitizarParaLog };
