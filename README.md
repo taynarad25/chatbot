@@ -48,10 +48,12 @@ Pergunta nome e dias/horários disponíveis, depois envia um resumo para o grupo
 
 #### Alterar evento existente
 
-1. Escolhe o departamento → o bot lista até 15 próximos eventos daquela agenda no ano corrente → escolhe o evento → escolhe **o que mudar**: Horário, Data, Nome do evento, Local, ou "Outra alteração" (texto livre, para o que não encaixar nas opções estruturadas).
+1. Escolhe o departamento → o bot lista até 15 próximos eventos daquela agenda **a partir de hoje** até o fim do ano corrente → escolhe o evento → escolhe **o que mudar**: Horário, Data, Nome do evento, Local, ou "Outra alteração" (texto livre, para o que não encaixar nas opções estruturadas).
 2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde, **como resposta (reply) a essa mensagem**, **"alterar evento"** (aprova) ou **"não alterar"** (recusa) — o solicitante é notificado da decisão.
    - Para as 4 opções estruturadas (horário/data/nome/local), a aprovação **já aplica a mudança automaticamente** na Google Agenda (via `calendar.events.patch`), sem precisar editar manualmente.
    - Para "Outra alteração" (texto livre), como o bot não interpreta o texto com segurança, a edição continua sendo feita manualmente pela secretaria depois de aprovar.
+   - **Evento que já passou:** nunca aparece na lista pra escolher — não dá pra alterar nem cancelar um evento que já aconteceu, isso precisa virar um agendamento novo (opção 1).
+   - **Nova data no passado:** ao escolher "Data" como o que mudar, uma data anterior a hoje é recusada como **data inválida** ("❌ Data inválida: esse dia já passou. Escolha uma data a partir de hoje."), mesma lógica de "Agendar novo evento".
 
 #### Cancelar evento existente
 

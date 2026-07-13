@@ -747,6 +747,30 @@ test("opção 6 (líder): alterar horário de evento existente, aplicado automat
   assert.match(aprovacao.respostas[0], /Alteração aplicada na agenda/);
 });
 
+test("opção 6 (líder): alterar a data de um evento para um dia que já passou é recusado como data inválida", async () => {
+  const eventoExistente = {
+    id: "evt-culto-jovens",
+    summary: "Culto de Jovens",
+    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").set({ hour: 19, minute: 0 }).format() },
+    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").set({ hour: 21, minute: 0 }).format() },
+  };
+  const { handleMessage, etapas, setEventos } = criarContexto({ eventos: [eventoExistente] });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "2");
+  setEventos([eventoExistente]);
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // seleciona o evento
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // Data
+
+  const ontem = moment.tz("America/Sao_Paulo").subtract(1, "day");
+  const resp = await enviar(handleMessage, NUMERO_LIDER, ontem.format("DD/MM"));
+
+  assert.match(resp[0], /Data inválida/);
+  assert.match(resp[0], /já passou/);
+  assert.equal(etapas[NUMERO_LIDER].etapa, "alterar_nova_data", "deveria continuar esperando uma data válida");
+});
+
 test("opção 6 (líder): cancelar evento existente — aprovado pela secretaria remove da agenda", async () => {
   const eventoExistente = {
     id: "evt-retiro",
@@ -810,6 +834,50 @@ test("opção 6 (líder): departamento sem eventos futuros encerra o fluxo de al
   const resp = await enviar(handleMessage, NUMERO_LIDER, "9");
   assert.match(resp[1], /Não encontrei eventos futuros/);
   assert.equal(etapas[NUMERO_LIDER], undefined);
+});
+
+test("opção 6 (líder): evento que já passou não aparece na lista pra alterar/cancelar (precisa ser um agendamento novo)", async () => {
+  const etapas = {};
+  const client = {
+    sendMessage: async () => {},
+    getChats: async () => [{ isGroup: true, name: "Mensagens Secretaria", sendMessage: async () => {} }],
+  };
+  const calendar = { events: {} };
+
+  const ontem = moment.tz("America/Sao_Paulo").subtract(1, "day");
+  const amanha = moment.tz("America/Sao_Paulo").add(1, "day");
+  const eventoPassado = {
+    summary: "Evento Já Ocorrido",
+    start: { dateTime: ontem.clone().set({ hour: 10, minute: 0 }).format() },
+    end: { dateTime: ontem.clone().set({ hour: 11, minute: 0 }).format() },
+  };
+  const eventoFuturo = {
+    summary: "Evento Futuro",
+    start: { dateTime: amanha.clone().set({ hour: 10, minute: 0 }).format() },
+    end: { dateTime: amanha.clone().set({ hour: 11, minute: 0 }).format() },
+  };
+  // Mock realista: filtra por período, como a implementação de verdade (bot/chatbot.js)
+  // faz via calendar.events.list({ timeMin, timeMax }) — diferente do mock padrão de
+  // criarContexto(), que ignora o período e sempre retorna tudo.
+  const buscarEventosPorPeriodo = async (inicio, fim) => {
+    return [eventoPassado, eventoFuturo].filter((ev) => {
+      const d = moment(ev.start.dateTime);
+      return d.isSameOrAfter(moment(inicio)) && d.isSameOrBefore(moment(fim));
+    });
+  };
+
+  const handleMessage = createMessageHandler({
+    client, calendar, agendasParaLer: AGENDAS, lideres: LIDERES, etapas,
+    buscarEventos: buscarEventosPorPeriodo,
+  });
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // Alterar evento existente
+  const listaResp = await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
+
+  const ultimaResp = listaResp[listaResp.length - 1];
+  assert.doesNotMatch(ultimaResp, /Evento Já Ocorrido/);
+  assert.match(ultimaResp, /Evento Futuro/);
 });
 
 // ---------------------------------------------------------------------------

@@ -365,11 +365,13 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             try {
               const agora = moment.tz("America/Sao_Paulo");
-              const inicioAno = agora.clone().startOf('year').subtract(1, 'minute').format();
+              // Começa em "hoje", não no início do ano — um evento que já passou não
+              // pode ser alterado nem cancelado (precisaria virar um agendamento novo).
+              const inicioBusca = agora.clone().startOf('day').subtract(1, 'minute').format();
               const fimAno = agora.clone().endOf('year').format();
 
               // Busca eventos especificamente na agenda do departamento selecionado
-              const filtrados = await buscarEventos(inicioAno, fimAno, info.calendarIdBusca);
+              const filtrados = await buscarEventos(inicioBusca, fimAno, info.calendarIdBusca);
 
               if (filtrados.length === 0) {
                 delete etapas[numero];
@@ -497,8 +499,22 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const match = msg.body.trim().match(DATA_REGEX);
             if (!match) return msg.reply("❌ Formato inválido. Use DD/MM (ex: 25/12).");
 
-            info.novoDia = parseInt(match[1]);
-            info.novoMes = parseInt(match[2]);
+            const novoDia = parseInt(match[1]);
+            const novoMes = parseInt(match[2]);
+            // A nova data herda o ano do evento original (mesma regra de
+            // montarResourcePatchAlteracao), então valida contra esse ano — não o atual.
+            const anoOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo").year();
+            const novaDataTeste = moment.tz(`${novoDia}/${novoMes}/${anoOriginal}`, "D/M/YYYY", "America/Sao_Paulo");
+
+            if (!novaDataTeste.isValid() || novaDataTeste.date() !== novoDia) {
+              return msg.reply("❌ Data inválida. Use DD/MM (ex: 25/12).");
+            }
+            if (novaDataTeste.isBefore(moment.tz("America/Sao_Paulo").startOf("day"))) {
+              return msg.reply("❌ Data inválida: esse dia já passou. Escolha uma data a partir de hoje.");
+            }
+
+            info.novoDia = novoDia;
+            info.novoMes = novoMes;
             info.etapa = "alterar_finalizar_estruturado";
             // Não retorna aqui, deixa o fluxo cair para a próxima etapa
           }
