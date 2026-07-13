@@ -33,7 +33,7 @@ function loadUsers() {
     console.log(`[Users] Banco carregado. Usuários detectados: ${Object.keys(users).join(", ") || "Nenhum"}`);
     return users;
   } catch (err) {
-    console.error("[Users] Erro crítico ao carregar usuários. Retornando vazio para evitar perda de dados.", err);
+    console.error("[ALERTA:persistencia] Erro crítico ao carregar usuários (login.json). Retornando vazio para evitar perda de dados.", err);
     return {};
   }
 }
@@ -44,7 +44,7 @@ function saveUser(user) {
   try {
     fs.writeFileSync(LOGIN_FILE, JSON.stringify(users, null, 2), "utf8");
   } catch (err) {
-    console.error("[Users] Erro ao gravar arquivo de usuários:", err);
+    console.error("[ALERTA:persistencia] Erro ao gravar arquivo de usuários (login.json):", err);
   }
 }
 

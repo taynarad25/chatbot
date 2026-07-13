@@ -60,8 +60,21 @@ function identificarUsuario(contato, numero, isLider) {
  * @param {string[]} deps.lideres - números de telefone com acesso às opções de líder
  * @param {object} deps.etapas - mapa mutável "número -> estado da conversa", compartilhado entre reconexões
  * @param {(inicio: string, fim: string, agendaId?: string) => Promise<object[]>} deps.buscarEventos
+ * @param {() => object[]} [deps.listLideres] - retorna os líderes cadastrados no painel ({ nome, telefone }),
+ *   usado para identificar o solicitante nos resumos de evento pelo nome cadastrado (não o nome do contato salvo no celular)
  */
-function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapas, buscarEventos }) {
+function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapas, buscarEventos, listLideres = () => [] }) {
+  // Identifica o solicitante de um evento (criar/alterar/cancelar) pelo nome
+  // cadastrado no painel de líderes, já que o nome salvo no celular do líder
+  // (nomeContato) pode divergir do nome oficial usado pela secretaria. Sem
+  // correspondência (ou nome cadastrado vazio), cai de volta no nome do contato.
+  function nomeSolicitante(contato, numero) {
+    const numeroDigitos = String(numero).replace(/\D/g, "");
+    const lider = listLideres().find((l) => numeroDigitos.includes(l.telefone));
+    if (lider && lider.nome && lider.nome.trim()) return lider.nome.trim();
+    return nomeContato(contato, numero);
+  }
+
   // Busca, filtra e entrega a listagem de agenda para um período, deixando o
   // fluxo pronto para receber o número de um item na próxima mensagem.
   async function entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg) {
@@ -82,7 +95,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
       return msg.reply(montarMensagemAgenda(itens, tituloPeriodo));
     } catch (e) {
-      console.error(`Erro ao buscar agenda para ${mascararTelefone(numero)}:`, e);
+      console.error(`[ALERTA:google-calendar] Erro ao buscar agenda para ${mascararTelefone(numero)}:`, e);
       delete etapas[numero];
       return msg.reply("⚠️ Erro ao carregar agenda.");
     }
@@ -92,26 +105,31 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
   // aprovação pro grupo da secretaria. Compartilhado pelos dois caminhos de
   // busca de data (por dia da semana + horário, ou por data específica).
   async function finalizarNovoAgendamento({ msg, numero, contato, info, dataFinal, isLider }) {
-    const dataFormatada = moment(dataFinal).format("DD/MM");
-    const resumo = `✅ *Solicitação de Agendamento*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}\n*Data:* ${dataFormatada}\n*Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+    try {
+      const dataFormatada = moment(dataFinal).format("DD/MM");
+      const resumo = `✅ *Solicitação de Agendamento*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}\n*Data:* ${dataFormatada}\n*Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
 
-    const dadosAgendamento = {
-      solicitanteId: numero,
-      evento: info.nome,
-      local: info.local,
-      rede: info.rede,
-      dia: dataFinal.getDate(),
-      mes: dataFinal.getMonth() + 1,
-      horarioInicio: info.horarioInicio,
-      horarioFim: info.horarioFim,
-      isDiaInteiro: info.isDiaInteiro,
-    };
-    const codigo = salvarPendente(dadosAgendamento);
-    const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
-    await notificarSecretaria(client, resumoGrupo);
+      const dadosAgendamento = {
+        solicitanteId: numero,
+        evento: info.nome,
+        local: info.local,
+        rede: info.rede,
+        dia: dataFinal.getDate(),
+        mes: dataFinal.getMonth() + 1,
+        horarioInicio: info.horarioInicio,
+        horarioFim: info.horarioFim,
+        isDiaInteiro: info.isDiaInteiro,
+      };
+      const codigo = salvarPendente(dadosAgendamento);
+      const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
+      await notificarSecretaria(client, resumoGrupo);
 
-    console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
-    await msg.reply(resumo);
+      console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
+      await msg.reply(resumo);
+    } catch (e) {
+      console.error(`[ALERTA:persistencia] Erro ao registrar solicitação de agendamento para ${identificarUsuario(contato, numero, isLider)}:`, e);
+      await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
+    }
   }
 
   return async function handleMessage(msg) {
@@ -157,7 +175,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   console.log(`[Secretaria] Agendamento automático realizado para ${mascararTelefone(solicitanteId)}`);
                   return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
                 } catch (err) {
-                  console.error("[Secretaria] Erro no agendamento automático:", err);
+                  console.error("[ALERTA:google-calendar] Erro no agendamento automático:", err);
                   return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                 }
               } else {
@@ -167,7 +185,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await client.sendMessage(solicitanteId, feedback);
                   console.log(`[Secretaria] Feedback de recusa enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Líder notificado sobre a recusa.`);
               }
@@ -200,7 +218,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                     console.log(`[Secretaria] Alteração automática aplicada para ${mascararTelefone(solicitanteId)}`);
                     return msg.reply(`✅ Alteração aplicada na agenda e líder notificado.`);
                   } catch (err) {
-                    console.error("[Secretaria] Erro ao aplicar alteração automática:", err);
+                    console.error("[ALERTA:google-calendar] Erro ao aplicar alteração automática:", err);
                     return msg.reply("❌ Erro ao aplicar a alteração na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                   }
                 }
@@ -211,7 +229,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await client.sendMessage(solicitanteId, feedback);
                   console.log(`[Secretaria] Feedback de alteração aprovada enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração.`);
               } else {
@@ -221,7 +239,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await client.sendMessage(solicitanteId, feedback);
                   console.log(`[Secretaria] Feedback de alteração recusada enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a recusa da alteração.`);
               }
@@ -248,7 +266,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   console.log(`[Secretaria] Cancelamento automático realizado para ${mascararTelefone(solicitanteId)}`);
                   return msg.reply(`✅ Evento cancelado na agenda e líder notificado.`);
                 } catch (err) {
-                  console.error("[Secretaria] Erro no cancelamento automático:", err);
+                  console.error("[ALERTA:google-calendar] Erro no cancelamento automático:", err);
                   return msg.reply("❌ Erro ao cancelar o evento na agenda do Google. A permissão ou conflito impediu a exclusão automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                 }
               } else {
@@ -258,7 +276,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await client.sendMessage(solicitanteId, feedback);
                   console.log(`[Secretaria] Feedback de manutenção de evento enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback de manutenção para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de manutenção para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Líder notificado que o evento foi mantido.`);
               }
@@ -326,12 +344,12 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               info.acaoEvento = "alterar";
               info.etapa = "alterar_departamento";
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou alteração de evento.`);
-              return msg.reply(`De qual departamento é o evento que deseja alterar?\n\n${montarListaRedes()}`);
+              return msg.reply(`🏢 De qual departamento é o evento que deseja alterar?\n\n${montarListaRedes()}`);
             } else if (msg.body === "3") {
               info.acaoEvento = "cancelar";
               info.etapa = "alterar_departamento";
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou cancelamento de evento.`);
-              return msg.reply(`De qual departamento é o evento que deseja cancelar?\n\n${montarListaRedes()}`);
+              return msg.reply(`🏢 De qual departamento é o evento que deseja cancelar?\n\n${montarListaRedes()}`);
             } else {
               return msg.reply("❌ Opção inválida. Digite 1 para Agendar, 2 para Alterar ou 3 para Cancelar.");
             }
@@ -347,11 +365,13 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             try {
               const agora = moment.tz("America/Sao_Paulo");
-              const inicioAno = agora.clone().startOf('year').subtract(1, 'minute').format();
+              // Começa em "hoje", não no início do ano — um evento que já passou não
+              // pode ser alterado nem cancelado (precisaria virar um agendamento novo).
+              const inicioBusca = agora.clone().startOf('day').subtract(1, 'minute').format();
               const fimAno = agora.clone().endOf('year').format();
 
               // Busca eventos especificamente na agenda do departamento selecionado
-              const filtrados = await buscarEventos(inicioAno, fimAno, info.calendarIdBusca);
+              const filtrados = await buscarEventos(inicioBusca, fimAno, info.calendarIdBusca);
 
               if (filtrados.length === 0) {
                 delete etapas[numero];
@@ -369,7 +389,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               });
               return msg.reply(lista);
             } catch (e) {
-              console.error(e);
+              console.error("[ALERTA:google-calendar] Erro ao buscar eventos para alterar/cancelar:", e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao buscar eventos.");
             }
@@ -396,21 +416,26 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               return msg.reply("❌ Cancelamento não confirmado. Digite *SIM* para confirmar, ou *menu* para desistir.");
             }
 
-            const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
-            const dadosCancelamento = {
-              solicitanteId: numero,
-              evento: info.eventoParaAlterar.summary,
-              eventId: info.eventoParaAlterar.id,
-              calendarId: info.calendarIdBusca,
-            };
+            try {
+              const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
+              const dadosCancelamento = {
+                solicitanteId: numero,
+                evento: info.eventoParaAlterar.summary,
+                eventId: info.eventoParaAlterar.id,
+                calendarId: info.calendarIdBusca,
+              };
 
-            const resumo = `🗑️ *Solicitação de Cancelamento*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data:* ${dataOriginal.format("DD/MM")}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
-            const codigoCancelamento = salvarPendente(dadosCancelamento);
-            const resumoGrupo = `🗑️ *PEDIDO DE CANCELAMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data:* ${dataOriginal.format("DD/MM")}\n\n_Responda a este resumo com "cancelar evento" para confirmar o cancelamento, ou "manter evento" para negar._\n\n_Código: ${codigoCancelamento}_`;
-            await notificarSecretaria(client, resumoGrupo);
+              const resumo = `🗑️ *Solicitação de Cancelamento*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data:* ${dataOriginal.format("DD/MM")}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+              const codigoCancelamento = salvarPendente(dadosCancelamento);
+              const resumoGrupo = `🗑️ *PEDIDO DE CANCELAMENTO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data:* ${dataOriginal.format("DD/MM")}\n\n_Responda a este resumo com "cancelar evento" para confirmar o cancelamento, ou "manter evento" para negar._\n\n_Código: ${codigoCancelamento}_`;
+              await notificarSecretaria(client, resumoGrupo);
 
-            console.log(`Cancelamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
-            await msg.reply(resumo);
+              console.log(`Cancelamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
+              await msg.reply(resumo);
+            } catch (e) {
+              console.error(`[ALERTA:persistencia] Erro ao registrar solicitação de cancelamento para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
+            }
             delete etapas[numero];
             return;
           }
@@ -442,7 +467,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             }
             if (opcao === "5") {
               info.etapa = "alterar_detalhes";
-              return msg.reply(`Descreva a alteração que você precisa (Ex: Mudar horário para 20h, alterar data para o dia seguinte, etc):`);
+              return msg.reply(`📝 Descreva a alteração que você precisa (Ex: Mudar horário para 20h, alterar data para o dia seguinte, etc):`);
             }
             return msg.reply("❌ Opção inválida. Escolha um número de 1 a 5.");
           }
@@ -474,8 +499,22 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const match = msg.body.trim().match(DATA_REGEX);
             if (!match) return msg.reply("❌ Formato inválido. Use DD/MM (ex: 25/12).");
 
-            info.novoDia = parseInt(match[1]);
-            info.novoMes = parseInt(match[2]);
+            const novoDia = parseInt(match[1]);
+            const novoMes = parseInt(match[2]);
+            // A nova data herda o ano do evento original (mesma regra de
+            // montarResourcePatchAlteracao), então valida contra esse ano — não o atual.
+            const anoOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo").year();
+            const novaDataTeste = moment.tz(`${novoDia}/${novoMes}/${anoOriginal}`, "D/M/YYYY", "America/Sao_Paulo");
+
+            if (!novaDataTeste.isValid() || novaDataTeste.date() !== novoDia) {
+              return msg.reply("❌ Data inválida. Use DD/MM (ex: 25/12).");
+            }
+            if (novaDataTeste.isBefore(moment.tz("America/Sao_Paulo").startOf("day"))) {
+              return msg.reply("❌ Data inválida: esse dia já passou. Escolha uma data a partir de hoje.");
+            }
+
+            info.novoDia = novoDia;
+            info.novoMes = novoMes;
             info.etapa = "alterar_finalizar_estruturado";
             // Não retorna aqui, deixa o fluxo cair para a próxima etapa
           }
@@ -493,63 +532,74 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           }
 
           if (info.etapa === "alterar_finalizar_estruturado") {
-            const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
+            try {
+              const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
 
-            const dadosAlteracao = {
-              solicitanteId: numero,
-              evento: info.eventoParaAlterar.summary,
-              eventId: info.eventoParaAlterar.id,
-              calendarId: info.calendarIdBusca,
-              campo: info.campoAlterado,
-              isDiaInteiroOriginal: !info.eventoParaAlterar.start.dateTime,
-              inicioOriginal: info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date,
-              fimOriginal: info.eventoParaAlterar.end.dateTime || info.eventoParaAlterar.end.date,
-            };
+              const dadosAlteracao = {
+                solicitanteId: numero,
+                evento: info.eventoParaAlterar.summary,
+                eventId: info.eventoParaAlterar.id,
+                calendarId: info.calendarIdBusca,
+                campo: info.campoAlterado,
+                isDiaInteiroOriginal: !info.eventoParaAlterar.start.dateTime,
+                inicioOriginal: info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date,
+                fimOriginal: info.eventoParaAlterar.end.dateTime || info.eventoParaAlterar.end.date,
+              };
 
-            let descricaoMudanca;
-            if (info.campoAlterado === "horario") {
-              descricaoMudanca = `Novo horário: ${info.novoHorarioInicio} - ${info.novoHorarioFim}`;
-              dadosAlteracao.novoHorarioInicio = info.novoHorarioInicio;
-              dadosAlteracao.novoHorarioFim = info.novoHorarioFim;
-            } else if (info.campoAlterado === "data") {
-              descricaoMudanca = `Nova data: ${info.novoDia}/${info.novoMes}`;
-              dadosAlteracao.novoDia = info.novoDia;
-              dadosAlteracao.novoMes = info.novoMes;
-            } else if (info.campoAlterado === "nome") {
-              descricaoMudanca = `Novo nome: ${info.novoNome}`;
-              dadosAlteracao.novoNome = info.novoNome;
-            } else if (info.campoAlterado === "local") {
-              descricaoMudanca = `Novo local: ${info.novoLocal}`;
-              dadosAlteracao.novoLocal = info.novoLocal;
+              let descricaoMudanca;
+              if (info.campoAlterado === "horario") {
+                descricaoMudanca = `Novo horário: ${info.novoHorarioInicio} - ${info.novoHorarioFim}`;
+                dadosAlteracao.novoHorarioInicio = info.novoHorarioInicio;
+                dadosAlteracao.novoHorarioFim = info.novoHorarioFim;
+              } else if (info.campoAlterado === "data") {
+                descricaoMudanca = `Nova data: ${info.novoDia}/${info.novoMes}`;
+                dadosAlteracao.novoDia = info.novoDia;
+                dadosAlteracao.novoMes = info.novoMes;
+              } else if (info.campoAlterado === "nome") {
+                descricaoMudanca = `Novo nome: ${info.novoNome}`;
+                dadosAlteracao.novoNome = info.novoNome;
+              } else if (info.campoAlterado === "local") {
+                descricaoMudanca = `Novo local: ${info.novoLocal}`;
+                dadosAlteracao.novoLocal = info.novoLocal;
+              }
+
+              const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.format("DD/MM")}\n*Mudança:* ${descricaoMudanca}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+              const codigoAlteracao = salvarPendente(dadosAlteracao);
+              const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.format("DD/MM")}\n📝 *Mudança:* ${descricaoMudanca}\n\n_Responda a este resumo com "alterar evento" para aplicar automaticamente na agenda, ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracao}_`;
+              await notificarSecretaria(client, resumoGrupo);
+
+              console.log(`Alteração estruturada solicitada por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
+              await msg.reply(resumo);
+            } catch (e) {
+              console.error(`[ALERTA:persistencia] Erro ao registrar solicitação de alteração para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
             }
-
-            const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginal.format("DD/MM")}\n*Mudança:* ${descricaoMudanca}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
-            const codigoAlteracao = salvarPendente(dadosAlteracao);
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginal.format("DD/MM")}\n📝 *Mudança:* ${descricaoMudanca}\n\n_Responda a este resumo com "alterar evento" para aplicar automaticamente na agenda, ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracao}_`;
-            await notificarSecretaria(client, resumoGrupo);
-
-            console.log(`Alteração estruturada solicitada por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
-            await msg.reply(resumo);
             delete etapas[numero];
             return;
           }
 
           if (info.etapa === "alterar_detalhes") {
             info.detalhesAlteracao = msg.body;
-            const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
-            const dataOriginalFmt = dataOriginal.format("DD/MM");
 
-            const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginalFmt}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+            try {
+              const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
+              const dataOriginalFmt = dataOriginal.format("DD/MM");
 
-            const dadosAlteracao = {
-              solicitanteId: numero,
-              evento: info.eventoParaAlterar.summary,
-            };
-            const codigoAlteracaoLivre = salvarPendente(dadosAlteracao);
-            const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "alterar evento" para confirmar ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracaoLivre}_`;
-            await notificarSecretaria(client, resumoGrupo);
+              const resumo = `🔄 *Solicitação de Alteração*\n\n*Evento:* ${info.eventoParaAlterar.summary}\n*Data Original:* ${dataOriginalFmt}\n*Solicitação:* ${info.detalhesAlteracao}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
 
-            await msg.reply(resumo);
+              const dadosAlteracao = {
+                solicitanteId: numero,
+                evento: info.eventoParaAlterar.summary,
+              };
+              const codigoAlteracaoLivre = salvarPendente(dadosAlteracao);
+              const resumoGrupo = `⚠️ *PEDIDO DE ALTERAÇÃO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.summary}\n📆 *Data Atual:* ${dataOriginalFmt}\n📝 *Mudança:* ${info.detalhesAlteracao}\n\n_Responda com "alterar evento" para confirmar ou "não alterar" para recusar._\n\n_Código: ${codigoAlteracaoLivre}_`;
+              await notificarSecretaria(client, resumoGrupo);
+
+              await msg.reply(resumo);
+            } catch (e) {
+              console.error(`[ALERTA:persistencia] Erro ao registrar solicitação de alteração (texto livre) para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
+            }
             delete etapas[numero];
             return;
           }
@@ -565,7 +615,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             info.local = resolverLocalEvento(msg.body);
             console.log(`[Agendamento] Local do evento: ${info.local}`);
             info.etapa = "evento_rede";
-            return msg.reply(`Qual departamento está organizando?\n\n${montarListaRedes()}`);
+            return msg.reply(`🏢 Qual departamento está organizando?\n\n${montarListaRedes()}`);
           }
 
           if (info.etapa === "evento_rede") {
@@ -591,11 +641,11 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const opcao = msg.body.trim();
             if (opcao === "1") {
               info.etapa = "evento_dia_especifico";
-              return msg.reply(`Qual o dia do mês? (Ex: 25, para o dia 25/${String(info.mes).padStart(2, "0")})`);
+              return msg.reply(`📅 Qual o dia do mês? (Ex: 25, para o dia 25/${String(info.mes).padStart(2, "0")})`);
             }
             if (opcao === "2") {
               info.etapa = "evento_tipo_dia";
-              return msg.reply("Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Vários dias / Evento longo");
+              return msg.reply("📅 Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Vários dias / Evento longo");
             }
             return msg.reply("❌ Opção inválida. Digite 1 para escolher uma data específica, ou 2 para ver as datas disponíveis.");
           }
@@ -640,7 +690,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
               return msg.reply(`✅ O dia ${resultado.dataFormatada} está livre!\n\n⏰ *Horários livres nesse dia* (considerando 1h de intervalo antes/depois de outros eventos):\n${listaJanelas}\n\nQual o *horário de início* do seu evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração.`);
             } catch (e) {
-              console.error(`Erro ao verificar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:google-calendar] Erro ao verificar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao acessar a agenda.");
             }
@@ -706,7 +756,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               delete etapas[numero];
               return;
             } catch (e) {
-              console.error(`Erro ao confirmar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:google-calendar] Erro ao confirmar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao acessar a agenda.");
             }
@@ -810,7 +860,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               return msg.reply(montarMensagemDatasDisponiveis(disponiveis, info.mes));
 
             } catch (e) {
-              console.error(`Erro ao consultar agendas para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:google-calendar] Erro ao consultar agendas para ${identificarUsuario(contato, numero, isLider)}:`, e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao acessar a agenda.");
             }
@@ -831,7 +881,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const comunicado = msg.body;
             const resumoUsuario = `📢 *Solicitação de Comunicado Enviada!*\n\nSua mensagem foi encaminhada para a secretaria analisar e incluir nos avisos do culto.\n\nDigite *menu* para voltar ao menu principal.`;
 
-            const resumoGrupo = `📢 *NOVO COMUNICADO PARA O CULTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n📝 *Mensagem:* ${comunicado}`;
+            const resumoGrupo = `📢 *NOVO COMUNICADO PARA O CULTO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📝 *Mensagem:* ${comunicado}`;
             await notificarSecretaria(client, resumoGrupo);
 
             await msg.reply(resumoUsuario);
@@ -982,7 +1032,7 @@ Digite *menu* para voltar ao menu principal.`;
       if (texto === "6" && isLider) {
         console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando agendamento`);
         etapas[numero] = { fluxo: "agendamento", etapa: "evento_acao" };
-        return msg.reply("O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente\n3 - Cancelar evento existente");
+        return msg.reply("📅 O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente\n3 - Cancelar evento existente");
       }
 
       if (texto === "7" && isLider) {
@@ -1004,7 +1054,7 @@ Digite *menu* para voltar ao menu principal.`;
       console.log(`[Mensagem não reconhecida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
       return msg.reply("❓ Não entendi sua mensagem. Digite *menu* para ver as opções disponíveis.");
     } catch (err) {
-      console.error("[Erro Fatal no Listener de Mensagens]:", err);
+      console.error("[ALERTA:fatal] Erro Fatal no Listener de Mensagens:", err);
     }
   };
 }

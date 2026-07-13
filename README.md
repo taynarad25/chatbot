@@ -43,14 +43,17 @@ Pergunta nome e dias/horários disponíveis, depois envia um resumo para o grupo
    - **Evento de dia inteiro:** bloqueia (e é bloqueado por) qualquer outro evento no mesmo dia.
    - **Conflito de horário:** eventos com hora marcada têm uma margem de segurança de **1 hora** antes e depois — um evento que termina às 20h bloqueia novos agendamentos até as 21h no mesmo local de calendário.
    - **Exceção da Rede Ruach:** entre os sábados livres do mês, o último fica automaticamente reservado só para a Rede Ruach.
+   - **Data no passado:** um dia anterior a hoje nunca aparece como disponível (caminho "2") nem é aceito como data específica (caminho "1") — mesma regra já aplicada à busca de agenda por período personalizado (opção 2).
 4. O bot notifica o grupo **"Mensagens Secretaria"** com um resumo e pede que respondam, **como resposta (reply) a essa mensagem**, **"marcar evento"** (grava automaticamente na agenda do Google certa, e avisa o solicitante) ou **"não marcar"** (só avisa o solicitante da recusa).
 
 #### Alterar evento existente
 
-1. Escolhe o departamento → o bot lista até 15 próximos eventos daquela agenda no ano corrente → escolhe o evento → escolhe **o que mudar**: Horário, Data, Nome do evento, Local, ou "Outra alteração" (texto livre, para o que não encaixar nas opções estruturadas).
+1. Escolhe o departamento → o bot lista até 15 próximos eventos daquela agenda **a partir de hoje** até o fim do ano corrente → escolhe o evento → escolhe **o que mudar**: Horário, Data, Nome do evento, Local, ou "Outra alteração" (texto livre, para o que não encaixar nas opções estruturadas).
 2. O bot notifica o grupo **"Mensagens Secretaria"**, que responde, **como resposta (reply) a essa mensagem**, **"alterar evento"** (aprova) ou **"não alterar"** (recusa) — o solicitante é notificado da decisão.
    - Para as 4 opções estruturadas (horário/data/nome/local), a aprovação **já aplica a mudança automaticamente** na Google Agenda (via `calendar.events.patch`), sem precisar editar manualmente.
    - Para "Outra alteração" (texto livre), como o bot não interpreta o texto com segurança, a edição continua sendo feita manualmente pela secretaria depois de aprovar.
+   - **Evento que já passou:** nunca aparece na lista pra escolher — não dá pra alterar nem cancelar um evento que já aconteceu, isso precisa virar um agendamento novo (opção 1).
+   - **Nova data no passado:** ao escolher "Data" como o que mudar, uma data anterior a hoje é recusada como **data inválida** ("❌ Data inválida: esse dia já passou. Escolha uma data a partir de hoje."), mesma lógica de "Agendar novo evento".
 
 #### Cancelar evento existente
 
@@ -67,7 +70,25 @@ Esse grupo do WhatsApp é o canal central de aprovação: toda solicitação (ag
 
 ⚠️ **As respostas "marcar evento"/"não marcar", "alterar evento"/"não alterar" e "cancelar evento"/"manter evento" só funcionam quando enviadas como resposta (reply/citação) à mensagem original do bot** — segure/deslize na mensagem do bot no grupo e escolha "Responder" antes de digitar. Digitar como uma mensagem solta, sem responder, é ignorado silenciosamente (o bot não avisa que não entendeu).
 
+Nas solicitações que só líderes podem fazer — **agendar, alterar ou cancelar evento** e **comunicado para o culto** —, o campo "Solicitante" mostra o nome cadastrado do líder na aba "Líderes" do painel (não o nome/apelido salvo no celular dele) — evita depender de como cada líder configurou o próprio perfil do WhatsApp. Sem um líder cadastrado com esse telefone (ou com o nome em branco), cai de volta no nome do contato salvo no celular do próprio bot. Já o pedido de atendimento (opção 5, aberto a qualquer pessoa) continua usando o nome do contato, já que quem manda pode não ser um líder cadastrado.
+
 Cada mensagem de pedido termina com um código curto (ex: `_Código: A3F9_`), que é como o bot sabe qual solicitação está sendo respondida — os dados completos ficam guardados em `pendentes.json` (veja abaixo), não na mensagem em si, então o texto visível pode mudar livremente sem afetar o processamento. Isso também é o que permite ter **várias solicitações pendentes ao mesmo tempo**: cada uma tem seu próprio código, e a secretaria responde à mensagem específica que quer decidir. Depois de aprovada ou recusada, a solicitação é removida de `pendentes.json` — responder de novo à mesma mensagem (exceto logo após um erro ao gravar no Google Calendar, quando a solicitação é mantida de propósito pra permitir tentar de novo) avisa que não encontrou mais nada pendente ali.
+
+### Grupo "Alertas"
+
+Grupo do WhatsApp separado do "Mensagens Secretaria" — em vez de pedidos pra aprovar, recebe avisos automáticos de **falhas operacionais críticas** do próprio bot (não erros de uso, tipo senha errada ou uma data inválida digitada por um líder — esses continuam só no log, sem virar alerta).
+
+Categorias que geram alerta hoje:
+- `google-calendar` — falha ao consultar ou gravar/alterar/cancelar um evento no Google Calendar.
+- `persistencia` — falha ao ler ou gravar `pendentes.json`, `lideres.json`, `login.json` ou `bot_state.json` (ex: o bug de bind mount virando diretório, veja aviso acima).
+- `secretaria` — falha ao notificar o grupo "Mensagens Secretaria" (o pedido não conseguiu nem chegar lá).
+- `whatsapp` — falha ao enviar uma mensagem direta de volta pro solicitante (feedback de aprovação/recusa).
+- `web` — erro 500 no painel de controle.
+- `fatal` — exceção não tratada ou promessa rejeitada sem `.catch()` (o tipo de erro que faria o processo cair sem avisar ninguém).
+
+Pra evitar spam quando a mesma falha se repete várias vezes seguidas (ex: Google Calendar fora do ar por alguns minutos), o bot manda **no máximo 1 alerta por categoria a cada 10 minutos** — categorias diferentes não se bloqueiam entre si. Se o grupo "Alertas" não existir no WhatsApp, o bot só loga um aviso (`[Aviso] Grupo 'Alertas' não encontrado...`) e segue funcionando normalmente — crie um grupo chamado exatamente **"Alertas"** e adicione o número do bot nele pra habilitar.
+
+Tecnicamente, isso funciona interceptando globalmente todo `console.error(...)` do processo (em `bot/chatbot.js`) e checando se a mensagem começa com a tag `[ALERTA:categoria]` — só os `console.error` já revisados e marcados manualmente com essa tag disparam um alerta; qualquer outro `console.error` novo que for adicionado ao código continua só indo pro log (`combined.log`) até alguém decidir que ele também merece a tag.
 
 ### Painel de controle web
 
@@ -96,6 +117,7 @@ bot/                            domínio do bot de WhatsApp
   disponibilidade.js            cálculo de disponibilidade para agendamento (Opção 6)
   redes.js                      mapeamento único "rede -> agenda do Google"
   secretaria.js                 notificação do grupo "Mensagens Secretaria"
+  alertas.js                    notificação do grupo "Alertas" (falhas operacionais críticas), com deduplicação por categoria
   agendamentoAutomatico.js      monta o "resource" (criação/patch) enviado à API do Google Calendar
   pendentesAprovacao.js         solicitações aguardando aprovação da secretaria (pendentes.json), identificadas por um código curto na mensagem do grupo
 web.js                          servidor HTTP do painel de controle
@@ -126,6 +148,7 @@ Arquivos necessários (não versionados, veja `.gitignore`):
 - `pendentes.json` — solicitações aguardando aprovação da secretaria (veja "Grupo Mensagens Secretaria" acima); veja `pendentes.json.example`.
 
 ⚠️ **`login.json`, `lideres.json` e `pendentes.json` precisam existir na raiz do projeto *antes* do primeiro `docker compose up`** (copie os `.example` correspondentes, ex: `cp pendentes.json.example pendentes.json`). O `docker-compose.bot.yml` monta os três como bind mount de arquivo — se o arquivo não existir no host nesse momento, o Docker cria um **diretório** vazio no lugar dele dentro do container, e o bot nunca mais consegue ler/gravar nada ali (as edições/solicitações parecem "sumir" a cada redeploy, porque o container é recriado do zero e o "arquivo" nunca foi de fato o volume persistido). Se você já rodou o bot antes desse mount existir, confira se cada um é mesmo um arquivo (`ls -la pendentes.json`) antes de subir de novo.
+- Se isso acontecer com `pendentes.json` especificamente (o mais recente dos três), o líder que estava agendando/alterando/cancelando um evento recebe **"⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes."** no WhatsApp — mensagem que só aparece exatamente quando `salvarPendente()` falha (arquivo quebrado, sem permissão de escrita, etc.), diferente de **"⚠️ Erro ao acessar a agenda."**, que é sobre uma falha ao ler o Google Calendar. Corrija o arquivo (ver acima) e peça pro líder tentar de novo — essa tentativa não ficou salva em nenhum lugar.
 
 ⚠️ **Permissão de escrita**: o container roda como usuário `node` (não-root, veja `Dockerfile`), então `login.json`, `lideres.json` e `pendentes.json` no host precisam ser graváveis por ele. Se você criou o arquivo como root (`sudo`, ou logado como root no servidor), o container pode não conseguir gravar nele. Se aparecer erro de permissão ao editar líderes/usuários pelo painel, ou ao aprovar/recusar uma solicitação no grupo:
 ```bash

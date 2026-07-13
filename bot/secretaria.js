@@ -22,7 +22,7 @@ async function notificarSecretaria(client, mensagem) {
     console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_SECRETARIA}'.`);
     return true;
   } catch (error) {
-    console.error("[Erro] Falha ao enviar notificação para o grupo:", error);
+    console.error("[ALERTA:secretaria] Falha ao enviar notificação para o grupo 'Mensagens Secretaria':", error);
     return false;
   }
 }

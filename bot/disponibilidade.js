@@ -16,6 +16,8 @@ const DIAS_SEMANA_ABREV = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
  *    a Ruach — outras redes não podem escolhê-lo (a lista de disponíveis perde o último
  *    item, ou fica vazia se só havia um).
  *
+ * @param {moment.Moment} [deps.agora] - momento de referência para "hoje" (dias antes disso
+ *   nunca ficam disponíveis); parametrizável só para permitir testes determinísticos.
  * @returns {{ disponiveis: Date[], conflito: object|null }} conflito guarda apenas o
  *   primeiro conflito encontrado (na ordem cronológica), para a mensagem de erro.
  */
@@ -29,6 +31,7 @@ function calcularDisponibilidade({
   horarioInicio, // "HH:MM", ignorado se isDiaInteiro
   horarioFim, // "HH:MM", ignorado se isDiaInteiro
   rede,
+  agora = moment.tz("America/Sao_Paulo"),
 }) {
   let firstConflictDetails = null;
 
@@ -39,10 +42,14 @@ function calcularDisponibilidade({
     .filter(isSabadoLivreEvangelismo)
     .map((ev) => moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf("day").format("YYYY-MM-DD"));
 
+  const hojeSP = agora.clone().startOf("day");
+
   let diasPossiveis = [];
   let dataCursor = new Date(ano, mes - 1, 1);
   while (dataCursor.getMonth() === mes - 1) {
-    if (diaSemanaFiltro === "TODOS" || dataCursor.getDay() === diaSemanaFiltro) {
+    const diaCorreto = diaSemanaFiltro === "TODOS" || dataCursor.getDay() === diaSemanaFiltro;
+    const naoPassado = moment(dataCursor).tz("America/Sao_Paulo").startOf("day").isSameOrAfter(hojeSP);
+    if (diaCorreto && naoPassado) {
       diasPossiveis.push(new Date(dataCursor));
     }
     dataCursor.setDate(dataCursor.getDate() + 1);
@@ -172,10 +179,14 @@ function montarMensagemDatasDisponiveis(disponiveis, mes) {
 // inteiro já existente), retornando os eventos do dia pra quem chamou poder
 // sugerir horários livres. Reaproveita a mesma regra de "último sábado
 // reservado pra Ruach" de calcularDisponibilidade, sem duplicar a lógica.
-function verificarDataEspecifica({ eventos, evangelismoCalendarId, ano, mes, dia, rede, isDiaInteiro, horarioInicio, horarioFim }) {
+function verificarDataEspecifica({ eventos, evangelismoCalendarId, ano, mes, dia, rede, isDiaInteiro, horarioInicio, horarioFim, agora = moment.tz("America/Sao_Paulo") }) {
   const dTarget = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo").startOf("day");
   const dTargetFormatted = dTarget.format("YYYY-MM-DD");
   const dataFormatada = dTarget.format("DD/MM");
+
+  if (dTarget.isBefore(agora.clone().startOf("day"))) {
+    return { disponivel: false, motivo: "data_passada", dataFormatada };
+  }
 
   const isSabadoLivreEvangelismo = (ev) =>
     ev.calendarId === evangelismoCalendarId && ev.summary && ev.summary.toLowerCase().includes("sábado livre");
@@ -190,7 +201,7 @@ function verificarDataEspecifica({ eventos, evangelismoCalendarId, ano, mes, dia
 
   if (dTarget.day() === 6 && !rede.toLowerCase().includes("ruach")) {
     const { disponiveis: sabadosDoMes } = calcularDisponibilidade({
-      eventos, evangelismoCalendarId, ano, mes, diaSemanaFiltro: 6, isDiaInteiro: true, rede,
+      eventos, evangelismoCalendarId, ano, mes, diaSemanaFiltro: 6, isDiaInteiro: true, rede, agora,
     });
     const aindaDisponivel = sabadosDoMes.some((d) => moment(d).format("YYYY-MM-DD") === dTargetFormatted);
     if (!aindaDisponivel) {
@@ -296,6 +307,9 @@ function calcularJanelasLivres({ eventosNoDia, ano, mes, dia, inicioDiaHH = 7, f
 function montarMensagemDataEspecificaBloqueada(resultado) {
   const { motivo, conflito, dataFormatada } = resultado;
 
+  if (motivo === "data_passada") {
+    return `❌ O dia ${dataFormatada} já passou. Escolha uma data a partir de hoje, ou digite *menu* para recomeçar.`;
+  }
   if (motivo === "sabado_livre") {
     return `❌ O dia ${dataFormatada} está reservado como "Sábado LIVRE" do Evangelismo. Escolha outro dia, ou digite *menu* para recomeçar.`;
   }
