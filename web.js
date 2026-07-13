@@ -332,7 +332,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not found');
     } catch (globalErr) {
-      console.error(`[Web] 500 Internal Server Error em ${req.url}:`, globalErr);
+      console.error(`[ALERTA:web] 500 Internal Server Error em ${req.url}:`, globalErr);
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, message: 'Erro interno no servidor.' }));
@@ -342,7 +342,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 
   // Captura erros globais do servidor para evitar crash e logar Erro 500
   server.on('error', (err) => {
-    console.error(`[Web] Erro crítico no servidor:`, err);
+    console.error(`[ALERTA:web] Erro crítico no servidor:`, err);
   });
 
   server.listen(port, '0.0.0.0', () => {

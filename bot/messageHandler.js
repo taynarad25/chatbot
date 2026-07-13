@@ -95,7 +95,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
       return msg.reply(montarMensagemAgenda(itens, tituloPeriodo));
     } catch (e) {
-      console.error(`Erro ao buscar agenda para ${mascararTelefone(numero)}:`, e);
+      console.error(`[ALERTA:google-calendar] Erro ao buscar agenda para ${mascararTelefone(numero)}:`, e);
       delete etapas[numero];
       return msg.reply("⚠️ Erro ao carregar agenda.");
     }
@@ -127,7 +127,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
       await msg.reply(resumo);
     } catch (e) {
-      console.error(`Erro ao registrar solicitação de agendamento para ${identificarUsuario(contato, numero, isLider)}:`, e);
+      console.error(`[ALERTA:persistencia] Erro ao registrar solicitação de agendamento para ${identificarUsuario(contato, numero, isLider)}:`, e);
       await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
     }
   }
@@ -175,7 +175,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   console.log(`[Secretaria] Agendamento automático realizado para ${mascararTelefone(solicitanteId)}`);
                   return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
                 } catch (err) {
-                  console.error("[Secretaria] Erro no agendamento automático:", err);
+                  console.error("[ALERTA:google-calendar] Erro no agendamento automático:", err);
                   return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                 }
               } else {
@@ -185,7 +185,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await client.sendMessage(solicitanteId, feedback);
                   console.log(`[Secretaria] Feedback de recusa enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Líder notificado sobre a recusa.`);
               }
@@ -218,7 +218,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                     console.log(`[Secretaria] Alteração automática aplicada para ${mascararTelefone(solicitanteId)}`);
                     return msg.reply(`✅ Alteração aplicada na agenda e líder notificado.`);
                   } catch (err) {
-                    console.error("[Secretaria] Erro ao aplicar alteração automática:", err);
+                    console.error("[ALERTA:google-calendar] Erro ao aplicar alteração automática:", err);
                     return msg.reply("❌ Erro ao aplicar a alteração na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                   }
                 }
@@ -229,7 +229,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await client.sendMessage(solicitanteId, feedback);
                   console.log(`[Secretaria] Feedback de alteração aprovada enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração.`);
               } else {
@@ -239,7 +239,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await client.sendMessage(solicitanteId, feedback);
                   console.log(`[Secretaria] Feedback de alteração recusada enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a recusa da alteração.`);
               }
@@ -266,7 +266,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   console.log(`[Secretaria] Cancelamento automático realizado para ${mascararTelefone(solicitanteId)}`);
                   return msg.reply(`✅ Evento cancelado na agenda e líder notificado.`);
                 } catch (err) {
-                  console.error("[Secretaria] Erro no cancelamento automático:", err);
+                  console.error("[ALERTA:google-calendar] Erro no cancelamento automático:", err);
                   return msg.reply("❌ Erro ao cancelar o evento na agenda do Google. A permissão ou conflito impediu a exclusão automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                 }
               } else {
@@ -276,7 +276,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await client.sendMessage(solicitanteId, feedback);
                   console.log(`[Secretaria] Feedback de manutenção de evento enviado para ${mascararTelefone(solicitanteId)}`);
                 } catch (sendErr) {
-                  console.error(`[Secretaria] Erro ao enviar feedback de manutenção para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de manutenção para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Líder notificado que o evento foi mantido.`);
               }
@@ -389,7 +389,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               });
               return msg.reply(lista);
             } catch (e) {
-              console.error(e);
+              console.error("[ALERTA:google-calendar] Erro ao buscar eventos para alterar/cancelar:", e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao buscar eventos.");
             }
@@ -433,7 +433,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               console.log(`Cancelamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
               await msg.reply(resumo);
             } catch (e) {
-              console.error(`Erro ao registrar solicitação de cancelamento para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:persistencia] Erro ao registrar solicitação de cancelamento para ${identificarUsuario(contato, numero, isLider)}:`, e);
               await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
             }
             delete etapas[numero];
@@ -571,7 +571,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               console.log(`Alteração estruturada solicitada por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
               await msg.reply(resumo);
             } catch (e) {
-              console.error(`Erro ao registrar solicitação de alteração para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:persistencia] Erro ao registrar solicitação de alteração para ${identificarUsuario(contato, numero, isLider)}:`, e);
               await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
             }
             delete etapas[numero];
@@ -597,7 +597,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
               await msg.reply(resumo);
             } catch (e) {
-              console.error(`Erro ao registrar solicitação de alteração (texto livre) para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:persistencia] Erro ao registrar solicitação de alteração (texto livre) para ${identificarUsuario(contato, numero, isLider)}:`, e);
               await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
             }
             delete etapas[numero];
@@ -690,7 +690,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
               return msg.reply(`✅ O dia ${resultado.dataFormatada} está livre!\n\n⏰ *Horários livres nesse dia* (considerando 1h de intervalo antes/depois de outros eventos):\n${listaJanelas}\n\nQual o *horário de início* do seu evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração.`);
             } catch (e) {
-              console.error(`Erro ao verificar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:google-calendar] Erro ao verificar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao acessar a agenda.");
             }
@@ -756,7 +756,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               delete etapas[numero];
               return;
             } catch (e) {
-              console.error(`Erro ao confirmar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:google-calendar] Erro ao confirmar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao acessar a agenda.");
             }
@@ -860,7 +860,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               return msg.reply(montarMensagemDatasDisponiveis(disponiveis, info.mes));
 
             } catch (e) {
-              console.error(`Erro ao consultar agendas para ${identificarUsuario(contato, numero, isLider)}:`, e);
+              console.error(`[ALERTA:google-calendar] Erro ao consultar agendas para ${identificarUsuario(contato, numero, isLider)}:`, e);
               delete etapas[numero];
               return msg.reply("⚠️ Erro ao acessar a agenda.");
             }
@@ -1054,7 +1054,7 @@ Digite *menu* para voltar ao menu principal.`;
       console.log(`[Mensagem não reconhecida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
       return msg.reply("❓ Não entendi sua mensagem. Digite *menu* para ver as opções disponíveis.");
     } catch (err) {
-      console.error("[Erro Fatal no Listener de Mensagens]:", err);
+      console.error("[ALERTA:fatal] Erro Fatal no Listener de Mensagens:", err);
     }
   };
 }

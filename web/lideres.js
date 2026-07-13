@@ -54,7 +54,7 @@ function loadLideres() {
     sincronizarTelefones(lideres);
     return lideres;
   } catch (err) {
-    console.error("[Lideres] Erro crítico ao carregar líderes. Retornando vazio para evitar perda de dados.", err);
+    console.error("[ALERTA:persistencia] Erro crítico ao carregar líderes (lideres.json). Retornando vazio para evitar perda de dados.", err);
     sincronizarTelefones({});
     return {};
   }

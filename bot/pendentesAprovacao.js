@@ -24,7 +24,7 @@ function loadPendentes() {
     const data = fs.readFileSync(PENDENTES_FILE, "utf8");
     return data.trim() ? JSON.parse(data) : {};
   } catch (err) {
-    console.error("[Pendentes] Erro ao carregar solicitações pendentes. Retornando vazio para evitar perda de dados.", err);
+    console.error("[ALERTA:persistencia] Erro ao carregar solicitações pendentes (pendentes.json). Retornando vazio para evitar perda de dados.", err);
     return {};
   }
 }

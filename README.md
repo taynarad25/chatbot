@@ -74,6 +74,22 @@ Nas solicitações que só líderes podem fazer — **agendar, alterar ou cancel
 
 Cada mensagem de pedido termina com um código curto (ex: `_Código: A3F9_`), que é como o bot sabe qual solicitação está sendo respondida — os dados completos ficam guardados em `pendentes.json` (veja abaixo), não na mensagem em si, então o texto visível pode mudar livremente sem afetar o processamento. Isso também é o que permite ter **várias solicitações pendentes ao mesmo tempo**: cada uma tem seu próprio código, e a secretaria responde à mensagem específica que quer decidir. Depois de aprovada ou recusada, a solicitação é removida de `pendentes.json` — responder de novo à mesma mensagem (exceto logo após um erro ao gravar no Google Calendar, quando a solicitação é mantida de propósito pra permitir tentar de novo) avisa que não encontrou mais nada pendente ali.
 
+### Grupo "Alertas"
+
+Grupo do WhatsApp separado do "Mensagens Secretaria" — em vez de pedidos pra aprovar, recebe avisos automáticos de **falhas operacionais críticas** do próprio bot (não erros de uso, tipo senha errada ou uma data inválida digitada por um líder — esses continuam só no log, sem virar alerta).
+
+Categorias que geram alerta hoje:
+- `google-calendar` — falha ao consultar ou gravar/alterar/cancelar um evento no Google Calendar.
+- `persistencia` — falha ao ler ou gravar `pendentes.json`, `lideres.json`, `login.json` ou `bot_state.json` (ex: o bug de bind mount virando diretório, veja aviso acima).
+- `secretaria` — falha ao notificar o grupo "Mensagens Secretaria" (o pedido não conseguiu nem chegar lá).
+- `whatsapp` — falha ao enviar uma mensagem direta de volta pro solicitante (feedback de aprovação/recusa).
+- `web` — erro 500 no painel de controle.
+- `fatal` — exceção não tratada ou promessa rejeitada sem `.catch()` (o tipo de erro que faria o processo cair sem avisar ninguém).
+
+Pra evitar spam quando a mesma falha se repete várias vezes seguidas (ex: Google Calendar fora do ar por alguns minutos), o bot manda **no máximo 1 alerta por categoria a cada 10 minutos** — categorias diferentes não se bloqueiam entre si. Se o grupo "Alertas" não existir no WhatsApp, o bot só loga um aviso (`[Aviso] Grupo 'Alertas' não encontrado...`) e segue funcionando normalmente — crie um grupo chamado exatamente **"Alertas"** e adicione o número do bot nele pra habilitar.
+
+Tecnicamente, isso funciona interceptando globalmente todo `console.error(...)` do processo (em `bot/chatbot.js`) e checando se a mensagem começa com a tag `[ALERTA:categoria]` — só os `console.error` já revisados e marcados manualmente com essa tag disparam um alerta; qualquer outro `console.error` novo que for adicionado ao código continua só indo pro log (`combined.log`) até alguém decidir que ele também merece a tag.
+
 ### Painel de controle web
 
 Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao servidor:
@@ -101,6 +117,7 @@ bot/                            domínio do bot de WhatsApp
   disponibilidade.js            cálculo de disponibilidade para agendamento (Opção 6)
   redes.js                      mapeamento único "rede -> agenda do Google"
   secretaria.js                 notificação do grupo "Mensagens Secretaria"
+  alertas.js                    notificação do grupo "Alertas" (falhas operacionais críticas), com deduplicação por categoria
   agendamentoAutomatico.js      monta o "resource" (criação/patch) enviado à API do Google Calendar
   pendentesAprovacao.js         solicitações aguardando aprovação da secretaria (pendentes.json), identificadas por um código curto na mensagem do grupo
 web.js                          servidor HTTP do painel de controle

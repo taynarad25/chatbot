@@ -14,6 +14,7 @@ const moment = require("moment-timezone");
 const { google } = require("googleapis");
 const { createMessageHandler } = require("./messageHandler");
 const { telefonesLideres, loadLideres, listLideres } = require("../web/lideres");
+const { notificarAlerta, extrairAlerta } = require("./alertas");
 
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
 // estado persistido e a sessão do WhatsApp (.wwebjs_auth) sempre viveram na
@@ -59,17 +60,33 @@ const logger = (originalFn, ...args) => {
 };
 
 console.log = (...args) => logger(originalLog, ...args);
-console.error = (...args) => logger(originalError, ...args);
+console.error = (...args) => {
+  logger(originalError, ...args);
+
+  // Convenção "[ALERTA:categoria] ..." (veja bot/alertas.js) marca esse
+  // console.error como falha operacional crítica — some dispara um aviso pro
+  // grupo "Alertas" do WhatsApp, separado do log normal. `client` é lido no
+  // momento da chamada (não na definição desse override), então já reflete a
+  // conexão em andamento mesmo sendo atribuído mais abaixo neste arquivo.
+  const alerta = extrairAlerta(args[0]);
+  if (alerta) {
+    const detalhes = args.slice(1)
+      .map((a) => (a instanceof Error ? (a.stack || a.message) : util.format(a)))
+      .filter(Boolean)
+      .join("\n");
+    const mensagem = `🚨 *Alerta do Bot*\n\n${alerta.textoLimpo}${detalhes ? `\n${detalhes}` : ""}\n\n${getTimestamp()}`;
+    notificarAlerta(client, alerta.categoria, mensagem).catch(() => {});
+  }
+};
 console.warn = (...args) => logger(originalWarn, ...args);
 
 // Captura de erros que fariam o processo morrer sem logar
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('[Fatal] Rejeição de promessa não tratada em:', promise, 'motivo:', reason);
+  console.error('[ALERTA:fatal] Rejeição de promessa não tratada em:', promise, 'motivo:', reason);
 });
 
 process.on('uncaughtException', (err) => {
-  console.error('[Fatal] Exceção não capturada:', err);
-  console.error(err.stack);
+  console.error('[ALERTA:fatal] Exceção não capturada:', err);
   // Dá um tempo para o log gravar antes de sair
   setTimeout(() => process.exit(1), 500);
 });
@@ -142,7 +159,7 @@ async function buscarEventos(inicio, fim, agendaId = null) {
         pageToken = res.data.nextPageToken;
       } while (pageToken);
     } catch (e) {
-      console.error(`[Google Calendar] Erro na agenda ${id}:`, e.response?.data || e.message);
+      console.error(`[ALERTA:google-calendar] Erro na agenda ${id}:`, e.response?.data || e.message);
     }
   }
   return todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
@@ -241,11 +258,11 @@ const STATE_FILE = path.join(ROOT_DIR, 'bot_state.json');
 const saveBotState = (active) => {
   try {
     if (fs.existsSync(STATE_FILE) && fs.lstatSync(STATE_FILE).isDirectory()) {
-      return console.error(`[Critical] '${STATE_FILE}' é um diretório. Persistência de estado desativada.`);
+      return console.error(`[ALERTA:persistencia] '${STATE_FILE}' é um diretório. Persistência de estado desativada.`);
     }
     fs.writeFileSync(STATE_FILE, JSON.stringify({ active }), 'utf8');
   } catch (err) {
-    console.error(`[State Error] Falha ao salvar estado: ${err.message}`);
+    console.error(`[ALERTA:persistencia] Falha ao salvar estado (bot_state.json): ${err.message}`);
   }
 };
 
