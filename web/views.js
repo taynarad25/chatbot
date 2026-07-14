@@ -4,6 +4,7 @@ function renderLoginHtml(message = "") {
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login - Controle WhatsApp</title>
+  <link rel="icon" type="image/png" href="/favicon.ico" />
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
@@ -79,6 +80,7 @@ function renderRegisterHtml(message = "") {
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Concluir Cadastro - Controle WhatsApp</title>
+  <link rel="icon" type="image/png" href="/favicon.ico" />
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
     .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
@@ -157,6 +159,7 @@ function renderIndexHtml() {
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Controle WhatsApp</title>
+  <link rel="icon" type="image/png" href="/favicon.ico" />
   <style>
     body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 1rem; background: #f0f2f5; }
     .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.1); }
