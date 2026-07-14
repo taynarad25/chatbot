@@ -937,6 +937,30 @@ test("opção 7 (líder): resumo do comunicado também usa o nome cadastrado no 
 // Grupo "Mensagens Secretaria" — casos de borda
 // ---------------------------------------------------------------------------
 
+test("grupo: msg.getChat() falhando uma vez (soluço passageiro do whatsapp-web.js) tenta de novo e processa normalmente", async () => {
+  const { handleMessage, gruposEnviados } = criarContexto({ eventos: [] });
+
+  let chamadas = 0;
+  const respostas = [];
+  const msg = {
+    from: "120363000000000000@g.us",
+    fromMe: false,
+    hasQuotedMsg: false,
+    body: "qualquer coisa",
+    reply: async (texto) => { respostas.push(texto); return texto; },
+    getChat: async () => {
+      chamadas++;
+      if (chamadas === 1) throw new Error("r: r"); // simula a falha transitória real relatada
+      return { name: "Outro Grupo Qualquer", isGroup: true };
+    },
+  };
+
+  await handleMessage(msg);
+
+  assert.equal(chamadas, 2, "deveria ter tentado getChat() de novo depois da primeira falha");
+  assert.equal(respostas.length, 0, "grupo não é 'Mensagens Secretaria', então segue ignorado normalmente após a retentativa");
+});
+
 test("grupo: mensagens em outros grupos são ignoradas (sem resposta)", async () => {
   const { handleMessage } = criarContexto();
   const msg = criarMsgGrupo({ nomeGrupo: "Outro Grupo Qualquer", body: "marcar evento", quotedBody: "irrelevante" });
