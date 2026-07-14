@@ -122,7 +122,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       try {
         url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       } catch (urlErr) {
-        console.warn(`[Web] URL inválida ou malformada recebida de ${ip}: ${sanitizarParaLog(req.url)}`); // NOSONAR
+        console.warn(`[Web] URL inválida ou malformada recebida de ${sanitizarParaLog(ip)}: ${sanitizarParaLog(req.url)}`); // NOSONAR
         res.writeHead(400, { 'Content-Type': 'text/plain' });
         return res.end('Bad Request: Invalid URL');
       }
@@ -138,13 +138,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           const password = body.password?.trim();
 
           if (loginRateLimiter.isBlocked(ip)) {
-              console.warn(`[Web] Rate limit atingido para o IP: ${ip}`);
+              console.warn(`[Web] Rate limit atingido para o IP: ${sanitizarParaLog(ip)}`); // NOSONAR
               return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
           }
 
           const user = findUser(username);
           if (!user) {
-            console.warn(`[Web] Login falhou: Usuário '${sanitizarParaLog(username)}' não encontrado (IP: ${ip})`); // NOSONAR
+            console.warn(`[Web] Login falhou: Usuário '${sanitizarParaLog(username)}' não encontrado (IP: ${sanitizarParaLog(ip)})`); // NOSONAR
           } else {
             const isPasswordValid = await validatePassword(password, user.salt, user.hash);
             const isActive = (user.status === 'active' || user.status === undefined);
@@ -153,12 +153,12 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
               const token = createSession(username, user.role, user.status);
               loginRateLimiter.reset(ip);
               setSessionCookie(res, token);
-              console.log(`[Web] Login bem-sucedido: ${sanitizarParaLog(username)} (IP: ${ip})`); // NOSONAR
+              console.log(`[Web] Login bem-sucedido: ${sanitizarParaLog(username)} (IP: ${sanitizarParaLog(ip)})`); // NOSONAR
               return sendJson(res, 200, { ok: true });
             } else if (!isPasswordValid) {
-              console.warn(`[Web] Login falhou: Senha incorreta para o usuário '${sanitizarParaLog(username)}' (IP: ${ip}). Verifique o hash no log de Auth.`); // NOSONAR
+              console.warn(`[Web] Login falhou: Senha incorreta para o usuário '${sanitizarParaLog(username)}' (IP: ${sanitizarParaLog(ip)}). Verifique o hash no log de Auth.`); // NOSONAR
             } else {
-              console.warn(`[Web] Login falhou: Usuário '${sanitizarParaLog(username)}' está com status inativo (${user.status}) (IP: ${ip})`); // NOSONAR
+              console.warn(`[Web] Login falhou: Usuário '${sanitizarParaLog(username)}' está com status inativo (${user.status}) (IP: ${sanitizarParaLog(ip)})`); // NOSONAR
             }
           }
           loginRateLimiter.registerFailure(ip);
@@ -173,7 +173,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           res.writeHead(302, { Location: '/login' });
           return res.end();
         }
-        console.warn(`[Web] 401 Acesso negado para ${sanitizarParaLog(pathname)} | IP: ${ip}`); // NOSONAR
+        console.warn(`[Web] 401 Acesso negado para ${sanitizarParaLog(pathname)} | IP: ${sanitizarParaLog(ip)}`); // NOSONAR
         return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
       }
       if (req.method === 'GET' && pathname === '/register') {
