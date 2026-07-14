@@ -6,7 +6,9 @@ Bot de WhatsApp para a secretaria da igreja, com integração à Google Agenda e
 
 ### Menu principal
 
-Qualquer saudação ("oi", "olá", "paz", "bom dia", "boa tarde", "boa noite", "menu"...) reseta a conversa e mostra o menu. O menu tem duas versões: uma para o público geral e outra, com opções extras, para números cadastrados como líder (aba "Líderes" do painel web, veja abaixo).
+Qualquer saudação ("oi", "olá", "paz", "paz do senhor", "bom dia", "boa tarde", "boa noite", "menu"...) reseta a conversa e mostra o menu. O menu tem duas versões: uma para o público geral e outra, com opções extras, para números cadastrados como líder (aba "Líderes" do painel web, veja abaixo).
+
+Mais de uma saudação junta na mesma mensagem também ativa o menu (ex: "Oi, boa tarde" ou "boa tarde a paz"). Mas se a mensagem tiver qualquer coisa além de saudações, ela não ativa o menu — o bot fica em silêncio, já que pode ser uma conversa de verdade com a secretaria (ex: "a paz, boa tarde. vou no ensaio hoje" não aciona nada).
 
 | Opção | Disponível para | O que faz |
 |---|---|---|
