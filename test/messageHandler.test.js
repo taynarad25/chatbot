@@ -146,7 +146,7 @@ test("saudação: usuário comum recebe o menu sem as opções de líder (6 e 7)
 
 test("saudação: variações de texto (paz, bom dia, MENU, oiii) ativam o menu", async () => {
   const { handleMessage } = criarContexto();
-  for (const texto of ["paz", "bom dia", "MENU", "oiii", "a pazzz", "Paz do Senhor", "paz do senhor"]) {
+  for (const texto of ["paz", "bom dia", "MENU", "oiii", "a pazzz", "A paz", "Paz do Senhor", "paz do senhor"]) {
     const respostas = await enviar(handleMessage, NUMERO_COMUM, texto);
     assert.match(respostas[0], /Escolha uma opção/, `"${texto}" deveria acionar o menu`);
   }
