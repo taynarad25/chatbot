@@ -53,6 +53,23 @@ function identificarUsuario(contato, numero, isLider) {
   return `${nomeContato(contato, numero)} | ${mascararTelefone(numero)} (${isLider ? "Líder" : "Usuário"})`;
 }
 
+// msg.getChat() (assim como outras chamadas do whatsapp-web.js que avaliam JS dentro
+// da página do WhatsApp Web via Puppeteer) falha esporadicamente por um soluço passageiro
+// da sessão — sem relação com a mensagem em si. Tenta de novo uma vez, com uma pequena
+// espera, antes de desistir e deixar a mensagem cair no catch de erro fatal.
+async function comRetry(fn, { tentativas = 2, esperaMs = 1500 } = {}) {
+  let ultimoErro;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      ultimoErro = err;
+      if (i < tentativas - 1) await new Promise((resolve) => setTimeout(resolve, esperaMs));
+    }
+  }
+  throw ultimoErro;
+}
+
 /**
  * Monta o handler de mensagens do bot (menu principal + fluxos de conversa).
  * Todas as dependências que envolvem I/O real (WhatsApp, Google Calendar) são
@@ -147,7 +164,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
       // Lógica para mensagens em grupo (Confirmação da Secretaria)
       if (msg.from.endsWith("@g.us")) {
-        const chat = await msg.getChat();
+        const chat = await comRetry(() => msg.getChat());
         // Loga toda mensagem de grupo processada aqui, incluindo se é uma resposta
         // (hasQuotedMsg) — sem isso, uma mensagem solta "marcar evento" (sem usar o
         // "Responder" do WhatsApp) ou um grupo com nome diferente do esperado eram
@@ -1060,7 +1077,7 @@ Digite *menu* para voltar ao menu principal.`;
       console.log(`[Mensagem não reconhecida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
       return msg.reply("❓ Não entendi sua mensagem. Digite *menu* para ver as opções disponíveis.");
     } catch (err) {
-      console.error("[ALERTA:fatal] Erro Fatal no Listener de Mensagens:", err);
+      console.error(`[ALERTA:fatal] Erro Fatal no Listener de Mensagens (de: ${msg?.from ? mascararTelefone(msg.from) : "?"}, id: ${msg?.id?._serialized}):`, err);
     }
   };
 }
