@@ -146,9 +146,25 @@ test("saudação: usuário comum recebe o menu sem as opções de líder (6 e 7)
 
 test("saudação: variações de texto (paz, bom dia, MENU, oiii) ativam o menu", async () => {
   const { handleMessage } = criarContexto();
-  for (const texto of ["paz", "bom dia", "MENU", "oiii", "a pazzz"]) {
+  for (const texto of ["paz", "bom dia", "MENU", "oiii", "a pazzz", "Paz do Senhor", "paz do senhor"]) {
     const respostas = await enviar(handleMessage, NUMERO_COMUM, texto);
     assert.match(respostas[0], /Escolha uma opção/, `"${texto}" deveria acionar o menu`);
+  }
+});
+
+test("saudação: mensagens com mais de uma saudação combinada também ativam o menu", async () => {
+  const { handleMessage } = criarContexto();
+  for (const texto of ["Oi, boa tarde", "boa tarde a Paz", "bom dia e paz"]) {
+    const respostas = await enviar(handleMessage, NUMERO_COMUM, texto);
+    assert.match(respostas[0], /Escolha uma opção/, `"${texto}" deveria acionar o menu`);
+  }
+});
+
+test("saudação: mensagem com texto além da saudação NÃO ativa o menu (pode ser conversa com a secretaria)", async () => {
+  const { handleMessage } = criarContexto();
+  for (const texto of ["a paz, boa tarde. vou no ensaio hoje", "boa tarde! vou chegar mais tarde na reunião"]) {
+    const respostas = await enviar(handleMessage, NUMERO_COMUM, texto);
+    assert.equal(respostas.length, 0, `"${texto}" não deveria gerar resposta nenhuma`);
   }
 });
 
