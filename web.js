@@ -13,6 +13,8 @@ const { getClientIp } = require("./web/clientIp");
 const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
 // Sobrescrevível via env var (usado pelos testes, para nunca ler/limpar o log real de produção).
 const LOG_FILE = process.env.COMBINED_LOG_PATH || path.join(__dirname, "combined.log");
+const FAVICON_FILE = path.join(__dirname, "web", "public", "favicon.png");
+const faviconBuffer = fs.existsSync(FAVICON_FILE) ? fs.readFileSync(FAVICON_FILE) : null;
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -131,6 +133,10 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       // Navegadores pedem isso sozinhos em toda navegação; sem essa rota, cai no
       // fallback de "404 Not Found" e loga um aviso a cada login/troca de página.
       if (pathname === '/favicon.ico') {
+        if (faviconBuffer) {
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+          return res.end(faviconBuffer);
+        }
         res.writeHead(204);
         return res.end();
       }
