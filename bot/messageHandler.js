@@ -10,8 +10,8 @@ const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = requi
 // uma sequência desses átomos (separados por vírgula/ponto/"e"/espaço) pra contar como
 // saudação — assim "Oi, boa tarde" ou "boa tarde a paz" ainda ativam o menu, mas "a paz,
 // boa tarde. vou no ensaio hoje" não ativa, porque sobra texto que não é saudação.
-const SAUDACAO_ATOM = "(?:oi+|ol[aá]+|olla+|a\\s+paz\\s+do\\s+senhor|paz\\s+do\\s+senhor|a\\s+paz+|paz+|bom\\s+dia|boa\\s+tarde|boa\\s+noite|dia+|menu)";
-const SAUDACAO_SEPARADOR = "(?:\\s*[,.!]*\\s*(?:e\\s+)?)";
+const SAUDACAO_ATOM = String.raw`(?:oi+|ol[aá]+|olla+|a\s+paz\s+do\s+senhor|paz\s+do\s+senhor|a\s+paz+|paz+|bom\s+dia|boa\s+tarde|boa\s+noite|dia+|menu)`;
+const SAUDACAO_SEPARADOR = String.raw`(?:\s*[,.!]*\s*(?:e\s+)?)`;
 const SAUDACOES_REGEX = new RegExp(`^${SAUDACAO_SEPARADOR}${SAUDACAO_ATOM}(?:${SAUDACAO_SEPARADOR}${SAUDACAO_ATOM})*${SAUDACAO_SEPARADOR}$`, "i");
 const HORARIO_REGEX = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 const DATA_REGEX = /^([0-2]?[0-9]|3[01])\/(0?[1-9]|1[0-2])$/;
