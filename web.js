@@ -128,6 +128,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       }
       const pathname = url.pathname;
 
+      // Navegadores pedem isso sozinhos em toda navegação; sem essa rota, cai no
+      // fallback de "404 Not Found" e loga um aviso a cada login/troca de página.
+      if (pathname === '/favicon.ico') {
+        res.writeHead(204);
+        return res.end();
+      }
+
       if (req.method === 'GET' && pathname === '/login') {
         return sendHtml(res, renderLoginHtml());   
       }

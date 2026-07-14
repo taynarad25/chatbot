@@ -56,6 +56,11 @@ test("GET /login: retorna a página de login com status 200", async () => {
   assert.match(html, /<form id="loginForm">/);
 });
 
+test("GET /favicon.ico: retorna 204 (sem conteúdo), sem cair no 404", async () => {
+  const res = await fetch(`${baseUrl}/favicon.ico`);
+  assert.equal(res.status, 204);
+});
+
 test("GET /register: retorna a página de cadastro com status 200", async () => {
   const res = await fetch(`${baseUrl}/register`);
   assert.equal(res.status, 200);
