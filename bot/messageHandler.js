@@ -164,7 +164,17 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
       // Lógica para mensagens em grupo (Confirmação da Secretaria)
       if (msg.from.endsWith("@g.us")) {
-        const chat = await comRetry(() => msg.getChat());
+        let chat;
+        try {
+          chat = await comRetry(() => msg.getChat());
+        } catch (err) {
+          // Não é "erro fatal": existem mensagens de grupo cujo chat nunca resolve
+          // de verdade (JID inválido/sintético, sem relação com o fluxo do bot) —
+          // tentar de novo não ajuda nesses casos, então só ignora essa mensagem em
+          // vez de estourar o alerta crítico repetidamente pra algo não-acionável.
+          console.warn(`[Grupo] Não foi possível carregar o chat de uma mensagem (de: ${mascararTelefone(msg.from)}, id: ${msg.id?._serialized}) — ignorando. Detalhe: ${err.message}`);
+          return;
+        }
         // Loga toda mensagem de grupo processada aqui, incluindo se é uma resposta
         // (hasQuotedMsg) — sem isso, uma mensagem solta "marcar evento" (sem usar o
         // "Responder" do WhatsApp) ou um grupo com nome diferente do esperado eram
