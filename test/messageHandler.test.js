@@ -961,6 +961,31 @@ test("grupo: msg.getChat() falhando uma vez (soluço passageiro do whatsapp-web.
   assert.equal(respostas.length, 0, "grupo não é 'Mensagens Secretaria', então segue ignorado normalmente após a retentativa");
 });
 
+test("grupo: msg.getChat() que nunca resolve (JID inválido/sintético) é ignorado sem virar erro fatal", async () => {
+  const { handleMessage } = criarContexto({ eventos: [] });
+
+  let chamadas = 0;
+  const respostas = [];
+  const msg = {
+    from: "12030000000000000043@g.us", // JID estranho, sem chat de verdade por trás
+    fromMe: false,
+    hasQuotedMsg: false,
+    body: "",
+    reply: async (texto) => { respostas.push(texto); return texto; },
+    getChat: async () => {
+      chamadas++;
+      throw new Error("r: r"); // sempre falha, como no caso real relatado em produção
+    },
+  };
+
+  // Não deveria lançar (o catch interno precisa segurar isso antes de chegar no
+  // catch externo, que é o que gera o alerta crítico repetidamente).
+  await assert.doesNotReject(() => handleMessage(msg));
+
+  assert.equal(chamadas, 2, "ainda tenta de novo uma vez, mas desiste depois disso");
+  assert.equal(respostas.length, 0, "não responde nada — a mensagem é só ignorada");
+});
+
 test("grupo: mensagens em outros grupos são ignoradas (sem resposta)", async () => {
   const { handleMessage } = criarContexto();
   const msg = criarMsgGrupo({ nomeGrupo: "Outro Grupo Qualquer", body: "marcar evento", quotedBody: "irrelevante" });
