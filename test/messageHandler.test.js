@@ -938,15 +938,15 @@ test("opção 7 (líder): resumo do comunicado também usa o nome cadastrado no 
 // ---------------------------------------------------------------------------
 
 test("grupo: msg.getChat() falhando uma vez (soluço passageiro do whatsapp-web.js) tenta de novo e processa normalmente", async () => {
-  const { handleMessage, gruposEnviados } = criarContexto({ eventos: [] });
+  const { handleMessage } = criarContexto({ eventos: [] });
 
   let chamadas = 0;
   const respostas = [];
   const msg = {
     from: "120363000000000000@g.us",
     fromMe: false,
-    hasQuotedMsg: false,
-    body: "qualquer coisa",
+    hasQuotedMsg: true, // só chega em getChat() se for resposta a algo E bater uma palavra-chave
+    body: "marcar evento",
     reply: async (texto) => { respostas.push(texto); return texto; },
     getChat: async () => {
       chamadas++;
@@ -969,8 +969,8 @@ test("grupo: msg.getChat() que nunca resolve (JID inválido/sintético) é ignor
   const msg = {
     from: "12030000000000000043@g.us", // JID estranho, sem chat de verdade por trás
     fromMe: false,
-    hasQuotedMsg: false,
-    body: "",
+    hasQuotedMsg: true,
+    body: "marcar evento",
     reply: async (texto) => { respostas.push(texto); return texto; },
     getChat: async () => {
       chamadas++;
@@ -984,6 +984,46 @@ test("grupo: msg.getChat() que nunca resolve (JID inválido/sintético) é ignor
 
   assert.equal(chamadas, 2, "ainda tenta de novo uma vez, mas desiste depois disso");
   assert.equal(respostas.length, 0, "não responde nada — a mensagem é só ignorada");
+});
+
+test("grupo: mensagem comum (não é palavra-chave de aprovação) é ignorada sem chamar getChat() nem logar", async () => {
+  const { handleMessage } = criarContexto({ eventos: [] });
+
+  let chamadasGetChat = 0;
+  const respostas = [];
+  const msg = {
+    from: "120363000000000000@g.us",
+    fromMe: false,
+    hasQuotedMsg: false,
+    body: "Obrigado ♥️\n\nA paz e bom dia",
+    reply: async (texto) => { respostas.push(texto); return texto; },
+    getChat: async () => { chamadasGetChat++; return { name: "DIÁCONOS CURADOS", isGroup: true }; },
+  };
+
+  await handleMessage(msg);
+
+  assert.equal(chamadasGetChat, 0, "não deveria nem tentar carregar o chat pra uma mensagem comum do grupo");
+  assert.equal(respostas.length, 0);
+});
+
+test("grupo: palavra-chave digitada sem usar 'Responder' é ignorada sem chamar getChat()", async () => {
+  const { handleMessage } = criarContexto({ eventos: [] });
+
+  let chamadasGetChat = 0;
+  const respostas = [];
+  const msg = {
+    from: "120363000000000000@g.us",
+    fromMe: false,
+    hasQuotedMsg: false,
+    body: "marcar evento",
+    reply: async (texto) => { respostas.push(texto); return texto; },
+    getChat: async () => { chamadasGetChat++; return { name: "Mensagens Secretaria", isGroup: true }; },
+  };
+
+  await handleMessage(msg);
+
+  assert.equal(chamadasGetChat, 0, "não precisa do nome do chat só pra registrar que a palavra-chave veio sem reply");
+  assert.equal(respostas.length, 0);
 });
 
 test("grupo: mensagens em outros grupos são ignoradas (sem resposta)", async () => {

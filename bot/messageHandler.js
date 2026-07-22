@@ -162,8 +162,33 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         return;
       }
 
-      // Lógica para mensagens em grupo (Confirmação da Secretaria)
+      // Lógica para mensagens em grupo (Confirmação da Secretaria). A imensa maioria
+      // das mensagens em qualquer grupo não tem nada a ver com o bot (conversa normal
+      // do grupo) — pra não gerar log nem chamar getChat() (a parte cara/frágil que já
+      // causou erro por causa de JIDs sintéticos) à toa, só investiga mais a fundo
+      // quando a mensagem é uma resposta (reply) a algo E o texto é uma das palavras-
+      // chave de aprovação conhecidas.
       if (msg.from.endsWith("@g.us")) {
+        const textoMsg = (msg.body || "").toLowerCase().trim();
+        const PALAVRAS_CHAVE_APROVACAO = [
+          "marcar evento", "não marcar",
+          "alterar evento", "não alterar",
+          "cancelar evento", "manter evento",
+        ];
+        const ehPalavraChave = PALAVRAS_CHAVE_APROVACAO.includes(textoMsg);
+
+        if (!ehPalavraChave) {
+          return; // Mensagem comum do grupo, sem relação com o bot — ignora em silêncio
+        }
+
+        if (!msg.hasQuotedMsg) {
+          // Provável esquecimento: a secretaria digitou a palavra-chave certa, mas sem
+          // usar "Responder" na mensagem do bot — não dá pra saber a qual pedido se
+          // refere. Não precisa de getChat() pra registrar esse diagnóstico.
+          console.log(`[Grupo] Palavra-chave "${textoMsg}" digitada sem usar "Responder" (de: ${mascararTelefone(msg.from)}) — ignorada.`);
+          return;
+        }
+
         let chat;
         try {
           chat = await comRetry(() => msg.getChat());
@@ -175,13 +200,9 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           console.warn(`[Grupo] Não foi possível carregar o chat de uma mensagem (de: ${mascararTelefone(msg.from)}, id: ${msg.id?._serialized}) — ignorando. Detalhe: ${err.message}`);
           return;
         }
-        // Loga toda mensagem de grupo processada aqui, incluindo se é uma resposta
-        // (hasQuotedMsg) — sem isso, uma mensagem solta "marcar evento" (sem usar o
-        // "Responder" do WhatsApp) ou um grupo com nome diferente do esperado eram
-        // ignorados em silêncio, sem deixar rastro nenhum no log pra diagnosticar.
+
         console.log(`[Grupo] "${chat.name}" | Resposta a outra mensagem: ${msg.hasQuotedMsg} | Texto: "${msg.body}"`);
-        if (chat.name === "Mensagens Secretaria" && msg.hasQuotedMsg) {
-          const textoMsg = msg.body.toLowerCase().trim();
+        if (chat.name === "Mensagens Secretaria") {
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o resumo enviado pelo bot
