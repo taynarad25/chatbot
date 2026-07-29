@@ -1,6 +1,11 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { encontrarGrupoSecretaria, notificarSecretaria } = require("../bot/secretaria");
+const { 
+  encontrarGrupoSecretaria, 
+  notificarSecretaria, 
+  encontrarGrupoPastoral, 
+  notificarPastoral 
+} = require("../bot/secretaria");
 
 function fakeChat({ isGroup, name }) {
   return { isGroup, name, sendMessage: async () => {} };
@@ -14,6 +19,14 @@ test("encontrarGrupoSecretaria: encontra o grupo pelo nome exato entre vários c
   ];
   const grupo = encontrarGrupoSecretaria(chats);
   assert.equal(grupo.name, "Mensagens Secretaria");
+});
+
+test("encontrarGrupoSecretaria: encontra o grupo mesmo com diferenças de maiúsculas/minúsculas e espaços em branco", () => {
+  const chats = [
+    fakeChat({ isGroup: true, name: "  mensagens secretaria  " }),
+  ];
+  const grupo = encontrarGrupoSecretaria(chats);
+  assert.equal(grupo.name, "  mensagens secretaria  ");
 });
 
 test("encontrarGrupoSecretaria: ignora um chat individual com o mesmo nome (precisa ser grupo)", () => {
@@ -52,5 +65,40 @@ test("notificarSecretaria: retorna false sem lançar erro quando sendMessage fal
   const grupo = { isGroup: true, name: "Mensagens Secretaria", sendMessage: async () => { throw new Error("falha ao enviar"); } };
   const client = { getChats: async () => [grupo] };
   const resultado = await notificarSecretaria(client, "Olá secretaria");
+  assert.equal(resultado, false);
+});
+
+// Atendimento Pastoral Tests
+test("encontrarGrupoPastoral: encontra o grupo pelo nome", () => {
+  const chats = [
+    fakeChat({ isGroup: false, name: "Fulano" }),
+    fakeChat({ isGroup: true, name: "Outro Grupo" }),
+    fakeChat({ isGroup: true, name: "Atendimento Pastoral" }),
+  ];
+  const grupo = encontrarGrupoPastoral(chats);
+  assert.equal(grupo.name, "Atendimento Pastoral");
+});
+
+test("encontrarGrupoPastoral: encontra o grupo mesmo com diferenças de maiúsculas/minúsculas e espaços", () => {
+  const chats = [
+    fakeChat({ isGroup: true, name: "  atendimento pastoral  " }),
+  ];
+  const grupo = encontrarGrupoPastoral(chats);
+  assert.equal(grupo.name, "  atendimento pastoral  ");
+});
+
+test("notificarPastoral: envia a mensagem quando o grupo existe e retorna true", async () => {
+  let mensagemEnviada = null;
+  const grupo = { isGroup: true, name: "Atendimento Pastoral", sendMessage: async (msg) => { mensagemEnviada = msg; } };
+  const client = { getChats: async () => [grupo] };
+
+  const resultado = await notificarPastoral(client, "Olá pastores");
+  assert.equal(resultado, true);
+  assert.equal(mensagemEnviada, "Olá pastores");
+});
+
+test("notificarPastoral: retorna false sem lançar erro quando o grupo não é encontrado", async () => {
+  const client = { getChats: async () => [fakeChat({ isGroup: true, name: "Outro Grupo" })] };
+  const resultado = await notificarPastoral(client, "Olá pastores");
   assert.equal(resultado, false);
 });

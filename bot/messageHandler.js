@@ -2,7 +2,7 @@ const moment = require("moment-timezone");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
 const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
-const { notificarSecretaria } = require("./secretaria");
+const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
 
@@ -174,15 +174,19 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           "marcar evento", "não marcar",
           "alterar evento", "não alterar",
           "cancelar evento", "manter evento",
+          "não confirmar", "recusar",
         ];
-        const ehPalavraChave = PALAVRAS_CHAVE_APROVACAO.includes(textoMsg);
+        let ehPalavraChave = PALAVRAS_CHAVE_APROVACAO.includes(textoMsg);
+        if (!ehPalavraChave) {
+          ehPalavraChave = /^(?:confirmar|confirmado)\b/i.test(msg.body.trim());
+        }
 
         if (!ehPalavraChave) {
           return; // Mensagem comum do grupo, sem relação com o bot — ignora em silêncio
         }
 
         if (!msg.hasQuotedMsg) {
-          // Provável esquecimento: a secretaria digitou a palavra-chave certa, mas sem
+          // Provável esquecimento: a secretaria ou pastor digitou a palavra-chave certa, mas sem
           // usar "Responder" na mensagem do bot — não dá pra saber a qual pedido se
           // refere. Não precisa de getChat() pra registrar esse diagnóstico.
           console.log(`[Grupo] Palavra-chave "${textoMsg}" digitada sem usar "Responder" (de: ${mascararTelefone(msg.from)}) — ignorada.`);
@@ -202,7 +206,8 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         }
 
         console.log(`[Grupo] "${chat.name}" | Resposta a outra mensagem: ${msg.hasQuotedMsg} | Texto: "${msg.body}"`);
-        if (chat.name === "Mensagens Secretaria") {
+        const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
+        if (nomeChatNormalizado === NOME_GRUPO_SECRETARIA.trim().toLowerCase()) {
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o resumo enviado pelo bot
@@ -334,6 +339,44 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 }
                 return msg.reply(`✅ Líder notificado que o evento foi mantido.`);
               }
+            }
+          }
+        } else if (nomeChatNormalizado === NOME_GRUPO_PASTORAL.trim().toLowerCase()) {
+          const quotedMsg = await msg.getQuotedMessage();
+          if (quotedMsg.fromMe) {
+            const codigo = extrairCodigo(quotedMsg.body);
+            const dados = codigo ? buscarPendente(codigo) : null;
+            if (!dados || dados.tipo !== "pastoral") {
+              return msg.reply("❌ Não encontrei essa solicitação de atendimento (código inválido ou já respondido antes).");
+            }
+
+            const { solicitanteId, nome } = dados;
+
+            const matchConfirmar = msg.body.trim().match(/^(?:confirmar|confirmado)\s+(.+)$/i);
+            if (matchConfirmar) {
+              const diaHorario = matchConfirmar[1].trim();
+              removerPendente(codigo);
+
+              const feedback = `Olá! Seu atendimento pastoral foi confirmado para:\n\n🗓️ *${diaHorario}*\n\nQualquer dúvida, entre em contato. Deus abençoe! 🙏\n\nDigite *menu* para voltar ao menu principal.`;
+              try {
+                await client.sendMessage(solicitanteId, feedback);
+                console.log(`[Pastoral] Atendimento confirmado para ${nome} (${mascararTelefone(solicitanteId)}): ${diaHorario}`);
+              } catch (sendErr) {
+                console.error(`[ALERTA:whatsapp] Erro ao enviar confirmação de pastoral para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+              }
+              return msg.reply(`✅ Atendimento de *${nome}* confirmado para *${diaHorario}*. O discípulo foi notificado.`);
+            } else if (textoMsg === "não confirmar" || textoMsg === "recusar") {
+              removerPendente(codigo);
+              const feedback = `Olá! Infelizmente não pudemos confirmar o seu atendimento pastoral para os dias/horários sugeridos. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.`;
+              try {
+                await client.sendMessage(solicitanteId, feedback);
+                console.log(`[Pastoral] Atendimento recusado para ${nome} (${mascararTelefone(solicitanteId)})`);
+              } catch (sendErr) {
+                console.error(`[ALERTA:whatsapp] Erro ao enviar recusa de pastoral para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+              }
+              return msg.reply(`❌ Atendimento de *${nome}* não confirmado e discípulo notificado.`);
+            } else {
+              return msg.reply("❌ Comando inválido para atendimento pastoral. Responda com \"confirmar [dia/horário]\" ou \"não confirmar\".");
             }
           }
         }
@@ -953,8 +996,20 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
           if (info.etapa === "disponibilidade") {
             info.disponibilidade = msg.body;
-            console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${mascararTelefone(numero)}). Disponibilidade: ${info.disponibilidade}`);
-            await msg.reply(`Perfeito! Sua solicitação de atendimento pastoral foi registrada.\n\n👤 *Nome:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\nA secretaria entrará em contato em breve para confirmar o agendamento. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
+            
+            const dadosPastoral = {
+              tipo: "pastoral",
+              solicitanteId: numero,
+              nome: info.nome,
+              disponibilidade: info.disponibilidade,
+            };
+            const codigo = salvarPendente(dadosPastoral);
+
+            const resumoGrupo = `🔔 *NOVA SOLICITAÇÃO DE ATENDIMENTO PASTORAL*\n\n👤 *Discípulo:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\n_Responda a esta mensagem com "confirmar [dia e horário]" (ex: confirmar segunda as 19h) ou "não confirmar" para responder ao discípulo._\n\n_Código: ${codigo}_`;
+            await notificarPastoral(client, resumoGrupo);
+
+            console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${mascararTelefone(numero)}). Código: ${codigo}. Disponibilidade: ${info.disponibilidade}`);
+            await msg.reply(`Perfeito! Sua solicitação de atendimento pastoral foi registrada.\n\n👤 *Nome:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\nA pastoral entrará em contato em breve para confirmar o agendamento. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
             delete etapas[numero];
             return;
           }

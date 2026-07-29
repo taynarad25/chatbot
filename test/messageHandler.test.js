@@ -53,11 +53,18 @@ function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
     sendMessage: async (to, texto) => {
       diretasEnviadas.push({ to, texto });
     },
-    getChats: async () => [{
-      isGroup: true,
-      name: "Mensagens Secretaria",
-      sendMessage: async (texto) => { gruposEnviados.push(texto); },
-    }],
+    getChats: async () => [
+      {
+        isGroup: true,
+        name: "Mensagens Secretaria",
+        sendMessage: async (texto) => { gruposEnviados.push(texto); },
+      },
+      {
+        isGroup: true,
+        name: "Atendimento Pastoral",
+        sendMessage: async (texto) => { gruposEnviados.push(texto); },
+      }
+    ],
   };
 
   const calendar = {
@@ -282,7 +289,7 @@ test("opção 2: período personalizado em formato inválido pede para tentar de
 // Opção 3 — Atendimento pastoral
 // ---------------------------------------------------------------------------
 
-test("opção 3: coleta nome e disponibilidade, notifica a secretaria e encerra o fluxo", async () => {
+test("opção 3: coleta nome e disponibilidade, notifica o grupo de atendimento pastoral e encerra o fluxo", async () => {
   const { handleMessage, etapas, gruposEnviados } = criarContexto();
 
   const r1 = await enviar(handleMessage, NUMERO_COMUM, "3");
@@ -297,8 +304,9 @@ test("opção 3: coleta nome e disponibilidade, notifica a secretaria e encerra 
   assert.match(r3[0], /Terças à tarde/);
 
   assert.equal(etapas[NUMERO_COMUM], undefined);
-  // Atendimento pastoral não notifica o grupo da secretaria (só orienta a pessoa a aguardar contato)
-  assert.equal(gruposEnviados.length, 0);
+  // Atendimento pastoral notifica o grupo "Atendimento Pastoral"
+  assert.equal(gruposEnviados.length, 1);
+  assert.match(gruposEnviados[0], /NOVA SOLICITAÇÃO DE ATENDIMENTO PASTORAL/);
 });
 
 // ---------------------------------------------------------------------------
@@ -1067,4 +1075,107 @@ test("digitar 'menu' no meio de qualquer fluxo reseta a conversa e mostra o menu
   const respostas = await enviar(handleMessage, NUMERO_COMUM, "menu");
   assert.match(respostas[0], /Escolha uma opção/);
   assert.equal(etapas[NUMERO_COMUM], undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Fluxo Pastoral (Opção 3) e aprovação pelo grupo "Atendimento Pastoral"
+// ---------------------------------------------------------------------------
+
+test("opção 3: fluxo de atendimento pastoral completo - solicitação + confirmação pela pastoral", async () => {
+  const { handleMessage, gruposEnviados, diretasEnviadas } = criarContexto();
+
+  // 1. Discípulo inicia o fluxo pastoral
+  const r1 = await enviar(handleMessage, NUMERO_COMUM, "3");
+  assert.match(r1[0], /Qual é o seu \*nome\*/);
+
+  // 2. Discípulo informa o nome
+  const r2 = await enviar(handleMessage, NUMERO_COMUM, "Gabriel");
+  assert.match(r2[0], /informe quais os \*dias e horários\*/);
+
+  // 3. Discípulo informa a disponibilidade
+  const r3 = await enviar(handleMessage, NUMERO_COMUM, "Segunda à noite ou quarta de manhã");
+  assert.match(r3[0], /atendimento pastoral foi registrada/);
+  assert.match(r3[0], /Gabriel/);
+  assert.match(r3[0], /Segunda à noite ou quarta de manhã/);
+
+  // Deve ter notificado o grupo "Atendimento Pastoral"
+  assert.equal(gruposEnviados.length, 1);
+  assert.match(gruposEnviados[0], /NOVA SOLICITAÇÃO DE ATENDIMENTO PASTORAL/);
+  assert.match(gruposEnviados[0], /Gabriel/);
+  assert.match(gruposEnviados[0], /Segunda à noite ou quarta de manhã/);
+
+  const codigo = extrairCodigo(gruposEnviados[0]);
+  assert.ok(codigo);
+
+  // 4. Pastor responde no grupo "Atendimento Pastoral" confirmando o atendimento
+  const msgPastor = criarMsgGrupo({
+    nomeGrupo: "Atendimento Pastoral",
+    body: "confirmar segunda as 19h",
+    quotedBody: gruposEnviados[0],
+  });
+  await handleMessage(msgPastor);
+
+  // Deve ter respondido ao pastor no grupo
+  assert.equal(msgPastor.respostas.length, 1);
+  assert.match(msgPastor.respostas[0], /✅ Atendimento de \*Gabriel\* confirmado para \*segunda as 19h\*/);
+
+  // Deve ter enviado mensagem direta confirmando para o discípulo
+  assert.equal(diretasEnviadas.length, 1);
+  assert.equal(diretasEnviadas[0].to, NUMERO_COMUM);
+  assert.match(diretasEnviadas[0].texto, /atendimento pastoral foi confirmado/);
+  assert.match(diretasEnviadas[0].texto, /segunda as 19h/);
+
+  // Solicitação pendente deve ter sido removida
+  assert.equal(buscarPendente(codigo), null);
+});
+
+test("opção 3: fluxo de atendimento pastoral completo - solicitação + recusa pela pastoral", async () => {
+  const { handleMessage, gruposEnviados, diretasEnviadas } = criarContexto();
+
+  // 1. Discípulo inicia o fluxo pastoral
+  await enviar(handleMessage, NUMERO_COMUM, "3");
+  await enviar(handleMessage, NUMERO_COMUM, "Gabriel");
+  await enviar(handleMessage, NUMERO_COMUM, "Segunda à noite");
+
+  const codigo = extrairCodigo(gruposEnviados[0]);
+  assert.ok(codigo);
+
+  // 2. Pastor responde no grupo "Atendimento Pastoral" recusando
+  const msgPastor = criarMsgGrupo({
+    nomeGrupo: "Atendimento Pastoral",
+    body: "não confirmar",
+    quotedBody: gruposEnviados[0],
+  });
+  await handleMessage(msgPastor);
+
+  // Deve ter respondido ao pastor no grupo
+  assert.equal(msgPastor.respostas.length, 1);
+  assert.match(msgPastor.respostas[0], /❌ Atendimento de \*Gabriel\* não confirmado/);
+
+  // Deve ter enviado mensagem direta para o discípulo informando a recusa
+  assert.equal(diretasEnviadas.length, 1);
+  assert.equal(diretasEnviadas[0].to, NUMERO_COMUM);
+  assert.match(diretasEnviadas[0].texto, /Infelizmente não pudemos confirmar o seu atendimento pastoral/);
+
+  // Solicitação pendente deve ter sido removida
+  assert.equal(buscarPendente(codigo), null);
+});
+
+test("opção 3: fluxo pastoral - comando inválido do pastor avisa no grupo", async () => {
+  const { handleMessage, gruposEnviados, diretasEnviadas } = criarContexto();
+
+  await enviar(handleMessage, NUMERO_COMUM, "3");
+  await enviar(handleMessage, NUMERO_COMUM, "Gabriel");
+  await enviar(handleMessage, NUMERO_COMUM, "Segunda");
+
+  const msgPastor = criarMsgGrupo({
+    nomeGrupo: "Atendimento Pastoral",
+    body: "confirmar",
+    quotedBody: gruposEnviados[0],
+  });
+  await handleMessage(msgPastor);
+
+  assert.equal(msgPastor.respostas.length, 1);
+  assert.match(msgPastor.respostas[0], /❌ Comando inválido/);
+  assert.equal(diretasEnviadas.length, 0); // discipulo não foi notificado de nada ainda
 });
