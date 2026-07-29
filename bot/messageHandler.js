@@ -178,7 +178,12 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         ];
         let ehPalavraChave = PALAVRAS_CHAVE_APROVACAO.includes(textoMsg);
         if (!ehPalavraChave) {
-          ehPalavraChave = /^(?:confirmar|confirmado)\b/i.test(msg.body.trim());
+          const bodyTrimmedLower = (msg.body || "").trim().toLowerCase();
+          ehPalavraChave =
+            bodyTrimmedLower === "confirmar" ||
+            bodyTrimmedLower === "confirmado" ||
+            bodyTrimmedLower.startsWith("confirmar ") ||
+            bodyTrimmedLower.startsWith("confirmado ");
         }
 
         if (!ehPalavraChave) {
@@ -352,9 +357,16 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
             const { solicitanteId, nome } = dados;
 
-            const matchConfirmar = msg.body.trim().match(/^(?:confirmar|confirmado)\s+(.+)$/i);
-            if (matchConfirmar) {
-              const diaHorario = matchConfirmar[1].trim();
+            const bodyTrimmed = msg.body.trim();
+            const bodyLower = bodyTrimmed.toLowerCase();
+            let diaHorario = "";
+            if (bodyLower.startsWith("confirmar ")) {
+              diaHorario = bodyTrimmed.slice("confirmar ".length).trim();
+            } else if (bodyLower.startsWith("confirmado ")) {
+              diaHorario = bodyTrimmed.slice("confirmado ".length).trim();
+            }
+
+            if (diaHorario) {
               removerPendente(codigo);
 
               const feedback = `Olá! Seu atendimento pastoral foi confirmado para:\n\n🗓️ *${diaHorario}*\n\nQualquer dúvida, entre em contato. Deus abençoe! 🙏\n\nDigite *menu* para voltar ao menu principal.`;
