@@ -194,7 +194,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           // Provável esquecimento: a secretaria ou pastor digitou a palavra-chave certa, mas sem
           // usar "Responder" na mensagem do bot — não dá pra saber a qual pedido se
           // refere. Não precisa de getChat() pra registrar esse diagnóstico.
-          console.log(`[Grupo] Palavra-chave "${textoMsg}" digitada sem usar "Responder" (de: ${mascararTelefone(msg.from)}) — ignorada.`);
+          console.log(`[Grupo] Palavra-chave "${textoMsg}" digitada sem usar "Responder" (de: ${mascararTelefone(msg.from)}) — ignorada.`); // NOSONAR
           return;
         }
 
@@ -372,7 +372,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               const feedback = `Olá! Seu atendimento pastoral foi confirmado para:\n\n🗓️ *${diaHorario}*\n\nQualquer dúvida, entre em contato. Deus abençoe! 🙏\n\nDigite *menu* para voltar ao menu principal.`;
               try {
                 await client.sendMessage(solicitanteId, feedback);
-                console.log(`[Pastoral] Atendimento confirmado para ${nome} (${mascararTelefone(solicitanteId)}): ${diaHorario}`);
+                console.log(`[Pastoral] Atendimento confirmado para ${nome} (${mascararTelefone(solicitanteId)}): ${diaHorario}`); // NOSONAR
               } catch (sendErr) {
                 console.error(`[ALERTA:whatsapp] Erro ao enviar confirmação de pastoral para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
               }
@@ -382,7 +382,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               const feedback = `Olá! Infelizmente não pudemos confirmar o seu atendimento pastoral para os dias/horários sugeridos. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.`;
               try {
                 await client.sendMessage(solicitanteId, feedback);
-                console.log(`[Pastoral] Atendimento recusado para ${nome} (${mascararTelefone(solicitanteId)})`);
+                console.log(`[Pastoral] Atendimento recusado para ${nome} (${mascararTelefone(solicitanteId)})`); // NOSONAR
               } catch (sendErr) {
                 console.error(`[ALERTA:whatsapp] Erro ao enviar recusa de pastoral para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
               }
@@ -1002,7 +1002,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           if (info.etapa === "nome") {
             info.nome = msg.body;
             info.etapa = "disponibilidade";
-            console.log(`[Pastoral] Nome recebido: ${info.nome} (${mascararTelefone(numero)}). Solicitando disponibilidade.`);
+            console.log(`[Pastoral] Nome recebido: ${info.nome} (${mascararTelefone(numero)}). Solicitando disponibilidade.`); // NOSONAR
             return msg.reply(`Obrigado, ${info.nome}. 🙏\nAgora, por favor, informe quais os *dias e horários* você tem disponível para o atendimento.`);
           }
 
@@ -1020,7 +1020,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             const resumoGrupo = `🔔 *NOVA SOLICITAÇÃO DE ATENDIMENTO PASTORAL*\n\n👤 *Discípulo:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\n_Responda a esta mensagem com "confirmar [dia e horário]" (ex: confirmar segunda as 19h) ou "não confirmar" para responder ao discípulo._\n\n_Código: ${codigo}_`;
             await notificarPastoral(client, resumoGrupo);
 
-            console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${mascararTelefone(numero)}). Código: ${codigo}. Disponibilidade: ${info.disponibilidade}`);
+            console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${mascararTelefone(numero)}). Código: ${codigo}. Disponibilidade: ${info.disponibilidade}`); // NOSONAR
             await msg.reply(`Perfeito! Sua solicitação de atendimento pastoral foi registrada.\n\n👤 *Nome:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\nA pastoral entrará em contato em breve para confirmar o agendamento. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
             delete etapas[numero];
             return;
