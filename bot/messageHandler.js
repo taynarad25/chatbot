@@ -2,7 +2,7 @@ const moment = require("moment-timezone");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
 const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
-const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo } = require("./secretaria");
+const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
 
@@ -169,6 +169,26 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       // quando a mensagem é uma resposta (reply) a algo E o texto é uma das palavras-
       // chave de aprovação conhecidas.
       if (msg.from.endsWith("@g.us")) {
+        const cachedSecretaria = obterJidCached(NOME_GRUPO_SECRETARIA);
+        const cachedPastoral = obterJidCached(NOME_GRUPO_PASTORAL);
+        let chat = null;
+        let getChatFailed = false;
+
+        if (msg.from !== cachedSecretaria && msg.from !== cachedPastoral) {
+          try {
+            chat = await comRetry(() => msg.getChat());
+            const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
+            if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
+              atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
+            } else if (nomeChatNormalizado.includes(NOME_GRUPO_PASTORAL.trim().toLowerCase())) {
+              atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
+            }
+          } catch (err) {
+            getChatFailed = true;
+            console.warn(`[Grupo] Erro ao obter chat para ler o nome do grupo (${msg.from}):`, err.message);
+          }
+        }
+
         const textoMsg = (msg.body || "").toLowerCase().trim();
         const PALAVRAS_CHAVE_APROVACAO = [
           "marcar evento", "não marcar",
@@ -198,9 +218,14 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           return;
         }
 
-        let chat;
+        if (getChatFailed) {
+          return;
+        }
+
         try {
-          chat = await comRetry(() => msg.getChat());
+          if (!chat) {
+            chat = await comRetry(() => msg.getChat());
+          }
         } catch (err) {
           // Não é "erro fatal": existem mensagens de grupo cujo chat nunca resolve
           // de verdade (JID inválido/sintético, sem relação com o fluxo do bot) —

@@ -133,4 +133,5 @@ module.exports = {
   encontrarGrupoPastoral,
   notificarPastoral,
   atualizarCacheGrupo,
+  obterJidCached,
 };
