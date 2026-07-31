@@ -2,7 +2,7 @@ const moment = require("moment-timezone");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
 const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
-const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL } = require("./secretaria");
+const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
 
@@ -213,6 +213,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         console.log(`[Grupo] "${chat.name}" | Resposta a outra mensagem: ${msg.hasQuotedMsg} | Texto: "${msg.body}"`);
         const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
         if (nomeChatNormalizado === NOME_GRUPO_SECRETARIA.trim().toLowerCase()) {
+          atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
             const quotedMsg = await msg.getQuotedMessage();
             // Verifica se a mensagem respondida é o resumo enviado pelo bot
@@ -347,6 +348,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             }
           }
         } else if (nomeChatNormalizado === NOME_GRUPO_PASTORAL.trim().toLowerCase()) {
+          atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
           const quotedMsg = await msg.getQuotedMessage();
           if (quotedMsg.fromMe) {
             const codigo = extrairCodigo(quotedMsg.body);

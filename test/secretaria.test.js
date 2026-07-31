@@ -1,11 +1,21 @@
-const { test } = require("node:test");
+const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
+const os = require("os");
+const path = require("path");
+const fs = require("fs");
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-secretaria-test-"));
+process.env.GRUPO_IDS_FILE_PATH = path.join(tmpDir, "grupo_ids.json");
+
 const { 
   encontrarGrupoSecretaria, 
   notificarSecretaria, 
   encontrarGrupoPastoral, 
   notificarPastoral 
 } = require("../bot/secretaria");
+
+after(() => {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
 
 function fakeChat({ isGroup, name }) {
   return { isGroup, name, sendMessage: async () => {} };

@@ -12,6 +12,7 @@ const path = require("path");
 const fs = require("fs");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-messagehandler-test-"));
 process.env.PENDENTES_FILE_PATH = path.join(tmpDir, "pendentes.json");
+process.env.GRUPO_IDS_FILE_PATH = path.join(tmpDir, "grupo_ids.json");
 
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
