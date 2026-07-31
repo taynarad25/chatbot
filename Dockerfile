@@ -23,7 +23,7 @@ USER node
 
 # Copia arquivos de dependências com a permissão correta
 COPY --chown=node:node package*.json ./
-RUN npm install --ignore-scripts --omit=dev && npm cache clean --force
+RUN npm ci --ignore-scripts --omit=dev && npm cache clean --force
 
 # Copia só o que o bot precisa em runtime, explicitamente — em vez de "COPY . .",
 # que copiaria o contexto de build inteiro (incluindo test/, .git/ se não fosse
