@@ -13,7 +13,7 @@ jobs:
 
       - name: Install Cloudflare Client
         run: |
-          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          curl -L --proto '=https' --tlsv1.2 --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared.deb
 
       - name: Executar Deploy via SSH
