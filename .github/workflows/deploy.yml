@@ -17,13 +17,16 @@ jobs:
           sudo dpkg -i cloudflared.deb
 
       - name: Executar Deploy via SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          CF_ID: ${{ secrets.CF_CLIENT_ID }}
+          CF_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          
-          CF_COMMAND="cloudflared access tcp --hostname ssh.secretariacasaforte.com.br --service-token-id ${{ secrets.CF_CLIENT_ID }} --service-token-secret ${{ secrets.CF_CLIENT_SECRET }}"
-          
+
+          CF_COMMAND="cloudflared access tcp --hostname ssh.secretariacasaforte.com.br --service-token-id $CF_ID --service-token-secret $CF_SECRET"
           ssh -v -o StrictHostKeyChecking=no \
               -o ConnectTimeout=120 \
               -o ServerAliveInterval=30 \
