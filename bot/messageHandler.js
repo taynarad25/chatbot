@@ -212,7 +212,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
         console.log(`[Grupo] "${chat.name}" | Resposta a outra mensagem: ${msg.hasQuotedMsg} | Texto: "${msg.body}"`);
         const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
-        if (nomeChatNormalizado === NOME_GRUPO_SECRETARIA.trim().toLowerCase()) {
+        if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
           atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
             const quotedMsg = await msg.getQuotedMessage();
@@ -347,7 +347,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               }
             }
           }
-        } else if (nomeChatNormalizado === NOME_GRUPO_PASTORAL.trim().toLowerCase()) {
+        } else if (nomeChatNormalizado.includes(NOME_GRUPO_PASTORAL.trim().toLowerCase())) {
           atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
           const quotedMsg = await msg.getQuotedMessage();
           if (quotedMsg.fromMe) {

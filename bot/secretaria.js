@@ -40,9 +40,9 @@ function obterJidCached(nome) {
   return cache[nome.trim().toLowerCase()] || null;
 }
 
-// Parte pura e testável: dado um array de chats já carregado, encontra o grupo.
 function encontrarGrupoSecretaria(chats) {
-  const grupo = chats.find((chat) => chat.isGroup && chat.name && chat.name.trim().toLowerCase() === NOME_GRUPO_SECRETARIA.trim().toLowerCase()) || null;
+  const target = NOME_GRUPO_SECRETARIA.trim().toLowerCase();
+  const grupo = chats.find((chat) => chat.isGroup && chat.name && chat.name.trim().toLowerCase().includes(target)) || null;
   if (grupo && grupo.id && grupo.id._serialized) {
     atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, grupo.id._serialized);
   }
@@ -50,7 +50,8 @@ function encontrarGrupoSecretaria(chats) {
 }
 
 function encontrarGrupoPastoral(chats) {
-  const grupo = chats.find((chat) => chat.isGroup && chat.name && chat.name.trim().toLowerCase() === NOME_GRUPO_PASTORAL.trim().toLowerCase()) || null;
+  const target = NOME_GRUPO_PASTORAL.trim().toLowerCase();
+  const grupo = chats.find((chat) => chat.isGroup && chat.name && chat.name.trim().toLowerCase().includes(target)) || null;
   if (grupo && grupo.id && grupo.id._serialized) {
     atualizarCacheGrupo(NOME_GRUPO_PASTORAL, grupo.id._serialized);
   }

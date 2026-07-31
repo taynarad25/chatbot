@@ -112,3 +112,19 @@ test("notificarPastoral: retorna false sem lançar erro quando o grupo não é e
   const resultado = await notificarPastoral(client, "Olá pastores");
   assert.equal(resultado, false);
 });
+
+test("encontrarGrupoSecretaria: encontra o grupo contendo emojis ou sufixos/prefixos", () => {
+  const chats = [
+    fakeChat({ isGroup: true, name: "💬 Mensagens Secretaria - Admin" }),
+  ];
+  const grupo = encontrarGrupoSecretaria(chats);
+  assert.equal(grupo.name, "💬 Mensagens Secretaria - Admin");
+});
+
+test("encontrarGrupoPastoral: encontra o grupo contendo emojis ou sufixos/prefixos", () => {
+  const chats = [
+    fakeChat({ isGroup: true, name: "⛪ Atendimento Pastoral ⛪" }),
+  ];
+  const grupo = encontrarGrupoPastoral(chats);
+  assert.equal(grupo.name, "⛪ Atendimento Pastoral ⛪");
+});
