@@ -3,14 +3,14 @@ FROM node:20-slim
 # Instala o Chromium e suas dependências
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
-    procps \
-    libgbm1 \
+    fonts-liberation \
     libasound2 \
+    libatk-bridge2.0-0 \
+    libgbm1 \
+    libgtk-3-0 \
     libnss3 \
     libxss1 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    fonts-liberation \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
@@ -23,7 +23,7 @@ USER node
 
 # Copia arquivos de dependências com a permissão correta
 COPY --chown=node:node package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
+RUN npm install --ignore-scripts --omit=dev && npm cache clean --force
 
 # Copia só o que o bot precisa em runtime, explicitamente — em vez de "COPY . .",
 # que copiaria o contexto de build inteiro (incluindo test/, .git/ se não fosse
