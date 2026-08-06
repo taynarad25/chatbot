@@ -52,11 +52,16 @@ test("encontrarGrupoSecretaria: retorna null quando o grupo não existe", () => 
 
 test("notificarSecretaria: envia a mensagem quando o grupo existe e retorna true", async () => {
   let mensagemEnviada = null;
-  const grupo = { isGroup: true, name: "Mensagens Secretaria", sendMessage: async (msg) => { mensagemEnviada = msg; } };
-  const client = { getChats: async () => [grupo] };
+  let jidDestino = null;
+  const grupo = { id: { _serialized: "120363024838492039@g.us" }, isGroup: true, name: "Mensagens Secretaria" };
+  const client = {
+    getChats: async () => [grupo],
+    sendMessage: async (jid, msg) => { jidDestino = jid; mensagemEnviada = msg; }
+  };
 
   const resultado = await notificarSecretaria(client, "Olá secretaria");
   assert.equal(resultado, true);
+  assert.equal(jidDestino, "120363024838492039@g.us");
   assert.equal(mensagemEnviada, "Olá secretaria");
 });
 
@@ -73,8 +78,11 @@ test("notificarSecretaria: retorna false sem lançar erro quando client.getChats
 });
 
 test("notificarSecretaria: retorna false sem lançar erro quando sendMessage falha", async () => {
-  const grupo = { isGroup: true, name: "Mensagens Secretaria", sendMessage: async () => { throw new Error("falha ao enviar"); } };
-  const client = { getChats: async () => [grupo] };
+  const grupo = { id: { _serialized: "120363024838492039@g.us" }, isGroup: true, name: "Mensagens Secretaria" };
+  const client = {
+    getChats: async () => [grupo],
+    sendMessage: async () => { throw new Error("falha ao enviar"); }
+  };
   const resultado = await notificarSecretaria(client, "Olá secretaria");
   assert.equal(resultado, false);
 });
@@ -100,11 +108,16 @@ test("encontrarGrupoPastoral: encontra o grupo mesmo com diferenças de maiúscu
 
 test("notificarPastoral: envia a mensagem quando o grupo existe e retorna true", async () => {
   let mensagemEnviada = null;
-  const grupo = { isGroup: true, name: "Atendimento Pastoral", sendMessage: async (msg) => { mensagemEnviada = msg; } };
-  const client = { getChats: async () => [grupo] };
+  let jidDestino = null;
+  const grupo = { id: { _serialized: "120363024838492039@g.us" }, isGroup: true, name: "Atendimento Pastoral" };
+  const client = {
+    getChats: async () => [grupo],
+    sendMessage: async (jid, msg) => { jidDestino = jid; mensagemEnviada = msg; }
+  };
 
   const resultado = await notificarPastoral(client, "Olá pastores");
   assert.equal(resultado, true);
+  assert.equal(jidDestino, "120363024838492039@g.us");
   assert.equal(mensagemEnviada, "Olá pastores");
 });
 
@@ -178,3 +191,56 @@ test("obterJidCached: sem variável de ambiente, cai de volta pro arquivo de cac
 
   assert.equal(obterJidCached("Atendimento Pastoral"), "jid-do-arquivo");
 });
+
+test("obterJidCached: JID real do cache tem prioridade sobre código de convite na variável de ambiente", () => {
+  fs.writeFileSync(
+    process.env.GRUPO_IDS_FILE_PATH,
+    JSON.stringify({ "mensagens secretaria": "120363024838492039@g.us" }),
+    "utf8"
+  );
+  process.env.GRUPO_JID_SECRETARIA = "KsHKE5q5BiI81KvJ1ARdUp";
+
+  try {
+    assert.equal(obterJidCached("Mensagens Secretaria"), "120363024838492039@g.us");
+  } finally {
+    delete process.env.GRUPO_JID_SECRETARIA;
+  }
+});
+
+test("notificarSecretaria: resolve o código de convite via getInviteInfo, atualiza o cache e envia mensagem", async () => {
+  fs.writeFileSync(
+    process.env.GRUPO_IDS_FILE_PATH,
+    JSON.stringify({}),
+    "utf8"
+  );
+  process.env.GRUPO_JID_SECRETARIA = "KsHKE5q5BiI81KvJ1ARdUp";
+
+  let getInviteInfoCalled = null;
+  let jidDestino = null;
+  let messageSent = null;
+
+  const client = {
+    getInviteInfo: async (code) => {
+      getInviteInfoCalled = code;
+      return { id: { _serialized: "120363024838492039@g.us" } };
+    },
+    sendMessage: async (jid, msg) => {
+      jidDestino = jid;
+      messageSent = msg;
+    }
+  };
+
+  try {
+    const resultado = await notificarSecretaria(client, "Mensagem secreta");
+    assert.equal(resultado, true);
+    assert.equal(getInviteInfoCalled, "KsHKE5q5BiI81KvJ1ARdUp");
+    assert.equal(jidDestino, "120363024838492039@g.us");
+    assert.equal(messageSent, "Mensagem secreta");
+
+    const cacheData = JSON.parse(fs.readFileSync(process.env.GRUPO_IDS_FILE_PATH, "utf8"));
+    assert.equal(cacheData["mensagens secretaria"], "120363024838492039@g.us");
+  } finally {
+    delete process.env.GRUPO_JID_SECRETARIA;
+  }
+});
+

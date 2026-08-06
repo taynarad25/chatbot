@@ -75,7 +75,7 @@ console.error = (...args) => {
       .filter(Boolean)
       .join("\n");
     const mensagem = `🚨 *Alerta do Bot*\n\n${alerta.textoLimpo}${detalhes ? `\n${detalhes}` : ""}\n\n${getTimestamp()}`;
-    notificarAlerta(client, alerta.categoria, mensagem).catch(() => {});
+    notificarAlerta(client, alerta.categoria, mensagem).catch(() => { });
   }
 };
 console.warn = (...args) => logger(originalWarn, ...args);
@@ -127,7 +127,7 @@ const auth = new google.auth.GoogleAuth({
 
 const calendar = google.calendar({
   version: "v3",
-  auth: auth, 
+  auth: auth,
 });
 
 // Funções auxiliares
@@ -135,7 +135,7 @@ async function buscarEventos(inicio, fim, agendaId = null) {
   let todosEventos = [];
   const agendas = agendaId ? [agendaId] : agendasParaLer;
   console.log(`[Google Calendar] Buscando eventos em ${agendas.length} agenda(s) entre ${inicio} e ${fim}`);
-  
+
   for (const id of agendas) {
     try {
       let pageToken;
@@ -210,12 +210,45 @@ function criarClient() {
     }
   });
 
-  client.on("ready", () => {
+  client.on("ready", async () => {
     clientReady = true;
     pendingQr = null;
     isGeneratingQr = false;
     saveBotState(true); // Salva como ativo apenas quando a conexão é confirmada
     console.log("✅ Bot conectado!");
+
+    try {
+      const inviteSec = "KsHKE5q5BiI81KvJ1ARdUp";
+      const invitePas = "I2AxSM7v9CI211RGWJBX2Y";
+      
+      console.log('=============== RESOLVENDO GRUPOS POR CONVITE ===============');
+      try {
+        const info = await client.getInviteInfo(inviteSec);
+        const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
+        console.log(`NOME: "Mensagens Secretaria"  --->  JID RESOLVIDO: "${jid}"`);
+        if (jid) {
+          const { atualizarCacheGrupo } = require("./secretaria");
+          atualizarCacheGrupo("Mensagens Secretaria", jid);
+        }
+      } catch (err) {
+        console.error("Erro ao resolver convite Secretaria:", err.message);
+      }
+      
+      try {
+        const info = await client.getInviteInfo(invitePas);
+        const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
+        console.log(`NOME: "Atendimento Pastoral"  --->  JID RESOLVIDO: "${jid}"`);
+        if (jid) {
+          const { atualizarCacheGrupo } = require("./secretaria");
+          atualizarCacheGrupo("Atendimento Pastoral", jid);
+        }
+      } catch (err) {
+        console.error("Erro ao resolver convite Pastoral:", err.message);
+      }
+      console.log('=============================================================');
+    } catch (err) {
+      console.error('Erro na rotina de resolução de grupos:', err);
+    }
   });
 
   client.on("authenticated", () => {
@@ -299,7 +332,7 @@ async function startClient() {
   const sessionDir = path.join(ROOT_DIR, ".wwebjs_auth", `session-${clientId}`);
   const profileDir = path.join(sessionDir, "Default");
   const locks = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
-  
+
   [sessionDir, profileDir].forEach(dir => {
     try {
       if (!fs.existsSync(dir)) return;
