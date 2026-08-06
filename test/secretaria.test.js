@@ -6,11 +6,12 @@ const fs = require("fs");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-secretaria-test-"));
 process.env.GRUPO_IDS_FILE_PATH = path.join(tmpDir, "grupo_ids.json");
 
-const { 
-  encontrarGrupoSecretaria, 
-  notificarSecretaria, 
-  encontrarGrupoPastoral, 
-  notificarPastoral 
+const {
+  encontrarGrupoSecretaria,
+  notificarSecretaria,
+  encontrarGrupoPastoral,
+  notificarPastoral,
+  obterJidCached,
 } = require("../bot/secretaria");
 
 after(() => {
@@ -127,4 +128,23 @@ test("encontrarGrupoPastoral: encontra o grupo contendo emojis ou sufixos/prefix
   ];
   const grupo = encontrarGrupoPastoral(chats);
   assert.equal(grupo.name, "⛪ Atendimento Pastoral ⛪");
+});
+
+// Reproduz o bug real de produção: alguém editou grupo_ids.json manualmente e salvou
+// as chaves com o nome "de exibição" (capitalizado), igual ao que aparece no WhatsApp,
+// em vez do formato interno em minúsculo que atualizarCacheGrupo grava. Isso fazia
+// obterJidCached nunca encontrar o JID salvo, e o bot caía sempre no fallback lento
+// via getChats() — que, quando falhava, silenciava o envio da notificação ao grupo.
+test("obterJidCached: encontra o JID mesmo quando o arquivo foi editado manualmente com chaves capitalizadas", () => {
+  fs.writeFileSync(
+    process.env.GRUPO_IDS_FILE_PATH,
+    JSON.stringify({
+      "Atendimento Pastoral": "I2AxSM7v9CI211RGWJBX2Y",
+      "Mensagens Secretaria": "KsHKE5q5BiI81KvJ1ARdUp",
+    }),
+    "utf8"
+  );
+
+  assert.equal(obterJidCached("Mensagens Secretaria"), "KsHKE5q5BiI81KvJ1ARdUp");
+  assert.equal(obterJidCached("Atendimento Pastoral"), "I2AxSM7v9CI211RGWJBX2Y");
 });

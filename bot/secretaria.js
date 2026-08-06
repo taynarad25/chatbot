@@ -6,11 +6,22 @@ const NOME_GRUPO_PASTORAL = "Atendimento Pastoral";
 
 const CACHE_FILE = process.env.GRUPO_IDS_FILE_PATH || path.join(__dirname, "..", "grupo_ids.json");
 
+// Normaliza as chaves para minúsculo/sem espaços nas bordas ao ler: o arquivo é
+// editável manualmente (ex: alguém colando o JID direto, como aconteceu em produção
+// com "Atendimento Pastoral"/"Mensagens Secretaria" capitalizados), mas
+// atualizarCacheGrupo/obterJidCached sempre operam em minúsculo — sem essa
+// normalização, uma chave capitalizada nunca é encontrada e o cache fica sempre
+// "vazio" na prática, fazendo o bot cair sempre no fallback lento de getChats().
 function lerCacheGrupos() {
   try {
     if (!fs.existsSync(CACHE_FILE)) return {};
     const data = fs.readFileSync(CACHE_FILE, "utf8");
-    return data.trim() ? JSON.parse(data) : {};
+    const cache = data.trim() ? JSON.parse(data) : {};
+    const normalizado = {};
+    for (const [chave, valor] of Object.entries(cache)) {
+      normalizado[chave.trim().toLowerCase()] = valor;
+    }
+    return normalizado;
   } catch (err) {
     console.error("[ALERTA:secretaria] Erro ao ler cache de grupos:", err.message);
     return {};
