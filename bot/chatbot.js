@@ -218,15 +218,36 @@ function criarClient() {
     console.log("✅ Bot conectado!");
 
     try {
-      const chats = await client.getChats();
-      const grupos = chats.filter(chat => chat.isGroup);
-      console.log('=============== SEUS GRUPOS E JIDS ===============');
-      grupos.forEach(g => {
-        console.log(`NOME: "${g.name}"  --->  JID: "${g.id._serialized}"`);
-      });
-      console.log('==================================================');
+      const inviteSec = "KsHKE5q5BiI81KvJ1ARdUp";
+      const invitePas = "I2AxSM7v9CI211RGWJBX2Y";
+      
+      console.log('=============== RESOLVENDO GRUPOS POR CONVITE ===============');
+      try {
+        const info = await client.getInviteInfo(inviteSec);
+        const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
+        console.log(`NOME: "Mensagens Secretaria"  --->  JID RESOLVIDO: "${jid}"`);
+        if (jid) {
+          const { atualizarCacheGrupo } = require("./secretaria");
+          atualizarCacheGrupo("Mensagens Secretaria", jid);
+        }
+      } catch (err) {
+        console.error("Erro ao resolver convite Secretaria:", err.message);
+      }
+      
+      try {
+        const info = await client.getInviteInfo(invitePas);
+        const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
+        console.log(`NOME: "Atendimento Pastoral"  --->  JID RESOLVIDO: "${jid}"`);
+        if (jid) {
+          const { atualizarCacheGrupo } = require("./secretaria");
+          atualizarCacheGrupo("Atendimento Pastoral", jid);
+        }
+      } catch (err) {
+        console.error("Erro ao resolver convite Pastoral:", err.message);
+      }
+      console.log('=============================================================');
     } catch (err) {
-      console.error('Erro ao buscar grupos:', err);
+      console.error('Erro na rotina de resolução de grupos:', err);
     }
   });
 
