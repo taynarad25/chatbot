@@ -96,11 +96,11 @@ Tecnicamente, isso funciona interceptando globalmente todo `console.error(...)` 
 
 ### Painel de controle web
 
-Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao servidor:
+Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao servidor. Todo o painel vive sob o prefixo **`/secretaria`** (`/secretaria/login`, `/secretaria`, etc.) — a raiz do site (`/`) fica livre para uma futura landing page institucional, sem exigir login; só rotas dentro de `/secretaria` são protegidas por autenticação.
 
-- **Login** com sessão em cookie (`HttpOnly`, `SameSite=Strict`) e rate limiting de tentativas por IP.
+- **Login** (`/secretaria/login`) com sessão em cookie (`HttpOnly`, `SameSite=Strict`) e rate limiting de tentativas por IP.
 - **Status da conexão:** mostra se o WhatsApp está conectado, gera QR Code para parear, permite cancelar ou desconectar.
-- **Gestão de usuários** (admin): criar usuário (com senha definida na hora, ou como "pendente" para a pessoa definir a própria senha depois via `/register`), listar e excluir.
+- **Gestão de usuários** (admin): criar usuário (com senha definida na hora, ou como "pendente" para a pessoa definir a própria senha depois via `/secretaria/register`), listar e excluir.
 - **Gestão de líderes** (admin): cadastrar, listar, editar e remover líderes (nome + telefone), com filtros de busca por nome (ignora acentos/maiúsculas) e por telefone (aceita um trecho parcial do número). Persistido em `lideres.json`, aplicado ao bot imediatamente, sem precisar reiniciar.
 - **Logs** (admin): visualizar e limpar o arquivo de log combinado do bot.
 
