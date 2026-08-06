@@ -111,7 +111,6 @@ function encontrarGrupoPastoral(chats) {
 // log já "driftadas" entre si — aqui o comportamento fica único e consistente.
 async function notificarSecretaria(client, mensagem) {
   try {
-    let grupo = null;
     let cachedJid = obterJidCached(NOME_GRUPO_SECRETARIA);
 
     if (cachedJid && !cachedJid.includes("@")) {
@@ -134,29 +133,29 @@ async function notificarSecretaria(client, mensagem) {
 
     if (cachedJid && cachedJid.includes("@")) {
       try {
-        grupo = await client.getChatById(cachedJid);
+        await client.sendMessage(cachedJid, mensagem);
+        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_SECRETARIA}' via JID.`);
+        return true;
       } catch (err) {
-        console.warn(`[Aviso] Falha ao carregar grupo 'Mensagens Secretaria' pelo JID cached ${cachedJid}:`, err.message);
+        console.warn(`[Aviso] Falha ao enviar para o grupo 'Mensagens Secretaria' pelo JID cached ${cachedJid}:`, err.message);
       }
     }
 
-    if (!grupo) {
-      try {
-        const chats = await client.getChats();
-        grupo = encontrarGrupoSecretaria(chats);
-      } catch (err) {
-        console.warn("[Aviso] Falha ao obter todos os chats via client.getChats() para 'Mensagens Secretaria':", err.message || err);
+    // Fallback lento/legado em caso de falha no JID direto
+    try {
+      const chats = await client.getChats();
+      const grupo = encontrarGrupoSecretaria(chats);
+      if (grupo && grupo.id && grupo.id._serialized) {
+        await client.sendMessage(grupo.id._serialized, mensagem);
+        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_SECRETARIA}' via fallback de busca.`);
+        return true;
       }
+    } catch (err) {
+      console.warn("[Aviso] Falha ao obter todos os chats via client.getChats() para 'Mensagens Secretaria':", err.message || err);
     }
 
-    if (!grupo) {
-      console.warn(`[Aviso] Grupo '${NOME_GRUPO_SECRETARIA}' não encontrado para envio da notificação.`);
-      return false;
-    }
-
-    await grupo.sendMessage(mensagem);
-    console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_SECRETARIA}'.`);
-    return true;
+    console.warn(`[Aviso] Grupo '${NOME_GRUPO_SECRETARIA}' não encontrado para envio da notificação.`);
+    return false;
   } catch (error) {
     console.error("[ALERTA:secretaria] Falha ao enviar notificação para o grupo 'Mensagens Secretaria':", error);
     return false;
@@ -165,7 +164,6 @@ async function notificarSecretaria(client, mensagem) {
 
 async function notificarPastoral(client, mensagem) {
   try {
-    let grupo = null;
     let cachedJid = obterJidCached(NOME_GRUPO_PASTORAL);
 
     if (cachedJid && !cachedJid.includes("@")) {
@@ -188,29 +186,29 @@ async function notificarPastoral(client, mensagem) {
 
     if (cachedJid && cachedJid.includes("@")) {
       try {
-        grupo = await client.getChatById(cachedJid);
+        await client.sendMessage(cachedJid, mensagem);
+        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_PASTORAL}' via JID.`);
+        return true;
       } catch (err) {
-        console.warn(`[Aviso] Falha ao carregar grupo 'Atendimento Pastoral' pelo JID cached ${cachedJid}:`, err.message);
+        console.warn(`[Aviso] Falha ao enviar para o grupo 'Atendimento Pastoral' pelo JID cached ${cachedJid}:`, err.message);
       }
     }
 
-    if (!grupo) {
-      try {
-        const chats = await client.getChats();
-        grupo = encontrarGrupoPastoral(chats);
-      } catch (err) {
-        console.warn("[Aviso] Falha ao obter todos os chats via client.getChats() para 'Atendimento Pastoral':", err.message || err);
+    // Fallback lento/legado em caso de falha no JID direto
+    try {
+      const chats = await client.getChats();
+      const grupo = encontrarGrupoPastoral(chats);
+      if (grupo && grupo.id && grupo.id._serialized) {
+        await client.sendMessage(grupo.id._serialized, mensagem);
+        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_PASTORAL}' via fallback de busca.`);
+        return true;
       }
+    } catch (err) {
+      console.warn("[Aviso] Falha ao obter todos os chats via client.getChats() para 'Atendimento Pastoral':", err.message || err);
     }
 
-    if (!grupo) {
-      console.warn(`[Aviso] Grupo '${NOME_GRUPO_PASTORAL}' não encontrado para envio da notificação.`);
-      return false;
-    }
-
-    await grupo.sendMessage(mensagem);
-    console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_PASTORAL}'.`);
-    return true;
+    console.warn(`[Aviso] Grupo '${NOME_GRUPO_PASTORAL}' não encontrado para envio da notificação.`);
+    return false;
   } catch (error) {
     console.error("[ALERTA:secretaria] Falha ao enviar notificação para o grupo 'Atendimento Pastoral':", error);
     return false;
