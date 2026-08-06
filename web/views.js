@@ -32,7 +32,7 @@ function renderLoginHtml(message = "") {
         <span id="togglePassword" class="toggle-password">👀</span>
       </div>
       <button type="submit">Entrar</button>
-      <div class="links">Não tem conta? <a href="/register">Cadastre-se</a></div>
+      <div class="links">Não tem conta? <a href="/secretaria/register">Cadastre-se</a></div>
     </form>
   </div>
   <script>
@@ -55,14 +55,14 @@ function renderLoginHtml(message = "") {
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
-      const res = await fetch('/login', {
+      const res = await fetch('/secretaria/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(Object.fromEntries(formData)),
       });
       if (res.ok) {
         console.log('Login bem-sucedido.');
-        window.location.href = '/whatsappcontrol';
+        window.location.href = '/secretaria';
       } else {
         const json = await res.json();
         console.error('Falha no login:', json.message);
@@ -107,7 +107,7 @@ function renderRegisterHtml(message = "") {
       </div>
       <input name="confirmPassword" type="password" placeholder="Confirmar Senha" required minlength="6" />
       <button type="submit">Definir Senha e Entrar</button>
-      <div style="margin-top:1rem; text-align:center;"><a href="/login">Voltar ao login</a></div>
+      <div style="margin-top:1rem; text-align:center;"><a href="/secretaria/login">Voltar ao login</a></div>
     </form>
   </div>
   <script>
@@ -131,7 +131,7 @@ function renderRegisterHtml(message = "") {
         return;
       }
 
-      const res = await fetch('/register', {
+      const res = await fetch('/secretaria/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -141,7 +141,7 @@ function renderRegisterHtml(message = "") {
         console.log('Conta criada com sucesso.');
         msgEl.textContent = json.message || 'Senha definida! Redirecionando...';
         msgEl.className = 'success';
-        setTimeout(() => window.location.href = '/login?message=Conta criada com sucesso!', 2000);
+        setTimeout(() => window.location.href = '/secretaria/login?message=Conta criada com sucesso!', 2000);
       }
       else {
         console.error('Erro no cadastro:', json.message);
@@ -264,18 +264,18 @@ function renderIndexHtml() {
 
     async function refresh() {
       try {
-        const res = await fetch('/status');
-        
+        const res = await fetch('/secretaria/status');
+
         // Se o servidor retornar 401, a sessão expirou ou o servidor reiniciou (limpando a memória)
         if (res.status === 401) {
-          window.location.href = '/login?message=Sessão expirada ou servidor reiniciado.';
+          window.location.href = '/secretaria/login?message=Sessão expirada ou servidor reiniciado.';
           return;
         }
         if (!res.ok) return;
         const json = await res.json();
-        
-        const userRes = await fetch('/api/user-info');
-        if (userRes.status === 401) { window.location.href = '/login'; return; }
+
+        const userRes = await fetch('/secretaria/api/user-info');
+        if (userRes.status === 401) { window.location.href = '/secretaria/login'; return; }
         const userJson = await userRes.json();
         const isAdmin = userJson.ok && userJson.user.role === 'admin';
         document.getElementById('btn-tab-admin').style.display = isAdmin ? 'block' : 'none';
@@ -305,7 +305,7 @@ function renderIndexHtml() {
       document.getElementById('requestQr').style.display = !json.connected && !isWorking ? 'inline-block' : 'none';
 
       if (isAdmin) {
-        fetch('/api/logs')
+        fetch('/secretaria/api/logs')
           .then(r => r.ok ? r.json() : Promise.reject('Erro no servidor'))
           .then(json => {
             const cont = document.getElementById('logsContainer');
@@ -322,7 +322,7 @@ function renderIndexHtml() {
     }
 
     async function fetchUsers() {
-      fetch('/api/admin/users')
+      fetch('/secretaria/api/admin/users')
         .then(r => r.ok ? r.json() : Promise.reject('Erro ao carregar usuários'))
         .then(json => {
           const list = document.getElementById('userList');
@@ -350,7 +350,7 @@ function renderIndexHtml() {
     async function deleteUser(name) {
       if (confirm('Tem certeza que deseja excluir o usuário ' + name + '?')) {
         console.log('Solicitando exclusão do usuário:', name);
-        await fetch('/api/admin/users/'+encodeURIComponent(name), { method: 'DELETE' });
+        await fetch('/secretaria/api/admin/users/'+encodeURIComponent(name), { method: 'DELETE' });
         fetchUsers();
       }
     }
@@ -472,7 +472,7 @@ function renderIndexHtml() {
     document.getElementById('filtroLiderTelefone').addEventListener('input', renderLideres);
 
     async function fetchLideres() {
-      fetch('/api/admin/lideres')
+      fetch('/secretaria/api/admin/lideres')
         .then(r => r.ok ? r.json() : Promise.reject('Erro ao carregar líderes'))
         .then(json => {
           lideresCache = json.lideres || [];
@@ -484,7 +484,7 @@ function renderIndexHtml() {
     async function deleteLider(telefone) {
       if (confirm('Tem certeza que deseja remover o líder ' + telefone + '?')) {
         console.log('Solicitando remoção do líder:', telefone);
-        await fetch('/api/admin/lideres/'+encodeURIComponent(telefone), { method: 'DELETE' });
+        await fetch('/secretaria/api/admin/lideres/'+encodeURIComponent(telefone), { method: 'DELETE' });
         if (liderEmEdicao === telefone) cancelarEdicaoLider();
         fetchLideres();
       }
@@ -514,7 +514,7 @@ function renderIndexHtml() {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target));
       console.log('Tentando adicionar novo usuário:', data.username);
-      const res = await fetch('/api/admin/users', {
+      const res = await fetch('/secretaria/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -541,7 +541,7 @@ function renderIndexHtml() {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target));
       const editando = !!liderEmEdicao;
-      const url = editando ? '/api/admin/lideres/' + encodeURIComponent(liderEmEdicao) : '/api/admin/lideres';
+      const url = editando ? '/secretaria/api/admin/lideres/' + encodeURIComponent(liderEmEdicao) : '/secretaria/api/admin/lideres';
       const method = editando ? 'PUT' : 'POST';
       console.log((editando ? 'Editando líder:' : 'Tentando adicionar novo líder:'), data.nome);
       const res = await fetch(url, {
@@ -569,27 +569,27 @@ function renderIndexHtml() {
 
     document.getElementById('requestQr').onclick = () => {
       console.log('Botão: Solicitar QR Code');
-      fetch('/request-qr', {method:'POST'}).then(refresh);
+      fetch('/secretaria/request-qr', {method:'POST'}).then(refresh);
     };
     document.getElementById('cancelQr').onclick = () => {
       console.log('Botão: Cancelar QR Code');
-      fetch('/cancel-qr', {method:'POST'}).then(refresh);
+      fetch('/secretaria/cancel-qr', {method:'POST'}).then(refresh);
     };
-    document.getElementById('disconnect').onclick = () => { 
+    document.getElementById('disconnect').onclick = () => {
       if(confirm('Desconectar o WhatsApp?')) {
         console.log('Botão: Desconectar');
-        fetch('/disconnect', {method:'POST'}).then(refresh); 
+        fetch('/secretaria/disconnect', {method:'POST'}).then(refresh);
       }
     };
     document.getElementById('logout').onclick = () => {
       console.log('Encerrando sessão...');
-      fetch('/logout', {method:'POST'}).then(() => window.location.href='/login');
+      fetch('/secretaria/logout', {method:'POST'}).then(() => window.location.href='/secretaria/login');
     };
 
     document.getElementById('clearLogsBtn').onclick = async () => {
       if (!confirm('Tem certeza que deseja limpar todos os logs?')) return;
       console.log('Solicitando limpeza de logs...');
-      const res = await fetch('/api/logs', { method: 'DELETE' });
+      const res = await fetch('/secretaria/api/logs', { method: 'DELETE' });
       if (res.ok) {
         console.log('Logs limpos com sucesso.');
         refresh();

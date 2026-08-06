@@ -7,6 +7,7 @@ credenciais-google.json
 login.json
 lideres.json
 pendentes.json
+grupo_ids.json
 *.log
 npm-debug.log*
 .DS_Store

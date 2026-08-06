@@ -41,7 +41,7 @@ function extraiCookie(res) {
 }
 
 async function fazerLogin(username, password) {
-  const res = await fetch(`${baseUrl}/login`, {
+  const res = await fetch(`${baseUrl}/secretaria/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -49,8 +49,8 @@ async function fazerLogin(username, password) {
   return { res, cookie: extraiCookie(res) };
 }
 
-test("GET /login: retorna a página de login com status 200", async () => {
-  const res = await fetch(`${baseUrl}/login`);
+test("GET /secretaria/login: retorna a página de login com status 200", async () => {
+  const res = await fetch(`${baseUrl}/secretaria/login`);
   assert.equal(res.status, 200);
   const html = await res.text();
   assert.match(html, /<form id="loginForm">/);
@@ -64,30 +64,30 @@ test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404", async () => {
   assert.ok(buffer.length > 0, "o favicon deveria ter conteúdo");
 });
 
-test("GET /register: retorna a página de cadastro com status 200", async () => {
-  const res = await fetch(`${baseUrl}/register`);
+test("GET /secretaria/register: retorna a página de cadastro com status 200", async () => {
+  const res = await fetch(`${baseUrl}/secretaria/register`);
   assert.equal(res.status, 200);
 });
 
-test("GET /whatsappcontrol sem sessão: redireciona para /login (302)", async () => {
-  const res = await fetch(`${baseUrl}/whatsappcontrol`, { redirect: "manual" });
+test("GET /secretaria sem sessão: redireciona para /secretaria/login (302)", async () => {
+  const res = await fetch(`${baseUrl}/secretaria`, { redirect: "manual" });
   assert.equal(res.status, 302);
-  assert.match(res.headers.get("location"), /\/login/);
+  assert.match(res.headers.get("location"), /\/secretaria\/login/);
 });
 
-test("POST /disconnect sem sessão: 401 (rota protegida, método não-GET)", async () => {
-  const res = await fetch(`${baseUrl}/disconnect`, { method: "POST" });
+test("POST /secretaria/disconnect sem sessão: 401 (rota protegida, método não-GET)", async () => {
+  const res = await fetch(`${baseUrl}/secretaria/disconnect`, { method: "POST" });
   assert.equal(res.status, 401);
 });
 
-test("POST /login: credenciais de usuário inexistente retorna 401", async () => {
+test("POST /secretaria/login: credenciais de usuário inexistente retorna 401", async () => {
   const { res } = await fazerLogin("usuario-que-nao-existe", "qualquercoisa");
   assert.equal(res.status, 401);
   const json = await res.json();
   assert.equal(json.ok, false);
 });
 
-test("POST /login: username com quebra de linha não injeta uma linha de log falsa (log injection)", async () => {
+test("POST /secretaria/login: username com quebra de linha não injeta uma linha de log falsa (log injection)", async () => {
   const payloadInjecao = "admin\n[Web] Login bem-sucedido: forjado (IP: 1.2.3.4)";
   const chamadas = [];
   const originalWarn = console.warn;
@@ -124,22 +124,22 @@ test("fluxo completo: cria admin, faz login, acessa rota autenticada e rota admi
   assert.ok(cookie, "deveria retornar um cookie de sessão");
   assert.match(cookie, /whatsapp_control_session=/);
 
-  const userInfo = await fetch(`${baseUrl}/api/user-info`, { headers: { Cookie: cookie } });
+  const userInfo = await fetch(`${baseUrl}/secretaria/api/user-info`, { headers: { Cookie: cookie } });
   assert.equal(userInfo.status, 200);
   const userInfoJson = await userInfo.json();
   assert.equal(userInfoJson.user.username, "admin-teste");
   assert.equal(userInfoJson.user.role, "admin");
 
-  const adminUsers = await fetch(`${baseUrl}/api/admin/users`, { headers: { Cookie: cookie } });
+  const adminUsers = await fetch(`${baseUrl}/secretaria/api/admin/users`, { headers: { Cookie: cookie } });
   assert.equal(adminUsers.status, 200);
   const adminUsersJson = await adminUsers.json();
   assert.ok(adminUsersJson.users.some((u) => u.username === "admin-teste"));
 });
 
-test("POST /api/admin/users (como admin): cria um novo usuário pendente", async () => {
+test("POST /secretaria/api/admin/users (como admin): cria um novo usuário pendente", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
 
-  const res = await fetch(`${baseUrl}/api/admin/users`, {
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({ username: "lider-novo", role: "user" }),
@@ -148,13 +148,13 @@ test("POST /api/admin/users (como admin): cria um novo usuário pendente", async
   const json = await res.json();
   assert.equal(json.ok, true);
 
-  const lista = await fetch(`${baseUrl}/api/admin/users`, { headers: { Cookie: cookie } });
+  const lista = await fetch(`${baseUrl}/secretaria/api/admin/users`, { headers: { Cookie: cookie } });
   const listaJson = await lista.json();
   assert.ok(listaJson.users.some((u) => u.username === "lider-novo"));
 });
 
-test("POST /register: usuário pendente consegue definir a senha e concluir o cadastro", async () => {
-  const res = await fetch(`${baseUrl}/register`, {
+test("POST /secretaria/register: usuário pendente consegue definir a senha e concluir o cadastro", async () => {
+  const res = await fetch(`${baseUrl}/secretaria/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username: "lider-novo", password: "outraSenha456" }),
@@ -167,8 +167,8 @@ test("POST /register: usuário pendente consegue definir a senha e concluir o ca
   assert.equal(loginRes.status, 200, "deveria conseguir logar depois de concluir o cadastro");
 });
 
-test("POST /register: usuário desconhecido retorna 404", async () => {
-  const res = await fetch(`${baseUrl}/register`, {
+test("POST /secretaria/register: usuário desconhecido retorna 404", async () => {
+  const res = await fetch(`${baseUrl}/secretaria/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username: "ninguem-criou-esse", password: "senha123" }),
@@ -178,54 +178,54 @@ test("POST /register: usuário desconhecido retorna 404", async () => {
 
 test("usuário comum (não-admin) não consegue acessar rota de admin", async () => {
   const { cookie } = await fazerLogin("lider-novo", "outraSenha456");
-  const res = await fetch(`${baseUrl}/api/admin/users`, { headers: { Cookie: cookie } });
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/users`, { headers: { Cookie: cookie } });
   // isAdmin(req) faz parte da própria condição da rota — sem ser admin, cai no 404 padrão
   assert.equal(res.status, 404);
 });
 
-test("DELETE /api/admin/users/:username (como admin): remove o usuário", async () => {
+test("DELETE /secretaria/api/admin/users/:username (como admin): remove o usuário", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
 
-  const del = await fetch(`${baseUrl}/api/admin/users/lider-novo`, { method: "DELETE", headers: { Cookie: cookie } });
+  const del = await fetch(`${baseUrl}/secretaria/api/admin/users/lider-novo`, { method: "DELETE", headers: { Cookie: cookie } });
   assert.equal(del.status, 200);
 
-  const lista = await fetch(`${baseUrl}/api/admin/users`, { headers: { Cookie: cookie } });
+  const lista = await fetch(`${baseUrl}/secretaria/api/admin/users`, { headers: { Cookie: cookie } });
   const listaJson = await lista.json();
   assert.ok(!listaJson.users.some((u) => u.username === "lider-novo"));
 });
 
-test("DELETE /api/admin/users/:username: usuário inexistente retorna 404 (não finge sucesso)", async () => {
+test("DELETE /secretaria/api/admin/users/:username: usuário inexistente retorna 404 (não finge sucesso)", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
-  const del = await fetch(`${baseUrl}/api/admin/users/ninguem-com-esse-nome`, { method: "DELETE", headers: { Cookie: cookie } });
+  const del = await fetch(`${baseUrl}/secretaria/api/admin/users/ninguem-com-esse-nome`, { method: "DELETE", headers: { Cookie: cookie } });
   assert.equal(del.status, 404);
 });
 
-test("DELETE /api/admin/users/:username: nome com acentuação é decodificado da URL corretamente antes de excluir", async () => {
+test("DELETE /secretaria/api/admin/users/:username: nome com acentuação é decodificado da URL corretamente antes de excluir", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
   await addUser({ username: "Joãozinho", password: "senha123456", role: "user", status: "active" });
 
   // O front-end chama encodeURIComponent(name) — reproduz isso aqui para garantir
   // que o servidor decodifica antes de procurar o usuário.
-  const del = await fetch(`${baseUrl}/api/admin/users/${encodeURIComponent("Joãozinho")}`, { method: "DELETE", headers: { Cookie: cookie } });
+  const del = await fetch(`${baseUrl}/secretaria/api/admin/users/${encodeURIComponent("Joãozinho")}`, { method: "DELETE", headers: { Cookie: cookie } });
   assert.equal(del.status, 200);
 
-  const lista = await fetch(`${baseUrl}/api/admin/users`, { headers: { Cookie: cookie } });
+  const lista = await fetch(`${baseUrl}/secretaria/api/admin/users`, { headers: { Cookie: cookie } });
   const listaJson = await lista.json();
   assert.ok(!listaJson.users.some((u) => u.username === "joãozinho"));
 });
 
-test("GET /api/admin/lideres (como admin): lista vazia quando não há líderes cadastrados", async () => {
+test("GET /secretaria/api/admin/lideres (como admin): lista vazia quando não há líderes cadastrados", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
-  const res = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, { headers: { Cookie: cookie } });
   assert.equal(res.status, 200);
   const json = await res.json();
   assert.deepEqual(json.lideres, []);
 });
 
-test("POST /api/admin/lideres (como admin): adiciona um líder novo", async () => {
+test("POST /secretaria/api/admin/lideres (como admin): adiciona um líder novo", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
 
-  const res = await fetch(`${baseUrl}/api/admin/lideres`, {
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({ nome: "Taynara Diniz", telefone: "+55 (11) 94659-3056" }),
@@ -234,16 +234,16 @@ test("POST /api/admin/lideres (como admin): adiciona um líder novo", async () =
   const json = await res.json();
   assert.equal(json.ok, true);
 
-  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const lista = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, { headers: { Cookie: cookie } });
   const listaJson = await lista.json();
   // O telefone é normalizado (só dígitos) na hora de salvar
   assert.ok(listaJson.lideres.some((l) => l.nome === "Taynara Diniz" && l.telefone === "5511946593056"));
 });
 
-test("POST /api/admin/lideres: telefone duplicado é rejeitado", async () => {
+test("POST /secretaria/api/admin/lideres: telefone duplicado é rejeitado", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
 
-  const res = await fetch(`${baseUrl}/api/admin/lideres`, {
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({ nome: "Outro Nome", telefone: "5511946593056" }),
@@ -253,10 +253,10 @@ test("POST /api/admin/lideres: telefone duplicado é rejeitado", async () => {
   assert.equal(json.ok, false);
 });
 
-test("PUT /api/admin/lideres/:telefone (como admin): edita o nome mantendo o telefone", async () => {
+test("PUT /secretaria/api/admin/lideres/:telefone (como admin): edita o nome mantendo o telefone", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
 
-  const res = await fetch(`${baseUrl}/api/admin/lideres/5511946593056`, {
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/lideres/5511946593056`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({ nome: "Taynara D. Silva", telefone: "5511946593056" }),
@@ -265,40 +265,40 @@ test("PUT /api/admin/lideres/:telefone (como admin): edita o nome mantendo o tel
   const json = await res.json();
   assert.equal(json.ok, true);
 
-  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const lista = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, { headers: { Cookie: cookie } });
   const listaJson = await lista.json();
   assert.ok(listaJson.lideres.some((l) => l.nome === "Taynara D. Silva" && l.telefone === "5511946593056"));
 });
 
-test("PUT /api/admin/lideres/:telefone: também troca o telefone do líder", async () => {
+test("PUT /secretaria/api/admin/lideres/:telefone: também troca o telefone do líder", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
 
-  await fetch(`${baseUrl}/api/admin/lideres`, {
+  await fetch(`${baseUrl}/secretaria/api/admin/lideres`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({ nome: "Temporário", telefone: "5511900000000" }),
   });
 
-  const res = await fetch(`${baseUrl}/api/admin/lideres/5511900000000`, {
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/lideres/5511900000000`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({ nome: "Temporário", telefone: "5511911111111" }),
   });
   assert.equal(res.status, 200);
 
-  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const lista = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, { headers: { Cookie: cookie } });
   const listaJson = await lista.json();
   assert.ok(!listaJson.lideres.some((l) => l.telefone === "5511900000000"));
   assert.ok(listaJson.lideres.some((l) => l.telefone === "5511911111111"));
 
   // Limpeza: remove o líder temporário criado só para este teste, para não
   // interferir nos testes seguintes.
-  await fetch(`${baseUrl}/api/admin/lideres/5511911111111`, { method: "DELETE", headers: { Cookie: cookie } });
+  await fetch(`${baseUrl}/secretaria/api/admin/lideres/5511911111111`, { method: "DELETE", headers: { Cookie: cookie } });
 });
 
-test("PUT /api/admin/lideres/:telefone: líder inexistente retorna 400", async () => {
+test("PUT /secretaria/api/admin/lideres/:telefone: líder inexistente retorna 400", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
-  const res = await fetch(`${baseUrl}/api/admin/lideres/0000000000000`, {
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/lideres/0000000000000`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({ nome: "Ninguem", telefone: "0000000000000" }),
@@ -308,72 +308,77 @@ test("PUT /api/admin/lideres/:telefone: líder inexistente retorna 400", async (
 
 test("usuário comum (não-admin) não consegue acessar rotas de líderes", async () => {
   // Cria um usuário próprio para este teste (em vez de reusar "lider-novo", já
-  // removido pelo teste de DELETE /api/admin/users anterior), evitando depender
+  // removido pelo teste de DELETE /secretaria/api/admin/users anterior), evitando depender
   // da ordem de execução dos testes.
   await addUser({ username: "usuario-comum-lideres", password: "senha123456", role: "user", status: "active" });
   const { cookie } = await fazerLogin("usuario-comum-lideres", "senha123456");
-  const res = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const res = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, { headers: { Cookie: cookie } });
   assert.equal(res.status, 404);
 });
 
-test("DELETE /api/admin/lideres/:telefone (como admin): remove o líder", async () => {
+test("DELETE /secretaria/api/admin/lideres/:telefone (como admin): remove o líder", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
 
-  const del = await fetch(`${baseUrl}/api/admin/lideres/5511946593056`, { method: "DELETE", headers: { Cookie: cookie } });
+  const del = await fetch(`${baseUrl}/secretaria/api/admin/lideres/5511946593056`, { method: "DELETE", headers: { Cookie: cookie } });
   assert.equal(del.status, 200);
 
-  const lista = await fetch(`${baseUrl}/api/admin/lideres`, { headers: { Cookie: cookie } });
+  const lista = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, { headers: { Cookie: cookie } });
   const listaJson = await lista.json();
   assert.ok(!listaJson.lideres.some((l) => l.telefone === "5511946593056"));
 });
 
-test("DELETE /api/admin/lideres/:telefone: líder inexistente retorna 404", async () => {
+test("DELETE /secretaria/api/admin/lideres/:telefone: líder inexistente retorna 404", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
-  const del = await fetch(`${baseUrl}/api/admin/lideres/0000000000000`, { method: "DELETE", headers: { Cookie: cookie } });
+  const del = await fetch(`${baseUrl}/secretaria/api/admin/lideres/0000000000000`, { method: "DELETE", headers: { Cookie: cookie } });
   assert.equal(del.status, 404);
 });
 
-test("GET /api/logs (como admin): lê o arquivo de log isolado do teste", async () => {
+test("GET /secretaria/api/logs (como admin): lê o arquivo de log isolado do teste", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
-  const res = await fetch(`${baseUrl}/api/logs`, { headers: { Cookie: cookie } });
+  const res = await fetch(`${baseUrl}/secretaria/api/logs`, { headers: { Cookie: cookie } });
   assert.equal(res.status, 200);
   const json = await res.json();
   assert.match(json.logs, /linha de log de teste/);
 });
 
-test("DELETE /api/logs (como admin): limpa o arquivo de log isolado do teste", async () => {
+test("DELETE /secretaria/api/logs (como admin): limpa o arquivo de log isolado do teste", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
 
-  const del = await fetch(`${baseUrl}/api/logs`, { method: "DELETE", headers: { Cookie: cookie } });
+  const del = await fetch(`${baseUrl}/secretaria/api/logs`, { method: "DELETE", headers: { Cookie: cookie } });
   assert.equal(del.status, 200);
 
-  const res = await fetch(`${baseUrl}/api/logs`, { headers: { Cookie: cookie } });
+  const res = await fetch(`${baseUrl}/secretaria/api/logs`, { headers: { Cookie: cookie } });
   const json = await res.json();
   assert.equal(json.logs, "");
 });
 
-test("POST /logout: invalida a sessão (rota volta a exigir login)", async () => {
+test("POST /secretaria/logout: invalida a sessão (rota volta a exigir login)", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
-  const logout = await fetch(`${baseUrl}/logout`, { method: "POST", headers: { Cookie: cookie } });
+  const logout = await fetch(`${baseUrl}/secretaria/logout`, { method: "POST", headers: { Cookie: cookie } });
   assert.equal(logout.status, 200);
 
-  // /api/user-info é uma rota GET: sem sessão válida, o gate de autenticação redireciona (302)
-  // para /login em vez de responder 401 — precisa de redirect:"manual" pra não seguir e mascarar
+  // /secretaria/api/user-info é uma rota GET: sem sessão válida, o gate de autenticação redireciona (302)
+  // para /secretaria/login em vez de responder 401 — precisa de redirect:"manual" pra não seguir e mascarar
   // o resultado com o 200 da própria página de login.
-  const depois = await fetch(`${baseUrl}/api/user-info`, { headers: { Cookie: cookie }, redirect: "manual" });
+  const depois = await fetch(`${baseUrl}/secretaria/api/user-info`, { headers: { Cookie: cookie }, redirect: "manual" });
   assert.equal(depois.status, 302);
 });
 
-test("rota desconhecida retorna 404 (quando autenticado, passa pelo gate e cai no fallback)", async () => {
+test("rota desconhecida dentro de /secretaria retorna 404 (quando autenticado, passa pelo gate e cai no fallback)", async () => {
   const { cookie } = await fazerLogin("admin-teste", "senhaSegura123");
-  const res = await fetch(`${baseUrl}/essa-rota-nao-existe`, { headers: { Cookie: cookie } });
+  const res = await fetch(`${baseUrl}/secretaria/essa-rota-nao-existe`, { headers: { Cookie: cookie } });
   assert.equal(res.status, 404);
 });
 
-test("rota desconhecida sem sessão: redireciona para /login (mesmo gate de autenticação, não chega a 404)", async () => {
-  const res = await fetch(`${baseUrl}/essa-rota-nao-existe`, { redirect: "manual" });
+test("rota desconhecida dentro de /secretaria sem sessão: redireciona para /secretaria/login (não chega a 404)", async () => {
+  const res = await fetch(`${baseUrl}/secretaria/essa-rota-nao-existe`, { redirect: "manual" });
   assert.equal(res.status, 302);
-  assert.match(res.headers.get("location"), /\/login/);
+  assert.match(res.headers.get("location"), /\/secretaria\/login/);
+});
+
+test("rota desconhecida fora de /secretaria: 404 direto, sem exigir login (livre para uma futura landing page)", async () => {
+  const res = await fetch(`${baseUrl}/essa-rota-nao-existe`, { redirect: "manual" });
+  assert.equal(res.status, 404, "só o que está sob /secretaria é protegido por login; o resto do site fica livre");
 });
 
 // Deixado por último de propósito: consome o limite de tentativas do rate limiter,
