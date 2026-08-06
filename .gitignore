@@ -11,4 +11,5 @@ pendentes.json
 npm-debug.log*
 .DS_Store
 Thumbs.db
-bot_state.jsongrupo_ids.json
+bot_state.json
+grupo_ids.json
