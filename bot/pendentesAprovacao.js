@@ -1,10 +1,5 @@
-const fs = require("fs");
-const path = require("path");
 const crypto = require("crypto");
-
-// Sobrescrevível via env var (usado pelos testes, para nunca ler/escrever no
-// pendentes.json real de produção).
-const PENDENTES_FILE = process.env.PENDENTES_FILE_PATH || path.join(__dirname, "..", "pendentes.json");
+const db = require("../db");
 
 // Sem O/0, I/1/L — evita confusão visual na secretaria digitando/lendo o código.
 const CARACTERES_CODIGO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -18,54 +13,47 @@ function gerarCodigo() {
   return codigo;
 }
 
-function loadPendentes() {
-  try {
-    if (!fs.existsSync(PENDENTES_FILE)) return {};
-    const data = fs.readFileSync(PENDENTES_FILE, "utf8");
-    return data.trim() ? JSON.parse(data) : {};
-  } catch (err) {
-    console.error("[ALERTA:persistencia] Erro ao carregar solicitações pendentes (pendentes.json). Retornando vazio para evitar perda de dados.", err);
-    return {};
-  }
-}
-
-function salvar(pendentes) {
-  fs.writeFileSync(PENDENTES_FILE, JSON.stringify(pendentes, null, 2), "utf8");
-}
-
 // Salva uma solicitação aguardando aprovação da secretaria e retorna um código
 // curto pra identificar ela na mensagem do grupo — em vez de embutir os dados
 // crus (base64 ilegível) na própria mensagem. Suporta várias solicitações
-// pendentes ao mesmo tempo, cada uma com seu próprio código.
+// pendentes ao mesmo tempo, cada uma com seu próprio código. O payload varia por
+// fluxo (agendamento/alteração/cancelamento/pastoral), por isso fica como JSON
+// numa coluna só, em vez de colunas fixas para cada campo possível.
+// Propaga erros de gravação (sem capturar aqui) — quem chama já trata isso
+// (ver bot/messageHandler.js) mostrando uma mensagem amigável ao solicitante.
 function salvarPendente(dados) {
-  const pendentes = loadPendentes();
-
   let codigo;
   do {
     codigo = gerarCodigo();
-  } while (pendentes[codigo]);
+  } while (db.prepare("SELECT 1 FROM pendentes WHERE codigo = ?").get(codigo));
 
-  pendentes[codigo] = { ...dados, criadoEm: new Date().toISOString() };
-  salvar(pendentes);
+  const criadoEm = new Date().toISOString();
+  db.prepare("INSERT INTO pendentes (codigo, dados, criadoEm) VALUES (?, ?, ?)").run(codigo, JSON.stringify(dados), criadoEm);
   console.log(`[Pendentes] Solicitação registrada com o código ${codigo}.`);
   return codigo;
 }
 
+// Nunca lança erro: uma falha de leitura aqui deve terminar num "não encontrei
+// essa solicitação" amigável (comportamento já esperado pelos vários pontos que
+// chamam isso em bot/messageHandler.js sem try/catch local), não num alerta fatal.
 function buscarPendente(codigo) {
-  const pendentes = loadPendentes();
-  return pendentes[codigo] || null;
+  try {
+    const row = db.prepare("SELECT dados, criadoEm FROM pendentes WHERE codigo = ?").get(codigo);
+    if (!row) return null;
+    return { ...JSON.parse(row.dados), criadoEm: row.criadoEm };
+  } catch (err) {
+    console.error("[ALERTA:persistencia] Erro ao buscar solicitação pendente:", err);
+    return null;
+  }
 }
 
 // Remove a solicitação depois que a secretaria já respondeu definitivamente
-// (aprovou ou recusou) — evita acumular pendentes.json indefinidamente. Não
-// remove em caso de erro na gravação do Google Calendar, pra secretaria poder
-// responder de novo à mesma mensagem depois de resolvido o problema.
+// (aprovou ou recusou) — evita acumular pendentes indefinidamente. Não remove em
+// caso de erro na gravação do Google Calendar, pra secretaria poder responder de
+// novo à mesma mensagem depois de resolvido o problema.
 function removerPendente(codigo) {
-  const pendentes = loadPendentes();
-  if (!pendentes[codigo]) return;
-  delete pendentes[codigo];
-  salvar(pendentes);
-  console.log(`[Pendentes] Solicitação ${codigo} removida.`);
+  const info = db.prepare("DELETE FROM pendentes WHERE codigo = ?").run(codigo);
+  if (info.changes > 0) console.log(`[Pendentes] Solicitação ${codigo} removida.`);
 }
 
 // Extrai o código de uma mensagem do bot (ex: "_Código: A3F9_").

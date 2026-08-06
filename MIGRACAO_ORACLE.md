@@ -104,11 +104,7 @@ O bot guarda tudo que importa em arquivos na raiz do projeto (fora do controle d
 | Arquivo/pasta | O que é |
 |---|---|
 | `credenciais-google.json` | Chave da conta de serviço do Google Calendar |
-| `login.json` | Usuários do painel web |
-| `lideres.json` | Líderes cadastrados |
-| `pendentes.json` | Solicitações aguardando aprovação (se houver alguma pendente no momento da migração) |
-| `bot_state.json` | Estado de conexão do bot |
-| `grupo_ids.json` | Cache dos IDs dos grupos "Mensagens Secretaria" e "Atendimento Pastoral" |
+| `dados.db` | Banco SQLite com usuários do painel, líderes, solicitações pendentes e o cache do JID dos grupos "Mensagens Secretaria"/"Atendimento Pastoral" |
 | `.wwebjs_auth/` (pasta) | **Sessão do WhatsApp já pareada** — copiando essa pasta, você evita ter que escanear o QR Code de novo |
 | `.env` | Suas variáveis de ambiente (inclusive o `CLOUDFLARE_TOKEN`, veja passo 4) |
 
@@ -117,14 +113,14 @@ No **notebook** (não no servidor), rode um comando `scp` para cada item, aponta
 ```bash
 cd caminho/para/o/projeto/no/notebook
 
-scp -i caminho/para/sua-chave.pem credenciais-google.json login.json lideres.json pendentes.json bot_state.json grupo_ids.json .env ubuntu@SEU_IP_PUBLICO:~/chatbot/
+scp -i caminho/para/sua-chave.pem credenciais-google.json dados.db .env ubuntu@SEU_IP_PUBLICO:~/chatbot/
 
 scp -i caminho/para/sua-chave.pem -r .wwebjs_auth ubuntu@SEU_IP_PUBLICO:~/chatbot/
 ```
 
-Se algum desses arquivos ainda não existir no notebook (ex: `pendentes.json` se não tiver nada pendente agora), crie a partir do `.example` direto no servidor: `cp pendentes.json.example pendentes.json` (mesma lógica para `lideres.json`, `login.json`, `grupo_ids.json`).
+Se o notebook ainda estiver numa versão anterior (com `login.json`, `lideres.json`, `pendentes.json`, `grupo_ids.json` e `bot_state.json` soltos, em vez de `dados.db`), copie esses arquivos junto e rode `node migrar_para_sqlite.js` **no servidor novo**, depois de atualizar o código — o script importa tudo pro `dados.db` automaticamente.
 
-⚠️ Depois de copiar, confirme que os arquivos existem como **arquivos de verdade** no servidor (`ls -la ~/chatbot/*.json`) antes de subir o Docker — se `docker compose up` rodar com algum desses arquivos faltando, o Docker cria um **diretório vazio** no lugar (bug conhecido de bind mount, já documentado no README) e o bot para de gravar tudo silenciosamente.
+⚠️ Depois de copiar, confirme que `dados.db` existe como **arquivo de verdade** no servidor (`ls -la ~/chatbot/dados.db`) antes de subir o Docker — se `docker compose up` rodar com ele faltando, o Docker cria um **diretório vazio** no lugar (bug conhecido de bind mount, já documentado no README) e o bot não consegue nem abrir o banco.
 
 ---
 
@@ -184,7 +180,7 @@ Espere ver `✅ Site de controle rodando em http://0.0.0.0:3000` e, se a sessão
 ## 6. Testar
 
 1. Acesse `https://comunidadecristacurados.com.br/secretaria/login` no navegador.
-2. Faça login com o usuário admin que já existia (veio junto no `login.json` copiado).
+2. Faça login com o usuário admin que já existia (veio junto no `dados.db` copiado).
 3. Confira a aba "Whatsapp" — deve mostrar "Conectado ✅".
 4. Mande uma mensagem de teste pro número do bot pelo WhatsApp e confirme que ele responde.
 5. Teste o painel de Líderes/Logs também, pra garantir que os dados vieram certos.

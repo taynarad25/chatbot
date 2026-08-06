@@ -5,14 +5,13 @@
 // mensagens e verifica as respostas, exatamente como o README descreve cada
 // funcionalidade do bot.
 
-// Isola completamente do pendentes.json real de produção ANTES de exigir o
-// messageHandler (que usa bot/pendentesAprovacao.js internamente).
+// Isola completamente do banco real de produção ANTES de exigir o
+// messageHandler (que usa bot/pendentesAprovacao.js e bot/secretaria.js internamente).
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-messagehandler-test-"));
-process.env.PENDENTES_FILE_PATH = path.join(tmpDir, "pendentes.json");
-process.env.GRUPO_IDS_FILE_PATH = path.join(tmpDir, "grupo_ids.json");
+process.env.DB_PATH = path.join(tmpDir, "dados.db");
 
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");

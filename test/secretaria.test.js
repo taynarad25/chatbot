@@ -4,7 +4,7 @@ const os = require("os");
 const path = require("path");
 const fs = require("fs");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-secretaria-test-"));
-process.env.GRUPO_IDS_FILE_PATH = path.join(tmpDir, "grupo_ids.json");
+process.env.DB_PATH = path.join(tmpDir, "dados.db");
 
 const { 
   encontrarGrupoSecretaria, 

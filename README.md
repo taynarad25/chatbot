@@ -74,7 +74,7 @@ Esse grupo do WhatsApp é o canal central de aprovação: toda solicitação (ag
 
 Nas solicitações que só líderes podem fazer — **agendar, alterar ou cancelar evento** e **comunicado para o culto** —, o campo "Solicitante" mostra o nome cadastrado do líder na aba "Líderes" do painel (não o nome/apelido salvo no celular dele) — evita depender de como cada líder configurou o próprio perfil do WhatsApp. Sem um líder cadastrado com esse telefone (ou com o nome em branco), cai de volta no nome do contato salvo no celular do próprio bot. Já o pedido de atendimento (opção 5, aberto a qualquer pessoa) continua usando o nome do contato, já que quem manda pode não ser um líder cadastrado.
 
-Cada mensagem de pedido termina com um código curto (ex: `_Código: A3F9_`), que é como o bot sabe qual solicitação está sendo respondida — os dados completos ficam guardados em `pendentes.json` (veja abaixo), não na mensagem em si, então o texto visível pode mudar livremente sem afetar o processamento. Isso também é o que permite ter **várias solicitações pendentes ao mesmo tempo**: cada uma tem seu próprio código, e a secretaria responde à mensagem específica que quer decidir. Depois de aprovada ou recusada, a solicitação é removida de `pendentes.json` — responder de novo à mesma mensagem (exceto logo após um erro ao gravar no Google Calendar, quando a solicitação é mantida de propósito pra permitir tentar de novo) avisa que não encontrou mais nada pendente ali.
+Cada mensagem de pedido termina com um código curto (ex: `_Código: A3F9_`), que é como o bot sabe qual solicitação está sendo respondida — os dados completos ficam guardados na tabela "pendentes" do banco (veja abaixo), não na mensagem em si, então o texto visível pode mudar livremente sem afetar o processamento. Isso também é o que permite ter **várias solicitações pendentes ao mesmo tempo**: cada uma tem seu próprio código, e a secretaria responde à mensagem específica que quer decidir. Depois de aprovada ou recusada, a solicitação é removida do banco — responder de novo à mesma mensagem (exceto logo após um erro ao gravar no Google Calendar, quando a solicitação é mantida de propósito pra permitir tentar de novo) avisa que não encontrou mais nada pendente ali.
 
 Pra não gerar log nem processar toda mensagem de todo grupo em que o bot está (a imensa maioria é conversa comum, sem nada a ver com aprovação), o bot só investiga mais a fundo — e só chama `msg.getChat()` — quando o texto é exatamente uma das palavras-chave de aprovação **e** a mensagem é uma resposta (reply) a algo. Ler os dados do chat (`msg.getChat()`) às vezes falha uma única vez por um soluço passageiro da sessão do WhatsApp Web (nada relacionado à mensagem em si) — o bot tenta de novo automaticamente uma vez antes de desistir. Se mesmo assim continuar falhando (ex: mensagens vindas de um JID sintético/inválido, sem um chat de verdade por trás — observado em produção), a mensagem é só ignorada com um aviso no log, sem virar alerta crítico repetidamente por algo que não é uma falha do sistema.
 
@@ -84,7 +84,7 @@ Grupo do WhatsApp separado do "Mensagens Secretaria" — em vez de pedidos pra a
 
 Categorias que geram alerta hoje:
 - `google-calendar` — falha ao consultar ou gravar/alterar/cancelar um evento no Google Calendar.
-- `persistencia` — falha ao ler ou gravar `pendentes.json`, `lideres.json`, `login.json` ou `bot_state.json` (ex: o bug de bind mount virando diretório, veja aviso acima).
+- `persistencia` — falha ao ler ou gravar no banco (`dados.db`), ex: o bug de bind mount virando diretório, veja aviso acima.
 - `secretaria` — falha ao notificar o grupo "Mensagens Secretaria" (o pedido não conseguiu nem chegar lá).
 - `whatsapp` — falha ao enviar uma mensagem direta de volta pro solicitante (feedback de aprovação/recusa).
 - `web` — erro 500 no painel de controle.
@@ -101,7 +101,7 @@ Interface HTTP simples (`web.js` + `web/`) para gerenciar o bot sem acesso ao se
 - **Login** (`/secretaria/login`) com sessão em cookie (`HttpOnly`, `SameSite=Strict`) e rate limiting de tentativas por IP.
 - **Status da conexão:** mostra se o WhatsApp está conectado, gera QR Code para parear, permite cancelar ou desconectar.
 - **Gestão de usuários** (admin): criar usuário (com senha definida na hora, ou como "pendente" para a pessoa definir a própria senha depois via `/secretaria/register`), listar e excluir.
-- **Gestão de líderes** (admin): cadastrar, listar, editar e remover líderes (nome + telefone), com filtros de busca por nome (ignora acentos/maiúsculas) e por telefone (aceita um trecho parcial do número). Persistido em `lideres.json`, aplicado ao bot imediatamente, sem precisar reiniciar.
+- **Gestão de líderes** (admin): cadastrar, listar, editar e remover líderes (nome + telefone), com filtros de busca por nome (ignora acentos/maiúsculas) e por telefone (aceita um trecho parcial do número). Persistido no banco, aplicado ao bot imediatamente, sem precisar reiniciar.
 - **Logs** (admin): visualizar e limpar o arquivo de log combinado do bot.
 
 ## Como funciona por baixo dos panos
@@ -123,13 +123,13 @@ bot/                            domínio do bot de WhatsApp
   secretaria.js                 notificação do grupo "Mensagens Secretaria"
   alertas.js                    notificação do grupo "Alertas" (falhas operacionais críticas), com deduplicação por categoria
   agendamentoAutomatico.js      monta o "resource" (criação/patch) enviado à API do Google Calendar
-  pendentesAprovacao.js         solicitações aguardando aprovação da secretaria (pendentes.json), identificadas por um código curto na mensagem do grupo
+  pendentesAprovacao.js         solicitações aguardando aprovação da secretaria (tabela "pendentes" do banco), identificadas por um código curto na mensagem do grupo
 web.js                          servidor HTTP do painel de controle
 web/                            autenticação, usuários, rate limiter, IP do cliente, views HTML
 test/                           suíte de testes (node --test)
 ```
 
-`bot/chatbot.js` é o único arquivo do projeto que ainda depende de onde fica em relação à raiz: `credenciais-google.json`, `login.json`, `lideres.json`, `pendentes.json`, `combined.log`, `bot_state.json` e a sessão do WhatsApp (`.wwebjs_auth/`) sempre viveram na raiz do projeto (é lá que o `docker-compose.bot.yml` monta os volumes), então ele resolve esses caminhos explicitamente a partir de `bot/../` em vez de assumir que o processo foi iniciado da raiz.
+`bot/chatbot.js` é o único arquivo do projeto que ainda depende de onde fica em relação à raiz: `credenciais-google.json`, `dados.db`, `combined.log` e a sessão do WhatsApp (`.wwebjs_auth/`) sempre viveram na raiz do projeto (é lá que o `docker-compose.bot.yml` monta os volumes), então ele resolve esses caminhos explicitamente a partir de `bot/../` em vez de assumir que o processo foi iniciado da raiz.
 
 ## Configuração
 
@@ -137,30 +137,25 @@ Variáveis de ambiente (arquivo `.env`, veja `docker-compose.bot.yml`):
 
 | Variável | Uso |
 |---|---|
-| `WHATSAPP_LIDERES` | Números de telefone (separados por vírgula) usados apenas para semear `lideres.json` na primeira execução (se o arquivo ainda não existir). Depois disso, o cadastro de líderes é feito pela aba "Líderes" do painel web |
+| `WHATSAPP_LIDERES` | Números de telefone (separados por vírgula) usados apenas para semear a tabela de líderes no banco na primeira execução (se ainda estiver vazia). Depois disso, o cadastro de líderes é feito pela aba "Líderes" do painel web |
 | `PUPPETEER_EXECUTABLE_PATH` / `CHROME_BIN` | Caminho de um Chromium já instalado (opcional, usado no Docker) |
 | `CLOUDFLARE_TOKEN` | Token do túnel Cloudflare, usado só por `docker-compose.tunnel.yml` (`cloudflared`) — gerado no painel da Cloudflare ao criar o túnel |
-| `LOGIN_FILE_PATH` | Sobrescreve o caminho de `login.json` (usado pelos testes, para nunca tocar no arquivo real) |
-| `LIDERES_FILE_PATH` | Sobrescreve o caminho de `lideres.json` (idem) |
-| `PENDENTES_FILE_PATH` | Sobrescreve o caminho de `pendentes.json` (idem) |
-| `GRUPO_IDS_FILE_PATH` | Sobrescreve o caminho de `grupo_ids.json` (idem) |
+| `DB_PATH` | Sobrescreve o caminho de `dados.db` (usado pelos testes, para nunca tocar no banco real) |
 | `COMBINED_LOG_PATH` | Sobrescreve o caminho do log combinado (idem) |
 
 Arquivos necessários (não versionados, veja `.gitignore`):
 
 - `credenciais-google.json` — chave de conta de serviço do Google com acesso às 10 agendas.
-- `login.json` — usuários do painel web (veja `login.json.example`).
-- `lideres.json` — líderes com acesso às opções extras do bot (nome + telefone); veja `lideres.json.example`.
-- `pendentes.json` — solicitações aguardando aprovação da secretaria (veja "Grupo Mensagens Secretaria" acima); veja `pendentes.json.example`.
-- `grupo_ids.json` — cache do JID (identificador interno do WhatsApp) dos grupos "Mensagens Secretaria" e "Atendimento Pastoral", pra não precisar varrer todos os chats a cada notificação; veja `grupo_ids.json.example`.
+- `dados.db` — banco SQLite com tudo que o bot precisa persistir: usuários do painel web, líderes, solicitações pendentes de aprovação e o cache do JID dos grupos "Mensagens Secretaria"/"Atendimento Pastoral". **Não precisa criar esse arquivo à mão** — o próprio bot cria o banco e as tabelas na primeira execução (`db.js`, chamado assim que qualquer módulo é carregado), diferente dos antigos arquivos JSON que exigiam copiar um `.example` antes do primeiro `docker compose up`.
 
-⚠️ **`login.json`, `lideres.json`, `pendentes.json` e `grupo_ids.json` precisam existir na raiz do projeto *antes* do primeiro `docker compose up`** (copie os `.example` correspondentes, ex: `cp pendentes.json.example pendentes.json`). O `docker-compose.bot.yml` monta esses arquivos como bind mount — se o arquivo não existir no host nesse momento, o Docker cria um **diretório** vazio no lugar dele dentro do container, e o bot nunca mais consegue ler/gravar nada ali (as edições/solicitações parecem "sumir" a cada redeploy, porque o container é recriado do zero e o "arquivo" nunca foi de fato o volume persistido). Se você já rodou o bot antes desse mount existir, confira se cada um é mesmo um arquivo (`ls -la pendentes.json`) antes de subir de novo.
-- Se isso acontecer com `pendentes.json` especificamente, o líder que estava agendando/alterando/cancelando um evento recebe **"⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes."** no WhatsApp — mensagem que só aparece exatamente quando `salvarPendente()` falha (arquivo quebrado, sem permissão de escrita, etc.), diferente de **"⚠️ Erro ao acessar a agenda."**, que é sobre uma falha ao ler o Google Calendar. Corrija o arquivo (ver acima) e peça pro líder tentar de novo — essa tentativa não ficou salva em nenhum lugar.
+📦 **Migrando de uma versão anterior a essa** (que usava `login.json`, `lideres.json`, `pendentes.json`, `grupo_ids.json` e `bot_state.json` soltos)? Rode `node migrar_para_sqlite.js` uma vez, antes de subir o bot com essa versão — ele importa o conteúdo de cada arquivo existente pro `dados.db` e renomeia os originais para `<nome>.migrado` (não apaga nada). Arquivos que não existem são só ignorados.
 
-⚠️ **Permissão de escrita**: o container roda como usuário `node` (não-root, veja `Dockerfile`), então `login.json`, `lideres.json` e `pendentes.json` no host precisam ser graváveis por ele. Se você criou o arquivo como root (`sudo`, ou logado como root no servidor), o container pode não conseguir gravar nele. Se aparecer erro de permissão ao editar líderes/usuários pelo painel, ou ao aprovar/recusar uma solicitação no grupo:
+⚠️ **`dados.db` ainda é um bind mount de arquivo único**, então a mesma pegadinha do Docker que afetava os arquivos JSON antigos ainda vale *na primeira vez que o container sobe*: se, por algum motivo, `dados.db` não existir no host bem no instante do `docker compose up` (ex: alguém apagou sem querer), o Docker cria um **diretório** vazio no lugar dele em vez de deixar o bot criar o arquivo. Diferente do esquema antigo, isso não deveria mais acontecer em uso normal — sem mais edição manual de arquivo nem risco de um `git pull` apagar dados reais (o banco nunca é versionado) — mas se acontecer, o sintoma é o bot falhar ao abrir o banco logo na inicialização (em vez de falhar silenciosamente depois, como antes). Corrija com `rm -rf dados.db && docker compose -f docker-compose.bot.yml restart` (o banco novo nasce vazio; rode a migração de novo se tiver um `.migrado` pra recuperar).
+
+⚠️ **Permissão de escrita**: o container roda como usuário `node` (não-root, veja `Dockerfile`), então `dados.db` no host precisa ser gravável por ele. Se você criou o arquivo como root (`sudo`, ou logado como root no servidor), o container pode não conseguir gravar nele. Se aparecer erro de permissão ao editar líderes/usuários pelo painel, ou ao aprovar/recusar uma solicitação no grupo:
 ```bash
-ls -la lideres.json login.json pendentes.json   # confere o dono/permissão atual
-chmod 664 lideres.json login.json pendentes.json   # ou 666, se o dono não puder ser trocado para o usuário do container
+ls -la dados.db   # confere o dono/permissão atual
+chmod 664 dados.db   # ou 666, se o dono não puder ser trocado para o usuário do container
 docker compose -f docker-compose.bot.yml restart
 ```
 

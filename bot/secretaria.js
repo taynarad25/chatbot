@@ -1,43 +1,38 @@
-const fs = require("fs");
-const path = require("path");
+const db = require("../db");
 
 const NOME_GRUPO_SECRETARIA = "Mensagens Secretaria";
 const NOME_GRUPO_PASTORAL = "Atendimento Pastoral";
 
-const CACHE_FILE = process.env.GRUPO_IDS_FILE_PATH || path.join(__dirname, "..", "grupo_ids.json");
-
-function lerCacheGrupos() {
+// A chave sempre normalizada (minúsculo/sem espaços nas bordas) evita o bug que já
+// aconteceu em produção com o arquivo grupo_ids.json antigo: uma edição manual com
+// o nome "de exibição" capitalizado nunca batia com a chave usada pelo código. Como
+// agora a escrita só acontece por aqui (não tem mais arquivo pra editar à mão), essa
+// classe inteira de bug deixa de existir.
+function atualizarCacheGrupo(nome, jid) {
   try {
-    if (!fs.existsSync(CACHE_FILE)) return {};
-    const data = fs.readFileSync(CACHE_FILE, "utf8");
-    return data.trim() ? JSON.parse(data) : {};
-  } catch (err) {
-    console.error("[ALERTA:secretaria] Erro ao ler cache de grupos:", err.message);
-    return {};
-  }
-}
+    const chave = nome.trim().toLowerCase();
+    const atual = db.prepare("SELECT jid FROM grupo_ids WHERE nome = ?").get(chave);
+    if (atual && atual.jid === jid) return;
 
-function salvarCacheGrupos(cache) {
-  try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), "utf8");
+    db.prepare(`
+      INSERT INTO grupo_ids (nome, jid) VALUES (?, ?)
+      ON CONFLICT(nome) DO UPDATE SET jid = excluded.jid
+    `).run(chave, jid);
+    console.log(`[Secretaria] JID do grupo '${nome}' salvo no cache: ${jid}`);
   } catch (err) {
     console.error("[ALERTA:secretaria] Erro ao salvar cache de grupos:", err.message);
   }
 }
 
-function atualizarCacheGrupo(nome, jid) {
-  const cache = lerCacheGrupos();
-  const chave = nome.trim().toLowerCase();
-  if (cache[chave] !== jid) {
-    cache[chave] = jid;
-    salvarCacheGrupos(cache);
-    console.log(`[Secretaria] JID do grupo '${nome}' salvo no cache: ${jid}`);
-  }
-}
-
 function obterJidCached(nome) {
-  const cache = lerCacheGrupos();
-  return cache[nome.trim().toLowerCase()] || null;
+  try {
+    const chave = nome.trim().toLowerCase();
+    const row = db.prepare("SELECT jid FROM grupo_ids WHERE nome = ?").get(chave);
+    return row ? row.jid : null;
+  } catch (err) {
+    console.error("[ALERTA:secretaria] Erro ao ler cache de grupos:", err.message);
+    return null;
+  }
 }
 
 function encontrarGrupoSecretaria(chats) {

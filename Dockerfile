@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22-slim
 
 # Instala o Chromium e suas dependências
 RUN apt-get update && apt-get install -y --no-install-recommends \

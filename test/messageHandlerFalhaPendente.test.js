@@ -1,21 +1,22 @@
-// Reproduz o bug real de produção (EISDIR): o bind mount do Docker cria um
-// DIRETÓRIO no lugar de pendentes.json quando o arquivo não existe no host
-// antes do primeiro `docker compose up`, e bot/pendentesAprovacao.js falha ao
-// tentar ler/escrever nele. Precisa de um arquivo de teste isolado porque
-// PENDENTES_FILE_PATH só é lido uma vez, no load do módulo — os outros testes
-// já usam esse mesmo env var apontando pra um arquivo válido.
+// Simula uma falha de gravação no banco (ex: tabela ausente/corrompida) para
+// garantir que o líder recebe um aviso claro em vez de ficar sem resposta, ou
+// ver "erro na agenda" (a falha é ao salvar a solicitação, não ao consultar o
+// Google Calendar). Usa um banco isolado (DB_PATH próprio) e depois derruba a
+// tabela "pendentes" de propósito, pra forçar esse erro de escrita de forma
+// determinística (independe de permissão de arquivo do usuário do processo).
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-pendente-falha-test-"));
-const dirNoLugarDoArquivo = path.join(tmpDir, "pendentes.json");
-fs.mkdirSync(dirNoLugarDoArquivo);
-process.env.PENDENTES_FILE_PATH = dirNoLugarDoArquivo;
+process.env.DB_PATH = path.join(tmpDir, "dados.db");
 
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
+const db = require("../db");
 const { createMessageHandler } = require("../bot/messageHandler");
+
+db.exec("DROP TABLE pendentes");
 
 after(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -65,7 +66,7 @@ async function enviar(handleMessage, numero, body) {
   return msg.respostas;
 }
 
-test("pendentes.json quebrado (diretório em vez de arquivo): líder recebe um aviso claro, não fica sem resposta nem vê 'erro na agenda'", async () => {
+test("tabela de pendentes indisponível: líder recebe um aviso claro, não fica sem resposta nem vê 'erro na agenda'", async () => {
   const { handleMessage } = criarContexto();
 
   await enviar(handleMessage, NUMERO_LIDER, "6");

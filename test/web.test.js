@@ -1,14 +1,13 @@
-// Isola completamente de arquivos reais de produção (login.json, combined.log) ANTES de
+// Isola completamente de arquivos/banco reais de produção (dados.db, combined.log) ANTES de
 // exigir qualquer módulo — este ambiente também roda o bot de produção de verdade, então
-// nunca podemos ler/escrever nos arquivos reais durante os testes. Cada arquivo de teste
+// nunca podemos ler/escrever nos dados reais durante os testes. Cada arquivo de teste
 // roda em processo separado no test runner do Node, então isso não vaza para outros testes.
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-web-test-"));
-process.env.LOGIN_FILE_PATH = path.join(tmpDir, "login.json");
-process.env.LIDERES_FILE_PATH = path.join(tmpDir, "lideres.json");
+process.env.DB_PATH = path.join(tmpDir, "dados.db");
 process.env.COMBINED_LOG_PATH = path.join(tmpDir, "combined.log");
 fs.writeFileSync(process.env.COMBINED_LOG_PATH, "linha de log de teste\n");
 
