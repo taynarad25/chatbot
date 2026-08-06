@@ -164,6 +164,8 @@ chmod 664 lideres.json login.json pendentes.json   # ou 666, se o dono não pude
 docker compose -f docker-compose.bot.yml restart
 ```
 
+📦 **Migrando de servidor?** Veja [`MIGRACAO_ORACLE.md`](./MIGRACAO_ORACLE.md) para o passo a passo completo de subir o bot na Oracle Cloud (camada Always Free) com um domínio próprio.
+
 ## Rodando
 
 ```bash
