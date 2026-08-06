@@ -178,3 +178,61 @@ test("obterJidCached: sem variável de ambiente, cai de volta pro arquivo de cac
 
   assert.equal(obterJidCached("Atendimento Pastoral"), "jid-do-arquivo");
 });
+
+test("obterJidCached: JID real do cache tem prioridade sobre código de convite na variável de ambiente", () => {
+  fs.writeFileSync(
+    process.env.GRUPO_IDS_FILE_PATH,
+    JSON.stringify({ "mensagens secretaria": "120363024838492039@g.us" }),
+    "utf8"
+  );
+  process.env.GRUPO_JID_SECRETARIA = "KsHKE5q5BiI81KvJ1ARdUp";
+
+  try {
+    assert.equal(obterJidCached("Mensagens Secretaria"), "120363024838492039@g.us");
+  } finally {
+    delete process.env.GRUPO_JID_SECRETARIA;
+  }
+});
+
+test("notificarSecretaria: resolve o código de convite via getInviteInfo, atualiza o cache e envia mensagem", async () => {
+  fs.writeFileSync(
+    process.env.GRUPO_IDS_FILE_PATH,
+    JSON.stringify({}),
+    "utf8"
+  );
+  process.env.GRUPO_JID_SECRETARIA = "KsHKE5q5BiI81KvJ1ARdUp";
+
+  let getInviteInfoCalled = null;
+  let getChatByIdCalled = null;
+  let messageSent = null;
+
+  const fakeGroup = {
+    id: { _serialized: "120363024838492039@g.us" },
+    sendMessage: async (msg) => { messageSent = msg; }
+  };
+
+  const client = {
+    getInviteInfo: async (code) => {
+      getInviteInfoCalled = code;
+      return { id: { _serialized: "120363024838492039@g.us" } };
+    },
+    getChatById: async (jid) => {
+      getChatByIdCalled = jid;
+      return fakeGroup;
+    }
+  };
+
+  try {
+    const resultado = await notificarSecretaria(client, "Mensagem secreta");
+    assert.equal(resultado, true);
+    assert.equal(getInviteInfoCalled, "KsHKE5q5BiI81KvJ1ARdUp");
+    assert.equal(getChatByIdCalled, "120363024838492039@g.us");
+    assert.equal(messageSent, "Mensagem secreta");
+
+    const cacheData = JSON.parse(fs.readFileSync(process.env.GRUPO_IDS_FILE_PATH, "utf8"));
+    assert.equal(cacheData["mensagens secretaria"], "120363024838492039@g.us");
+  } finally {
+    delete process.env.GRUPO_JID_SECRETARIA;
+  }
+});
+
