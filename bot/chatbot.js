@@ -75,7 +75,7 @@ console.error = (...args) => {
       .filter(Boolean)
       .join("\n");
     const mensagem = `🚨 *Alerta do Bot*\n\n${alerta.textoLimpo}${detalhes ? `\n${detalhes}` : ""}\n\n${getTimestamp()}`;
-    notificarAlerta(client, alerta.categoria, mensagem).catch(() => {});
+    notificarAlerta(client, alerta.categoria, mensagem).catch(() => { });
   }
 };
 console.warn = (...args) => logger(originalWarn, ...args);
@@ -127,7 +127,7 @@ const auth = new google.auth.GoogleAuth({
 
 const calendar = google.calendar({
   version: "v3",
-  auth: auth, 
+  auth: auth,
 });
 
 // Funções auxiliares
@@ -135,7 +135,7 @@ async function buscarEventos(inicio, fim, agendaId = null) {
   let todosEventos = [];
   const agendas = agendaId ? [agendaId] : agendasParaLer;
   console.log(`[Google Calendar] Buscando eventos em ${agendas.length} agenda(s) entre ${inicio} e ${fim}`);
-  
+
   for (const id of agendas) {
     try {
       let pageToken;
@@ -210,12 +210,24 @@ function criarClient() {
     }
   });
 
-  client.on("ready", () => {
+  client.on("ready", async () => {
     clientReady = true;
     pendingQr = null;
     isGeneratingQr = false;
     saveBotState(true); // Salva como ativo apenas quando a conexão é confirmada
     console.log("✅ Bot conectado!");
+
+    try {
+      const chats = await client.getChats();
+      const grupos = chats.filter(chat => chat.isGroup);
+      console.log('=============== SEUS GRUPOS E JIDS ===============');
+      grupos.forEach(g => {
+        console.log(`NOME: "${g.name}"  --->  JID: "${g.id._serialized}"`);
+      });
+      console.log('==================================================');
+    } catch (err) {
+      console.error('Erro ao buscar grupos:', err);
+    }
   });
 
   client.on("authenticated", () => {
@@ -299,7 +311,7 @@ async function startClient() {
   const sessionDir = path.join(ROOT_DIR, ".wwebjs_auth", `session-${clientId}`);
   const profileDir = path.join(sessionDir, "Default");
   const locks = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
-  
+
   [sessionDir, profileDir].forEach(dir => {
     try {
       if (!fs.existsSync(dir)) return;
