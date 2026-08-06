@@ -143,6 +143,8 @@ Variáveis de ambiente (arquivo `.env`, veja `docker-compose.bot.yml`):
 | `LIDERES_FILE_PATH` | Sobrescreve o caminho de `lideres.json` (idem) |
 | `PENDENTES_FILE_PATH` | Sobrescreve o caminho de `pendentes.json` (idem) |
 | `COMBINED_LOG_PATH` | Sobrescreve o caminho do log combinado (idem) |
+| `GRUPO_JID_SECRETARIA` | JID do grupo "Mensagens Secretaria" (ex: `123456789@g.us`), opcional. Tem prioridade sobre o cache em `grupo_ids.json` — recomendado em produção, já que sobrevive a qualquer problema no arquivo de cache (edição manual, bind mount do Docker virando diretório). Descubra o JID rodando `descobrir_grupos.js` |
+| `GRUPO_JID_PASTORAL` | Mesma ideia, para o grupo "Atendimento Pastoral" |
 
 Arquivos necessários (não versionados, veja `.gitignore`):
 
