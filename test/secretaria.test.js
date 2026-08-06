@@ -148,3 +148,33 @@ test("obterJidCached: encontra o JID mesmo quando o arquivo foi editado manualme
   assert.equal(obterJidCached("Mensagens Secretaria"), "KsHKE5q5BiI81KvJ1ARdUp");
   assert.equal(obterJidCached("Atendimento Pastoral"), "I2AxSM7v9CI211RGWJBX2Y");
 });
+
+// client.getChats() provou ser não-confiável em produção (falha sempre, independente da
+// versão da lib), e o arquivo de cache já se perdeu duas vezes por motivos operacionais
+// (edição manual, bind mount do Docker virando diretório vazio). As variáveis de ambiente
+// GRUPO_JID_SECRETARIA/GRUPO_JID_PASTORAL são uma fonte alternativa que sobrevive a isso.
+test("obterJidCached: variável de ambiente tem prioridade sobre o arquivo de cache", () => {
+  fs.writeFileSync(
+    process.env.GRUPO_IDS_FILE_PATH,
+    JSON.stringify({ "mensagens secretaria": "jid-do-arquivo" }),
+    "utf8"
+  );
+  process.env.GRUPO_JID_SECRETARIA = "jid-da-env";
+
+  try {
+    assert.equal(obterJidCached("Mensagens Secretaria"), "jid-da-env");
+  } finally {
+    delete process.env.GRUPO_JID_SECRETARIA;
+  }
+});
+
+test("obterJidCached: sem variável de ambiente, cai de volta pro arquivo de cache", () => {
+  fs.writeFileSync(
+    process.env.GRUPO_IDS_FILE_PATH,
+    JSON.stringify({ "atendimento pastoral": "jid-do-arquivo" }),
+    "utf8"
+  );
+  delete process.env.GRUPO_JID_PASTORAL;
+
+  assert.equal(obterJidCached("Atendimento Pastoral"), "jid-do-arquivo");
+});

@@ -6,6 +6,22 @@ const NOME_GRUPO_PASTORAL = "Atendimento Pastoral";
 
 const CACHE_FILE = process.env.GRUPO_IDS_FILE_PATH || path.join(__dirname, "..", "grupo_ids.json");
 
+// client.getChats() (que lista TODOS os chats de uma vez) provou ser não-confiável em
+// produção — falha de forma consistente com um erro opaco ("r: r") vindo de dentro da
+// página do WhatsApp Web, independente da versão do whatsapp-web.js. client.getChatById()
+// (que busca só UM chat) é bem mais robusto. Só que o arquivo de cache do JID
+// (grupo_ids.json) é um bind mount do Docker, e mostrou duas formas de se perder por
+// completo (edição manual apagando o conteúdo, bind mount virando diretório vazio). Essas
+// variáveis de ambiente são uma segunda fonte do JID, gravada no .env, que sobrevive a
+// qualquer problema no arquivo — garantindo que getChatById() sempre tenha a chance de
+// funcionar antes de cair no getChats() frágil.
+function jidPorEnv(nome) {
+  const chave = nome.trim().toLowerCase();
+  if (chave === NOME_GRUPO_SECRETARIA.trim().toLowerCase()) return process.env.GRUPO_JID_SECRETARIA || null;
+  if (chave === NOME_GRUPO_PASTORAL.trim().toLowerCase()) return process.env.GRUPO_JID_PASTORAL || null;
+  return null;
+}
+
 // Normaliza as chaves para minúsculo/sem espaços nas bordas ao ler: o arquivo é
 // editável manualmente (ex: alguém colando o JID direto, como aconteceu em produção
 // com "Atendimento Pastoral"/"Mensagens Secretaria" capitalizados), mas
@@ -47,6 +63,8 @@ function atualizarCacheGrupo(nome, jid) {
 }
 
 function obterJidCached(nome) {
+  const doEnv = jidPorEnv(nome);
+  if (doEnv) return doEnv;
   const cache = lerCacheGrupos();
   return cache[nome.trim().toLowerCase()] || null;
 }
