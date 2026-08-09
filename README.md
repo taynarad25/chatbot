@@ -142,6 +142,8 @@ Variáveis de ambiente (arquivo `.env`, veja `docker-compose.bot.yml`):
 | `CLOUDFLARE_TOKEN` | Token do túnel Cloudflare, usado só por `docker-compose.tunnel.yml` (`cloudflared`) — gerado no painel da Cloudflare ao criar o túnel |
 | `DB_PATH` | Sobrescreve o caminho de `dados.db` (usado pelos testes, para nunca tocar no banco real) |
 | `COMBINED_LOG_PATH` | Sobrescreve o caminho do log combinado (idem) |
+| `GRUPO_JID_SECRETARIA` | JID do grupo "Mensagens Secretaria" (ex: `123456789@g.us`), opcional. Uma segunda fonte do JID, gravada no `.env`, que sobrevive a qualquer problema no `dados.db` — entre a variável de ambiente e o cache salvo no banco (tabela `grupo_ids`), o bot sempre usa o que for um JID real (contém `@`); se nenhum dos dois for, a variável de ambiente tem prioridade. Descubra o JID rodando `descobrir_grupos.js` |
+| `GRUPO_JID_PASTORAL` | Mesma ideia, para o grupo "Atendimento Pastoral" |
 
 Arquivos necessários (não versionados, veja `.gitignore`):
 

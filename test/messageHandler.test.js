@@ -18,6 +18,7 @@ const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
 const { createMessageHandler } = require("../bot/messageHandler");
 const { buscarPendente, extrairCodigo } = require("../bot/pendentesAprovacao");
+const { atualizarCacheGrupo, NOME_GRUPO_SECRETARIA } = require("../bot/secretaria");
 
 after(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -38,6 +39,16 @@ const LIDERES = ["5511999999999"];
 const NUMERO_LIDER = "5511999999999@c.us";
 const NUMERO_COMUM = "5511888888888@c.us";
 
+// Únicos em todo o arquivo (não redefinidos por teste): o cache de JID de grupo
+// (bot/secretaria.js) é compartilhado entre todos os testes via DB_PATH
+// (um único banco, nunca resetado entre testes) — se criarContexto() e criarMsgGrupo()
+// usassem JIDs "de mentira" diferentes pro mesmo grupo, um teste anterior que recebe
+// mensagem de grupo (criarMsgGrupo) sobrescreveria o cache com um JID que o
+// client.sendMessage mockado de outro teste não reconhece, e a mensagem de
+// notificação cairia silenciosamente no bucket errado.
+const JID_GRUPO_SECRETARIA = "111111111111111@g.us";
+const JID_GRUPO_PASTORAL = "222222222222222@g.us";
+
 // Monta um novo "servidor" de teste: handler + espiões de tudo que ele chamaria
 // de verdade (mensagens de grupo, mensagens diretas, gravação na Google Agenda).
 function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
@@ -49,20 +60,31 @@ function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
   const eventosCancelados = []; // calendar.events.delete(...)
   let eventosAtuais = eventos;
 
+  // notificarSecretaria/notificarPastoral (bot/secretaria.js) mandam a mensagem de
+  // grupo direto por JID via client.sendMessage(jid, texto) — não mais buscando o
+  // chat e chamando chat.sendMessage(texto) — então o mock precisa rotear pelo "to"
+  // pra separar mensagem de grupo de mensagem direta ao solicitante, com o mesmo
+  // client.sendMessage único usado pelos dois casos.
+  const JIDS_DE_GRUPO = new Set([JID_GRUPO_SECRETARIA, JID_GRUPO_PASTORAL]);
+
   const client = {
     sendMessage: async (to, texto) => {
-      diretasEnviadas.push({ to, texto });
+      if (JIDS_DE_GRUPO.has(to)) {
+        gruposEnviados.push(texto);
+      } else {
+        diretasEnviadas.push({ to, texto });
+      }
     },
     getChats: async () => [
       {
+        id: { _serialized: JID_GRUPO_SECRETARIA },
         isGroup: true,
         name: "Mensagens Secretaria",
-        sendMessage: async (texto) => { gruposEnviados.push(texto); },
       },
       {
+        id: { _serialized: JID_GRUPO_PASTORAL },
         isGroup: true,
         name: "Atendimento Pastoral",
-        sendMessage: async (texto) => { gruposEnviados.push(texto); },
       }
     ],
   };
@@ -121,7 +143,7 @@ function criarMsgPrivada(numero, body, { pushname } = {}) {
 function criarMsgGrupo({ nomeGrupo, body, quotedBody, quotedFromMe = true }) {
   const respostas = [];
   const msg = {
-    from: "120363000000000000@g.us",
+    from: nomeGrupo === "Atendimento Pastoral" ? JID_GRUPO_PASTORAL : JID_GRUPO_SECRETARIA,
     fromMe: false,
     hasQuotedMsg: true,
     body,
@@ -997,10 +1019,17 @@ test("grupo: msg.getChat() que nunca resolve (JID inválido/sintético) é ignor
 test("grupo: mensagem comum (não é palavra-chave de aprovação) é ignorada sem chamar getChat() nem logar", async () => {
   const { handleMessage } = criarContexto({ eventos: [] });
 
+  // Simula um grupo já conhecido (JID em cache) — só nesse caso o código pula o
+  // getChat() de checagem oportunista pra mensagens sem palavra-chave. Semeado
+  // explicitamente aqui (em vez de depender do cache deixado por outro teste
+  // anterior no arquivo) pra esse teste não depender de ordem de execução.
+  const jidGrupoConhecido = "120363000000000000@g.us";
+  atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, jidGrupoConhecido);
+
   let chamadasGetChat = 0;
   const respostas = [];
   const msg = {
-    from: "120363000000000000@g.us",
+    from: jidGrupoConhecido,
     fromMe: false,
     hasQuotedMsg: false,
     body: "Obrigado ♥️\n\nA paz e bom dia",
@@ -1017,10 +1046,15 @@ test("grupo: mensagem comum (não é palavra-chave de aprovação) é ignorada s
 test("grupo: palavra-chave digitada sem usar 'Responder' é ignorada sem chamar getChat()", async () => {
   const { handleMessage } = criarContexto({ eventos: [] });
 
+  // Mesma ideia: JID já conhecido, semeado explicitamente pra não depender de
+  // cache deixado por outro teste.
+  const jidGrupoConhecido = "120363000000000000@g.us";
+  atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, jidGrupoConhecido);
+
   let chamadasGetChat = 0;
   const respostas = [];
   const msg = {
-    from: "120363000000000000@g.us",
+    from: jidGrupoConhecido,
     fromMe: false,
     hasQuotedMsg: false,
     body: "marcar evento",

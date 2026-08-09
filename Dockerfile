@@ -31,6 +31,7 @@ RUN npm ci --ignore-scripts --omit=dev && npm cache clean --force
 COPY --chown=node:node bot/ ./bot/
 COPY --chown=node:node web/ ./web/
 COPY --chown=node:node web.js ./
+COPY --chown=node:node db.js ./
 
 EXPOSE 3000
 CMD [ "node", "bot/chatbot.js" ]
