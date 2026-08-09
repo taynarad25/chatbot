@@ -453,16 +453,25 @@ function renderIndexHtml() {
         span.textContent = (l.nome || '(sem nome)') + ' | ' + formatarTelefone(l.telefone);
         li.appendChild(span);
 
+        // Agrupa os dois botões numa única "coluna" à direita — com os botões
+        // soltos como filhos diretos do <li> (display:flex + space-between), a
+        // posição do botão "Editar" varia conforme o tamanho do nome/telefone,
+        // porque o espaço livre é distribuído em partes iguais entre os 3 itens.
+        const acoes = document.createElement('span');
+        acoes.style.display = 'flex';
+
         const btnEditar = document.createElement('button');
         btnEditar.textContent = 'Editar';
         btnEditar.addEventListener('click', () => iniciarEdicaoLider(l));
-        li.appendChild(btnEditar);
+        acoes.appendChild(btnEditar);
 
         const btnRemover = document.createElement('button');
         btnRemover.className = 'danger';
         btnRemover.textContent = 'Remover';
         btnRemover.addEventListener('click', () => deleteLider(l.telefone));
-        li.appendChild(btnRemover);
+        acoes.appendChild(btnRemover);
+
+        li.appendChild(acoes);
 
         list.appendChild(li);
       });
