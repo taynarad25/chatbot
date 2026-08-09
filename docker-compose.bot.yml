@@ -9,11 +9,7 @@ services:
     volumes:
       - ./.wwebjs_auth:/usr/src/app/.wwebjs_auth
       - ./combined.log:/usr/src/app/combined.log
-      - ./login.json:/usr/src/app/login.json
-      - ./lideres.json:/usr/src/app/lideres.json
-      - ./pendentes.json:/usr/src/app/pendentes.json
-      - ./bot_state.json:/usr/src/app/bot_state.json
-      - ./grupo_ids.json:/usr/src/app/grupo_ids.json
+      - ./dados.db:/usr/src/app/dados.db
       - ./credenciais-google.json:/usr/src/app/credenciais-google.json
     networks:
       - bot-bridge

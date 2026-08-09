@@ -4,7 +4,7 @@ const os = require("os");
 const path = require("path");
 const fs = require("fs");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-secretaria-test-"));
-process.env.GRUPO_IDS_FILE_PATH = path.join(tmpDir, "grupo_ids.json");
+process.env.DB_PATH = path.join(tmpDir, "dados.db");
 
 const {
   encontrarGrupoSecretaria,
@@ -12,6 +12,7 @@ const {
   encontrarGrupoPastoral,
   notificarPastoral,
   obterJidCached,
+  atualizarCacheGrupo,
 } = require("../bot/secretaria");
 
 after(() => {
@@ -143,35 +144,24 @@ test("encontrarGrupoPastoral: encontra o grupo contendo emojis ou sufixos/prefix
   assert.equal(grupo.name, "⛪ Atendimento Pastoral ⛪");
 });
 
-// Reproduz o bug real de produção: alguém editou grupo_ids.json manualmente e salvou
-// as chaves com o nome "de exibição" (capitalizado), igual ao que aparece no WhatsApp,
-// em vez do formato interno em minúsculo que atualizarCacheGrupo grava. Isso fazia
-// obterJidCached nunca encontrar o JID salvo, e o bot caía sempre no fallback lento
-// via getChats() — que, quando falhava, silenciava o envio da notificação ao grupo.
-test("obterJidCached: encontra o JID mesmo quando o arquivo foi editado manualmente com chaves capitalizadas", () => {
-  fs.writeFileSync(
-    process.env.GRUPO_IDS_FILE_PATH,
-    JSON.stringify({
-      "Atendimento Pastoral": "I2AxSM7v9CI211RGWJBX2Y",
-      "Mensagens Secretaria": "KsHKE5q5BiI81KvJ1ARdUp",
-    }),
-    "utf8"
-  );
+// atualizarCacheGrupo sempre normaliza a chave em minúsculo ao gravar no banco — a
+// consulta em obterJidCached precisa encontrar o JID independente de como o nome
+// foi digitado (igual ao "nome de exibição" do WhatsApp, capitalizado).
+test("obterJidCached: encontra o JID independente de maiúsculas/minúsculas no nome consultado", () => {
+  atualizarCacheGrupo("Atendimento Pastoral", "I2AxSM7v9CI211RGWJBX2Y");
+  atualizarCacheGrupo("Mensagens Secretaria", "KsHKE5q5BiI81KvJ1ARdUp");
 
   assert.equal(obterJidCached("Mensagens Secretaria"), "KsHKE5q5BiI81KvJ1ARdUp");
   assert.equal(obterJidCached("Atendimento Pastoral"), "I2AxSM7v9CI211RGWJBX2Y");
 });
 
 // client.getChats() provou ser não-confiável em produção (falha sempre, independente da
-// versão da lib), e o arquivo de cache já se perdeu duas vezes por motivos operacionais
-// (edição manual, bind mount do Docker virando diretório vazio). As variáveis de ambiente
-// GRUPO_JID_SECRETARIA/GRUPO_JID_PASTORAL são uma fonte alternativa que sobrevive a isso.
-test("obterJidCached: variável de ambiente tem prioridade sobre o arquivo de cache", () => {
-  fs.writeFileSync(
-    process.env.GRUPO_IDS_FILE_PATH,
-    JSON.stringify({ "mensagens secretaria": "jid-do-arquivo" }),
-    "utf8"
-  );
+// versão da lib), e o cache já se perdeu por motivos operacionais no passado (arquivo
+// editado manualmente, bind mount do Docker virando diretório vazio). As variáveis de
+// ambiente GRUPO_JID_SECRETARIA/GRUPO_JID_PASTORAL são uma fonte alternativa que
+// sobrevive a isso, mesmo com o cache agora em banco.
+test("obterJidCached: variável de ambiente tem prioridade sobre o banco quando nenhum dos dois é um JID real", () => {
+  atualizarCacheGrupo("Mensagens Secretaria", "codigo-convite-do-banco");
   process.env.GRUPO_JID_SECRETARIA = "jid-da-env";
 
   try {
@@ -181,23 +171,15 @@ test("obterJidCached: variável de ambiente tem prioridade sobre o arquivo de ca
   }
 });
 
-test("obterJidCached: sem variável de ambiente, cai de volta pro arquivo de cache", () => {
-  fs.writeFileSync(
-    process.env.GRUPO_IDS_FILE_PATH,
-    JSON.stringify({ "atendimento pastoral": "jid-do-arquivo" }),
-    "utf8"
-  );
+test("obterJidCached: sem variável de ambiente, cai de volta pro banco", () => {
+  atualizarCacheGrupo("Atendimento Pastoral", "jid-do-banco");
   delete process.env.GRUPO_JID_PASTORAL;
 
-  assert.equal(obterJidCached("Atendimento Pastoral"), "jid-do-arquivo");
+  assert.equal(obterJidCached("Atendimento Pastoral"), "jid-do-banco");
 });
 
-test("obterJidCached: JID real do cache tem prioridade sobre código de convite na variável de ambiente", () => {
-  fs.writeFileSync(
-    process.env.GRUPO_IDS_FILE_PATH,
-    JSON.stringify({ "mensagens secretaria": "120363024838492039@g.us" }),
-    "utf8"
-  );
+test("obterJidCached: JID real do banco tem prioridade sobre código de convite na variável de ambiente", () => {
+  atualizarCacheGrupo("Mensagens Secretaria", "120363024838492039@g.us");
   process.env.GRUPO_JID_SECRETARIA = "KsHKE5q5BiI81KvJ1ARdUp";
 
   try {
@@ -208,11 +190,9 @@ test("obterJidCached: JID real do cache tem prioridade sobre código de convite 
 });
 
 test("notificarSecretaria: resolve o código de convite via getInviteInfo, atualiza o cache e envia mensagem", async () => {
-  fs.writeFileSync(
-    process.env.GRUPO_IDS_FILE_PATH,
-    JSON.stringify({}),
-    "utf8"
-  );
+  // Sobrescreve qualquer JID real deixado no banco por testes anteriores, pra garantir
+  // que a resolução por convite (via variável de ambiente) realmente seja exercitada.
+  atualizarCacheGrupo("Mensagens Secretaria", "valor-antigo-sem-jid");
   process.env.GRUPO_JID_SECRETARIA = "KsHKE5q5BiI81KvJ1ARdUp";
 
   let getInviteInfoCalled = null;
@@ -237,8 +217,8 @@ test("notificarSecretaria: resolve o código de convite via getInviteInfo, atual
     assert.equal(jidDestino, "120363024838492039@g.us");
     assert.equal(messageSent, "Mensagem secreta");
 
-    const cacheData = JSON.parse(fs.readFileSync(process.env.GRUPO_IDS_FILE_PATH, "utf8"));
-    assert.equal(cacheData["mensagens secretaria"], "120363024838492039@g.us");
+    delete process.env.GRUPO_JID_SECRETARIA;
+    assert.equal(obterJidCached("Mensagens Secretaria"), "120363024838492039@g.us");
   } finally {
     delete process.env.GRUPO_JID_SECRETARIA;
   }

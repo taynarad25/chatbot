@@ -5,14 +5,13 @@
 // mensagens e verifica as respostas, exatamente como o README descreve cada
 // funcionalidade do bot.
 
-// Isola completamente do pendentes.json real de produção ANTES de exigir o
-// messageHandler (que usa bot/pendentesAprovacao.js internamente).
+// Isola completamente do banco real de produção ANTES de exigir o
+// messageHandler (que usa bot/pendentesAprovacao.js e bot/secretaria.js internamente).
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-messagehandler-test-"));
-process.env.PENDENTES_FILE_PATH = path.join(tmpDir, "pendentes.json");
-process.env.GRUPO_IDS_FILE_PATH = path.join(tmpDir, "grupo_ids.json");
+process.env.DB_PATH = path.join(tmpDir, "dados.db");
 
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
@@ -41,8 +40,8 @@ const NUMERO_LIDER = "5511999999999@c.us";
 const NUMERO_COMUM = "5511888888888@c.us";
 
 // Únicos em todo o arquivo (não redefinidos por teste): o cache de JID de grupo
-// (bot/secretaria.js) é compartilhado entre todos os testes via GRUPO_IDS_FILE_PATH
-// (só um arquivo, nunca resetado entre testes) — se criarContexto() e criarMsgGrupo()
+// (bot/secretaria.js) é compartilhado entre todos os testes via DB_PATH
+// (um único banco, nunca resetado entre testes) — se criarContexto() e criarMsgGrupo()
 // usassem JIDs "de mentira" diferentes pro mesmo grupo, um teste anterior que recebe
 // mensagem de grupo (criarMsgGrupo) sobrescreveria o cache com um JID que o
 // client.sendMessage mockado de outro teste não reconhece, e a mensagem de

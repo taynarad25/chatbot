@@ -1,20 +1,14 @@
-const fs = require("fs");
-const path = require("path");
+const db = require("../db");
 
 const NOME_GRUPO_SECRETARIA = "Mensagens Secretaria";
 const NOME_GRUPO_PASTORAL = "Atendimento Pastoral";
 
-const CACHE_FILE = process.env.GRUPO_IDS_FILE_PATH || path.join(__dirname, "..", "grupo_ids.json");
-
 // client.getChats() (que lista TODOS os chats de uma vez) provou ser não-confiável em
 // produção — falha de forma consistente com um erro opaco ("r: r") vindo de dentro da
 // página do WhatsApp Web, independente da versão do whatsapp-web.js. client.getChatById()
-// (que busca só UM chat) é bem mais robusto. Só que o arquivo de cache do JID
-// (grupo_ids.json) é um bind mount do Docker, e mostrou duas formas de se perder por
-// completo (edição manual apagando o conteúdo, bind mount virando diretório vazio). Essas
-// variáveis de ambiente são uma segunda fonte do JID, gravada no .env, que sobrevive a
-// qualquer problema no arquivo — garantindo que getChatById() sempre tenha a chance de
-// funcionar antes de cair no getChats() frágil.
+// (que busca só UM chat) é bem mais robusto. Essas variáveis de ambiente são uma segunda
+// fonte do JID, gravada no .env, que sobrevive a qualquer problema no banco — garantindo
+// que getChatById() sempre tenha a chance de funcionar antes de cair no getChats() frágil.
 function jidPorEnv(nome) {
   const chave = nome.trim().toLowerCase();
   if (chave === NOME_GRUPO_SECRETARIA.trim().toLowerCase()) return process.env.GRUPO_JID_SECRETARIA || null;
@@ -32,50 +26,41 @@ function extrairCodigoConvite(codigoOuLink) {
   return null;
 }
 
-// Normaliza as chaves para minúsculo/sem espaços nas bordas ao ler: o arquivo é
-// editável manualmente (ex: alguém colando o JID direto, como aconteceu em produção
-// com "Atendimento Pastoral"/"Mensagens Secretaria" capitalizados), mas
-// atualizarCacheGrupo/obterJidCached sempre operam em minúsculo — sem essa
-// normalização, uma chave capitalizada nunca é encontrada e o cache fica sempre
-// "vazio" na prática, fazendo o bot cair sempre no fallback lento de getChats().
-function lerCacheGrupos() {
+// A chave sempre normalizada (minúsculo/sem espaços nas bordas) evita o bug que já
+// aconteceu em produção com o arquivo grupo_ids.json antigo: uma edição manual com
+// o nome "de exibição" capitalizado nunca batia com a chave usada pelo código. Como
+// agora a escrita só acontece por aqui (não tem mais arquivo pra editar à mão), essa
+// classe inteira de bug deixa de existir.
+function atualizarCacheGrupo(nome, jid) {
   try {
-    if (!fs.existsSync(CACHE_FILE)) return {};
-    const data = fs.readFileSync(CACHE_FILE, "utf8");
-    const cache = data.trim() ? JSON.parse(data) : {};
-    const normalizado = {};
-    for (const [chave, valor] of Object.entries(cache)) {
-      normalizado[chave.trim().toLowerCase()] = valor;
-    }
-    return normalizado;
-  } catch (err) {
-    console.error("[ALERTA:secretaria] Erro ao ler cache de grupos:", err.message);
-    return {};
-  }
-}
+    const chave = nome.trim().toLowerCase();
+    const atual = db.prepare("SELECT jid FROM grupo_ids WHERE nome = ?").get(chave);
+    if (atual && atual.jid === jid) return;
 
-function salvarCacheGrupos(cache) {
-  try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), "utf8");
+    db.prepare(`
+      INSERT INTO grupo_ids (nome, jid) VALUES (?, ?)
+      ON CONFLICT(nome) DO UPDATE SET jid = excluded.jid
+    `).run(chave, jid);
+    console.log(`[Secretaria] JID do grupo '${nome}' salvo no cache: ${jid}`);
   } catch (err) {
     console.error("[ALERTA:secretaria] Erro ao salvar cache de grupos:", err.message);
   }
 }
 
-function atualizarCacheGrupo(nome, jid) {
-  const cache = lerCacheGrupos();
-  const chave = nome.trim().toLowerCase();
-  if (cache[chave] !== jid) {
-    cache[chave] = jid;
-    salvarCacheGrupos(cache);
-    console.log(`[Secretaria] JID do grupo '${nome}' salvo no cache: ${jid}`);
+function lerCacheGrupo(nome) {
+  try {
+    const chave = nome.trim().toLowerCase();
+    const row = db.prepare("SELECT jid FROM grupo_ids WHERE nome = ?").get(chave);
+    return row ? row.jid : null;
+  } catch (err) {
+    console.error("[ALERTA:secretaria] Erro ao ler cache de grupos:", err.message);
+    return null;
   }
 }
 
 function obterJidCached(nome) {
   const doEnv = jidPorEnv(nome);
-  const cache = lerCacheGrupos();
-  const doCache = cache[nome.trim().toLowerCase()] || null;
+  const doCache = lerCacheGrupo(nome);
 
   if (doEnv && doEnv.includes("@")) {
     return doEnv;

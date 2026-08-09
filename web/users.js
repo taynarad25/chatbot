@@ -1,63 +1,63 @@
-const fs = require("fs");
-const path = require("path");
-
-// Sobrescrevível via env var (usado pelos testes, para nunca ler/escrever no
-// login.json real de produção).
-const LOGIN_FILE = process.env.LOGIN_FILE_PATH || path.join(__dirname, "..", "login.json");
+const db = require("../db");
 
 function loadUsers() {
   try {
-    if (!fs.existsSync(LOGIN_FILE)) {
-      console.warn(`[Users] Arquivo de usuários não encontrado em: ${LOGIN_FILE}`);
-      return {};
+    const rows = db.prepare("SELECT * FROM users").all();
+    const users = {};
+    for (const row of rows) {
+      users[row.username] = {
+        username: row.username,
+        salt: row.salt,
+        hash: row.hash,
+        status: row.status,
+        role: row.role,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      };
     }
-    const data = fs.readFileSync(LOGIN_FILE, "utf8");
-    if (!data.trim()) {
-      console.warn(`[Users] O arquivo login.json está vazio.`);
-      return {};
-    }
-    let usersRaw = JSON.parse(data);
-    let users = usersRaw;
-
-    // Se o arquivo for um Array [...], converte para Objeto {"username": {...}}
-    if (Array.isArray(usersRaw)) {
-      console.warn("[Users] Corrigindo formato de array para objeto no login.json...");
-      users = {};
-      usersRaw.forEach(u => {
-        if (u.username) users[u.username.toLowerCase().trim()] = u;
-      });
-      // Salva de volta para corrigir o arquivo fisicamente
-      fs.writeFileSync(LOGIN_FILE, JSON.stringify(users, null, 2), "utf8");
-    }
-
     console.log(`[Users] Banco carregado. Usuários detectados: ${Object.keys(users).join(", ") || "Nenhum"}`);
     return users;
   } catch (err) {
-    console.error("[ALERTA:persistencia] Erro crítico ao carregar usuários (login.json). Retornando vazio para evitar perda de dados.", err);
+    console.error("[ALERTA:persistencia] Erro crítico ao carregar usuários. Retornando vazio para evitar perda de dados.", err);
     return {};
   }
 }
 
 function saveUser(user) {
-  const users = loadUsers();
-  users[user.username] = user;
   try {
-    fs.writeFileSync(LOGIN_FILE, JSON.stringify(users, null, 2), "utf8");
+    db.prepare(`
+      INSERT INTO users (username, salt, hash, status, role, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(username) DO UPDATE SET
+        salt = excluded.salt,
+        hash = excluded.hash,
+        status = excluded.status,
+        role = excluded.role,
+        updatedAt = excluded.updatedAt
+    `).run(
+      user.username,
+      user.salt ?? null,
+      user.hash ?? null,
+      user.status,
+      user.role,
+      user.createdAt ?? null,
+      user.updatedAt ?? null
+    );
   } catch (err) {
-    console.error("[ALERTA:persistencia] Erro ao gravar arquivo de usuários (login.json):", err);
+    console.error("[ALERTA:persistencia] Erro ao gravar usuário:", err);
   }
 }
 
 function deleteUser(username) {
-  const users = loadUsers();
   const normalized = username?.toLowerCase().trim();
-  if (!users[normalized]) {
+  const existing = db.prepare("SELECT username FROM users WHERE username = ?").get(normalized);
+  if (!existing) {
     console.warn(`[Users] Tentativa de excluir usuário inexistente: '${normalized}'`);
     return { ok: false, message: "Usuário não encontrado." };
   }
-  delete users[normalized];
-  fs.writeFileSync(LOGIN_FILE, JSON.stringify(users, null, 2), "utf8");
+  db.prepare("DELETE FROM users WHERE username = ?").run(normalized);
   console.log(`[Users] Usuário '${normalized}' removido.`);
   return { ok: true, message: "Usuário excluído com sucesso." };
 }
+
 module.exports = { loadUsers, saveUser, deleteUser };

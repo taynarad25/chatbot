@@ -15,6 +15,7 @@ const { google } = require("googleapis");
 const { createMessageHandler } = require("./messageHandler");
 const { telefonesLideres, loadLideres, listLideres } = require("../web/lideres");
 const { notificarAlerta, extrairAlerta } = require("./alertas");
+const db = require("../db");
 
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
 // estado persistido e a sessão do WhatsApp (.wwebjs_auth) sempre viveram na
@@ -111,7 +112,7 @@ const agendasParaLer = [
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
 
 // A lista de líderes agora é gerenciada pelo painel web (aba "Líderes") e
-// persistida em lideres.json. `telefonesLideres` é a mesma referência de array
+// persistida no banco (tabela "lideres"). `telefonesLideres` é a mesma referência de array
 // usada pelo módulo web/lideres.js, então uma edição feita no painel já reflete
 // aqui sem precisar reiniciar o bot.
 loadLideres();
@@ -287,15 +288,14 @@ function criarClient() {
 
 // PERSISTÊNCIA DE ESTADO (ATIVO/PARADO)
 // =====================================
-const STATE_FILE = path.join(ROOT_DIR, 'bot_state.json');
 const saveBotState = (active) => {
   try {
-    if (fs.existsSync(STATE_FILE) && fs.lstatSync(STATE_FILE).isDirectory()) {
-      return console.error(`[ALERTA:persistencia] '${STATE_FILE}' é um diretório. Persistência de estado desativada.`);
-    }
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ active }), 'utf8');
+    db.prepare(`
+      INSERT INTO bot_state (id, active) VALUES (1, ?)
+      ON CONFLICT(id) DO UPDATE SET active = excluded.active
+    `).run(active ? 1 : 0);
   } catch (err) {
-    console.error(`[ALERTA:persistencia] Falha ao salvar estado (bot_state.json): ${err.message}`);
+    console.error(`[ALERTA:persistencia] Falha ao salvar estado do bot: ${err.message}`);
   }
 };
 
@@ -304,11 +304,11 @@ const loadBotState = () => {
   // conectar, igual ao comportamento histórico. Só fica "false" quando alguém realmente
   // pediu para desconectar (ver disconnectClient).
   try {
-    if (!fs.existsSync(STATE_FILE)) return { active: true };
-    if (fs.lstatSync(STATE_FILE).isDirectory()) return { active: true };
-    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const row = db.prepare("SELECT active FROM bot_state WHERE id = 1").get();
+    return row ? { active: !!row.active } : { active: true };
+  } catch (e) {
+    return { active: true };
   }
-  catch (e) { return { active: true }; }
 };
 
 async function startClient() {
