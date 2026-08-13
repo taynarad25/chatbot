@@ -1,9 +1,4 @@
-const fs = require("fs");
-const path = require("path");
-
-// Sobrescrevível via env var (usado pelos testes, para nunca ler/escrever no
-// lideres.json real de produção).
-const LIDERES_FILE = process.env.LIDERES_FILE_PATH || path.join(__dirname, "..", "lideres.json");
+const db = require("../db");
 
 // Array mantido em memória e sempre atualizado por mutação (nunca reatribuído).
 // bot/chatbot.js guarda essa mesma referência ao montar o messageHandler, então
@@ -15,54 +10,47 @@ function normalizarTelefone(telefone) {
   return String(telefone || "").replace(/\D/g, "");
 }
 
-function sincronizarTelefones(lideres) {
+function sincronizarTelefones() {
+  const rows = db.prepare("SELECT telefone FROM lideres").all();
   telefonesLideres.length = 0;
-  telefonesLideres.push(...Object.keys(lideres));
+  telefonesLideres.push(...rows.map((r) => r.telefone));
 }
 
-// Na primeira execução (arquivo ainda não existe), semeia a partir da variável
-// de ambiente WHATSAPP_LIDERES para não perder os números já configurados.
-// A partir daí, o arquivo passa a ser a fonte de verdade.
-function seedFromEnv() {
+// Na primeira execução (banco ainda sem nenhum líder), semeia a partir da
+// variável de ambiente WHATSAPP_LIDERES para não perder os números já
+// configurados. A partir daí, o banco passa a ser a fonte de verdade.
+function seedFromEnvSeNecessario() {
+  const { total } = db.prepare("SELECT COUNT(*) AS total FROM lideres").get();
+  if (total > 0) return;
+
   const numeros = (process.env.WHATSAPP_LIDERES || "")
     .split(",")
     .map(normalizarTelefone)
     .filter(Boolean);
+  if (numeros.length === 0) return;
 
-  const lideres = {};
-  numeros.forEach((telefone) => {
-    lideres[telefone] = { nome: "", telefone, createdAt: new Date().toISOString() };
-  });
-  return lideres;
+  const agora = new Date().toISOString();
+  const insert = db.prepare("INSERT INTO lideres (telefone, nome, createdAt) VALUES (?, ?, ?)");
+  numeros.forEach((telefone) => insert.run(telefone, "", agora));
+  console.log(`[Lideres] Banco semeado a partir de WHATSAPP_LIDERES com ${numeros.length} número(s).`);
 }
 
 function loadLideres() {
   try {
-    if (!fs.existsSync(LIDERES_FILE)) {
-      const lideres = seedFromEnv();
-      if (Object.keys(lideres).length > 0) {
-        fs.writeFileSync(LIDERES_FILE, JSON.stringify(lideres, null, 2), "utf8");
-        console.log(`[Lideres] Arquivo criado a partir de WHATSAPP_LIDERES com ${Object.keys(lideres).length} número(s).`);
-      }
-      sincronizarTelefones(lideres);
-      return lideres;
+    seedFromEnvSeNecessario();
+    const rows = db.prepare("SELECT * FROM lideres").all();
+    const lideres = {};
+    for (const row of rows) {
+      lideres[row.telefone] = { nome: row.nome, telefone: row.telefone, createdAt: row.createdAt, updatedAt: row.updatedAt };
     }
-
-    const data = fs.readFileSync(LIDERES_FILE, "utf8");
-    const lideres = data.trim() ? JSON.parse(data) : {};
     console.log(`[Lideres] Banco carregado. ${Object.keys(lideres).length} líder(es) detectado(s).`);
-    sincronizarTelefones(lideres);
+    sincronizarTelefones();
     return lideres;
   } catch (err) {
-    console.error("[ALERTA:persistencia] Erro crítico ao carregar líderes (lideres.json). Retornando vazio para evitar perda de dados.", err);
-    sincronizarTelefones({});
+    console.error("[ALERTA:persistencia] Erro crítico ao carregar líderes. Retornando vazio para evitar perda de dados.", err);
+    sincronizarTelefones();
     return {};
   }
-}
-
-function salvar(lideres) {
-  fs.writeFileSync(LIDERES_FILE, JSON.stringify(lideres, null, 2), "utf8");
-  sincronizarTelefones(lideres);
 }
 
 function listLideres() {
@@ -75,15 +63,12 @@ function addLider({ nome, telefone }) {
   if (!telefoneNormalizado) return { ok: false, message: "Telefone inválido." };
   if (!nome || !nome.trim()) return { ok: false, message: "Nome é obrigatório." };
 
-  const lideres = loadLideres();
-  if (lideres[telefoneNormalizado]) return { ok: false, message: "Já existe um líder com esse telefone." };
+  const existente = db.prepare("SELECT telefone FROM lideres WHERE telefone = ?").get(telefoneNormalizado);
+  if (existente) return { ok: false, message: "Já existe um líder com esse telefone." };
 
-  lideres[telefoneNormalizado] = {
-    nome: nome.trim(),
-    telefone: telefoneNormalizado,
-    createdAt: new Date().toISOString(),
-  };
-  salvar(lideres);
+  db.prepare("INSERT INTO lideres (telefone, nome, createdAt) VALUES (?, ?, ?)")
+    .run(telefoneNormalizado, nome.trim(), new Date().toISOString());
+  sincronizarTelefones();
   console.log(`[Lideres] Líder adicionado: ${nome.trim()} (${telefoneNormalizado})`);
   return { ok: true, message: "Líder adicionado com sucesso." };
 }
@@ -94,33 +79,29 @@ function updateLider(telefoneAtual, { nome, telefone }) {
   if (!novoTelefoneNormalizado) return { ok: false, message: "Telefone inválido." };
   if (!nome || !nome.trim()) return { ok: false, message: "Nome é obrigatório." };
 
-  const lideres = loadLideres();
-  const liderExistente = lideres[telefoneAtualNormalizado];
+  const liderExistente = db.prepare("SELECT * FROM lideres WHERE telefone = ?").get(telefoneAtualNormalizado);
   if (!liderExistente) return { ok: false, message: "Líder não encontrado." };
 
-  if (novoTelefoneNormalizado !== telefoneAtualNormalizado && lideres[novoTelefoneNormalizado]) {
-    return { ok: false, message: "Já existe um líder com esse telefone." };
+  if (novoTelefoneNormalizado !== telefoneAtualNormalizado) {
+    const conflito = db.prepare("SELECT telefone FROM lideres WHERE telefone = ?").get(novoTelefoneNormalizado);
+    if (conflito) return { ok: false, message: "Já existe um líder com esse telefone." };
   }
 
-  delete lideres[telefoneAtualNormalizado];
-  lideres[novoTelefoneNormalizado] = {
-    nome: nome.trim(),
-    telefone: novoTelefoneNormalizado,
-    createdAt: liderExistente.createdAt,
-    updatedAt: new Date().toISOString(),
-  };
-  salvar(lideres);
+  db.prepare("DELETE FROM lideres WHERE telefone = ?").run(telefoneAtualNormalizado);
+  db.prepare("INSERT INTO lideres (telefone, nome, createdAt, updatedAt) VALUES (?, ?, ?, ?)")
+    .run(novoTelefoneNormalizado, nome.trim(), liderExistente.createdAt, new Date().toISOString());
+  sincronizarTelefones();
   console.log(`[Lideres] Líder editado: ${telefoneAtualNormalizado} -> ${nome.trim()} (${novoTelefoneNormalizado})`);
   return { ok: true, message: "Líder atualizado com sucesso." };
 }
 
 function removeLider(telefone) {
   const telefoneNormalizado = normalizarTelefone(telefone);
-  const lideres = loadLideres();
-  if (!lideres[telefoneNormalizado]) return { ok: false, message: "Líder não encontrado." };
+  const existente = db.prepare("SELECT telefone FROM lideres WHERE telefone = ?").get(telefoneNormalizado);
+  if (!existente) return { ok: false, message: "Líder não encontrado." };
 
-  delete lideres[telefoneNormalizado];
-  salvar(lideres);
+  db.prepare("DELETE FROM lideres WHERE telefone = ?").run(telefoneNormalizado);
+  sincronizarTelefones();
   console.log(`[Lideres] Líder removido: ${telefoneNormalizado}`);
   return { ok: true, message: "Líder removido com sucesso." };
 }

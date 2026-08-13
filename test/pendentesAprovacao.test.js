@@ -1,10 +1,10 @@
-// Isola completamente do pendentes.json real de produção ANTES de exigir o módulo.
+// Isola completamente do banco real de produção ANTES de exigir o módulo.
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-pendentes-test-"));
-process.env.PENDENTES_FILE_PATH = path.join(tmpDir, "pendentes.json");
+process.env.DB_PATH = path.join(tmpDir, "dados.db");
 
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");

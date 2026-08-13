@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22-slim
 
 # Instala o Chromium e suas dependências
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,6 +31,7 @@ RUN npm ci --ignore-scripts --omit=dev && npm cache clean --force
 COPY --chown=node:node bot/ ./bot/
 COPY --chown=node:node web/ ./web/
 COPY --chown=node:node web.js ./
+COPY --chown=node:node db.js ./
 
 EXPOSE 3000
 CMD [ "node", "bot/chatbot.js" ]

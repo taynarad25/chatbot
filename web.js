@@ -141,10 +141,10 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         return res.end();
       }
 
-      if (req.method === 'GET' && pathname === '/login') {
-        return sendHtml(res, renderLoginHtml());   
+      if (req.method === 'GET' && pathname === '/secretaria/login') {
+        return sendHtml(res, renderLoginHtml());
       }
-      if (req.method === 'POST' && pathname === '/login') {
+      if (req.method === 'POST' && pathname === '/secretaria/login') {
         try {
           const body = await parseRequestBody(req);
           const username = body.username?.trim();
@@ -181,19 +181,21 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           return sendJson(res, 400, { ok: false, message: 'Falha ao processar login.' });
         }
       }
-      if (pathname !== '/login' && pathname !== '/register' && !isAuthenticated(req)) {
+      // O gate de autenticação só se aplica a rotas dentro de /secretaria — outras
+      // rotas (ex: uma futura landing page em "/") ficam livres, sem exigir login.
+      if (pathname.startsWith('/secretaria') && pathname !== '/secretaria/login' && pathname !== '/secretaria/register' && !isAuthenticated(req)) {
         if (req.method === 'GET') {
-          res.writeHead(302, { Location: '/login' });
+          res.writeHead(302, { Location: '/secretaria/login' });
           return res.end();
         }
         console.warn(`[Web] 401 Acesso negado para ${sanitizarParaLog(pathname)} | IP: ${sanitizarParaLog(ip)}`); // NOSONAR
         return sendJson(res, 401, { ok: false, message: 'Login requerido.' });
       }
-      if (req.method === 'GET' && pathname === '/register') {
+      if (req.method === 'GET' && pathname === '/secretaria/register') {
         return sendHtml(res, renderRegisterHtml());
-      
+
       }
-      if (req.method === 'POST' && pathname === '/register') {
+      if (req.method === 'POST' && pathname === '/secretaria/register') {
         try {
           const body = await parseRequestBody(req);
           const { username, password } = body;
@@ -219,11 +221,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
         }
       }
+      // Placeholder até existir uma landing page de verdade em "/" — nesse caso, troque
+      // este redirect por um handler que sirva a página institucional.
       if (req.method === 'GET' && pathname === '/') {
-        res.writeHead(302, { Location: '/whatsappcontrol' });
+        res.writeHead(302, { Location: '/secretaria' });
         return res.end();
       }
-      if (req.method === 'GET' && pathname === '/whatsappcontrol') {
+      if (req.method === 'GET' && pathname === '/secretaria') {
         try {
           const html = renderIndexHtml();
           return sendHtml(res, html);
@@ -232,32 +236,32 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           throw renderErr; // Repassa para o catch global
         }
       }
-      if (req.method === 'GET' && pathname === '/status') {
+      if (req.method === 'GET' && pathname === '/secretaria/status') {
         return sendJson(res, 200, getStatus());
       }
 
       // API: Informações do Usuário Logado
-      if (req.method === 'GET' && pathname === '/api/user-info') {
+      if (req.method === 'GET' && pathname === '/secretaria/api/user-info') {
         const session = getSession(req);
         return sendJson(res, 200, { ok: true, user: session });
       }
 
       // API: Deletar Usuário (Apenas Admin)
-      if (req.method === 'DELETE' && pathname.startsWith('/api/admin/users/') && isAdmin(req)) {
-        const target = decodeURIComponent(pathname.replace('/api/admin/users/', ''));
+      if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/admin/users/') && isAdmin(req)) {
+        const target = decodeURIComponent(pathname.replace('/secretaria/api/admin/users/', ''));
         const result = deleteUser(target);
         return sendJson(res, result.ok ? 200 : 404, result);
       }
 
       // API: Listar Usuários (Apenas Admin)
-      if (req.method === 'GET' && pathname === '/api/admin/users' && isAdmin(req)) {
+      if (req.method === 'GET' && pathname === '/secretaria/api/admin/users' && isAdmin(req)) {
         const users = loadUsers();
         const userList = Object.values(users).map(u => ({ username: u.username, role: u.role }));
         return sendJson(res, 200, { ok: true, users: userList });
       }
 
       // API: Criar Usuário (Apenas Admin)
-      if (req.method === 'POST' && pathname === '/api/admin/users' && isAdmin(req)) {
+      if (req.method === 'POST' && pathname === '/secretaria/api/admin/users' && isAdmin(req)) {
         try {
           const body = await parseRequestBody(req);
           const result = await addUser(body);
@@ -269,13 +273,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       }
 
       // API: Listar Líderes (Apenas Admin)
-      if (req.method === 'GET' && pathname === '/api/admin/lideres' && isAdmin(req)) {
+      if (req.method === 'GET' && pathname === '/secretaria/api/admin/lideres' && isAdmin(req)) {
         const lideres = listLideres();
         return sendJson(res, 200, { ok: true, lideres });
       }
 
       // API: Adicionar Líder (Apenas Admin)
-      if (req.method === 'POST' && pathname === '/api/admin/lideres' && isAdmin(req)) {
+      if (req.method === 'POST' && pathname === '/secretaria/api/admin/lideres' && isAdmin(req)) {
         try {
           const body = await parseRequestBody(req);
           const result = addLider(body);
@@ -287,9 +291,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       }
 
       // API: Editar Líder (Apenas Admin)
-      if (req.method === 'PUT' && pathname.startsWith('/api/admin/lideres/') && isAdmin(req)) {
+      if (req.method === 'PUT' && pathname.startsWith('/secretaria/api/admin/lideres/') && isAdmin(req)) {
         try {
-          const target = decodeURIComponent(pathname.replace('/api/admin/lideres/', ''));
+          const target = decodeURIComponent(pathname.replace('/secretaria/api/admin/lideres/', ''));
           const body = await parseRequestBody(req);
           const result = updateLider(target, body);
           return sendJson(res, result.ok ? 200 : 400, result);
@@ -300,14 +304,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       }
 
       // API: Remover Líder (Apenas Admin)
-      if (req.method === 'DELETE' && pathname.startsWith('/api/admin/lideres/') && isAdmin(req)) {
-        const target = decodeURIComponent(pathname.replace('/api/admin/lideres/', ''));
+      if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/admin/lideres/') && isAdmin(req)) {
+        const target = decodeURIComponent(pathname.replace('/secretaria/api/admin/lideres/', ''));
         const result = removeLider(target);
         return sendJson(res, result.ok ? 200 : 404, result);
       }
 
       // API: Ler Logs (Apenas Admin)
-      if (req.method === 'GET' && pathname === '/api/logs' && isAdmin(req)) {
+      if (req.method === 'GET' && pathname === '/secretaria/api/logs' && isAdmin(req)) {
         try {
           const content = fs.readFileSync(LOG_FILE, 'utf8');
           return sendJson(res, 200, { ok: true, logs: content });
@@ -317,7 +321,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       }
 
       // API: Limpar Logs (Apenas Admin)
-      if (req.method === 'DELETE' && pathname === '/api/logs' && isAdmin(req)) {
+      if (req.method === 'DELETE' && pathname === '/secretaria/api/logs' && isAdmin(req)) {
         try {
           fs.writeFileSync(LOG_FILE, '');
           return sendJson(res, 200, { ok: true });
@@ -326,7 +330,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         }
       }
 
-      if (req.method === 'POST' && pathname === '/request-qr') {
+      if (req.method === 'POST' && pathname === '/secretaria/request-qr') {
         const status = getStatus();
         if (status.connected) {
           return sendJson(res, 200, { ok: false, message: 'Bot conectado.' });
@@ -334,15 +338,15 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         await startClient();
         return sendJson(res, 200, { ok: true });
       }
-      if (req.method === 'POST' && pathname === '/cancel-qr') {
+      if (req.method === 'POST' && pathname === '/secretaria/cancel-qr') {
         await cancelQr();
         return sendJson(res, 200, { ok: true });
       }
-      if (req.method === 'POST' && pathname === '/disconnect') {
+      if (req.method === 'POST' && pathname === '/secretaria/disconnect') {
         const result = await disconnectClient();
         return sendJson(res, result.ok ? 200 : 500, result);
       }
-      if (req.method === 'POST' && pathname === '/logout') {
+      if (req.method === 'POST' && pathname === '/secretaria/logout') {
         const sessionId = getSessionId(req);
         if (sessionId) delete sessions[sessionId];
         clearSessionCookie(res);

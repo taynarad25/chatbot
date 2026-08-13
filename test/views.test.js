@@ -38,10 +38,10 @@ function buildSandbox(usersPayload) {
   const calls = [];
   window.fetch = async (url, opts) => {
     calls.push({ url, method: opts?.method || "GET" });
-    if (url === "/api/admin/users") {
+    if (url === "/secretaria/api/admin/users") {
       return { ok: true, json: async () => ({ ok: true, users: usersPayload }) };
     }
-    if (url.startsWith("/api/admin/users/")) {
+    if (url.startsWith("/secretaria/api/admin/users/")) {
       return { ok: true, json: async () => ({ ok: true }) };
     }
     return { ok: false, status: 404, json: async () => ({ ok: false }) };
@@ -69,7 +69,7 @@ test("fetchUsers: username com payload de script é renderizado como texto, não
   assert.ok(span, "deveria existir um <span> com o nome do usuário");
   assert.equal(span.textContent, `${payload} (user)`, "o payload deve aparecer literalmente como texto");
 
-  assert.deepEqual(calls, [{ url: "/api/admin/users", method: "GET" }]);
+  assert.deepEqual(calls, [{ url: "/secretaria/api/admin/users", method: "GET" }]);
 });
 
 test("fetchUsers: username com aspas não quebra o atributo do botão (sem onclick inline)", async () => {
@@ -106,7 +106,7 @@ test("deleteUser: clique no botão dispara exclusão via addEventListener (sem l
   await flushMicrotasks();
 
   assert.ok(
-    calls.some((c) => c.url === "/api/admin/users/fulano" && c.method === "DELETE"),
+    calls.some((c) => c.url === "/secretaria/api/admin/users/fulano" && c.method === "DELETE"),
     "o clique deveria disparar uma chamada DELETE para o usuário correto"
   );
 });

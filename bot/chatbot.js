@@ -15,6 +15,7 @@ const { google } = require("googleapis");
 const { createMessageHandler } = require("./messageHandler");
 const { telefonesLideres, loadLideres, listLideres } = require("../web/lideres");
 const { notificarAlerta, extrairAlerta } = require("./alertas");
+const db = require("../db");
 
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
 // estado persistido e a sessão do WhatsApp (.wwebjs_auth) sempre viveram na
@@ -75,7 +76,7 @@ console.error = (...args) => {
       .filter(Boolean)
       .join("\n");
     const mensagem = `🚨 *Alerta do Bot*\n\n${alerta.textoLimpo}${detalhes ? `\n${detalhes}` : ""}\n\n${getTimestamp()}`;
-    notificarAlerta(client, alerta.categoria, mensagem).catch(() => {});
+    notificarAlerta(client, alerta.categoria, mensagem).catch(() => { });
   }
 };
 console.warn = (...args) => logger(originalWarn, ...args);
@@ -111,7 +112,7 @@ const agendasParaLer = [
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
 
 // A lista de líderes agora é gerenciada pelo painel web (aba "Líderes") e
-// persistida em lideres.json. `telefonesLideres` é a mesma referência de array
+// persistida no banco (tabela "lideres"). `telefonesLideres` é a mesma referência de array
 // usada pelo módulo web/lideres.js, então uma edição feita no painel já reflete
 // aqui sem precisar reiniciar o bot.
 loadLideres();
@@ -127,7 +128,7 @@ const auth = new google.auth.GoogleAuth({
 
 const calendar = google.calendar({
   version: "v3",
-  auth: auth, 
+  auth: auth,
 });
 
 // Funções auxiliares
@@ -135,7 +136,7 @@ async function buscarEventos(inicio, fim, agendaId = null) {
   let todosEventos = [];
   const agendas = agendaId ? [agendaId] : agendasParaLer;
   console.log(`[Google Calendar] Buscando eventos em ${agendas.length} agenda(s) entre ${inicio} e ${fim}`);
-  
+
   for (const id of agendas) {
     try {
       let pageToken;
@@ -210,12 +211,45 @@ function criarClient() {
     }
   });
 
-  client.on("ready", () => {
+  client.on("ready", async () => {
     clientReady = true;
     pendingQr = null;
     isGeneratingQr = false;
     saveBotState(true); // Salva como ativo apenas quando a conexão é confirmada
     console.log("✅ Bot conectado!");
+
+    try {
+      const inviteSec = "KsHKE5q5BiI81KvJ1ARdUp";
+      const invitePas = "I2AxSM7v9CI211RGWJBX2Y";
+      
+      console.log('=============== RESOLVENDO GRUPOS POR CONVITE ===============');
+      try {
+        const info = await client.getInviteInfo(inviteSec);
+        const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
+        console.log(`NOME: "Mensagens Secretaria"  --->  JID RESOLVIDO: "${jid}"`);
+        if (jid) {
+          const { atualizarCacheGrupo } = require("./secretaria");
+          atualizarCacheGrupo("Mensagens Secretaria", jid);
+        }
+      } catch (err) {
+        console.error("Erro ao resolver convite Secretaria:", err.message);
+      }
+      
+      try {
+        const info = await client.getInviteInfo(invitePas);
+        const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
+        console.log(`NOME: "Atendimento Pastoral"  --->  JID RESOLVIDO: "${jid}"`);
+        if (jid) {
+          const { atualizarCacheGrupo } = require("./secretaria");
+          atualizarCacheGrupo("Atendimento Pastoral", jid);
+        }
+      } catch (err) {
+        console.error("Erro ao resolver convite Pastoral:", err.message);
+      }
+      console.log('=============================================================');
+    } catch (err) {
+      console.error('Erro na rotina de resolução de grupos:', err);
+    }
   });
 
   client.on("authenticated", () => {
@@ -254,15 +288,14 @@ function criarClient() {
 
 // PERSISTÊNCIA DE ESTADO (ATIVO/PARADO)
 // =====================================
-const STATE_FILE = path.join(ROOT_DIR, 'bot_state.json');
 const saveBotState = (active) => {
   try {
-    if (fs.existsSync(STATE_FILE) && fs.lstatSync(STATE_FILE).isDirectory()) {
-      return console.error(`[ALERTA:persistencia] '${STATE_FILE}' é um diretório. Persistência de estado desativada.`);
-    }
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ active }), 'utf8');
+    db.prepare(`
+      INSERT INTO bot_state (id, active) VALUES (1, ?)
+      ON CONFLICT(id) DO UPDATE SET active = excluded.active
+    `).run(active ? 1 : 0);
   } catch (err) {
-    console.error(`[ALERTA:persistencia] Falha ao salvar estado (bot_state.json): ${err.message}`);
+    console.error(`[ALERTA:persistencia] Falha ao salvar estado do bot: ${err.message}`);
   }
 };
 
@@ -271,11 +304,11 @@ const loadBotState = () => {
   // conectar, igual ao comportamento histórico. Só fica "false" quando alguém realmente
   // pediu para desconectar (ver disconnectClient).
   try {
-    if (!fs.existsSync(STATE_FILE)) return { active: true };
-    if (fs.lstatSync(STATE_FILE).isDirectory()) return { active: true };
-    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const row = db.prepare("SELECT active FROM bot_state WHERE id = 1").get();
+    return row ? { active: !!row.active } : { active: true };
+  } catch (e) {
+    return { active: true };
   }
-  catch (e) { return { active: true }; }
 };
 
 async function startClient() {
@@ -299,7 +332,7 @@ async function startClient() {
   const sessionDir = path.join(ROOT_DIR, ".wwebjs_auth", `session-${clientId}`);
   const profileDir = path.join(sessionDir, "Default");
   const locks = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
-  
+
   [sessionDir, profileDir].forEach(dir => {
     try {
       if (!fs.existsSync(dir)) return;

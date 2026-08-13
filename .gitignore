@@ -4,11 +4,12 @@ node_modules/
 *.deb
 credenciais-google.json
 .env
-login.json
-lideres.json
-pendentes.json
+dados.db
+dados.db-journal
+dados.db-wal
+dados.db-shm
+*.migrado
 *.log
 npm-debug.log*
 .DS_Store
 Thumbs.db
-bot_state.json
