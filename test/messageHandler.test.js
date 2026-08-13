@@ -1123,8 +1123,9 @@ test("opção 3: fluxo de atendimento pastoral completo - solicitação + confir
   // Deve ter enviado mensagem direta confirmando para o discípulo
   assert.equal(diretasEnviadas.length, 1);
   assert.equal(diretasEnviadas[0].to, NUMERO_COMUM);
-  assert.match(diretasEnviadas[0].texto, /atendimento pastoral foi confirmado/);
-  assert.match(diretasEnviadas[0].texto, /segunda as 19h/);
+  assert.match(diretasEnviadas[0].texto, /Atendimento Pastoral foi confirmado/);
+  assert.match(diretasEnviadas[0].texto, /Dia: segunda/);
+  assert.match(diretasEnviadas[0].texto, /Horário: 19h/);
 
   // Solicitação pendente deve ter sido removida
   assert.equal(buscarPendente(codigo), null);
@@ -1156,7 +1157,7 @@ test("opção 3: fluxo de atendimento pastoral completo - solicitação + recusa
   // Deve ter enviado mensagem direta para o discípulo informando a recusa
   assert.equal(diretasEnviadas.length, 1);
   assert.equal(diretasEnviadas[0].to, NUMERO_COMUM);
-  assert.match(diretasEnviadas[0].texto, /Infelizmente não pudemos confirmar o seu atendimento pastoral/);
+  assert.match(diretasEnviadas[0].texto, /Infelizmente não teremos disponibilidade para o Atendimento Pastoral na Segunda à noite no momento/);
 
   // Solicitação pendente deve ter sido removida
   assert.equal(buscarPendente(codigo), null);

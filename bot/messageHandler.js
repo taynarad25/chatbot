@@ -47,6 +47,64 @@ function mascararTelefone(numero) {
   return `+${ddi} (${ddd}) ${mascara}-${ultimosQuatro}`;
 }
 
+// Divide o texto de dia/horário em duas partes: dia e horário (ex: "segunda as 19h" -> dia: "segunda", horario: "19h")
+function dividirDiaEHorario(texto) {
+  if (!texto) return { dia: "", horario: "" };
+  const textoLimpo = texto.trim();
+  
+  // Tenta separar usando conectivos comuns como " às ", " as ", " das ", " de ", " a ", " @ ", " - " ou ","
+  // seguidos por uma hora (número inicial)
+  const matchComSeparador = textoLimpo.match(/^(.*?)\s*(?:\s(?:às|as|das|de|a|@|-|para\s+as|para\s+às)\s+|\s*,\s*|\s+às\s+|\s+as\s+)(\d{1,2}(?:[hH\.:\s]|$).*)$/i);
+  if (matchComSeparador) {
+    return {
+      dia: matchComSeparador[1].trim(),
+      horario: matchComSeparador[2].trim()
+    };
+  }
+  
+  // Se não encontrar o separador explícito, mas achar uma hora no final (ex: "segunda-feira 19h" ou "segunda 19:30")
+  const matchHoraFinal = textoLimpo.match(/^(.*?)\s+(\d{1,2}\s*(?:h|min|hrs|horas|hs|:\d{2}|h\d{2})[a-z0-9\s]*)$/i);
+  if (matchHoraFinal) {
+    return {
+      dia: matchHoraFinal[1].trim(),
+      horario: matchHoraFinal[2].trim()
+    };
+  }
+  
+  // Caso contrário, assume tudo como dia e deixa o horário vazio
+  return {
+    dia: textoLimpo,
+    horario: ""
+  };
+}
+
+// Formata a disponibilidade para mensagens negativas de forma natural
+function formatarDisponibilidadeNegativa(disp) {
+  if (!disp) return "";
+  const limpo = disp.trim();
+  const lower = limpo.toLowerCase();
+  
+  if (lower.startsWith("no ") || lower.startsWith("na ") || lower.startsWith("em ") || lower.startsWith("para ") || lower.startsWith("às ") || lower.startsWith("as ")) {
+    return limpo;
+  }
+  
+  if (lower.startsWith("segunda") || lower.startsWith("terça") || lower.startsWith("quarta") || lower.startsWith("quinta") || lower.startsWith("sexta")) {
+    return `na ${limpo}`;
+  }
+  
+  if (lower.startsWith("sábado") || lower.startsWith("sabado") || lower.startsWith("domingo")) {
+    return `no ${limpo}`;
+  }
+  
+  return `em ${limpo}`;
+}
+
+// Capitaliza a primeira letra de cada palavra em um nome
+function capitalizarNome(nome) {
+  if (!nome) return "";
+  return nome.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+}
+
 // Monta a identificação padrão usada nos logs: nome do contato + telefone
 // mascarado + papel do usuário (ex: "Taynara Diniz | +55 (11) *****-6727 (Usuário)").
 function identificarUsuario(contato, numero, isLider) {
@@ -396,7 +454,15 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             if (diaHorario) {
               removerPendente(codigo);
 
-              const feedback = `Olá! Seu atendimento pastoral foi confirmado para:\n\n🗓️ *${diaHorario}*\n\nQualquer dúvida, entre em contato. Deus abençoe! 🙏\n\nDigite *menu* para voltar ao menu principal.`;
+              const { dia, horario } = dividirDiaEHorario(diaHorario);
+              const nomeCapitalizado = capitalizarNome(nome);
+              
+              let feedback = `Olá, ${nomeCapitalizado}! Tudo bem?\n\nSeu Atendimento Pastoral foi confirmado! 🙌\n\n🗓️ Dia: ${dia}`;
+              if (horario) {
+                feedback += `\n\n⏰ Horário: ${horario}`;
+              }
+              feedback += `\n\nCaso aconteça algum imprevisto, pedimos a gentileza de nos avisar com antecedência. Que Deus abençoe! 🙏`;
+
               try {
                 await client.sendMessage(solicitanteId, feedback);
                 console.log(`[Pastoral] Atendimento confirmado para ${nome} (${mascararTelefone(solicitanteId)}): ${diaHorario}`); // NOSONAR
@@ -406,7 +472,12 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               return msg.reply(`✅ Atendimento de *${nome}* confirmado para *${diaHorario}*. O discípulo foi notificado.`);
             } else if (textoMsg === "não confirmar" || textoMsg === "recusar") {
               removerPendente(codigo);
-              const feedback = `Olá! Infelizmente não pudemos confirmar o seu atendimento pastoral para os dias/horários sugeridos. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.`;
+
+              const nomeCapitalizado = capitalizarNome(nome);
+              const dispFormatada = formatarDisponibilidadeNegativa(dados.disponibilidade);
+              
+              const feedback = `Olá, ${nomeCapitalizado}! Tudo bem?\n\nInfelizmente não teremos disponibilidade para o Atendimento Pastoral ${dispFormatada} no momento.\n\nVocê teria outro dia ou horário disponível para verificarmos novamente com a equipe?\n\nFicamos no aguardo e continuamos à disposição! 🙏`;
+
               try {
                 await client.sendMessage(solicitanteId, feedback);
                 console.log(`[Pastoral] Atendimento recusado para ${nome} (${mascararTelefone(solicitanteId)})`); // NOSONAR
