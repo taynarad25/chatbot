@@ -51,7 +51,7 @@ function mascararTelefone(numero) {
 function dividirDiaEHorario(texto) {
   if (!texto) return { dia: "", horario: "" };
   const textoLimpo = texto.trim();
-  
+
   // Tenta separar usando conectivos comuns como " às ", " as ", " das ", " de ", " a ", " @ ", " - " ou ","
   // seguidos por uma hora (número inicial)
   const matchComSeparador = textoLimpo.match(/^(.*?)\s*(?:\s(?:às|as|das|de|a|@|-|para\s+as|para\s+às)\s+|\s*,\s*|\s+às\s+|\s+as\s+)(\d{1,2}(?:[hH\.:\s]|$).*)$/i);
@@ -61,7 +61,7 @@ function dividirDiaEHorario(texto) {
       horario: matchComSeparador[2].trim()
     };
   }
-  
+
   // Se não encontrar o separador explícito, mas achar uma hora no final (ex: "segunda-feira 19h" ou "segunda 19:30")
   const matchHoraFinal = textoLimpo.match(/^(.*?)\s+(\d{1,2}\s*(?:h|min|hrs|horas|hs|:\d{2}|h\d{2})[a-z0-9\s]*)$/i);
   if (matchHoraFinal) {
@@ -70,7 +70,7 @@ function dividirDiaEHorario(texto) {
       horario: matchHoraFinal[2].trim()
     };
   }
-  
+
   // Caso contrário, assume tudo como dia e deixa o horário vazio
   return {
     dia: textoLimpo,
@@ -83,19 +83,19 @@ function formatarDisponibilidadeNegativa(disp) {
   if (!disp) return "";
   const limpo = disp.trim();
   const lower = limpo.toLowerCase();
-  
+
   if (lower.startsWith("no ") || lower.startsWith("na ") || lower.startsWith("em ") || lower.startsWith("para ") || lower.startsWith("às ") || lower.startsWith("as ")) {
     return limpo;
   }
-  
+
   if (lower.startsWith("segunda") || lower.startsWith("terça") || lower.startsWith("quarta") || lower.startsWith("quinta") || lower.startsWith("sexta")) {
     return `na ${limpo}`;
   }
-  
+
   if (lower.startsWith("sábado") || lower.startsWith("sabado") || lower.startsWith("domingo")) {
     return `no ${limpo}`;
   }
-  
+
   return `em ${limpo}`;
 }
 
@@ -432,10 +432,30 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           }
         } else if (nomeChatNormalizado.includes(NOME_GRUPO_PASTORAL.trim().toLowerCase())) {
           atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
-          const quotedMsg = await msg.getQuotedMessage();
-          if (quotedMsg.fromMe) {
-            const codigo = extrairCodigo(quotedMsg.body);
+
+          // 🟢 Tenta obter a mensagem citada de forma totalmente segura (evitando o 'id undefined')
+          let quotedMsg = null;
+          try {
+            if (msg.hasQuotedMsg) {
+              quotedMsg = await comRetry(() => msg.getQuotedMessage());
+            }
+          } catch (errQuoted) {
+            console.warn(`[Pastoral] Falha ao executar getQuotedMessage(), tentando ler do payload direto:`, errQuoted.message);
+          }
+
+          // Fallback: se o getQuotedMessage() falhar, tenta extrair o corpo da citação do payload da própria mensagem
+          const textoQuoted = quotedMsg?.body
+            || msg.quotedMsg?.body
+            || msg._data?.quotedMsg?.body
+            || msg._data?.quotedMsg?.caption
+            || "";
+
+          const ehMensagemDoBot = quotedMsg ? quotedMsg.fromMe : (msg.quotedMsg?.fromMe || msg._data?.quotedMsg?.fromMe);
+
+          if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
+            const codigo = extrairCodigo(textoQuoted);
             const dados = codigo ? buscarPendente(codigo) : null;
+
             if (!dados || dados.tipo !== "pastoral") {
               return msg.reply("❌ Não encontrei essa solicitação de atendimento (código inválido ou já respondido antes).");
             }
@@ -445,6 +465,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             const bodyTrimmed = msg.body.trim();
             const bodyLower = bodyTrimmed.toLowerCase();
             let diaHorario = "";
+
             if (bodyLower.startsWith("confirmar ")) {
               diaHorario = bodyTrimmed.slice("confirmar ".length).trim();
             } else if (bodyLower.startsWith("confirmado ")) {
@@ -456,7 +477,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
               const { dia, horario } = dividirDiaEHorario(diaHorario);
               const nomeCapitalizado = capitalizarNome(nome);
-              
+
               let feedback = `Olá, ${nomeCapitalizado}! Tudo bem?\n\nSeu Atendimento Pastoral foi confirmado! 🙌\n\n🗓️ Dia: ${dia}`;
               if (horario) {
                 feedback += `\n\n⏰ Horário: ${horario}`;
@@ -465,26 +486,28 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
               try {
                 await client.sendMessage(solicitanteId, feedback);
-                console.log(`[Pastoral] Atendimento confirmado para ${nome} (${mascararTelefone(solicitanteId)}): ${diaHorario}`); // NOSONAR
+                console.log(`[Pastoral] Atendimento confirmado para ${nome} (${mascararTelefone(solicitanteId)}): ${diaHorario}`);
               } catch (sendErr) {
                 console.error(`[ALERTA:whatsapp] Erro ao enviar confirmação de pastoral para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
               }
               return msg.reply(`✅ Atendimento de *${nome}* confirmado para *${diaHorario}*. O discípulo foi notificado.`);
+
             } else if (textoMsg === "não confirmar" || textoMsg === "recusar") {
               removerPendente(codigo);
 
               const nomeCapitalizado = capitalizarNome(nome);
               const dispFormatada = formatarDisponibilidadeNegativa(dados.disponibilidade);
-              
+
               const feedback = `Olá, ${nomeCapitalizado}! Tudo bem?\n\nInfelizmente não teremos disponibilidade para o Atendimento Pastoral ${dispFormatada} no momento.\n\nVocê teria outro dia ou horário disponível para verificarmos novamente com a equipe?\n\nFicamos no aguardo e continuamos à disposição! 🙏`;
 
               try {
                 await client.sendMessage(solicitanteId, feedback);
-                console.log(`[Pastoral] Atendimento recusado para ${nome} (${mascararTelefone(solicitanteId)})`); // NOSONAR
+                console.log(`[Pastoral] Atendimento recusado para ${nome} (${mascararTelefone(solicitanteId)})`);
               } catch (sendErr) {
                 console.error(`[ALERTA:whatsapp] Erro ao enviar recusa de pastoral para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
               }
               return msg.reply(`❌ Atendimento de *${nome}* não confirmado e discípulo notificado.`);
+
             } else {
               return msg.reply("❌ Comando inválido para atendimento pastoral. Responda com \"confirmar [dia/horário]\" ou \"não confirmar\".");
             }
@@ -1019,8 +1042,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             // Compara os horários de início e fim
             const [hInicio, mInicio] = info.horarioInicio.split(":").map(Number);
             const [hFim, mFim] = info.horarioFim.split(":").map(Number);
-            const tempStart = moment.tz("America/Sao_Paulo").set({hour: hInicio, minute: mInicio, second: 0, millisecond: 0});
-            const tempEnd = moment.tz("America/Sao_Paulo").set({hour: hFim, minute: mFim, second: 0, millisecond: 0});
+            const tempStart = moment.tz("America/Sao_Paulo").set({ hour: hInicio, minute: mInicio, second: 0, millisecond: 0 });
+            const tempEnd = moment.tz("America/Sao_Paulo").set({ hour: hFim, minute: mFim, second: 0, millisecond: 0 });
             if (tempEnd.isSameOrBefore(tempStart)) {
               return msg.reply("❌ O horário de término deve ser depois do horário de início.");
             }
@@ -1106,7 +1129,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
           if (info.etapa === "disponibilidade") {
             info.disponibilidade = msg.body;
-            
+
             const dadosPastoral = {
               tipo: "pastoral",
               solicitanteId: numero,
