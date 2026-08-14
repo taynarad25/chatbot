@@ -325,11 +325,28 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         const nomeChatNormalizado = grupoPertence.trim().toLowerCase();
         if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
           atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
+
+          // 🟢 Tenta obter a mensagem citada de forma totalmente segura (evitando o 'id undefined')
+          let quotedMsg = null;
+          try {
+            if (msg.hasQuotedMsg) {
+              quotedMsg = await comRetry(() => msg.getQuotedMessage());
+            }
+          } catch (errQuoted) {
+            console.warn(`[Secretaria] Falha ao executar getQuotedMessage(), tentando ler do payload direto:`, errQuoted.message);
+          }
+
+          const textoQuoted = quotedMsg?.body
+            || msg.quotedMsg?.body
+            || msg._data?.quotedMsg?.body
+            || msg._data?.quotedMsg?.caption
+            || "";
+
+          const ehMensagemDoBot = quotedMsg ? quotedMsg.fromMe : (msg.quotedMsg?.fromMe || msg._data?.quotedMsg?.fromMe);
+
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
-            const quotedMsg = await msg.getQuotedMessage();
-            // Verifica se a mensagem respondida é o resumo enviado pelo bot
-            if (quotedMsg.fromMe) {
-              const codigo = extrairCodigo(quotedMsg.body);
+            if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
+              const codigo = extrairCodigo(textoQuoted);
               const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
@@ -367,10 +384,8 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               }
             }
           } else if (textoMsg === "alterar evento" || textoMsg === "não alterar") {
-            const quotedMsg = await msg.getQuotedMessage();
-            // Verifica se a mensagem respondida é o pedido de alteração enviado pelo bot
-            if (quotedMsg.fromMe) {
-              const codigo = extrairCodigo(quotedMsg.body);
+            if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
+              const codigo = extrairCodigo(textoQuoted);
               const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
@@ -421,10 +436,8 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               }
             }
           } else if (textoMsg === "cancelar evento" || textoMsg === "manter evento") {
-            const quotedMsg = await msg.getQuotedMessage();
-            // Verifica se a mensagem respondida é o pedido de cancelamento enviado pelo bot
-            if (quotedMsg.fromMe) {
-              const codigo = extrairCodigo(quotedMsg.body);
+            if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
+              const codigo = extrairCodigo(textoQuoted);
               const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
@@ -1247,17 +1260,11 @@ Estamos esperando por você e sua família em nossos encontros:
 ⛪ *Culto de Celebração*
 🗓️ Todos os Domingos
 ⏰ Às *18h*
-📍 *Endereço temporário:* Rua Orlando Telles, 225, Cidade Saúde - Itapevi
-⚠️ _Nota: Devido à transição para o nosso novo salão, os cultos de domingo à noite temporariamente continuam sendo realizados neste endereço._
 
 🍞 *Santa Ceia*
 🗓️ Todo 1º Domingo do Mês
 ⏰ Às *08h30*
-📍 *Local:* Salão Novo (Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi)
-⚠️ _Nota: Nossas Santa Ceias já estão sendo realizadas diretamente no salão novo. Lembrando que, neste domingo de Santa Ceia, não temos culto à noite._
 
-📢 *Aviso Importante (Mudança de Salão):*
-*A partir de Agosto*, TODOS os nossos cultos (incluindo os cultos de domingo à noite) serão realizados definitivamente em nosso novo endereço:
 📍 *Endereço:* Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi
 
 Venha viver um tempo precioso na presença de Deus! 🙏🙌
