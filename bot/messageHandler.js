@@ -1299,7 +1299,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
           if (info.etapa === "artes_foto") {
             if (msg.hasMedia) {
               try {
-                const media = await comRetry(() => msg.downloadMedia());
+                const media = await comRetry(() => msg.downloadMedia(), { tentativas: 4, esperaMs: 3000 });
                 info.midiaAnexa = media;
               } catch (errMedia) {
                 console.error("[Artes] Erro ao baixar mídia:", errMedia);
