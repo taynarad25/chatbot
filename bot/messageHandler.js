@@ -1170,7 +1170,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             await notificarPastoral(client, resumoGrupo);
 
             console.log(`[Pastoral] Pedido finalizado para ${info.nome} (${mascararTelefone(numero)}). Código: ${codigo}. Disponibilidade: ${info.disponibilidade}`); // NOSONAR
-            await msg.reply(`Perfeito! Sua solicitação de atendimento pastoral foi registrada.\n\n👤 *Nome:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\nA pastoral entrará em contato em breve para confirmar o agendamento. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
+            await msg.reply(`Perfeito! Sua solicitação de atendimento pastoral foi registrada.\n\n👤 *Nome:* ${info.nome}\n🗓️ *Disponibilidade:* ${info.disponibilidade}\n\nEm breve entraremos em contato para confirmar o agendamento. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
             delete etapas[numero];
             return;
           }
