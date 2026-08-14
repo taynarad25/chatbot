@@ -1239,3 +1239,89 @@ test("opção 3: fluxo pastoral - comando inválido do pastor avisa no grupo", a
   assert.match(msgPastor.respostas[0], /❌ Comando inválido/);
   assert.equal(diretasEnviadas.length, 0); // discipulo não foi notificado de nada ainda
 });
+
+// ---------------------------------------------------------------------------
+// Fluxo de Artes e Flyers (Área do Líder - Opção 3)
+// ---------------------------------------------------------------------------
+
+test("fluxo artes_flyers: solicita com sucesso sem imagem anexa", async () => {
+  const { handleMessage, gruposEnviados, etapas } = criarContexto();
+
+  // 1. Inicia Área do Líder -> Artes e Flyers
+  const r1 = await enviar(handleMessage, NUMERO_LIDER, "6");
+  const r2 = await enviar(handleMessage, NUMERO_LIDER, "3");
+  assert.match(r2[0], /De qual departamento é a solicitação/);
+
+  // 2. Escolhe departamento inválido e depois válido (7 - Rede de Homens)
+  const r3 = await enviar(handleMessage, NUMERO_LIDER, "15");
+  assert.match(r3[0], /Escolha um departamento da lista/);
+
+  const r4 = await enviar(handleMessage, NUMERO_LIDER, "7");
+  assert.match(r4[0], /Qual o \*tipo de material\* que você precisa/);
+
+  // 3. Escolhe tipo de material inválido e depois válido (1 - Flyer)
+  const r5 = await enviar(handleMessage, NUMERO_LIDER, "5");
+  assert.match(r5[0], /Escolha uma opção de 1 a 4/);
+
+  const r6 = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(r6[0], /O que \*deve constar na arte\/material\*/);
+
+  // 4. Digita os detalhes da arte
+  const r7 = await enviar(handleMessage, NUMERO_LIDER, "Texto: Culto dos Homens. Tema: Coragem.");
+  assert.match(r7[0], /Você tem alguma \*foto, logotipo ou referência visual\*/);
+
+  // 5. Responde "NÃO" para a foto
+  const r8 = await enviar(handleMessage, NUMERO_LIDER, "não");
+  assert.match(r8[0], /Para qual \*data máxima\*/);
+
+  // 6. Define o prazo final e encerra
+  const r9 = await enviar(handleMessage, NUMERO_LIDER, "25/08");
+  assert.match(r9[0], /Solicitação enviada com sucesso/);
+  assert.match(r9[0], /prazo de \*25\/08\*/);
+
+  // Verifica se a notificação foi enviada ao grupo da secretaria
+  assert.equal(gruposEnviados.length, 1);
+  assert.match(gruposEnviados[0], /NOVA SOLICITAÇÃO DE ARTE\/FLYER/);
+  assert.match(gruposEnviados[0], /Rede de Homens/);
+  assert.match(gruposEnviados[0], /Flyer \/ Arte para Redes Sociais/);
+  assert.match(gruposEnviados[0], /Coragem/);
+  assert.match(gruposEnviados[0], /25\/08/);
+
+  // O fluxo deve ter sido finalizado
+  assert.equal(etapas[NUMERO_LIDER], undefined);
+});
+
+test("fluxo artes_flyers: solicita com sucesso anexando imagem/mídia", async () => {
+  const { handleMessage, gruposEnviados, etapas } = criarContexto();
+
+  // Inicia e avança até a etapa da foto
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "3");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Detalhes da arte");
+
+  // Simula o envio de imagem (hasMedia=true)
+  const respostas = [];
+  const msgComMidia = {
+    from: NUMERO_LIDER,
+    fromMe: false,
+    body: "",
+    hasMedia: true,
+    downloadMedia: async () => ({ data: "fake_base64_data", mimetype: "image/png" }),
+    reply: async (texto) => { respostas.push(texto); return texto; },
+    getContact: async () => ({ id: { _serialized: NUMERO_LIDER }, pushname: "Pastor", name: undefined }),
+  };
+  await handleMessage(msgComMidia);
+  assert.match(respostas[0], /Para qual \*data máxima\*/);
+
+  // Finaliza informando o prazo
+  const rFinal = await enviar(handleMessage, NUMERO_LIDER, "25/08");
+  assert.match(rFinal[0], /Solicitação enviada com sucesso/);
+
+  // Deve ter enviado ao grupo da secretaria
+  assert.equal(gruposEnviados.length, 1);
+  assert.match(gruposEnviados[0], /NOVA SOLICITAÇÃO DE ARTE\/FLYER/);
+  assert.equal(etapas[NUMERO_LIDER], undefined);
+});
+

@@ -1259,14 +1259,84 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
             } else if (escolha === "3") {
               info.fluxo = "artes_flyers";
-              info.etapa = "inicio_artes";
-              return msg.reply("🎨 *Solicitar artes e flyers*\n\nEssa funcionalidade está sendo preparada e estará disponível em breve! 🙏\n\nDigite *menu* para voltar ao menu principal.");
+              info.etapa = "artes_departamento";
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedes()}`);
             } else {
               return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 3, ou digite *menu* para voltar.");
             }
           }
         } else if (info.fluxo === "artes_flyers") {
-          return msg.reply("🎨 O fluxo de solicitação de artes e flyers está em desenvolvimento.\n\nDigite *menu* para voltar ao menu principal.");
+          if (info.etapa === "artes_departamento") {
+            const rede = obterRedePorNumero(msg.body);
+            if (!rede) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
+
+            info.departamento = rede.nome;
+            info.etapa = "artes_tipo";
+            return msg.reply("📌 Qual o *tipo de material* que você precisa?\n\n1 - Flyer / Arte para Redes Sociais\n2 - Aviso / Comunicado Geral\n3 - Lembrancinha / Tag / Material Impresso\n4 - Outro");
+          }
+
+          if (info.etapa === "artes_tipo") {
+            const tipos = {
+              "1": "Flyer / Arte para Redes Sociais",
+              "2": "Aviso / Comunicado Geral",
+              "3": "Lembrancinha / Tag / Material Impresso",
+              "4": "Outro"
+            };
+            const tipoEscolhido = tipos[msg.body.trim()];
+            if (!tipoEscolhido) return msg.reply("❌ Escolha uma opção de 1 a 4.");
+
+            info.tipoMaterial = tipoEscolhido;
+            info.etapa = "artes_detalhes";
+            return msg.reply("📝 O que *deve constar na arte/material*?\n\nDigite todo o texto e detalhes necessários (frases, datas, horários, versículo, preletor, cores ou formatos):");
+          }
+
+          if (info.etapa === "artes_detalhes") {
+            info.detalhesArte = msg.body.trim();
+            info.etapa = "artes_foto";
+            return msg.reply("📷 Você tem alguma *foto, logotipo ou referência visual* para usar?\n\n👉 Envie a imagem agora pelo WhatsApp.\n👉 Se não precisar de imagem, apenas responda com *NÃO*.");
+          }
+
+          if (info.etapa === "artes_foto") {
+            if (msg.hasMedia) {
+              try {
+                const media = await msg.downloadMedia();
+                info.midiaAnexa = media;
+              } catch (errMedia) {
+                console.error("[Artes] Erro ao baixar mídia:", errMedia);
+                return msg.reply("❌ Ocorreu um erro ao baixar a imagem. Por favor, envie a imagem novamente ou responda com *NÃO* para continuar sem imagem.");
+              }
+            } else if (msg.body.trim().toLowerCase() === "não" || msg.body.trim().toLowerCase() === "nao") {
+              info.midiaAnexa = null;
+            } else {
+              return msg.reply("❌ Por favor, envie uma imagem ou responda com *NÃO*.");
+            }
+
+            info.etapa = "artes_prazo";
+            return msg.reply("⏳ Para qual *data máxima* você precisa desse material pronto? (Ex: 22/08)");
+          }
+
+          if (info.etapa === "artes_prazo") {
+            info.prazoEntrega = msg.body.trim();
+
+            const resumoGrupo = `🎨 *NOVA SOLICITAÇÃO DE ARTE/FLYER*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Depto/Rede:* ${info.departamento}\n📌 *Tipo de Material:* ${info.tipoMaterial}\n⏳ *Prazo de Entrega:* ${info.prazoEntrega}\n📝 *Detalhes/Texto:* ${info.detalhesArte}`;
+
+            try {
+              if (info.midiaAnexa) {
+                const groupJid = obterJidCached(NOME_GRUPO_SECRETARIA);
+                await client.sendMessage(groupJid, info.midiaAnexa, { caption: resumoGrupo });
+                console.log(`[Artes] Solicitação com imagem enviada para o grupo via JID.`);
+              } else {
+                await notificarSecretaria(client, resumoGrupo);
+              }
+            } catch (errSend) {
+              console.error("[Artes] Erro ao notificar secretaria com imagem:", errSend);
+              await notificarSecretaria(client, resumoGrupo + "\n\n⚠️ _Nota: Não foi possível enviar a imagem anexa devido a uma falha de transmissão._");
+            }
+
+            await msg.reply(`✅ *Solicitação enviada com sucesso!*\n\nSeu pedido de arte/material foi encaminhado para a equipe com o prazo de *${info.prazoEntrega}*. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
+            delete etapas[numero];
+            return;
+          }
         }
         return;
       }
