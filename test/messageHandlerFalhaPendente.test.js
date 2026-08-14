@@ -70,6 +70,7 @@ test("tabela de pendentes indisponível: líder recebe um aviso claro, não fica
   const { handleMessage } = criarContexto();
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar novo evento
   await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");

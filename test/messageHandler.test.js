@@ -197,11 +197,11 @@ test("saudação: mensagem com texto além da saudação NÃO ativa o menu (pode
   }
 });
 
-test("saudação: líder recebe o menu completo, com as opções 6 e 7", async () => {
+test("saudação: líder recebe o menu com a opção 6 da Área do Líder", async () => {
   const { handleMessage } = criarContexto();
   const respostas = await enviar(handleMessage, NUMERO_LIDER, "oi");
-  assert.match(respostas[0], /6️⃣ Agendar, alterar ou cancelar evento/);
-  assert.match(respostas[0], /7️⃣ Comunicados e Avisos/);
+  assert.match(respostas[0], /6️⃣ Área do Líder/);
+  assert.doesNotMatch(respostas[0], /7️⃣/);
 });
 
 test("texto livre sem fluxo ativo: bot fica em silêncio (pode ser conversa com a secretaria fora do menu)", async () => {
@@ -371,6 +371,7 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({ eventos: [] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar novo evento
   await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja"); // local
@@ -435,6 +436,7 @@ test("opção 6 (líder): resumo do grupo usa o nome cadastrado no painel de lí
   });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar novo evento
   await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
@@ -455,6 +457,7 @@ test("opção 6 (líder): sem nome cadastrado no painel, o resumo do grupo cai d
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7");
@@ -474,6 +477,7 @@ test("opção 6 (líder): duas solicitações pendentes ao mesmo tempo não se c
   // Primeira solicitação
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto A");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
@@ -486,6 +490,7 @@ test("opção 6 (líder): duas solicitações pendentes ao mesmo tempo não se c
 
   // Segunda solicitação, de outro líder, antes da primeira ser respondida
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto B");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
@@ -523,6 +528,7 @@ test("opção 6 (líder): endereço customizado (evento fora da igreja) é usado
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Reunião de Casais");
   await enviar(handleMessage, NUMERO_LIDER, "Rua das Flores, 123 - Jardim Primavera");
   await enviar(handleMessage, NUMERO_LIDER, "6"); // Rede de Casais
@@ -541,6 +547,7 @@ test("opção 6 (líder): evento de DIA TODO pula a pergunta de horário de tér
   const { handleMessage } = criarContexto({ eventos: [] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Retiro Espiritual");
   await enviar(handleMessage, NUMERO_LIDER, "Sítio da Família Silva"); // local
@@ -561,6 +568,7 @@ test("opção 6 (líder): agenda por data específica — dia livre sugere horá
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({ eventos: [] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
@@ -601,6 +609,7 @@ test("opção 6 (líder): agenda por data específica — dia de Sábado LIVRE �
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7");
@@ -623,6 +632,7 @@ test("opção 6 (líder): agenda por data específica — horário pedido confli
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7");
@@ -644,6 +654,7 @@ test("opção 6 (líder): agenda por data específica — dia inválido para o m
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7");
@@ -661,6 +672,7 @@ test("opção 6 (líder): agenda por data específica — não deixa escolher um
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7");
@@ -677,6 +689,7 @@ test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — 
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({ eventos: [] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
@@ -707,6 +720,7 @@ test("opção 6 (líder): alterar evento existente (texto livre), do início ao 
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosAlterados, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2"); // Alterar evento existente
   setEventos([eventoExistente]);
   const listaResp = await enviar(handleMessage, NUMERO_LIDER, "9"); // Rede de Mulheres
@@ -746,6 +760,7 @@ test("opção 6 (líder): alterar evento (texto livre) — secretaria recusa ('n
   const { handleMessage, gruposEnviados, diretasEnviadas } = criarContexto({ eventos: [eventoExistente] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2");
   await enviar(handleMessage, NUMERO_LIDER, "9");
   await enviar(handleMessage, NUMERO_LIDER, "1");
@@ -769,6 +784,7 @@ test("opção 6 (líder): alterar horário de evento existente, aplicado automat
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosAlterados, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2");
   setEventos([eventoExistente]);
   await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
@@ -803,6 +819,7 @@ test("opção 6 (líder): alterar a data de um evento para um dia que já passou
   const { handleMessage, etapas, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2");
   setEventos([eventoExistente]);
   await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
@@ -827,6 +844,7 @@ test("opção 6 (líder): cancelar evento existente — aprovado pela secretaria
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosCancelados, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "3"); // Cancelar evento existente
   setEventos([eventoExistente]);
   const listaResp = await enviar(handleMessage, NUMERO_LIDER, "1"); // Evangelismo
@@ -860,6 +878,7 @@ test("opção 6 (líder): cancelar evento — secretaria nega ('manter evento')"
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosCancelados } = criarContexto({ eventos: [eventoExistente] });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "3");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1");
@@ -876,6 +895,7 @@ test("opção 6 (líder): cancelar evento — secretaria nega ('manter evento')"
 test("opção 6 (líder): departamento sem eventos futuros encerra o fluxo de alteração", async () => {
   const { handleMessage, etapas } = criarContexto({ eventos: [] });
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2");
   const resp = await enviar(handleMessage, NUMERO_LIDER, "9");
   assert.match(resp[1], /Não encontrei eventos futuros/);
@@ -918,6 +938,7 @@ test("opção 6 (líder): evento que já passou não aparece na lista pra altera
   });
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2"); // Alterar evento existente
   const listaResp = await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
 
@@ -939,11 +960,14 @@ test("opção 7: usuário comum não tem acesso (fallback genérico)", async () 
 test("opção 7 (líder): encaminha o comunicado em texto livre para a secretaria", async () => {
   const { handleMessage, gruposEnviados, etapas } = criarContexto();
 
-  const r1 = await enviar(handleMessage, NUMERO_LIDER, "7");
-  assert.match(r1[0], /Comunicados e Avisos/);
+  const r1 = await enviar(handleMessage, NUMERO_LIDER, "6");
+  assert.match(r1[0], /Área do Líder/);
 
-  const r2 = await enviar(handleMessage, NUMERO_LIDER, "Não haverá culto no dia 20 por conta da reforma.");
-  assert.match(r2[0], /encaminhada para a secretaria/);
+  const r2 = await enviar(handleMessage, NUMERO_LIDER, "2");
+  assert.match(r2[0], /comunicado/i);
+
+  const r3 = await enviar(handleMessage, NUMERO_LIDER, "Não haverá culto no dia 20 por conta da reforma.");
+  assert.match(r3[0], /encaminhada para a secretaria/);
 
   assert.equal(gruposEnviados.length, 1);
   assert.match(gruposEnviados[0], /NOVO COMUNICADO PARA O CULTO/);
@@ -956,7 +980,8 @@ test("opção 7 (líder): resumo do comunicado também usa o nome cadastrado no 
     lideresCadastrados: [{ nome: "Pastor Marcos", telefone: "5511999999999" }],
   });
 
-  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "2");
   await enviar(handleMessage, NUMERO_LIDER, "Não haverá culto no dia 20.", { pushname: "celular do Pastor" });
 
   assert.match(gruposEnviados[0], /Solicitante:\* Pastor Marcos/);

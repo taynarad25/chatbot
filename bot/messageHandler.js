@@ -580,8 +580,7 @@ Escolha uma opção:
 3️⃣ Atendimento pastoral
 4️⃣ Aulas de música
 5️⃣ Falar com a secretaria
-6️⃣ Agendar, alterar ou cancelar evento (líderes)
-7️⃣ Comunicados e Avisos nos Cultos
+6️⃣ Área do Líder
 
 Digite *menu* a qualquer momento para voltar ao menu principal.`
           : `Olá! 👋
@@ -1247,6 +1246,27 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             return msg.reply(montarDetalheEvento(itens[index]));
           }
+        } else if (info.fluxo === "area_lider") {
+          if (info.etapa === "menu_lider") {
+            const escolha = msg.body.trim();
+            if (escolha === "1") {
+              info.fluxo = "agendamento";
+              info.etapa = "evento_acao";
+              return msg.reply("📅 O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente\n3 - Cancelar evento existente");
+            } else if (escolha === "2") {
+              info.fluxo = "comunicados";
+              info.etapa = "texto_comunicado";
+              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
+            } else if (escolha === "3") {
+              info.fluxo = "artes_flyers";
+              info.etapa = "inicio_artes";
+              return msg.reply("🎨 *Solicitar artes e flyers*\n\nEssa funcionalidade está sendo preparada e estará disponível em breve! 🙏\n\nDigite *menu* para voltar ao menu principal.");
+            } else {
+              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 3, ou digite *menu* para voltar.");
+            }
+          }
+        } else if (info.fluxo === "artes_flyers") {
+          return msg.reply("🎨 O fluxo de solicitação de artes e flyers está em desenvolvimento.\n\nDigite *menu* para voltar ao menu principal.");
         }
         return;
       }
@@ -1296,7 +1316,7 @@ Digite *menu* para voltar ao menu principal.`;
 
       if (texto === "4") {
         console.log(`Opção 4 selecionada por ${identificarUsuario(contato, numero, isLider)}`);
-        return msg.reply(`🎵 *Aulas de Música*\n\nOferecemos: Canto, Teclado, Violão e Guitarra.\n\n*Em breve abriremos novas inscrições!* Fique atento aos avisos.\n\nDigite *menu* para voltar ao menu principal.`);
+        return msg.reply(`🎵 *Aulas de Música*\n\nPor enquanto, as aulas de música estão suspensas. Assim que retornarmos, avisaremos!\n\nAgradecemos a compreensão. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
       }
 
       if (texto === "5") {
@@ -1307,15 +1327,10 @@ Digite *menu* para voltar ao menu principal.`;
       }
 
       if (texto === "6" && isLider) {
-        console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando agendamento`);
-        etapas[numero] = { fluxo: "agendamento", etapa: "evento_acao" };
-        return msg.reply("📅 O que você deseja fazer?\n\n1 - Agendar novo evento\n2 - Alterar evento existente\n3 - Cancelar evento existente");
-      }
-
-      if (texto === "7" && isLider) {
-        console.log(`Opção 7 selecionada por ${identificarUsuario(contato, numero, isLider)}`);
-        etapas[numero] = { fluxo: "comunicados", etapa: "texto_comunicado" };
-        return msg.reply("📢 *Comunicados e Avisos*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
+        console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando Área do Líder`);
+        etapas[numero] = { fluxo: "area_lider", etapa: "menu_lider" };
+        const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n\nDigite *menu* para voltar ao menu principal.`;
+        return msg.reply(msgSubmenu);
       }
 
       // Nenhuma opção reconhecida e nenhum fluxo ativo. Se a mensagem for só
