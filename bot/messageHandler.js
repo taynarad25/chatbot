@@ -229,16 +229,27 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       if (msg.from.endsWith("@g.us")) {
         const cachedSecretaria = obterJidCached(NOME_GRUPO_SECRETARIA);
         const cachedPastoral = obterJidCached(NOME_GRUPO_PASTORAL);
+
+        let grupoPertence = null;
+        if (msg.from === cachedSecretaria) {
+          grupoPertence = NOME_GRUPO_SECRETARIA;
+        } else if (msg.from === cachedPastoral) {
+          grupoPertence = NOME_GRUPO_PASTORAL;
+        }
+
         let chat = null;
         let getChatFailed = false;
 
-        if (msg.from !== cachedSecretaria && msg.from !== cachedPastoral) {
+        // Se não for nenhum dos dois grupos no cache, a gente tenta carregar o chat para identificar pelo nome
+        if (!grupoPertence) {
           try {
             chat = await comRetry(() => msg.getChat());
             const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
             if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
+              grupoPertence = NOME_GRUPO_SECRETARIA;
               atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
             } else if (nomeChatNormalizado.includes(NOME_GRUPO_PASTORAL.trim().toLowerCase())) {
+              grupoPertence = NOME_GRUPO_PASTORAL;
               atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
             }
           } catch (err) {
@@ -276,25 +287,42 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           return;
         }
 
-        if (getChatFailed) {
+        if (!grupoPertence && getChatFailed) {
           return;
         }
 
-        try {
-          if (!chat) {
-            chat = await comRetry(() => msg.getChat());
+        // Se ainda não identificamos o grupo (porque não estava no cache e falhou ao obter chat da primeira vez)
+        if (!grupoPertence) {
+          try {
+            if (!chat) {
+              chat = await comRetry(() => msg.getChat());
+            }
+            const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
+            if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
+              grupoPertence = NOME_GRUPO_SECRETARIA;
+              atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
+            } else if (nomeChatNormalizado.includes(NOME_GRUPO_PASTORAL.trim().toLowerCase())) {
+              grupoPertence = NOME_GRUPO_PASTORAL;
+              atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
+            }
+          } catch (err) {
+            // Não é "erro fatal": existem mensagens de grupo cujo chat nunca resolve
+            // de verdade (JID inválido/sintético, sem relação com o fluxo do bot) —
+            // tentar de novo não ajuda nesses casos, então só ignora essa mensagem em
+            // vez de estourar o alerta crítico repetidamente pra algo não-acionável.
+            console.warn(`[Grupo] Não foi possível carregar o chat de uma mensagem (de: ${mascararTelefone(msg.from)}, id: ${msg.id?._serialized}) — ignorando. Detalhe: ${err.message}`);
+            return;
           }
-        } catch (err) {
-          // Não é "erro fatal": existem mensagens de grupo cujo chat nunca resolve
-          // de verdade (JID inválido/sintético, sem relação com o fluxo do bot) —
-          // tentar de novo não ajuda nesses casos, então só ignora essa mensagem em
-          // vez de estourar o alerta crítico repetidamente pra algo não-acionável.
-          console.warn(`[Grupo] Não foi possível carregar o chat de uma mensagem (de: ${mascararTelefone(msg.from)}, id: ${msg.id?._serialized}) — ignorando. Detalhe: ${err.message}`);
-          return;
         }
 
-        console.log(`[Grupo] "${chat.name}" | Resposta a outra mensagem: ${msg.hasQuotedMsg} | Texto: "${msg.body}"`);
-        const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
+        if (!grupoPertence) {
+          return; // Não pertence a nenhum dos dois grupos
+        }
+
+        const nomeParaExibicao = chat?.name || grupoPertence;
+        console.log(`[Grupo] "${nomeParaExibicao}" | Resposta a outra mensagem: ${msg.hasQuotedMsg} | Texto: "${msg.body}"`);
+
+        const nomeChatNormalizado = grupoPertence.trim().toLowerCase();
         if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
           atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
