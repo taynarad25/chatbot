@@ -37,4 +37,14 @@ function mapearRedeParaAgendaIndex(nomeRede) {
   return (encontrada || REDE_PADRAO).agendaIndex;
 }
 
-module.exports = { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex };
+const { AGENDAS_INTERNAS, IDS_AGENDAS_INTERNAS, isAgendaInterna } = require("./agendasInternas");
+
+module.exports = {
+  REDES,
+  montarListaRedes,
+  obterRedePorNumero,
+  mapearRedeParaAgendaIndex,
+  AGENDAS_INTERNAS,
+  IDS_AGENDAS_INTERNAS,
+  isAgendaInterna,
+};

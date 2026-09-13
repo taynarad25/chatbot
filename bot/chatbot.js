@@ -107,7 +107,11 @@ const agendasParaLer = [
   "384215b0335082cfde0c5f5f98b75ca59612a77a5123544f15bd41dd60d238d4@group.calendar.google.com", // Rede de Homens
   "b02048ebc98f7504e086cf4b2a54881a4e645189b565c90b5f7c477a4d0de10f@group.calendar.google.com", // Rede de Mulheres
   "b0aae19433652d50d04ae2290889cf7f905cc226ae103eb839ff3ca511acd6af@group.calendar.google.com", // Rede Kids
-  "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com"  // Eventos Externos
+  "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com", // Eventos Externos
+  "b8f01bfd149139d388080ec63176c2556e6e1aedce184b84d37671c3d082d238@group.calendar.google.com", // Reuniões
+  "0a55126694643f39944faf173fe3acd127b2a52074c6ecc9e9ed4dc23edf8b57@group.calendar.google.com", // Atendimento
+  "7975950de545f60f585bc041682c6564ce4c29d0ef7e06cdeffa21ffc0ffd572@group.calendar.google.com", // Limpeza
+  "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com", // Ensaios
 ];
 
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);

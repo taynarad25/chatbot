@@ -1,7 +1,7 @@
 const moment = require("moment-timezone");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
-const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
+const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, isAgendaInterna } = require("./redes");
 const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
@@ -156,21 +156,29 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
     return nomeContato(contato, numero);
   }
 
+  function isAgendaOcultaOuInterna(calendarId) {
+    if (!calendarId) return false;
+    if (isAgendaInterna(calendarId)) return true;
+    const index = agendasParaLer.indexOf(calendarId);
+    return index >= 11;
+  }
+
   // Busca, filtra e entrega a listagem de agenda para um período, deixando o
   // fluxo pronto para receber o número de um item na próxima mensagem.
   async function entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg) {
     try {
       const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
       const calendarIdExternos = agendasParaLer[mapearRedeParaAgendaIndex("Eventos Externos")];
-      const isEventoExterno = (ev) =>
+      const isEventoOculto = (ev) =>
         Boolean(calendarIdExternos && ev.calendarId === calendarIdExternos) ||
-        ev.calendarId === "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com";
+        ev.calendarId === "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com" ||
+        isAgendaOcultaOuInterna(ev.calendarId);
 
       const todosEventos = todosEventosRaw.filter(ev => {
         if (ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre")) {
           return false;
         }
-        if (isEventoExterno(ev)) {
+        if (isEventoOculto(ev)) {
           return false;
         }
         return true;
@@ -191,6 +199,11 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       delete etapas[numero];
       return msg.reply("⚠️ Erro ao carregar agenda.");
     }
+  }
+
+  // Agendas internas não devem interferir na disponibilidade do agendamento de eventos
+  function filtrarEventosAgendamento(eventos) {
+    return eventos.filter(ev => !isAgendaOcultaOuInterna(ev.calendarId));
   }
 
   // Monta e envia o resumo de "novo evento" pro solicitante e o pedido de
@@ -894,7 +907,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             try {
               const inicioBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
               const fimBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").endOf('month').format();
-              const todosEventos = await buscarEventos(inicioBusca, fimBusca);
+              const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
+              const todosEventos = filtrarEventosAgendamento(todosEventosRaw);
 
               const resultado = verificarDataEspecifica({
                 eventos: todosEventos,
@@ -962,7 +976,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             try {
               const inicioBusca = moment.tz([info.anoEspecifico, info.mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
               const fimBusca = moment.tz([info.anoEspecifico, info.mes - 1], "America/Sao_Paulo").endOf('month').format();
-              const todosEventos = await buscarEventos(inicioBusca, fimBusca);
+              const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
+              const todosEventos = filtrarEventosAgendamento(todosEventosRaw);
 
               const resultado = verificarDataEspecifica({
                 eventos: todosEventos,
@@ -1062,7 +1077,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               const inicioBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
               const fimBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").endOf('month').format();
 
-              const todosEventos = await buscarEventos(inicioBusca, fimBusca);
+              const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
+              const todosEventos = filtrarEventosAgendamento(todosEventosRaw);
 
               const { disponiveis, conflito } = calcularDisponibilidade({
                 eventos: todosEventos,

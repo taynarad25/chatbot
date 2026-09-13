@@ -37,6 +37,7 @@ const AGENDAS = [
   "cal-evangelismo", "cal-epifania", "cal-intercessao", "cal-outros",
   "cal-seeds", "cal-ruach", "cal-casais", "cal-homens", "cal-mulheres", "cal-kids",
   "cal-externos",
+  "cal-reunioes", "cal-atendimento", "cal-limpeza", "cal-ensaios",
 ];
 const LIDERES = ["5511999999999"];
 const NUMERO_LIDER = "5511999999999@c.us";
@@ -341,6 +342,80 @@ test("opção 2: eventos da agenda 'Eventos Externos' ficam ocultos na consulta 
   await enviar(ctx2.handleMessage, NUMERO_COMUM, "2");
   const res2 = await enviar(ctx2.handleMessage, NUMERO_COMUM, String(mesAtual));
   assert.match(res2[1], /Não há eventos programados/);
+});
+
+test("opção 2: eventos das agendas internas (Reuniões, Atendimento, Limpeza, Ensaios) ficam ocultos na consulta da agenda da igreja", async () => {
+  const agora = moment.tz("America/Sao_Paulo");
+  const mesAtual = agora.month() + 1;
+  const eventoIgreja = {
+    calendarId: AGENDAS[6], // Casais
+    summary: "Culto de Casais",
+    location: "Salão Nobre",
+    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 19, minute: 30 }).format() },
+    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 21, minute: 0 }).format() },
+  };
+  const eventoReuniao = {
+    calendarId: AGENDAS[11], // Reuniões
+    summary: "Reunião de Líderes",
+    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 10, minute: 0 }).format() },
+    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 12, minute: 0 }).format() },
+  };
+  const eventoAtendimento = {
+    calendarId: AGENDAS[12], // Atendimento
+    summary: "Atendimento Individual",
+    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 14, minute: 0 }).format() },
+    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 15, minute: 0 }).format() },
+  };
+  const eventoLimpeza = {
+    calendarId: AGENDAS[13], // Limpeza
+    summary: "Faxina Geral do Templo",
+    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 17, hour: 8, minute: 0 }).format() },
+    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 17, hour: 12, minute: 0 }).format() },
+  };
+  const eventoEnsaio = {
+    calendarId: AGENDAS[14], // Ensaios
+    summary: "Ensaio Louvor Geral",
+    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 18, hour: 15, minute: 0 }).format() },
+    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 18, hour: 17, minute: 0 }).format() },
+  };
+
+  const ctx = criarContexto({ eventos: [eventoIgreja, eventoReuniao, eventoAtendimento, eventoLimpeza, eventoEnsaio] });
+  await enviar(ctx.handleMessage, NUMERO_COMUM, "2");
+  const res = await enviar(ctx.handleMessage, NUMERO_COMUM, String(mesAtual));
+  assert.match(res[1], /Culto de Casais/);
+  assert.doesNotMatch(res[1], /Reunião de Líderes/);
+  assert.doesNotMatch(res[1], /Atendimento Individual/);
+  assert.doesNotMatch(res[1], /Faxina Geral do Templo/);
+  assert.doesNotMatch(res[1], /Ensaio Louvor Geral/);
+});
+
+test("opção 6: eventos das agendas internas não impedem o agendamento de eventos da igreja", async () => {
+  const agora = moment.tz("America/Sao_Paulo");
+  const mesAlvo = agora.month() + 1;
+  const anoAlvo = agora.year();
+  const diaAlvo = 22;
+
+  const eventoLimpeza = {
+    calendarId: AGENDAS[13], // Limpeza
+    summary: "Limpeza da Nave",
+    start: { dateTime: moment.tz(`${diaAlvo}/${mesAlvo}/${anoAlvo} 19:00`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format() },
+    end: { dateTime: moment.tz(`${diaAlvo}/${mesAlvo}/${anoAlvo} 21:00`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format() },
+  };
+
+  const { handleMessage } = criarContexto({ eventos: [eventoLimpeza] });
+
+  // Líder agenda evento no mesmo dia e horário
+  await enviar(handleMessage, NUMERO_LIDER, "6"); // Área do Líder
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar, alterar ou cancelar
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Novo agendamento
+  await enviar(handleMessage, NUMERO_LIDER, "Culto de Homens");
+  await enviar(handleMessage, NUMERO_LIDER, "igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
+  await enviar(handleMessage, NUMERO_LIDER, String(mesAlvo));
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Data específica
+  const resDia = await enviar(handleMessage, NUMERO_LIDER, String(diaAlvo)); // Dia 22
+  assert.doesNotMatch(resDia.join(" "), /Limpeza da Nave/);
+  assert.match(resDia[1], /Horários livres/i);
 });
 
 test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agendamento de novo evento", async () => {

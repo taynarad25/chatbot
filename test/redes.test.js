@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("../bot/redes");
+const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, AGENDAS_INTERNAS, isAgendaInterna } = require("../bot/redes");
 
 test("REDES: tem exatamente 11 entradas com números únicos de 1 a 11", () => {
   assert.equal(REDES.length, 11);
@@ -52,4 +52,18 @@ test("mapearRedeParaAgendaIndex e obterRedePorNumero concordam entre si para a m
   const porNumero = obterRedePorNumero("7"); // Rede de Homens
   const porNome = mapearRedeParaAgendaIndex(porNumero.nome);
   assert.equal(porNumero.agendaIndex, porNome);
+});
+
+test("AGENDAS_INTERNAS: contém Reuniões, Atendimento, Limpeza e Ensaios com seus IDs e isAgendaInterna funciona", () => {
+  assert.equal(AGENDAS_INTERNAS.REUNIOES, "b8f01bfd149139d388080ec63176c2556e6e1aedce184b84d37671c3d082d238@group.calendar.google.com");
+  assert.equal(AGENDAS_INTERNAS.ATENDIMENTO, "0a55126694643f39944faf173fe3acd127b2a52074c6ecc9e9ed4dc23edf8b57@group.calendar.google.com");
+  assert.equal(AGENDAS_INTERNAS.LIMPEZA, "7975950de545f60f585bc041682c6564ce4c29d0ef7e06cdeffa21ffc0ffd572@group.calendar.google.com");
+  assert.equal(AGENDAS_INTERNAS.ENSAIOS, "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com");
+
+  assert.equal(isAgendaInterna(AGENDAS_INTERNAS.REUNIOES), true);
+  assert.equal(isAgendaInterna(AGENDAS_INTERNAS.ATENDIMENTO), true);
+  assert.equal(isAgendaInterna(AGENDAS_INTERNAS.LIMPEZA), true);
+  assert.equal(isAgendaInterna(AGENDAS_INTERNAS.ENSAIOS), true);
+  assert.equal(isAgendaInterna("cal-evangelismo"), false);
+  assert.equal(isAgendaInterna(null), false);
 });
