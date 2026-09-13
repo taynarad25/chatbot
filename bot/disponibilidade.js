@@ -12,9 +12,6 @@ const DIAS_SEMANA_ABREV = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
  * 2. Se o novo evento é de dia inteiro, qualquer evento existente no dia o bloqueia.
  * 3. Se o novo evento tem horário, verifica sobreposição com buffer de 1h antes/depois
  *    de cada evento existente no dia; um evento existente de dia inteiro sempre bloqueia.
- * 4. Exceção da Rede Ruach: entre os sábados disponíveis, o último fica reservado para
- *    a Ruach — outras redes não podem escolhê-lo (a lista de disponíveis perde o último
- *    item, ou fica vazia se só havia um).
  *
  * @param {moment.Moment} [deps.agora] - momento de referência para "hoje" (dias antes disso
  *   nunca ficam disponíveis); parametrizável só para permitir testes determinísticos.
@@ -132,14 +129,6 @@ function calcularDisponibilidade({
     return true;
   });
 
-  if (diaSemanaFiltro === 6 && !rede.toLowerCase().includes("ruach")) {
-    if (disponiveis.length > 1) {
-      disponiveis.pop();
-    } else {
-      disponiveis = [];
-    }
-  }
-
   return { disponiveis, conflito: firstConflictDetails };
 }
 
@@ -175,10 +164,8 @@ function montarMensagemDatasDisponiveis(disponiveis, mes) {
 
 // Verifica se UMA data específica (não o mês inteiro) está disponível, e — se
 // isDiaInteiro/horarioInicio/horarioFim não forem informados — só checa se o
-// dia como um todo está bloqueado (Sábado LIVRE, exceção Ruach, evento de dia
-// inteiro já existente), retornando os eventos do dia pra quem chamou poder
-// sugerir horários livres. Reaproveita a mesma regra de "último sábado
-// reservado pra Ruach" de calcularDisponibilidade, sem duplicar a lógica.
+// dia como um todo está bloqueado (Sábado LIVRE, evento de dia inteiro já
+// existente), retornando os eventos do dia pra quem chamou poder sugerir horários livres.
 function verificarDataEspecifica({ eventos, evangelismoCalendarId, ano, mes, dia, rede, isDiaInteiro, horarioInicio, horarioFim, agora = moment.tz("America/Sao_Paulo") }) {
   const dTarget = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo").startOf("day");
   const dTargetFormatted = dTarget.format("YYYY-MM-DD");
@@ -197,16 +184,6 @@ function verificarDataEspecifica({ eventos, evangelismoCalendarId, ano, mes, dia
   );
   if (ehSabadoLivre) {
     return { disponivel: false, motivo: "sabado_livre", dataFormatada };
-  }
-
-  if (dTarget.day() === 6 && !rede.toLowerCase().includes("ruach")) {
-    const { disponiveis: sabadosDoMes } = calcularDisponibilidade({
-      eventos, evangelismoCalendarId, ano, mes, diaSemanaFiltro: 6, isDiaInteiro: true, rede, agora,
-    });
-    const aindaDisponivel = sabadosDoMes.some((d) => moment(d).format("YYYY-MM-DD") === dTargetFormatted);
-    if (!aindaDisponivel) {
-      return { disponivel: false, motivo: "ruach_reservado", dataFormatada };
-    }
   }
 
   const eventosNoDia = eventos.filter((ev) => {
@@ -312,9 +289,6 @@ function montarMensagemDataEspecificaBloqueada(resultado) {
   }
   if (motivo === "sabado_livre") {
     return `❌ O dia ${dataFormatada} está reservado como "Sábado LIVRE" do Evangelismo. Escolha outro dia, ou digite *menu* para recomeçar.`;
-  }
-  if (motivo === "ruach_reservado") {
-    return `❌ O dia ${dataFormatada} é o último sábado disponível do mês, reservado para a Rede Ruach. Escolha outro dia, ou digite *menu* para recomeçar.`;
   }
   if (motivo === "dia_ocupado") {
     return `❌ O dia ${dataFormatada} já tem o evento "*${conflito.summary || "Evento sem título"}*" ocupando o dia (parcial ou integralmente). Escolha outro dia, ou digite *menu* para recomeçar.`;

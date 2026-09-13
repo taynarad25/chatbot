@@ -161,18 +161,13 @@ test("calcularDisponibilidade: evento em outro dia não afeta a disponibilidade 
   assert.ok(disponiveis.some((d) => d.getDate() === 10));
 });
 
-test("calcularDisponibilidade: exceção Rede Ruach reserva o último sábado disponível para outras redes", () => {
+test("calcularDisponibilidade: sábados do mês estão disponíveis para qualquer rede (sem reserva para Ruach)", () => {
   const { disponiveis } = calcularDisponibilidade(baseParams({ diaSemanaFiltro: 6, rede: "Rede de Casais" }));
-  // sábados de julho/2026: 4, 11, 18, 25 — o último (25) deve ser removido para quem não é Ruach
-  assert.deepEqual(disponiveis.map((d) => d.getDate()), [4, 11, 18]);
-});
-
-test("calcularDisponibilidade: exceção Rede Ruach não se aplica para a própria Rede Ruach", () => {
-  const { disponiveis } = calcularDisponibilidade(baseParams({ diaSemanaFiltro: 6, rede: "Rede Ruach" }));
+  // sábados de julho/2026: 4, 11, 18, 25 — todos disponíveis para qualquer rede
   assert.deepEqual(disponiveis.map((d) => d.getDate()), [4, 11, 18, 25]);
 });
 
-test("calcularDisponibilidade: com só 1 sábado disponível, rede que não é Ruach fica sem opções", () => {
+test("calcularDisponibilidade: com só 1 sábado disponível, qualquer rede pode agendá-lo", () => {
   // Bloqueia os 3 primeiros sábados via conflito de dia inteiro, sobrando só o dia 25
   const eventosConflito = [4, 11, 18].map((dia) =>
     eventoHorario({ data: `2026-07-${String(dia).padStart(2, "0")}`, horaInicio: "00:00", horaFim: "23:59", summary: "Ocupado" })
@@ -180,7 +175,7 @@ test("calcularDisponibilidade: com só 1 sábado disponível, rede que não é R
   const { disponiveis } = calcularDisponibilidade(
     baseParams({ eventos: eventosConflito, diaSemanaFiltro: 6, isDiaInteiro: true, rede: "Rede de Casais" })
   );
-  assert.deepEqual(disponiveis, [], "único sábado livre (25) deveria ser reservado para a Ruach, sem sobra para outras redes");
+  assert.deepEqual(disponiveis.map((d) => d.getDate()), [25]);
 });
 
 test("calcularDisponibilidade: exceção Rede Ruach não afeta dias que não são sábado", () => {
@@ -288,20 +283,9 @@ test("verificarDataEspecifica: 'Sábado LIVRE' do Evangelismo bloqueia o dia", (
   assert.equal(resultado.motivo, "sabado_livre");
 });
 
-test("verificarDataEspecifica: exceção Ruach bloqueia o último sábado disponível do mês para outras redes", () => {
-  // sábados de julho/2026: 4, 11, 18, 25 — o último (25) é reservado para a Ruach
+test("verificarDataEspecifica: último sábado do mês está disponível para qualquer rede (sem reserva para Ruach)", () => {
+  // sábados de julho/2026: 4, 11, 18, 25 — o dia 25 está livre para qualquer rede
   const resultado = verificarDataEspecifica(baseParamsData({ dia: 25, rede: "Rede de Casais" }));
-  assert.equal(resultado.disponivel, false);
-  assert.equal(resultado.motivo, "ruach_reservado");
-});
-
-test("verificarDataEspecifica: exceção Ruach não bloqueia a própria Rede Ruach", () => {
-  const resultado = verificarDataEspecifica(baseParamsData({ dia: 25, rede: "Rede Ruach" }));
-  assert.equal(resultado.disponivel, true);
-});
-
-test("verificarDataEspecifica: sábado que não é o último do mês não é afetado pela exceção Ruach", () => {
-  const resultado = verificarDataEspecifica(baseParamsData({ dia: 18, rede: "Rede de Casais" }));
   assert.equal(resultado.disponivel, true);
 });
 
@@ -385,10 +369,7 @@ test("montarMensagemDataEspecificaBloqueada: mensagens específicas por motivo",
     montarMensagemDataEspecificaBloqueada({ motivo: "sabado_livre", dataFormatada: "04/07" }),
     /04\/07.*Sábado LIVRE.*Evangelismo/s
   );
-  assert.match(
-    montarMensagemDataEspecificaBloqueada({ motivo: "ruach_reservado", dataFormatada: "25/07" }),
-    /25\/07.*Rede Ruach/s
-  );
+
   assert.match(
     montarMensagemDataEspecificaBloqueada({ motivo: "dia_ocupado", dataFormatada: "10/07", conflito: { summary: "Retiro" } }),
     /10\/07.*Retiro/s
