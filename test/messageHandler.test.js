@@ -166,6 +166,114 @@ async function enviar(handleMessage, numero, body, opts) {
   return msg.respostas;
 }
 
+function criarEventoIgreja(agora, mesAtual, { dia = 16, calendarId = AGENDAS[6], summary = "Culto de Casais", location = "Salão Nobre" } = {}) {
+  return {
+    calendarId,
+    summary,
+    location,
+    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: dia, hour: 19, minute: 30 }).format() },
+    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: dia, hour: 21, minute: 0 }).format() },
+  };
+}
+
+async function iniciarAgendamentoDataEspecifica(handleMessage, {
+  titulo = "Culto Extra",
+  local = "Igreja",
+  rede = "7",
+  mes = "12",
+  dia,
+  extraOpts,
+} = {}) {
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, titulo);
+  await enviar(handleMessage, NUMERO_LIDER, local);
+  const respRede = await enviar(handleMessage, NUMERO_LIDER, String(rede));
+  await enviar(handleMessage, NUMERO_LIDER, String(mes));
+  const respModo = await enviar(handleMessage, NUMERO_LIDER, "1");
+  const respDia = dia !== undefined ? await enviar(handleMessage, NUMERO_LIDER, String(dia), extraOpts) : undefined;
+  return { respRede, respModo, respDia };
+}
+
+async function solicitarAgendamentoSemana(handleMessage, {
+  titulo = "Culto de Jovens",
+  local = "Igreja",
+  rede = "7",
+  mes = "12",
+  diaSemana = "3",
+  inicio = "19:30",
+  fim = "21:00",
+  escolhaItem = "1",
+  extraOpts,
+} = {}) {
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, titulo);
+  await enviar(handleMessage, NUMERO_LIDER, local);
+  await enviar(handleMessage, NUMERO_LIDER, String(rede));
+  await enviar(handleMessage, NUMERO_LIDER, String(mes));
+  await enviar(handleMessage, NUMERO_LIDER, "2");
+  await enviar(handleMessage, NUMERO_LIDER, String(diaSemana));
+  await enviar(handleMessage, NUMERO_LIDER, inicio);
+  const finalResp = await enviar(handleMessage, NUMERO_LIDER, fim);
+  const escolha = escolhaItem !== undefined ? await enviar(handleMessage, NUMERO_LIDER, escolhaItem, extraOpts) : undefined;
+  return { finalResp, escolha };
+}
+
+function criarEventoExistente({ id, summary, diasAFrente = 10, hora = 19, minuto = 0, duracaoHoras = 2 } = {}) {
+  const start = moment.tz("America/Sao_Paulo").add(diasAFrente, "days").set({ hour: hora, minute: minuto });
+  const end = start.clone().add(duracaoHoras, "hours");
+  return { id, summary, start: { dateTime: start.format() }, end: { dateTime: end.format() } };
+}
+
+async function iniciarAlteracaoEvento(handleMessage, { rede = "7", item = "1", setEventos, evento } = {}) {
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "2");
+  if (setEventos && evento) setEventos([evento]);
+  const listaResp = await enviar(handleMessage, NUMERO_LIDER, String(rede));
+  const escolhaResp = item !== undefined ? await enviar(handleMessage, NUMERO_LIDER, String(item)) : undefined;
+  return { listaResp, escolhaResp };
+}
+
+async function iniciarCancelamentoEvento(handleMessage, { rede = "1", item = "1", setEventos, evento } = {}) {
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "3");
+  if (setEventos && evento) setEventos([evento]);
+  const listaResp = await enviar(handleMessage, NUMERO_LIDER, String(rede));
+  const confirmarResp = await enviar(handleMessage, NUMERO_LIDER, String(item));
+  const finalResp = await enviar(handleMessage, NUMERO_LIDER, "SIM");
+  return { listaResp, confirmarResp, finalResp };
+}
+
+function criarMsgGrupoSemQuote(jid, body, nomeChat) {
+  let chamadasGetChat = 0;
+  const respostas = [];
+  return {
+    from: jid,
+    fromMe: false,
+    hasQuotedMsg: false,
+    body,
+    reply: async (texto) => { respostas.push(texto); return texto; },
+    getChat: async () => { chamadasGetChat++; return { name: nomeChat, isGroup: true }; },
+    respostas,
+    getChamadasGetChat: () => chamadasGetChat,
+  };
+}
+
+async function responderGrupoPastoral(handleMessage, { body, quotedBody }) {
+  const msg = criarMsgGrupo({
+    nomeGrupo: "Atendimento Pastoral",
+    body,
+    quotedBody,
+  });
+  await handleMessage(msg);
+  return msg;
+}
+
 // ---------------------------------------------------------------------------
 // Menu principal
 // ---------------------------------------------------------------------------
@@ -315,13 +423,7 @@ test("opção 2: período personalizado em formato inválido pede para tentar de
 test("opção 2: eventos da agenda 'Eventos Externos' ficam ocultos na consulta da agenda da igreja", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const mesAtual = agora.month() + 1;
-  const eventoIgreja = {
-    calendarId: AGENDAS[6], // Casais
-    summary: "Culto de Casais",
-    location: "Salão Nobre",
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 19, minute: 30 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 21, minute: 0 }).format() },
-  };
+  const eventoIgreja = criarEventoIgreja(agora, mesAtual);
   const eventoExterno = {
     calendarId: AGENDAS[10], // Eventos Externos
     summary: "Congresso Regional Externo",
@@ -347,13 +449,7 @@ test("opção 2: eventos da agenda 'Eventos Externos' ficam ocultos na consulta 
 test("opção 2: eventos das agendas internas (Reuniões, Atendimento, Limpeza, Ensaios) ficam ocultos na consulta da agenda da igreja", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const mesAtual = agora.month() + 1;
-  const eventoIgreja = {
-    calendarId: AGENDAS[6], // Casais
-    summary: "Culto de Casais",
-    location: "Salão Nobre",
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 19, minute: 30 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 21, minute: 0 }).format() },
-  };
+  const eventoIgreja = criarEventoIgreja(agora, mesAtual);
   const eventoReuniao = {
     calendarId: AGENDAS[11], // Reuniões
     summary: "Reunião de Líderes",
@@ -404,18 +500,15 @@ test("opção 6: eventos das agendas internas não impedem o agendamento de even
 
   const { handleMessage } = criarContexto({ eventos: [eventoLimpeza] });
 
-  // Líder agenda evento no mesmo dia e horário
-  await enviar(handleMessage, NUMERO_LIDER, "6"); // Área do Líder
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar, alterar ou cancelar
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Novo agendamento
-  await enviar(handleMessage, NUMERO_LIDER, "Culto de Homens");
-  await enviar(handleMessage, NUMERO_LIDER, "igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
-  await enviar(handleMessage, NUMERO_LIDER, String(mesAlvo));
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Data específica
-  const resDia = await enviar(handleMessage, NUMERO_LIDER, String(diaAlvo)); // Dia 22
-  assert.doesNotMatch(resDia.join(" "), /Limpeza da Nave/);
-  assert.match(resDia[1], /Horários livres/i);
+  const { respDia } = await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Culto de Homens",
+    local: "igreja",
+    rede: "7",
+    mes: mesAlvo,
+    dia: diaAlvo,
+  });
+  assert.doesNotMatch(respDia.join(" "), /Limpeza da Nave/);
+  assert.match(respDia[1], /Horários livres/i);
 });
 
 test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agendamento de novo evento", async () => {
@@ -433,16 +526,13 @@ test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agen
 
   const { handleMessage } = criarContexto({ eventos: [eventoExterno] });
 
-  // Líder tenta agendar evento conflitante no mesmo dia e horário
-  await enviar(handleMessage, NUMERO_LIDER, "6"); // Área do Líder
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar, alterar ou cancelar
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Novo agendamento
-  await enviar(handleMessage, NUMERO_LIDER, "Reunião de Homens");
-  await enviar(handleMessage, NUMERO_LIDER, "igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
-  await enviar(handleMessage, NUMERO_LIDER, String(mesAlvo));
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Data específica
-  await enviar(handleMessage, NUMERO_LIDER, String(diaAlvo)); // Dia 20
+  await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Reunião de Homens",
+    local: "igreja",
+    rede: "7",
+    mes: mesAlvo,
+    dia: diaAlvo,
+  });
   await enviar(handleMessage, NUMERO_LIDER, "19:30"); // Horário de início em conflito
   const respFim = await enviar(handleMessage, NUMERO_LIDER, "20:30");
 
@@ -453,22 +543,19 @@ test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agen
 test("opção 6: líder pode agendar evento escolhendo departamento 'Eventos Externos' (opção 10)", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const mesAlvo = agora.month() + 1;
-  const anoAlvo = agora.year();
   const diaAlvo = 22;
 
   const { handleMessage, gruposEnviados, eventosGravados } = criarContexto();
 
-  await enviar(handleMessage, NUMERO_LIDER, "6"); // Área do Líder
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar, alterar ou cancelar
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Novo agendamento
-  await enviar(handleMessage, NUMERO_LIDER, "Encontro Regional");
-  await enviar(handleMessage, NUMERO_LIDER, "Parque da Cidade");
-  const respMenuRede = await enviar(handleMessage, NUMERO_LIDER, "10"); // Escolhe 10 - Eventos Externos
-  assert.match(respMenuRede[0], /Para qual \*mês\*/);
+  const { respRede } = await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Encontro Regional",
+    local: "Parque da Cidade",
+    rede: "10",
+    mes: mesAlvo,
+    dia: diaAlvo,
+  });
+  assert.match(respRede[0], /Para qual \*mês\*/);
 
-  await enviar(handleMessage, NUMERO_LIDER, String(mesAlvo));
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Data específica
-  await enviar(handleMessage, NUMERO_LIDER, String(diaAlvo));
   await enviar(handleMessage, NUMERO_LIDER, "14:00");
   const respFinalizar = await enviar(handleMessage, NUMERO_LIDER, "17:00");
 
@@ -553,21 +640,10 @@ test("opção 6: usuário comum não tem acesso (cai no fallback genérico, sem 
 test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretaria aprova pelo grupo", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({ eventos: [] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar novo evento
-  await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja"); // local
-  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
-  await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
-  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
-  await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
-  await enviar(handleMessage, NUMERO_LIDER, "19:30");
-  const finalResp = await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  const { finalResp, escolha } = await solicitarAgendamentoSemana(handleMessage);
 
   assert.match(finalResp[finalResp.length - 1], /Datas Disponíveis/);
 
-  const escolha = await enviar(handleMessage, NUMERO_LIDER, "1");
   assert.match(escolha[0], /Solicitação de Agendamento/);
   assert.match(escolha[0], /Culto de Jovens/);
   assert.match(escolha[0], /Rua Benedicto de Abreu Júnior/);
@@ -618,18 +694,7 @@ test("opção 6 (líder): resumo do grupo usa o nome cadastrado no painel de lí
     lideresCadastrados: [{ nome: "Pastor Marcos", telefone: "5511999999999" }],
   });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar novo evento
-  await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
-  await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
-  await enviar(handleMessage, NUMERO_LIDER, "2");
-  await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
-  await enviar(handleMessage, NUMERO_LIDER, "19:30");
-  await enviar(handleMessage, NUMERO_LIDER, "21:00");
-  await enviar(handleMessage, NUMERO_LIDER, "1", { pushname: "celular do Pastor" });
+  await solicitarAgendamentoSemana(handleMessage, { extraOpts: { pushname: "celular do Pastor" } });
 
   assert.match(gruposEnviados[0], /Solicitante:\* Pastor Marcos/);
   assert.doesNotMatch(gruposEnviados[0], /celular do Pastor/);
@@ -638,18 +703,7 @@ test("opção 6 (líder): resumo do grupo usa o nome cadastrado no painel de lí
 test("opção 6 (líder): sem nome cadastrado no painel, o resumo do grupo cai de volta pro nome do contato", async () => {
   const { handleMessage, gruposEnviados } = criarContexto({ eventos: [], lideresCadastrados: [] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7");
-  await enviar(handleMessage, NUMERO_LIDER, "12");
-  await enviar(handleMessage, NUMERO_LIDER, "2");
-  await enviar(handleMessage, NUMERO_LIDER, "3");
-  await enviar(handleMessage, NUMERO_LIDER, "19:30");
-  await enviar(handleMessage, NUMERO_LIDER, "21:00");
-  await enviar(handleMessage, NUMERO_LIDER, "1", { pushname: "celular do Pastor" });
+  await solicitarAgendamentoSemana(handleMessage, { extraOpts: { pushname: "celular do Pastor" } });
 
   assert.match(gruposEnviados[0], /Solicitante:\* celular do Pastor/);
 });
@@ -658,32 +712,10 @@ test("opção 6 (líder): duas solicitações pendentes ao mesmo tempo não se c
   const { handleMessage, gruposEnviados, eventosGravados } = criarContexto({ eventos: [] });
 
   // Primeira solicitação
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto A");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
-  await enviar(handleMessage, NUMERO_LIDER, "12");
-  await enviar(handleMessage, NUMERO_LIDER, "2");
-  await enviar(handleMessage, NUMERO_LIDER, "3");
-  await enviar(handleMessage, NUMERO_LIDER, "19:30");
-  await enviar(handleMessage, NUMERO_LIDER, "21:00");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await solicitarAgendamentoSemana(handleMessage, { titulo: "Culto A", rede: "7" });
 
   // Segunda solicitação, de outro líder, antes da primeira ser respondida
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto B");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "6"); // Rede de Casais
-  await enviar(handleMessage, NUMERO_LIDER, "12");
-  await enviar(handleMessage, NUMERO_LIDER, "2");
-  await enviar(handleMessage, NUMERO_LIDER, "3");
-  await enviar(handleMessage, NUMERO_LIDER, "19:30");
-  await enviar(handleMessage, NUMERO_LIDER, "21:00");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await solicitarAgendamentoSemana(handleMessage, { titulo: "Culto B", rede: "6" });
 
   assert.equal(gruposEnviados.length, 2);
   const dadosA = decodificarDadosAgendamento(gruposEnviados[0]);
@@ -709,19 +741,12 @@ test("opção 6 (líder): duas solicitações pendentes ao mesmo tempo não se c
 test("opção 6 (líder): endereço customizado (evento fora da igreja) é usado como informado, sem substituição", async () => {
   const { handleMessage } = criarContexto({ eventos: [] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Reunião de Casais");
-  await enviar(handleMessage, NUMERO_LIDER, "Rua das Flores, 123 - Jardim Primavera");
-  await enviar(handleMessage, NUMERO_LIDER, "6"); // Rede de Casais
-  await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
-  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
-  await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
-  await enviar(handleMessage, NUMERO_LIDER, "19:30");
-  await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  const { escolha } = await solicitarAgendamentoSemana(handleMessage, {
+    titulo: "Reunião de Casais",
+    local: "Rua das Flores, 123 - Jardim Primavera",
+    rede: "6",
+  });
 
-  const escolha = await enviar(handleMessage, NUMERO_LIDER, "1");
   assert.match(escolha[0], /Rua das Flores, 123 - Jardim Primavera/);
   assert.doesNotMatch(escolha[0], /Rua Benedicto de Abreu Júnior/);
 });
@@ -750,19 +775,17 @@ test("opção 6 (líder): evento de DIA TODO pula a pergunta de horário de tér
 test("opção 6 (líder): agenda por data específica — dia livre sugere horários e completa o fluxo", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({ eventos: [] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
-  await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
-  const modoResp = await enviar(handleMessage, NUMERO_LIDER, "1"); // já tenho uma data específica
-  assert.match(modoResp[0], /Qual o dia do mês/);
+  const { respModo, respDia } = await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Culto Extra",
+    local: "Igreja",
+    rede: "7",
+    mes: "12",
+    dia: "10",
+  });
+  assert.match(respModo[0], /Qual o dia do mês/);
 
-  const diaResp = await enviar(handleMessage, NUMERO_LIDER, "10"); // 10/12, quinta-feira, sem eventos
-  assert.match(diaResp[diaResp.length - 1], /está livre/);
-  assert.match(diaResp[diaResp.length - 1], /07:00 às 22:00/);
+  assert.match(respDia[respDia.length - 1], /está livre/);
+  assert.match(respDia[respDia.length - 1], /07:00 às 22:00/);
 
   await enviar(handleMessage, NUMERO_LIDER, "19:00");
   const finalResp = await enviar(handleMessage, NUMERO_LIDER, "21:00");
@@ -790,17 +813,14 @@ test("opção 6 (líder): agenda por data específica — dia de Sábado LIVRE �
   }];
   const { handleMessage, etapas } = criarContexto({ eventos });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7");
-  await enviar(handleMessage, NUMERO_LIDER, "12");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-
-  const diaResp = await enviar(handleMessage, NUMERO_LIDER, "5"); // sábado marcado como Sábado LIVRE
-  assert.match(diaResp[diaResp.length - 1], /Sábado LIVRE/);
+  const { respDia } = await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Culto Extra",
+    local: "Igreja",
+    rede: "7",
+    mes: "12",
+    dia: "5",
+  });
+  assert.match(respDia[respDia.length - 1], /Sábado LIVRE/);
   assert.equal(etapas[NUMERO_LIDER], undefined, "o fluxo deveria ser encerrado após o bloqueio");
 });
 
@@ -813,18 +833,15 @@ test("opção 6 (líder): agenda por data específica — horário pedido confli
   }];
   const { handleMessage } = criarContexto({ eventos });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7");
-  await enviar(handleMessage, NUMERO_LIDER, "12");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-
-  const diaResp = await enviar(handleMessage, NUMERO_LIDER, "10");
-  assert.match(diaResp[diaResp.length - 1], /07:00 às 18:00/); // livre até 18h (buffer de 1h antes do evento das 19h)
-  assert.match(diaResp[diaResp.length - 1], /21:00 às 22:00/); // livre depois do buffer de 1h após o evento das 20h
+  const { respDia } = await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Culto Extra",
+    local: "Igreja",
+    rede: "7",
+    mes: "12",
+    dia: "10",
+  });
+  assert.match(respDia[respDia.length - 1], /07:00 às 18:00/); // livre até 18h (buffer de 1h antes do evento das 19h)
+  assert.match(respDia[respDia.length - 1], /21:00 às 22:00/); // livre depois do buffer de 1h após o evento das 20h
 
   await enviar(handleMessage, NUMERO_LIDER, "20:15"); // dentro do buffer de 1h do evento das 19h-20h
   const conflitoResp = await enviar(handleMessage, NUMERO_LIDER, "21:00");
@@ -835,17 +852,14 @@ test("opção 6 (líder): agenda por data específica — horário pedido confli
 test("opção 6 (líder): agenda por data específica — dia inválido para o mês pede pra tentar de novo", async () => {
   const { handleMessage, etapas } = criarContexto({ eventos: [] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7");
-  await enviar(handleMessage, NUMERO_LIDER, "2"); // Fevereiro
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-
-  const diaResp = await enviar(handleMessage, NUMERO_LIDER, "30"); // fevereiro não tem dia 30
-  assert.match(diaResp[0], /Dia inválido/);
+  const { respDia } = await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Culto Extra",
+    local: "Igreja",
+    rede: "7",
+    mes: "2",
+    dia: "30",
+  });
+  assert.match(respDia[0], /Dia inválido/);
   assert.equal(etapas[NUMERO_LIDER].etapa, "evento_dia_especifico", "deveria continuar esperando um dia válido");
 });
 
@@ -853,36 +867,22 @@ test("opção 6 (líder): agenda por data específica — não deixa escolher um
   const { handleMessage, gruposEnviados } = criarContexto({ eventos: [] });
   const ontem = moment.tz("America/Sao_Paulo").subtract(1, "day");
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto Extra");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7");
-  await enviar(handleMessage, NUMERO_LIDER, String(ontem.month() + 1));
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // já tenho uma data específica
-
-  const diaResp = await enviar(handleMessage, NUMERO_LIDER, String(ontem.date()));
-  assert.match(diaResp[diaResp.length - 1], /já passou/);
-  assert.match(diaResp[diaResp.length - 1], /a partir de hoje/);
+  const { respDia } = await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Culto Extra",
+    local: "Igreja",
+    rede: "7",
+    mes: String(ontem.month() + 1),
+    dia: String(ontem.date()),
+  });
+  assert.match(respDia[respDia.length - 1], /já passou/);
+  assert.match(respDia[respDia.length - 1], /a partir de hoje/);
   assert.equal(gruposEnviados.length, 0, "não deveria notificar a secretaria de uma data que já passou");
 });
 
 test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — solicitante é avisado e nada é gravado", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({ eventos: [] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
-  await enviar(handleMessage, NUMERO_LIDER, "Igreja");
-  await enviar(handleMessage, NUMERO_LIDER, "7");
-  await enviar(handleMessage, NUMERO_LIDER, "12");
-  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
-  await enviar(handleMessage, NUMERO_LIDER, "3");
-  await enviar(handleMessage, NUMERO_LIDER, "19:30");
-  await enviar(handleMessage, NUMERO_LIDER, "21:00");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await solicitarAgendamentoSemana(handleMessage);
 
   const recusa = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "não marcar", quotedBody: gruposEnviados[0] });
   await handleMessage(recusa);
@@ -894,22 +894,11 @@ test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — 
 });
 
 test("opção 6 (líder): alterar evento existente (texto livre), do início ao fim, com aprovação manual da secretaria", async () => {
-  const eventoExistente = {
-    id: "evt-culto-mulheres",
-    summary: "Culto de Mulheres",
-    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").format() },
-    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").add(2, "hours").format() },
-  };
+  const eventoExistente = criarEventoExistente({ id: "evt-culto-mulheres", summary: "Culto de Mulheres" });
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosAlterados, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "2"); // Alterar evento existente
-  setEventos([eventoExistente]);
-  const listaResp = await enviar(handleMessage, NUMERO_LIDER, "9"); // Rede de Mulheres
+  const { listaResp, escolhaResp } = await iniciarAlteracaoEvento(handleMessage, { rede: "9", item: "1", setEventos, evento: eventoExistente });
   assert.match(listaResp[1], /Culto de Mulheres/);
-
-  const escolhaResp = await enviar(handleMessage, NUMERO_LIDER, "1");
   assert.match(escolhaResp[0], /Você selecionou.*Culto de Mulheres/s);
   assert.match(escolhaResp[0], /O que você deseja alterar/);
 
@@ -934,19 +923,10 @@ test("opção 6 (líder): alterar evento existente (texto livre), do início ao 
 });
 
 test("opção 6 (líder): alterar evento (texto livre) — secretaria recusa ('não alterar')", async () => {
-  const eventoExistente = {
-    id: "evt-culto-mulheres",
-    summary: "Culto de Mulheres",
-    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").format() },
-    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").add(2, "hours").format() },
-  };
+  const eventoExistente = criarEventoExistente({ id: "evt-culto-mulheres", summary: "Culto de Mulheres" });
   const { handleMessage, gruposEnviados, diretasEnviadas } = criarContexto({ eventos: [eventoExistente] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "2");
-  await enviar(handleMessage, NUMERO_LIDER, "9");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await iniciarAlteracaoEvento(handleMessage, { rede: "9", item: "1" });
   await enviar(handleMessage, NUMERO_LIDER, "5"); // Outra alteração (texto livre)
   await enviar(handleMessage, NUMERO_LIDER, "Mudar horário para 20h");
 
@@ -958,20 +938,10 @@ test("opção 6 (líder): alterar evento (texto livre) — secretaria recusa ('n
 });
 
 test("opção 6 (líder): alterar horário de evento existente, aplicado automaticamente na aprovação", async () => {
-  const eventoExistente = {
-    id: "evt-culto-jovens",
-    summary: "Culto de Jovens",
-    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").set({ hour: 19, minute: 0 }).format() },
-    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").set({ hour: 21, minute: 0 }).format() },
-  };
+  const eventoExistente = criarEventoExistente({ id: "evt-culto-jovens", summary: "Culto de Jovens", hora: 19, duracaoHoras: 2 });
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosAlterados, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "2");
-  setEventos([eventoExistente]);
-  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // seleciona o evento
+  await iniciarAlteracaoEvento(handleMessage, { rede: "7", item: "1", setEventos, evento: eventoExistente });
 
   const submenuResp = await enviar(handleMessage, NUMERO_LIDER, "1"); // Horário
   assert.match(submenuResp[0], /horário de início/);
@@ -993,20 +963,10 @@ test("opção 6 (líder): alterar horário de evento existente, aplicado automat
 });
 
 test("opção 6 (líder): alterar a data de um evento para um dia que já passou é recusado como data inválida", async () => {
-  const eventoExistente = {
-    id: "evt-culto-jovens",
-    summary: "Culto de Jovens",
-    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").set({ hour: 19, minute: 0 }).format() },
-    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").set({ hour: 21, minute: 0 }).format() },
-  };
+  const eventoExistente = criarEventoExistente({ id: "evt-culto-jovens", summary: "Culto de Jovens", hora: 19, duracaoHoras: 2 });
   const { handleMessage, etapas, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "2");
-  setEventos([eventoExistente]);
-  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
-  await enviar(handleMessage, NUMERO_LIDER, "1"); // seleciona o evento
+  await iniciarAlteracaoEvento(handleMessage, { rede: "7", item: "1", setEventos, evento: eventoExistente });
   await enviar(handleMessage, NUMERO_LIDER, "2"); // Data
 
   const ontem = moment.tz("America/Sao_Paulo").subtract(1, "day");
@@ -1018,25 +978,17 @@ test("opção 6 (líder): alterar a data de um evento para um dia que já passou
 });
 
 test("opção 6 (líder): cancelar evento existente — aprovado pela secretaria remove da agenda", async () => {
-  const eventoExistente = {
-    id: "evt-retiro",
-    summary: "Retiro Espiritual",
-    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").format() },
-    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").add(2, "hours").format() },
-  };
+  const eventoExistente = criarEventoExistente({ id: "evt-retiro", summary: "Retiro Espiritual" });
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosCancelados, setEventos } = criarContexto({ eventos: [eventoExistente] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "3"); // Cancelar evento existente
-  setEventos([eventoExistente]);
-  const listaResp = await enviar(handleMessage, NUMERO_LIDER, "1"); // Evangelismo
+  const { listaResp, confirmarResp, finalResp } = await iniciarCancelamentoEvento(handleMessage, {
+    rede: "1",
+    item: "1",
+    setEventos,
+    evento: eventoExistente,
+  });
   assert.match(listaResp[1], /Retiro Espiritual/);
-
-  const confirmarResp = await enviar(handleMessage, NUMERO_LIDER, "1");
   assert.match(confirmarResp[0], /certeza.*cancelar/is);
-
-  const finalResp = await enviar(handleMessage, NUMERO_LIDER, "SIM");
   assert.match(finalResp[0], /Solicitação de Cancelamento/);
 
   assert.equal(gruposEnviados.length, 1);
@@ -1052,20 +1004,10 @@ test("opção 6 (líder): cancelar evento existente — aprovado pela secretaria
 });
 
 test("opção 6 (líder): cancelar evento — secretaria nega ('manter evento')", async () => {
-  const eventoExistente = {
-    id: "evt-retiro-2",
-    summary: "Retiro Espiritual",
-    start: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").format() },
-    end: { dateTime: moment.tz("America/Sao_Paulo").add(10, "days").add(2, "hours").format() },
-  };
+  const eventoExistente = criarEventoExistente({ id: "evt-retiro-2", summary: "Retiro Espiritual" });
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosCancelados } = criarContexto({ eventos: [eventoExistente] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "3");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "SIM");
+  await iniciarCancelamentoEvento(handleMessage, { rede: "1", item: "1" });
 
   const negativa = criarMsgGrupo({ nomeGrupo: "Mensagens Secretaria", body: "manter evento", quotedBody: gruposEnviados[0] });
   await handleMessage(negativa);
@@ -1227,53 +1169,27 @@ test("grupo: msg.getChat() que nunca resolve (JID inválido/sintético) é ignor
 test("grupo: mensagem comum (não é palavra-chave de aprovação) é ignorada sem chamar getChat() nem logar", async () => {
   const { handleMessage } = criarContexto({ eventos: [] });
 
-  // Simula um grupo já conhecido (JID em cache) — só nesse caso o código pula o
-  // getChat() de checagem oportunista pra mensagens sem palavra-chave. Semeado
-  // explicitamente aqui (em vez de depender do cache deixado por outro teste
-  // anterior no arquivo) pra esse teste não depender de ordem de execução.
   const jidGrupoConhecido = "120363000000000000@g.us";
   atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, jidGrupoConhecido);
 
-  let chamadasGetChat = 0;
-  const respostas = [];
-  const msg = {
-    from: jidGrupoConhecido,
-    fromMe: false,
-    hasQuotedMsg: false,
-    body: "Obrigado ♥️\n\nA paz e bom dia",
-    reply: async (texto) => { respostas.push(texto); return texto; },
-    getChat: async () => { chamadasGetChat++; return { name: "DIÁCONOS CURADOS", isGroup: true }; },
-  };
-
+  const msg = criarMsgGrupoSemQuote(jidGrupoConhecido, "Obrigado ♥️\n\nA paz e bom dia", "DIÁCONOS CURADOS");
   await handleMessage(msg);
 
-  assert.equal(chamadasGetChat, 0, "não deveria nem tentar carregar o chat pra uma mensagem comum do grupo");
-  assert.equal(respostas.length, 0);
+  assert.equal(msg.getChamadasGetChat(), 0, "não deveria nem tentar carregar o chat pra uma mensagem comum do grupo");
+  assert.equal(msg.respostas.length, 0);
 });
 
 test("grupo: palavra-chave digitada sem usar 'Responder' é ignorada sem chamar getChat()", async () => {
   const { handleMessage } = criarContexto({ eventos: [] });
 
-  // Mesma ideia: JID já conhecido, semeado explicitamente pra não depender de
-  // cache deixado por outro teste.
   const jidGrupoConhecido = "120363000000000000@g.us";
   atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, jidGrupoConhecido);
 
-  let chamadasGetChat = 0;
-  const respostas = [];
-  const msg = {
-    from: jidGrupoConhecido,
-    fromMe: false,
-    hasQuotedMsg: false,
-    body: "marcar evento",
-    reply: async (texto) => { respostas.push(texto); return texto; },
-    getChat: async () => { chamadasGetChat++; return { name: "Mensagens Secretaria", isGroup: true }; },
-  };
-
+  const msg = criarMsgGrupoSemQuote(jidGrupoConhecido, "marcar evento", "Mensagens Secretaria");
   await handleMessage(msg);
 
-  assert.equal(chamadasGetChat, 0, "não precisa do nome do chat só pra registrar que a palavra-chave veio sem reply");
-  assert.equal(respostas.length, 0);
+  assert.equal(msg.getChamadasGetChat(), 0, "não precisa do nome do chat só pra registrar que a palavra-chave veio sem reply");
+  assert.equal(msg.respostas.length, 0);
 });
 
 test("grupo: mensagens em outros grupos são ignoradas (sem resposta)", async () => {
@@ -1350,12 +1266,10 @@ test("opção 3: fluxo de atendimento pastoral completo - solicitação + confir
   assert.ok(codigo);
 
   // 4. Pastor responde no grupo "Atendimento Pastoral" confirmando o atendimento
-  const msgPastor = criarMsgGrupo({
-    nomeGrupo: "Atendimento Pastoral",
+  const msgPastor = await responderGrupoPastoral(handleMessage, {
     body: "confirmar segunda as 19h",
     quotedBody: gruposEnviados[0],
   });
-  await handleMessage(msgPastor);
 
   // Deve ter respondido ao pastor no grupo
   assert.equal(msgPastor.respostas.length, 1);
@@ -1384,12 +1298,10 @@ test("opção 3: fluxo de atendimento pastoral completo - solicitação + recusa
   assert.ok(codigo);
 
   // 2. Pastor responde no grupo "Atendimento Pastoral" recusando
-  const msgPastor = criarMsgGrupo({
-    nomeGrupo: "Atendimento Pastoral",
+  const msgPastor = await responderGrupoPastoral(handleMessage, {
     body: "não confirmar",
     quotedBody: gruposEnviados[0],
   });
-  await handleMessage(msgPastor);
 
   // Deve ter respondido ao pastor no grupo
   assert.equal(msgPastor.respostas.length, 1);
@@ -1411,12 +1323,10 @@ test("opção 3: fluxo pastoral - comando inválido do pastor avisa no grupo", a
   await enviar(handleMessage, NUMERO_COMUM, "Gabriel");
   await enviar(handleMessage, NUMERO_COMUM, "Segunda");
 
-  const msgPastor = criarMsgGrupo({
-    nomeGrupo: "Atendimento Pastoral",
+  const msgPastor = await responderGrupoPastoral(handleMessage, {
     body: "confirmar",
     quotedBody: gruposEnviados[0],
   });
-  await handleMessage(msgPastor);
 
   assert.equal(msgPastor.respostas.length, 1);
   assert.match(msgPastor.respostas[0], /❌ Comando inválido/);
