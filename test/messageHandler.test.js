@@ -21,7 +21,9 @@ const { buscarPendente, extrairCodigo } = require("../bot/pendentesAprovacao");
 const { atualizarCacheGrupo, NOME_GRUPO_SECRETARIA } = require("../bot/secretaria");
 
 after(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  try {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch {}
 });
 
 // Extrai o código embutido na mensagem do bot pro grupo e busca a solicitação
@@ -34,6 +36,7 @@ function decodificarDadosAgendamento(mensagem) {
 const AGENDAS = [
   "cal-evangelismo", "cal-epifania", "cal-intercessao", "cal-outros",
   "cal-seeds", "cal-ruach", "cal-casais", "cal-homens", "cal-mulheres", "cal-kids",
+  "cal-externos",
 ];
 const LIDERES = ["5511999999999"];
 const NUMERO_LIDER = "5511999999999@c.us";
@@ -68,11 +71,12 @@ function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
   const JIDS_DE_GRUPO = new Set([JID_GRUPO_SECRETARIA, JID_GRUPO_PASTORAL]);
 
   const client = {
-    sendMessage: async (to, texto) => {
+    sendMessage: async (to, texto, options) => {
+      const conteudo = options?.caption || (typeof texto === "string" ? texto : texto?.caption || texto);
       if (JIDS_DE_GRUPO.has(to)) {
-        gruposEnviados.push(texto);
+        gruposEnviados.push(conteudo);
       } else {
-        diretasEnviadas.push({ to, texto });
+        diretasEnviadas.push({ to, texto: conteudo });
       }
     },
     getChats: async () => [
@@ -305,6 +309,110 @@ test("opção 2: período personalizado em formato inválido pede para tentar de
   const resposta = await enviar(handleMessage, NUMERO_COMUM, "não sei quando");
   assert.match(resposta[0], /Não consegui entender as datas/);
   assert.equal(etapas[NUMERO_COMUM].etapa, "periodo_personalizado");
+});
+
+test("opção 2: eventos da agenda 'Eventos Externos' ficam ocultos na consulta da agenda da igreja", async () => {
+  const agora = moment.tz("America/Sao_Paulo");
+  const mesAtual = agora.month() + 1;
+  const eventoIgreja = {
+    calendarId: AGENDAS[6], // Casais
+    summary: "Culto de Casais",
+    location: "Salão Nobre",
+    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 19, minute: 30 }).format() },
+    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 21, minute: 0 }).format() },
+  };
+  const eventoExterno = {
+    calendarId: AGENDAS[10], // Eventos Externos
+    summary: "Congresso Regional Externo",
+    location: "Ginásio Municipal",
+    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 17, hour: 14, minute: 0 }).format() },
+    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 17, hour: 18, minute: 0 }).format() },
+  };
+
+  // 1. Quando há evento da igreja e evento externo, apenas o evento da igreja aparece
+  const ctx1 = criarContexto({ eventos: [eventoIgreja, eventoExterno] });
+  await enviar(ctx1.handleMessage, NUMERO_COMUM, "2");
+  const res1 = await enviar(ctx1.handleMessage, NUMERO_COMUM, String(mesAtual));
+  assert.match(res1[1], /Culto de Casais/);
+  assert.doesNotMatch(res1[1], /Congresso Regional Externo/);
+
+  // 2. Quando há apenas evento externo no mês, a agenda informa que não há eventos programados
+  const ctx2 = criarContexto({ eventos: [eventoExterno] });
+  await enviar(ctx2.handleMessage, NUMERO_COMUM, "2");
+  const res2 = await enviar(ctx2.handleMessage, NUMERO_COMUM, String(mesAtual));
+  assert.match(res2[1], /Não há eventos programados/);
+});
+
+test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agendamento de novo evento", async () => {
+  const agora = moment.tz("America/Sao_Paulo");
+  const mesAlvo = agora.month() + 1;
+  const anoAlvo = agora.year();
+  const diaAlvo = 20;
+
+  const eventoExterno = {
+    calendarId: AGENDAS[10], // Eventos Externos
+    summary: "Evento Externo Bloqueador",
+    start: { dateTime: moment.tz(`${diaAlvo}/${mesAlvo}/${anoAlvo} 19:00`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format() },
+    end: { dateTime: moment.tz(`${diaAlvo}/${mesAlvo}/${anoAlvo} 21:00`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format() },
+  };
+
+  const { handleMessage } = criarContexto({ eventos: [eventoExterno] });
+
+  // Líder tenta agendar evento conflitante no mesmo dia e horário
+  await enviar(handleMessage, NUMERO_LIDER, "6"); // Área do Líder
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar, alterar ou cancelar
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Novo agendamento
+  await enviar(handleMessage, NUMERO_LIDER, "Reunião de Homens");
+  await enviar(handleMessage, NUMERO_LIDER, "igreja");
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
+  await enviar(handleMessage, NUMERO_LIDER, String(mesAlvo));
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Data específica
+  await enviar(handleMessage, NUMERO_LIDER, String(diaAlvo)); // Dia 20
+  await enviar(handleMessage, NUMERO_LIDER, "19:30"); // Horário de início em conflito
+  const respFim = await enviar(handleMessage, NUMERO_LIDER, "20:30");
+
+  assert.match(respFim[0], /Esse horário conflita com o evento/);
+  assert.match(respFim[0], /Evento Externo Bloqueador/);
+});
+
+test("opção 6: líder pode agendar evento escolhendo departamento 'Eventos Externos' (opção 10)", async () => {
+  const agora = moment.tz("America/Sao_Paulo");
+  const mesAlvo = agora.month() + 1;
+  const anoAlvo = agora.year();
+  const diaAlvo = 22;
+
+  const { handleMessage, gruposEnviados, eventosGravados } = criarContexto();
+
+  await enviar(handleMessage, NUMERO_LIDER, "6"); // Área do Líder
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar, alterar ou cancelar
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Novo agendamento
+  await enviar(handleMessage, NUMERO_LIDER, "Encontro Regional");
+  await enviar(handleMessage, NUMERO_LIDER, "Parque da Cidade");
+  const respMenuRede = await enviar(handleMessage, NUMERO_LIDER, "10"); // Escolhe 10 - Eventos Externos
+  assert.match(respMenuRede[0], /Para qual \*mês\*/);
+
+  await enviar(handleMessage, NUMERO_LIDER, String(mesAlvo));
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Data específica
+  await enviar(handleMessage, NUMERO_LIDER, String(diaAlvo));
+  await enviar(handleMessage, NUMERO_LIDER, "14:00");
+  const respFinalizar = await enviar(handleMessage, NUMERO_LIDER, "17:00");
+
+  assert.match(respFinalizar[0], /Solicitação de Agendamento/);
+  assert.match(respFinalizar[0], /Departamento:\* Eventos Externos/);
+
+  // Secretaria aprova no grupo
+  const codigo = extrairCodigo(gruposEnviados[0]);
+  assert.ok(codigo);
+
+  const msgSecretaria = criarMsgGrupo({
+    body: "marcar evento",
+    quotedBody: gruposEnviados[0],
+  });
+  await handleMessage(msgSecretaria);
+
+  assert.equal(eventosGravados.length, 1);
+  assert.equal(eventosGravados[0].calendarId, AGENDAS[10]); // Salvo na agenda de Eventos Externos
+  assert.match(eventosGravados[0].resource.summary, /Encontro Regional/);
 });
 
 // ---------------------------------------------------------------------------

@@ -25,6 +25,7 @@ after(() => {
 const AGENDAS = [
   "cal-evangelismo", "cal-epifania", "cal-intercessao", "cal-outros",
   "cal-seeds", "cal-ruach", "cal-casais", "cal-homens", "cal-mulheres", "cal-kids",
+  "cal-externos",
 ];
 const LIDERES = ["5511999999999"];
 const NUMERO_LIDER = "5511999999999@c.us";

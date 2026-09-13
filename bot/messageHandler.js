@@ -63,7 +63,7 @@ function dividirDiaEHorario(texto) {
   }
 
   // Se não encontrar o separador explícito, mas achar uma hora no final (ex: "segunda-feira 19h" ou "segunda 19:30")
-  const matchHoraFinal = textoLimpo.match(/^(.*?)\s+(\d{1,2}\s*(?:h|min|hrs|horas|hs|:\d{2}|h\d{2})[a-z0-9\s]*)$/i);
+  const matchHoraFinal = textoLimpo.match(/^(.*)\s+(\d{1,2}(?:[:h]\d{2})?(?:\s*(?:horas?|hrs?|hs|min|h))?)$/i);
   if (matchHoraFinal) {
     return {
       dia: matchHoraFinal[1].trim(),
