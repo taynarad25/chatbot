@@ -1,7 +1,14 @@
+const fs = require("fs");
+let MessageMedia;
+try {
+  MessageMedia = require("whatsapp-web.js").MessageMedia;
+} catch {
+  MessageMedia = null;
+}
 const moment = require("moment-timezone");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
-const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, isAgendaInterna } = require("./redes");
+const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, isAgendaInterna, AGENDAS_INTERNAS } = require("./redes");
 const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
@@ -22,6 +29,55 @@ const LOCAL_IGREJA_REGEX = /\bigreja\b|\btemplo\b|\bsal[aã]o\b/i;
 
 function nomeContato(contato, numero) {
   return contato.pushname || contato.name || numero;
+}
+
+const CAMINHO_PDF_ATA = process.env.PDF_ATA_REUNIAO || "C:/Users/gabri/OneDrive/Documentos/Curados/Diretoria/Secretaria/Reuniões/Ata de Reunião - Curados.pdf";
+
+function interpretarDataReuniao(texto) {
+  if (!texto) return null;
+  const t = texto.trim();
+  const m = t.match(/^([0-2]?[0-9]|3[01])\/(0?[1-9]|1[0-2])(?:\/(\d{4}))?$/);
+  if (!m) return null;
+  const dia = parseInt(m[1], 10);
+  const mes = parseInt(m[2], 10);
+  const agora = moment().tz("America/Sao_Paulo");
+  let ano = m[3] ? parseInt(m[3], 10) : agora.year();
+
+  const dataMoment = moment.tz(`${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`, "YYYY-MM-DD", "America/Sao_Paulo");
+  if (!dataMoment.isValid() || dataMoment.date() !== dia || dataMoment.month() + 1 !== mes) {
+    return null;
+  }
+
+  if (!m[3] && dataMoment.isBefore(agora.clone().startOf("day"))) {
+    ano += 1;
+  }
+
+  return { dia, mes, ano, formatada: `${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}/${ano}` };
+}
+
+function normalizarHorarioReuniao(texto) {
+  if (!texto) return null;
+  const t = texto.trim().toLowerCase().replace(/\s+/g, "");
+  const m = t.match(/^([01]?[0-9]|2[0-3])(?:[:h]([0-5][0-9]))?h?$/);
+  if (!m) return null;
+  const horas = m[1].padStart(2, "0");
+  const minutos = m[2] ? m[2].padStart(2, "0") : "00";
+  return `${horas}:${minutos}`;
+}
+
+async function enviarConfirmacaoReuniaoComAta(client, solicitanteId, feedback) {
+  if (MessageMedia && fs.existsSync(CAMINHO_PDF_ATA)) {
+    try {
+      const media = MessageMedia.fromFilePath(CAMINHO_PDF_ATA);
+      await client.sendMessage(solicitanteId, media, { caption: feedback });
+      console.log(`[Reuniões] Confirmação com PDF da ata enviada para ${mascararTelefone(solicitanteId)}`);
+      return;
+    } catch (errPdf) {
+      console.error("[Reuniões] Erro ao carregar/enviar PDF da ata de reunião:", errPdf);
+    }
+  }
+  await client.sendMessage(solicitanteId, feedback);
+  console.log(`[Reuniões] Confirmação em texto enviada para ${mascararTelefone(solicitanteId)}`);
 }
 
 // Se o líder disser que o evento é "na igreja"/"no templo"/"no salão", assume o
@@ -253,10 +309,16 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       if (msg.from.endsWith("@g.us")) {
         const textoMsg = (msg.body || "").toLowerCase().trim();
         const PALAVRAS_CHAVE_APROVACAO = [
-          "marcar evento", "não marcar",
-          "alterar evento", "não alterar",
+          "marcar evento", "não marcar", "nao marcar",
+          "marcar reuniao", "marcar reunião",
+          "confirmar reuniao", "confirmar reunião",
+          "alterar evento", "não alterar", "nao alterar",
+          "alterar reuniao", "alterar reunião",
           "cancelar evento", "manter evento",
-          "não confirmar", "recusar",
+          "desmarcar reuniao", "desmarcar reunião",
+          "cancelar reuniao", "cancelar reunião",
+          "manter reuniao", "manter reunião",
+          "não confirmar", "nao confirmar", "recusar",
         ];
         let ehPalavraChave = PALAVRAS_CHAVE_APROVACAO.includes(textoMsg);
         if (!ehPalavraChave) {
@@ -334,7 +396,39 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         if (grupoPertence === NOME_GRUPO_SECRETARIA) {
           atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
 
-          if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
+          const isMarcar =
+            textoMsg === "marcar evento" ||
+            textoMsg === "marcar reuniao" ||
+            textoMsg === "marcar reunião" ||
+            textoMsg === "confirmar reuniao" ||
+            textoMsg === "confirmar reunião";
+          const isRecusarMarcar =
+            textoMsg === "não marcar" ||
+            textoMsg === "nao marcar" ||
+            textoMsg === "não confirmar" ||
+            textoMsg === "nao confirmar" ||
+            textoMsg === "recusar";
+
+          const isAlterar =
+            textoMsg === "alterar evento" ||
+            textoMsg === "alterar reuniao" ||
+            textoMsg === "alterar reunião";
+          const isNaoAlterar =
+            textoMsg === "não alterar" ||
+            textoMsg === "nao alterar";
+
+          const isCancelar =
+            textoMsg === "cancelar evento" ||
+            textoMsg === "cancelar reuniao" ||
+            textoMsg === "cancelar reunião" ||
+            textoMsg === "desmarcar reuniao" ||
+            textoMsg === "desmarcar reunião";
+          const isManter =
+            textoMsg === "manter evento" ||
+            textoMsg === "manter reuniao" ||
+            textoMsg === "manter reunião";
+
+          if (isMarcar || isRecusarMarcar) {
             if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
               const codigo = extrairCodigo(textoQuoted);
               const dados = codigo ? buscarPendente(codigo) : null;
@@ -342,9 +436,53 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
 
+              if (dados.tipo === "reuniao") {
+                const { solicitanteId, evento, departamento } = dados;
+
+                if (isMarcar) {
+                  try {
+                    const ano = dados.ano || moment().tz("America/Sao_Paulo").year();
+                    const resource = {
+                      summary: `Reunião: ${evento} (${departamento})`,
+                      description: `Agendado via Bot - Departamento: ${departamento}`,
+                      location: dados.local || "Comunidade Cristã Curados",
+                      start: {
+                        dateTime: moment.tz(`${dados.dia}/${dados.mes}/${ano} ${dados.horarioInicio}`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format(),
+                        timeZone: "America/Sao_Paulo",
+                      },
+                      end: {
+                        dateTime: moment.tz(`${dados.dia}/${dados.mes}/${ano} ${dados.horarioFim}`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format(),
+                        timeZone: "America/Sao_Paulo",
+                      },
+                    };
+
+                    await calendar.events.insert({ calendarId: AGENDAS_INTERNAS.REUNIOES, resource });
+                    removerPendente(codigo);
+
+                    const feedback = "✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo. Ele deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.\n\nDigite *menu* para voltar ao menu principal.";
+                    await enviarConfirmacaoReuniaoComAta(client, solicitanteId, feedback);
+                    console.log(`[Secretaria] Reunião agendada automaticamente para ${mascararTelefone(solicitanteId)}`);
+                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões* e líder notificado com a Ata.`);
+                  } catch (err) {
+                    console.error("[ALERTA:google-calendar] Erro no agendamento de reunião:", err);
+                    return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
+                  }
+                } else {
+                  removerPendente(codigo);
+                  const feedback = "❌ *Aviso de Solicitação de Reunião*\n\nInfelizmente não pudemos confirmar sua solicitação de reunião para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
+                  try {
+                    await client.sendMessage(solicitanteId, feedback);
+                    console.log(`[Secretaria] Feedback de recusa de reunião enviado para ${mascararTelefone(solicitanteId)}`);
+                  } catch (sendErr) {
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de reunião para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Líder notificado sobre a recusa da reunião.`);
+                }
+              }
+
               const { solicitanteId, rede } = dados;
 
-              if (textoMsg === "marcar evento") {
+              if (isMarcar) {
                 try {
                   const ano = moment().tz("America/Sao_Paulo").year();
                   const agendaId = agendasParaLer[mapearRedeParaAgendaIndex(rede)];
@@ -373,7 +511,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 return msg.reply(`✅ Líder notificado sobre a recusa.`);
               }
             }
-          } else if (textoMsg === "alterar evento" || textoMsg === "não alterar") {
+          } else if (isAlterar || isNaoAlterar) {
             if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
               const codigo = extrairCodigo(textoQuoted);
               const dados = codigo ? buscarPendente(codigo) : null;
@@ -381,9 +519,50 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
 
+              if (dados.tipo === "reuniao_alterar") {
+                const { solicitanteId, evento } = dados;
+
+                if (isAlterar) {
+                  const resourcePatch = dados.campo ? montarResourcePatchAlteracao(dados) : null;
+
+                  if (resourcePatch) {
+                    try {
+                      await calendar.events.patch({ calendarId: dados.calendarId, eventId: dados.eventId, resource: resourcePatch });
+                      removerPendente(codigo);
+
+                      const feedback = `✅ *Alteração de Reunião Aprovada!*\n\nSua solicitação de alteração para a reunião "*${evento}*" foi aprovada e já foi atualizada na agenda oficial. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
+                      await client.sendMessage(solicitanteId, feedback);
+                      console.log(`[Secretaria] Alteração de reunião aplicada para ${mascararTelefone(solicitanteId)}`);
+                      return msg.reply(`✅ Alteração aplicada na agenda de Reuniões e líder notificado.`);
+                    } catch (err) {
+                      console.error("[ALERTA:google-calendar] Erro ao aplicar alteração de reunião:", err);
+                      return msg.reply("❌ Erro ao aplicar a alteração na agenda do Google. Responda de novo a esta mesma mensagem depois de resolvido.");
+                    }
+                  }
+
+                  removerPendente(codigo);
+                  const feedback = `✅ *Alteração de Reunião Aprovada!*\n\nSua solicitação de alteração para a reunião "*${evento}*" foi aprovada pela secretaria. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
+                  try {
+                    await client.sendMessage(solicitanteId, feedback);
+                  } catch (sendErr) {
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração de reunião.`);
+                } else {
+                  removerPendente(codigo);
+                  const feedback = `❌ *Alteração de Reunião Não Aprovada*\n\nInfelizmente sua solicitação de alteração para a reunião "*${evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria.\n\nDigite *menu* para voltar ao menu principal.`;
+                  try {
+                    await client.sendMessage(solicitanteId, feedback);
+                  } catch (sendErr) {
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de recusa para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Solicitante notificado sobre a recusa da alteração de reunião.`);
+                }
+              }
+
               const { solicitanteId, evento } = dados;
 
-              if (textoMsg === "alterar evento") {
+              if (isAlterar) {
                 // Alterações estruturadas (horário/data/nome/local) carregam "campo" e
                 // conseguem ser aplicadas automaticamente. O texto livre ("outro") não
                 // tem como ser interpretado com segurança, então continua manual.
@@ -425,7 +604,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 return msg.reply(`✅ Solicitante notificado sobre a recusa da alteração.`);
               }
             }
-          } else if (textoMsg === "cancelar evento" || textoMsg === "manter evento") {
+          } else if (isCancelar || isManter) {
             if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
               const codigo = extrairCodigo(textoQuoted);
               const dados = codigo ? buscarPendente(codigo) : null;
@@ -433,9 +612,37 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
 
+              if (dados.tipo === "reuniao_cancelar") {
+                const { solicitanteId, evento, calendarId, eventId } = dados;
+
+                if (isCancelar) {
+                  try {
+                    await calendar.events.delete({ calendarId, eventId });
+                    removerPendente(codigo);
+
+                    const feedback = `❌ *Reunião Desmarcada*\n\nSua solicitação para desmarcar a reunião "*${evento}*" foi aprovada e ela foi removida da agenda oficial.\n\nDigite *menu* para voltar ao menu principal.`;
+                    await client.sendMessage(solicitanteId, feedback);
+                    console.log(`[Secretaria] Reunião desmarcada automaticamente para ${mascararTelefone(solicitanteId)}`);
+                    return msg.reply(`✅ Reunião desmarcada na agenda e líder notificado.`);
+                  } catch (err) {
+                    console.error("[ALERTA:google-calendar] Erro ao desmarcar reunião:", err);
+                    return msg.reply("❌ Erro ao desmarcar a reunião na agenda do Google. Responda de novo a esta mesma mensagem depois de resolvido.");
+                  }
+                } else {
+                  removerPendente(codigo);
+                  const feedback = `✅ *Reunião Mantida*\n\nSua solicitação para desmarcar a reunião "*${evento}*" não foi aprovada — a reunião continua marcada normalmente.\n\nDigite *menu* para voltar ao menu principal.`;
+                  try {
+                    await client.sendMessage(solicitanteId, feedback);
+                  } catch (sendErr) {
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de reunião mantida para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Líder notificado que a reunião foi mantida.`);
+                }
+              }
+
               const { solicitanteId, evento, calendarId, eventId } = dados;
 
-              if (textoMsg === "cancelar evento") {
+              if (isCancelar) {
                 try {
                   await calendar.events.delete({ calendarId, eventId });
                   removerPendente(codigo);
@@ -1235,8 +1442,12 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
               return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedes()}`);
+            } else if (escolha === "4") {
+              info.fluxo = "reunioes";
+              info.etapa = "menu_reuniao";
+              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *menu* para voltar.");
             } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 3, ou digite *menu* para voltar.");
+              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 4, ou digite *menu* para voltar.");
             }
           }
         } else if (info.fluxo === "artes_flyers") {
@@ -1311,6 +1522,291 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
             delete etapas[numero];
             return;
           }
+        } else if (info.fluxo === "reunioes") {
+          if (info.etapa === "menu_reuniao") {
+            const escolha = msg.body.trim();
+            if (escolha === "1") {
+              info.etapa = "reuniao_assunto";
+              return msg.reply("🤝 *Agendar Reunião*\n\n1️⃣ Qual é o *assunto ou motivo* da reunião?");
+            } else if (escolha === "2" || escolha === "3") {
+              info.acaoReuniao = escolha === "3" ? "desmarcar" : "alterar";
+              await msg.reply("🔍 Buscando reuniões agendadas...");
+              try {
+                const agora = moment.tz("America/Sao_Paulo");
+                const inicioBusca = agora.clone().startOf("day").toISOString();
+                const fimAno = agora.clone().endOf("year").toISOString();
+                const eventos = await buscarEventos(inicioBusca, fimAno, AGENDAS_INTERNAS.REUNIOES);
+                const filtrados = (eventos || []).filter(e => e.status !== "cancelled");
+                if (filtrados.length === 0) {
+                  delete etapas[numero];
+                  return msg.reply("ℹ️ Não há reuniões agendadas no momento.\n\nDigite *menu* para voltar ao menu principal.");
+                }
+
+                info.eventosEncontrados = filtrados.slice(0, 15);
+                info.etapa = info.acaoReuniao === "desmarcar" ? "reuniao_desmarcar_selecionar" : "reuniao_alterar_selecionar";
+                const acaoVerbo = info.acaoReuniao === "desmarcar" ? "desmarcar" : "alterar";
+                let lista = `📋 *Reuniões Agendadas*\nQual reunião você deseja ${acaoVerbo}?\n\n`;
+                info.eventosEncontrados.forEach((ev, i) => {
+                  const d = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo");
+                  lista += `${i + 1} - ${d.format("DD/MM [às] HH:mm")}: ${ev.summary}\n`;
+                });
+                lista += `\nDigite o número da reunião ou *menu* para voltar.`;
+                return msg.reply(lista);
+              } catch (errList) {
+                console.error("[Reuniões] Erro ao listar reuniões:", errList);
+                delete etapas[numero];
+                return msg.reply("⚠️ Erro ao acessar a agenda de reuniões. Tente novamente mais tarde.");
+              }
+            } else {
+              return msg.reply("❌ Opção inválida. Escolha 1 para agendar, 2 para alterar ou 3 para desmarcar (ou digite *menu* para voltar).");
+            }
+          }
+
+          // Subfluxo Agendar Reunião
+          if (info.etapa === "reuniao_assunto") {
+            const assunto = msg.body.trim();
+            if (!assunto) return msg.reply("❌ Por favor, informe o assunto ou motivo da reunião:");
+            info.reuniaoAssunto = assunto;
+            info.etapa = "reuniao_departamento";
+            return msg.reply("2️⃣ Qual é o *departamento ou ministério* responsável pela reunião? (Ex: Louvor, Jovens, Geral)");
+          }
+
+          if (info.etapa === "reuniao_departamento") {
+            const depto = msg.body.trim();
+            if (!depto) return msg.reply("❌ Por favor, informe o departamento ou ministério:");
+            info.reuniaoDepartamento = depto;
+            info.etapa = "reuniao_data";
+            return msg.reply("3️⃣ Para qual *data* seria a reunião? (Ex: 25/10 ou 25/10/2026)");
+          }
+
+          if (info.etapa === "reuniao_data") {
+            const dataObj = interpretarDataReuniao(msg.body);
+            if (!dataObj) {
+              return msg.reply("❌ Formato de data inválido. Use DD/MM ou DD/MM/AAAA (ex: 25/10 ou 25/10/2026).");
+            }
+            info.reuniaoData = dataObj;
+            info.etapa = "reuniao_horario_inicio";
+            return msg.reply("4️⃣ Qual é o *horário de início* da reunião? (Ex: 19h ou 19:30)");
+          }
+
+          if (info.etapa === "reuniao_horario_inicio") {
+            const hInicio = normalizarHorarioReuniao(msg.body);
+            if (!hInicio) {
+              return msg.reply("❌ Formato de horário inválido. Use HH:MM ou HHh (ex: 19h ou 19:30).");
+            }
+            info.reuniaoHorarioInicio = hInicio;
+            info.etapa = "reuniao_horario_fim";
+            return msg.reply("5️⃣ Qual é o *horário previsto de término* da reunião? (Ex: 21h ou 21:30)");
+          }
+
+          if (info.etapa === "reuniao_horario_fim") {
+            const hFim = normalizarHorarioReuniao(msg.body);
+            if (!hFim) {
+              return msg.reply("❌ Formato de horário de término inválido. Use HH:MM ou HHh (ex: 21h ou 21:30).");
+            }
+            const [hi, mi] = info.reuniaoHorarioInicio.split(":").map(Number);
+            const [hf, mf] = hFim.split(":").map(Number);
+            if (hf < hi || (hf === hi && mf <= mi)) {
+              return msg.reply("❌ O horário de término deve ser posterior ao horário de início. Digite novamente:");
+            }
+            info.reuniaoHorarioFim = hFim;
+            info.etapa = "reuniao_local";
+            return msg.reply("6️⃣ Qual será o *local* da reunião? (Ex: Sala 01, Templo, Salão Social, Online)");
+          }
+
+          if (info.etapa === "reuniao_local") {
+            const local = resolverLocalEvento(msg.body);
+            if (!local) return msg.reply("❌ Por favor, informe o local da reunião:");
+            info.reuniaoLocal = local;
+
+            const dadosReuniao = {
+              tipo: "reuniao",
+              solicitanteId: numero,
+              evento: info.reuniaoAssunto,
+              departamento: info.reuniaoDepartamento,
+              local: info.reuniaoLocal,
+              dia: info.reuniaoData.dia,
+              mes: info.reuniaoData.mes,
+              ano: info.reuniaoData.ano,
+              horarioInicio: info.reuniaoHorarioInicio,
+              horarioFim: info.reuniaoHorarioFim,
+              isDiaInteiro: false,
+            };
+
+            try {
+              const codigo = salvarPendente(dadosReuniao);
+              const resumoGrupo = `🤝 *NOVA REUNIÃO SOLICITADA*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📝 *Assunto:* ${info.reuniaoAssunto}\n🏢 *Depto:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n\n_Responda a este resumo com "marcar reunião" ou "não marcar" para aprovar._\n\n_Código: ${codigo}_`;
+              await notificarSecretaria(client, resumoGrupo);
+
+              const resumoLider = `✅ *Solicitação de Reunião Enviada!*\n\n📝 *Assunto:* ${info.reuniaoAssunto}\n🏢 *Departamento:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n\nSua solicitação foi enviada para aprovação da secretaria. Assim que confirmada, você receberá a confirmação e a Ata de Reunião. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
+              delete etapas[numero];
+              return msg.reply(resumoLider);
+            } catch (errSalvar) {
+              console.error("[Reuniões] Erro ao salvar solicitação de reunião:", errSalvar);
+              delete etapas[numero];
+              return msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
+            }
+          }
+
+          // Subfluxo Desmarcar Reunião
+          if (info.etapa === "reuniao_desmarcar_selecionar") {
+            const index = parseInt(msg.body.trim()) - 1;
+            if (isNaN(index) || !info.eventosEncontrados[index]) {
+              return msg.reply("❌ Escolha um número válido da lista.");
+            }
+            info.reuniaoSelecionada = info.eventosEncontrados[index];
+            info.etapa = "reuniao_desmarcar_confirmar";
+            const d = moment.tz(info.reuniaoSelecionada.start.dateTime || info.reuniaoSelecionada.start.date, "America/Sao_Paulo");
+            return msg.reply(`⚠️ Confirma a solicitação para *desmarcar* a reunião:\n\n📌 *${info.reuniaoSelecionada.summary}*\n🗓️ *Data:* ${d.format("DD/MM/YYYY [às] HH:mm")}\n\nDigite *SIM* para confirmar ou *menu* para desistir.`);
+          }
+
+          if (info.etapa === "reuniao_desmarcar_confirmar") {
+            if (msg.body.trim().toLowerCase() !== "sim") {
+              return msg.reply("❌ Desmarcação não confirmada. Digite *SIM* para confirmar ou *menu* para desistir.");
+            }
+            try {
+              const dataOriginal = moment.tz(info.reuniaoSelecionada.start.dateTime || info.reuniaoSelecionada.start.date, "America/Sao_Paulo");
+              const dadosDesmarcar = {
+                tipo: "reuniao_cancelar",
+                solicitanteId: numero,
+                evento: info.reuniaoSelecionada.summary,
+                eventId: info.reuniaoSelecionada.id,
+                calendarId: AGENDAS_INTERNAS.REUNIOES,
+              };
+              const codigoCancelamento = salvarPendente(dadosDesmarcar);
+              const resumoGrupo = `🗑️ *PEDIDO PARA DESMARCAR REUNIÃO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Reunião:* ${info.reuniaoSelecionada.summary}\n📆 *Data:* ${dataOriginal.format("DD/MM/YYYY [às] HH:mm")}\n\n_Responda a este resumo com "desmarcar reunião" para confirmar ou "manter reunião" para negar._\n\n_Código: ${codigoCancelamento}_`;
+              await notificarSecretaria(client, resumoGrupo);
+
+              const resumoLider = `🗑️ *Solicitação para Desmarcar Reunião Enviada*\n\n*Reunião:* ${info.reuniaoSelecionada.summary}\n*Data:* ${dataOriginal.format("DD/MM/YYYY [às] HH:mm")}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+              delete etapas[numero];
+              return msg.reply(resumoLider);
+            } catch (errCancel) {
+              console.error("[Reuniões] Erro ao registrar solicitação de desmarcação:", errCancel);
+              delete etapas[numero];
+              return msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
+            }
+          }
+
+          // Subfluxo Alterar Reunião
+          if (info.etapa === "reuniao_alterar_selecionar") {
+            const index = parseInt(msg.body.trim()) - 1;
+            if (isNaN(index) || !info.eventosEncontrados[index]) {
+              return msg.reply("❌ Escolha um número válido da lista.");
+            }
+            info.reuniaoSelecionada = info.eventosEncontrados[index];
+            info.etapa = "reuniao_alterar_o_que";
+            return msg.reply(`📝 Você selecionou: *${info.reuniaoSelecionada.summary}*\n\nO que você deseja alterar?\n\n1 - Horário\n2 - Data\n3 - Local\n4 - Outra alteração (descreva em texto livre)`);
+          }
+
+          if (info.etapa === "reuniao_alterar_o_que") {
+            const opc = msg.body.trim();
+            if (opc === "1") {
+              info.etapa = "reuniao_alterar_novo_horario_inicio";
+              return msg.reply("⏰ Digite o *novo horário de início* da reunião (ex: 19h ou 19:30):");
+            } else if (opc === "2") {
+              info.etapa = "reuniao_alterar_nova_data";
+              return msg.reply("📆 Digite a *nova data* da reunião (ex: 25/10 ou 25/10/2026):");
+            } else if (opc === "3") {
+              info.etapa = "reuniao_alterar_novo_local";
+              return msg.reply("📍 Digite o *novo local* da reunião:");
+            } else if (opc === "4") {
+              info.etapa = "reuniao_alterar_outro";
+              return msg.reply("✍️ Descreva em detalhes o que você deseja alterar nesta reunião:");
+            } else {
+              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 4.");
+            }
+          }
+
+          if (info.etapa === "reuniao_alterar_novo_horario_inicio") {
+            const hInicio = normalizarHorarioReuniao(msg.body);
+            if (!hInicio) {
+              return msg.reply("❌ Formato de horário inválido. Use HH:MM ou HHh (ex: 19h ou 19:30).");
+            }
+            info.novoHorarioInicio = hInicio;
+            info.etapa = "reuniao_alterar_novo_horario_fim";
+            return msg.reply("⏰ Digite o *novo horário previsto de término* (ex: 21h ou 21:30):");
+          }
+
+          if (info.etapa === "reuniao_alterar_novo_horario_fim") {
+            const hFim = normalizarHorarioReuniao(msg.body);
+            if (!hFim) {
+              return msg.reply("❌ Formato de horário de término inválido. Use HH:MM ou HHh (ex: 21h ou 21:30).");
+            }
+            const [hi, mi] = info.novoHorarioInicio.split(":").map(Number);
+            const [hf, mf] = hFim.split(":").map(Number);
+            if (hf < hi || (hf === hi && mf <= mi)) {
+              return msg.reply("❌ O horário de término deve ser posterior ao horário de início. Digite novamente:");
+            }
+            info.novoHorarioFim = hFim;
+            info.campoAlterar = "horario";
+            info.descricaoAlteracao = `Novo horário: ${info.novoHorarioInicio} às ${info.novoHorarioFim}`;
+            info.etapa = "reuniao_alterar_finalizar";
+          }
+
+          if (info.etapa === "reuniao_alterar_nova_data") {
+            const dataObj = interpretarDataReuniao(msg.body);
+            if (!dataObj) {
+              return msg.reply("❌ Formato de data inválido. Use DD/MM ou DD/MM/AAAA (ex: 25/10 ou 25/10/2026).");
+            }
+            info.novoDia = dataObj.dia;
+            info.novoMes = dataObj.mes;
+            info.novoAno = dataObj.ano;
+            info.campoAlterar = "data";
+            info.descricaoAlteracao = `Nova data: ${dataObj.formatada}`;
+            info.etapa = "reuniao_alterar_finalizar";
+          }
+
+          if (info.etapa === "reuniao_alterar_novo_local") {
+            const local = resolverLocalEvento(msg.body);
+            if (!local) return msg.reply("❌ Por favor, informe o novo local:");
+            info.novoLocal = local;
+            info.campoAlterar = "local";
+            info.descricaoAlteracao = `Novo local: ${info.novoLocal}`;
+            info.etapa = "reuniao_alterar_finalizar";
+          }
+
+          if (info.etapa === "reuniao_alterar_outro") {
+            const descricao = msg.body.trim();
+            if (!descricao) return msg.reply("❌ Por favor, descreva o que deseja alterar:");
+            info.campoAlterar = "outro";
+            info.descricaoAlteracao = descricao;
+            info.etapa = "reuniao_alterar_finalizar";
+          }
+
+          if (info.etapa === "reuniao_alterar_finalizar") {
+            try {
+              const dataOriginal = moment.tz(info.reuniaoSelecionada.start.dateTime || info.reuniaoSelecionada.start.date, "America/Sao_Paulo");
+              const dadosAlteracao = {
+                tipo: "reuniao_alterar",
+                solicitanteId: numero,
+                evento: info.reuniaoSelecionada.summary,
+                eventId: info.reuniaoSelecionada.id,
+                calendarId: AGENDAS_INTERNAS.REUNIOES,
+                campo: info.campoAlterar !== "outro" ? info.campoAlterar : undefined,
+                novoDia: info.novoDia,
+                novoMes: info.novoMes,
+                novoHorarioInicio: info.novoHorarioInicio,
+                novoHorarioFim: info.novoHorarioFim,
+                novoLocal: info.novoLocal,
+                detalhes: info.descricaoAlteracao,
+                isDiaInteiroOriginal: false,
+                inicioOriginal: info.reuniaoSelecionada.start.dateTime || info.reuniaoSelecionada.start.date,
+                fimOriginal: info.reuniaoSelecionada.end.dateTime || info.reuniaoSelecionada.end.date,
+              };
+
+              const codigoAlteracao = salvarPendente(dadosAlteracao);
+              const resumoGrupo = `🔄 *PEDIDO DE ALTERAÇÃO DE REUNIÃO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Reunião:* ${info.reuniaoSelecionada.summary}\n📆 *Data Original:* ${dataOriginal.format("DD/MM/YYYY [às] HH:mm")}\n✏️ *Alteração:* ${info.descricaoAlteracao}\n\n_Responda a este resumo com "alterar reunião" para confirmar ou "não alterar" para negar._\n\n_Código: ${codigoAlteracao}_`;
+              await notificarSecretaria(client, resumoGrupo);
+
+              const resumoLider = `🔄 *Solicitação de Alteração de Reunião Enviada*\n\n*Reunião:* ${info.reuniaoSelecionada.summary}\n*Data Original:* ${dataOriginal.format("DD/MM/YYYY [às] HH:mm")}\n*Alteração Solicitada:* ${info.descricaoAlteracao}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+              delete etapas[numero];
+              return msg.reply(resumoLider);
+            } catch (errAlt) {
+              console.error("[Reuniões] Erro ao registrar solicitação de alteração:", errAlt);
+              delete etapas[numero];
+              return msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
+            }
+          }
         }
         return;
       }
@@ -1373,7 +1869,7 @@ Digite *menu* para voltar ao menu principal.`;
       if (texto === "6" && isLider) {
         console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando Área do Líder`);
         etapas[numero] = { fluxo: "area_lider", etapa: "menu_lider" };
-        const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n\nDigite *menu* para voltar ao menu principal.`;
+        const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n4️⃣ Agendar, alterar ou desmarcar reunião\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
       }
 

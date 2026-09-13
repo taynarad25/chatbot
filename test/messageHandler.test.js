@@ -19,6 +19,7 @@ const moment = require("moment-timezone");
 const { createMessageHandler } = require("../bot/messageHandler");
 const { buscarPendente, extrairCodigo } = require("../bot/pendentesAprovacao");
 const { atualizarCacheGrupo, NOME_GRUPO_SECRETARIA } = require("../bot/secretaria");
+const { AGENDAS_INTERNAS } = require("../bot/redes");
 
 after(() => {
   try {
@@ -77,7 +78,7 @@ function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
       if (JIDS_DE_GRUPO.has(to)) {
         gruposEnviados.push(conteudo);
       } else {
-        diretasEnviadas.push({ to, texto: conteudo });
+        diretasEnviadas.push({ to, texto: conteudo, media: typeof texto !== "string" ? texto : null });
       }
     },
     getChats: async () => [
@@ -1416,5 +1417,208 @@ test("fluxo artes_flyers: solicita com sucesso anexando imagem/mídia", async ()
   assert.equal(gruposEnviados.length, 1);
   assert.match(gruposEnviados[0], /NOVA SOLICITAÇÃO DE ARTE\/FLYER/);
   assert.equal(etapas[NUMERO_LIDER], undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Fluxo de Reuniões (Área do Líder - Opção 4)
+// ---------------------------------------------------------------------------
+
+test("área do líder: agendar reunião coleta dados rapidamente, secretaria aprova e líder recebe ata em anexo", async () => {
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados, etapas } = criarContexto();
+
+  const rMenu = await enviar(handleMessage, NUMERO_LIDER, "6");
+  assert.match(rMenu[0], /4️⃣ Agendar, alterar ou desmarcar reunião/);
+
+  const rSub = await enviar(handleMessage, NUMERO_LIDER, "4");
+  assert.match(rSub[0], /1 - Agendar reunião/);
+
+  const r1 = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(r1[0], /1️⃣ Qual é o \*assunto ou motivo\*/);
+
+  const r2 = await enviar(handleMessage, NUMERO_LIDER, "Alinhamento de Liderança");
+  assert.match(r2[0], /2️⃣ Qual é o \*departamento ou ministério\*/);
+
+  const r3 = await enviar(handleMessage, NUMERO_LIDER, "Diretoria");
+  assert.match(r3[0], /3️⃣ Para qual \*data\*/);
+
+  const r4 = await enviar(handleMessage, NUMERO_LIDER, "28/11/2026");
+  assert.match(r4[0], /4️⃣ Qual é o \*horário de início\*/);
+
+  const r5 = await enviar(handleMessage, NUMERO_LIDER, "19h30");
+  assert.match(r5[0], /5️⃣ Qual é o \*horário previsto de término\*/);
+
+  const r6 = await enviar(handleMessage, NUMERO_LIDER, "21h30");
+  assert.match(r6[0], /6️⃣ Qual será o \*local\*/);
+
+  const rFinal = await enviar(handleMessage, NUMERO_LIDER, "Sala de Reuniões");
+  assert.match(rFinal[0], /Solicitação de Reunião Enviada/);
+  assert.match(rFinal[0], /Alinhamento de Liderança/);
+  assert.equal(etapas[NUMERO_LIDER], undefined);
+
+  assert.equal(gruposEnviados.length, 1);
+  assert.match(gruposEnviados[0], /NOVA REUNIÃO SOLICITADA/);
+  assert.match(gruposEnviados[0], /Alinhamento de Liderança/);
+  assert.match(gruposEnviados[0], /Diretoria/);
+  assert.match(gruposEnviados[0], /28\/11\/2026/);
+  assert.match(gruposEnviados[0], /19:30 - 21:30/);
+
+  // Secretaria responde no grupo aprovando
+  const msgAprovacao = criarMsgGrupo({
+    body: "marcar reuniao",
+    quotedBody: gruposEnviados[0],
+  });
+  await handleMessage(msgAprovacao);
+
+  assert.equal(eventosGravados.length, 1);
+  assert.equal(eventosGravados[0].calendarId, AGENDAS_INTERNAS.REUNIOES);
+  assert.match(eventosGravados[0].resource.summary, /Alinhamento de Liderança/);
+
+  assert.equal(diretasEnviadas.length, 1);
+  assert.equal(diretasEnviadas[0].to, NUMERO_LIDER);
+  assert.match(diretasEnviadas[0].texto, /Reunião Confirmada e Agendada/);
+  assert.match(diretasEnviadas[0].texto, /Ata de Reunião/);
+  assert.match(diretasEnviadas[0].texto, /impresso e preenchido/);
+  assert.match(diretasEnviadas[0].texto, /secretárias para arquivar/);
+  // Se o PDF da ata existe no ambiente de execução, deve ter sido anexado como media
+  if (diretasEnviadas[0].media) {
+    assert.equal(diretasEnviadas[0].media.mimetype, "application/pdf");
+  }
+});
+
+test("área do líder: agendar reunião e secretaria recusa", async () => {
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto();
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "4");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Reunião de Oração");
+  await enviar(handleMessage, NUMERO_LIDER, "Intercessão");
+  await enviar(handleMessage, NUMERO_LIDER, "20/12/2026");
+  await enviar(handleMessage, NUMERO_LIDER, "20:00");
+  await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  await enviar(handleMessage, NUMERO_LIDER, "no templo");
+
+  assert.equal(gruposEnviados.length, 1);
+
+  const msgRecusa = criarMsgGrupo({
+    body: "não marcar",
+    quotedBody: gruposEnviados[0],
+  });
+  await handleMessage(msgRecusa);
+
+  assert.equal(eventosGravados.length, 0);
+  assert.equal(diretasEnviadas.length, 1);
+  assert.match(diretasEnviadas[0].texto, /não pudemos confirmar sua solicitação de reunião/);
+});
+
+test("área do líder: alterar reunião existente na agenda de reuniões", async () => {
+  const reunioesExistentes = [
+    {
+      id: "reuniao-louvor-99",
+      summary: "Reunião: Louvor (Louvor)",
+      start: { dateTime: "2026-11-20T19:00:00-03:00" },
+      end: { dateTime: "2026-11-20T21:00:00-03:00" },
+      location: "Sala 02",
+    },
+  ];
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosAlterados, setEventos } = criarContexto();
+  setEventos(reunioesExistentes);
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "4");
+  const rLista = await enviar(handleMessage, NUMERO_LIDER, "2");
+  assert.match(rLista[1], /Reuniões Agendadas/);
+  assert.match(rLista[1], /Reunião: Louvor/);
+
+  const rOpcoes = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(rOpcoes[0], /O que você deseja alterar/);
+
+  const rHorario = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(rHorario[0], /novo horário de início/);
+
+  const rFim = await enviar(handleMessage, NUMERO_LIDER, "20h");
+  assert.match(rFim[0], /novo horário previsto de término/);
+
+  const rFinal = await enviar(handleMessage, NUMERO_LIDER, "22h");
+  assert.match(rFinal[0], /Solicitação de Alteração de Reunião Enviada/);
+
+  assert.equal(gruposEnviados.length, 1);
+  assert.match(gruposEnviados[0], /PEDIDO DE ALTERAÇÃO DE REUNIÃO/);
+
+  const msgAprovacaoAlt = criarMsgGrupo({
+    body: "alterar reuniao",
+    quotedBody: gruposEnviados[0],
+  });
+  await handleMessage(msgAprovacaoAlt);
+
+  assert.equal(eventosAlterados.length, 1);
+  assert.equal(eventosAlterados[0].calendarId, AGENDAS_INTERNAS.REUNIOES);
+  assert.equal(eventosAlterados[0].eventId, "reuniao-louvor-99");
+  assert.equal(diretasEnviadas.length, 1);
+  assert.match(diretasEnviadas[0].texto, /Alteração de Reunião Aprovada/);
+});
+
+test("área do líder: desmarcar reunião existente na agenda de reuniões", async () => {
+  const reunioesExistentes = [
+    {
+      id: "reuniao-kids-88",
+      summary: "Reunião: Equipe Kids (Kids)",
+      start: { dateTime: "2026-11-22T15:00:00-03:00" },
+      end: { dateTime: "2026-11-22T17:00:00-03:00" },
+      location: "Salão Infantil",
+    },
+  ];
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosCancelados, setEventos } = criarContexto();
+  setEventos(reunioesExistentes);
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "4");
+  const rLista = await enviar(handleMessage, NUMERO_LIDER, "3");
+  assert.match(rLista[1], /Reuniões Agendadas/);
+
+  const rConfirma = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(rConfirma[0], /Confirma a solicitação para \*desmarcar\*/);
+
+  const rEnviado = await enviar(handleMessage, NUMERO_LIDER, "SIM");
+  assert.match(rEnviado[0], /Solicitação para Desmarcar Reunião Enviada/);
+
+  assert.equal(gruposEnviados.length, 1);
+  assert.match(gruposEnviados[0], /PEDIDO PARA DESMARCAR REUNIÃO/);
+
+  const msgDesmarcar = criarMsgGrupo({
+    body: "desmarcar reuniao",
+    quotedBody: gruposEnviados[0],
+  });
+  await handleMessage(msgDesmarcar);
+
+  assert.equal(eventosCancelados.length, 1);
+  assert.equal(eventosCancelados[0].calendarId, AGENDAS_INTERNAS.REUNIOES);
+  assert.equal(eventosCancelados[0].eventId, "reuniao-kids-88");
+  assert.equal(diretasEnviadas.length, 1);
+  assert.match(diretasEnviadas[0].texto, /Reunião Desmarcada/);
+});
+
+test("área do líder: validações de data e horários inválidos no fluxo de reunião", async () => {
+  const { handleMessage } = criarContexto();
+
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "4");
+  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "Assunto Teste");
+  await enviar(handleMessage, NUMERO_LIDER, "Depto Teste");
+
+  const rDataInvalida = await enviar(handleMessage, NUMERO_LIDER, "31/02/2026");
+  assert.match(rDataInvalida[0], /Formato de data inválido/);
+
+  const rDataValida = await enviar(handleMessage, NUMERO_LIDER, "10/11/2026");
+  assert.match(rDataValida[0], /Qual é o \*horário de início\*/);
+
+  const rHoraInicioInvalida = await enviar(handleMessage, NUMERO_LIDER, "horario-errado");
+  assert.match(rHoraInicioInvalida[0], /Formato de horário inválido/);
+
+  await enviar(handleMessage, NUMERO_LIDER, "19h");
+
+  const rHoraFimAnterior = await enviar(handleMessage, NUMERO_LIDER, "18h");
+  assert.match(rHoraFimAnterior[0], /horário de término deve ser posterior/);
 });
 
