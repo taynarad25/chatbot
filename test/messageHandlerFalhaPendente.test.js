@@ -19,7 +19,9 @@ const { createMessageHandler } = require("../bot/messageHandler");
 db.exec("DROP TABLE pendentes");
 
 after(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  try {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch {}
 });
 
 const AGENDAS = [

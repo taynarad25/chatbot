@@ -11,7 +11,9 @@ const assert = require("node:assert/strict");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("../bot/pendentesAprovacao");
 
 after(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  try {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch {}
 });
 
 function dadosExemplo(overrides = {}) {

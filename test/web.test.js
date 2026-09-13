@@ -31,7 +31,9 @@ before(async () => {
 
 after(() => {
   server.close();
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  try {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch {}
 });
 
 function extraiCookie(res) {

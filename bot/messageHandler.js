@@ -238,37 +238,6 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       // quando a mensagem é uma resposta (reply) a algo E o texto é uma das palavras-
       // chave de aprovação conhecidas.
       if (msg.from.endsWith("@g.us")) {
-        const cachedSecretaria = obterJidCached(NOME_GRUPO_SECRETARIA);
-        const cachedPastoral = obterJidCached(NOME_GRUPO_PASTORAL);
-
-        let grupoPertence = null;
-        if (msg.from === cachedSecretaria) {
-          grupoPertence = NOME_GRUPO_SECRETARIA;
-        } else if (msg.from === cachedPastoral) {
-          grupoPertence = NOME_GRUPO_PASTORAL;
-        }
-
-        let chat = null;
-        let getChatFailed = false;
-
-        // Se não for nenhum dos dois grupos no cache, a gente tenta carregar o chat para identificar pelo nome
-        if (!grupoPertence) {
-          try {
-            chat = await comRetry(() => msg.getChat());
-            const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
-            if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
-              grupoPertence = NOME_GRUPO_SECRETARIA;
-              atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
-            } else if (nomeChatNormalizado.includes(NOME_GRUPO_PASTORAL.trim().toLowerCase())) {
-              grupoPertence = NOME_GRUPO_PASTORAL;
-              atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
-            }
-          } catch (err) {
-            getChatFailed = true;
-            console.warn(`[Grupo] Erro ao obter chat para ler o nome do grupo (${msg.from}):`, err.message);
-          }
-        }
-
         const textoMsg = (msg.body || "").toLowerCase().trim();
         const PALAVRAS_CHAVE_APROVACAO = [
           "marcar evento", "não marcar",
@@ -298,16 +267,20 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           return;
         }
 
-        if (!grupoPertence && getChatFailed) {
-          return;
+        const cachedSecretaria = obterJidCached(NOME_GRUPO_SECRETARIA);
+        const cachedPastoral = obterJidCached(NOME_GRUPO_PASTORAL);
+
+        let grupoPertence = null;
+        if (msg.from === cachedSecretaria) {
+          grupoPertence = NOME_GRUPO_SECRETARIA;
+        } else if (msg.from === cachedPastoral) {
+          grupoPertence = NOME_GRUPO_PASTORAL;
         }
 
-        // Se ainda não identificamos o grupo (porque não estava no cache e falhou ao obter chat da primeira vez)
+        let chat = null;
         if (!grupoPertence) {
           try {
-            if (!chat) {
-              chat = await comRetry(() => msg.getChat());
-            }
+            chat = await comRetry(() => msg.getChat());
             const nomeChatNormalizado = chat.name ? chat.name.trim().toLowerCase() : "";
             if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
               grupoPertence = NOME_GRUPO_SECRETARIA;
@@ -317,10 +290,6 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
             }
           } catch (err) {
-            // Não é "erro fatal": existem mensagens de grupo cujo chat nunca resolve
-            // de verdade (JID inválido/sintético, sem relação com o fluxo do bot) —
-            // tentar de novo não ajuda nesses casos, então só ignora essa mensagem em
-            // vez de estourar o alerta crítico repetidamente pra algo não-acionável.
             console.warn(`[Grupo] Não foi possível carregar o chat de uma mensagem (de: ${mascararTelefone(msg.from)}, id: ${msg.id?._serialized}) — ignorando. Detalhe: ${err.message}`);
             return;
           }
@@ -333,27 +302,24 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         const nomeParaExibicao = chat?.name || grupoPertence;
         console.log(`[Grupo] "${nomeParaExibicao}" | Resposta a outra mensagem: ${msg.hasQuotedMsg} | Texto: "${msg.body}"`);
 
-        const nomeChatNormalizado = grupoPertence.trim().toLowerCase();
-        if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
+        // 🟢 Tenta obter a mensagem citada de forma totalmente segura (evitando o 'id undefined')
+        let quotedMsg = null;
+        try {
+          quotedMsg = await comRetry(() => msg.getQuotedMessage());
+        } catch (errQuoted) {
+          console.warn(`[${grupoPertence}] Falha ao executar getQuotedMessage(), tentando ler do payload direto:`, errQuoted.message);
+        }
+
+        const textoQuoted = quotedMsg?.body
+          || msg.quotedMsg?.body
+          || msg._data?.quotedMsg?.body
+          || msg._data?.quotedMsg?.caption
+          || "";
+
+        const ehMensagemDoBot = quotedMsg ? quotedMsg.fromMe : (msg.quotedMsg?.fromMe || msg._data?.quotedMsg?.fromMe);
+
+        if (grupoPertence === NOME_GRUPO_SECRETARIA) {
           atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
-
-          // 🟢 Tenta obter a mensagem citada de forma totalmente segura (evitando o 'id undefined')
-          let quotedMsg = null;
-          try {
-            if (msg.hasQuotedMsg) {
-              quotedMsg = await comRetry(() => msg.getQuotedMessage());
-            }
-          } catch (errQuoted) {
-            console.warn(`[Secretaria] Falha ao executar getQuotedMessage(), tentando ler do payload direto:`, errQuoted.message);
-          }
-
-          const textoQuoted = quotedMsg?.body
-            || msg.quotedMsg?.body
-            || msg._data?.quotedMsg?.body
-            || msg._data?.quotedMsg?.caption
-            || "";
-
-          const ehMensagemDoBot = quotedMsg ? quotedMsg.fromMe : (msg.quotedMsg?.fromMe || msg._data?.quotedMsg?.fromMe);
 
           if (textoMsg === "marcar evento" || textoMsg === "não marcar") {
             if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
@@ -482,27 +448,8 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               }
             }
           }
-        } else if (nomeChatNormalizado.includes(NOME_GRUPO_PASTORAL.trim().toLowerCase())) {
+        } else if (grupoPertence === NOME_GRUPO_PASTORAL) {
           atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
-
-          // 🟢 Tenta obter a mensagem citada de forma totalmente segura (evitando o 'id undefined')
-          let quotedMsg = null;
-          try {
-            if (msg.hasQuotedMsg) {
-              quotedMsg = await comRetry(() => msg.getQuotedMessage());
-            }
-          } catch (errQuoted) {
-            console.warn(`[Pastoral] Falha ao executar getQuotedMessage(), tentando ler do payload direto:`, errQuoted.message);
-          }
-
-          // Fallback: se o getQuotedMessage() falhar, tenta extrair o corpo da citação do payload da própria mensagem
-          const textoQuoted = quotedMsg?.body
-            || msg.quotedMsg?.body
-            || msg._data?.quotedMsg?.body
-            || msg._data?.quotedMsg?.caption
-            || "";
-
-          const ehMensagemDoBot = quotedMsg ? quotedMsg.fromMe : (msg.quotedMsg?.fromMe || msg._data?.quotedMsg?.fromMe);
 
           if (ehMensagemDoBot || textoQuoted.includes("CÓDIGO") || textoQuoted.includes("Código")) {
             const codigo = extrairCodigo(textoQuoted);

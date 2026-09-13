@@ -16,7 +16,9 @@ const {
 } = require("../bot/secretaria");
 
 after(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  try {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch {}
 });
 
 function fakeChat({ isGroup, name }) {
