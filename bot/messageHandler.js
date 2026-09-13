@@ -1,7 +1,7 @@
 const moment = require("moment-timezone");
 const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
 const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
-const { montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
+const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex } = require("./redes");
 const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
@@ -161,9 +161,20 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
   async function entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg) {
     try {
       const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
-      const todosEventos = todosEventosRaw.filter(ev =>
-        !(ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre"))
-      );
+      const calendarIdExternos = agendasParaLer[mapearRedeParaAgendaIndex("Eventos Externos")];
+      const isEventoExterno = (ev) =>
+        Boolean(calendarIdExternos && ev.calendarId === calendarIdExternos) ||
+        ev.calendarId === "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com";
+
+      const todosEventos = todosEventosRaw.filter(ev => {
+        if (ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre")) {
+          return false;
+        }
+        if (isEventoExterno(ev)) {
+          return false;
+        }
+        return true;
+      });
 
       if (todosEventos.length === 0) {
         delete etapas[numero];
@@ -627,7 +638,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
           if (info.etapa === "alterar_departamento") {
             const rede = obterRedePorNumero(msg.body);
-            if (!rede) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
+            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${REDES.length}).`);
 
             info.departamento = rede.nome;
             info.calendarIdBusca = agendasParaLer[rede.agendaIndex];
@@ -890,7 +901,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
           if (info.etapa === "evento_rede") {
             const rede = obterRedePorNumero(msg.body.trim());
-            if (!rede) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
+            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${REDES.length}).`);
 
             info.rede = rede.nome;
             console.log(`[Agendamento] Rede selecionada: ${info.rede}`);
@@ -1268,7 +1279,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
         } else if (info.fluxo === "artes_flyers") {
           if (info.etapa === "artes_departamento") {
             const rede = obterRedePorNumero(msg.body);
-            if (!rede) return msg.reply("❌ Escolha um departamento da lista (1 a 10).");
+            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${REDES.length}).`);
 
             info.departamento = rede.nome;
             info.etapa = "artes_tipo";

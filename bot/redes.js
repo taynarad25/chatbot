@@ -12,10 +12,11 @@ const REDES = [
   { numero: "7", nome: "Rede de Homens", agendaIndex: 7, palavrasChave: ["homens"] },
   { numero: "8", nome: "Rede de Mulheres", agendaIndex: 8, palavrasChave: ["mulheres"] },
   { numero: "9", nome: "Rede Kids", agendaIndex: 9, palavrasChave: ["kids"] },
-  { numero: "10", nome: "Outros", agendaIndex: 3, palavrasChave: [] },
+  { numero: "10", nome: "Eventos Externos", agendaIndex: 10, palavrasChave: ["externo", "externos"] },
+  { numero: "11", nome: "Outros", agendaIndex: 3, palavrasChave: [] },
 ];
 
-const REDE_PADRAO = REDES[REDES.length - 1]; // "Outros", usada como fallback
+const REDE_PADRAO = REDES.find((r) => r.nome === "Outros") || REDES[REDES.length - 1]; // "Outros", usada como fallback
 
 function montarListaRedes() {
   return REDES.map((r) => `${r.numero} - ${r.nome}`).join("\n");
@@ -30,7 +31,9 @@ function obterRedePorNumero(numero) {
 // confirmação automática de agendamento vinda do grupo). Sem correspondência, cai em "Outros".
 function mapearRedeParaAgendaIndex(nomeRede) {
   const alvo = (nomeRede || "").toLowerCase();
-  const encontrada = REDES.find((r) => r.palavrasChave.some((p) => alvo.includes(p)));
+  const encontrada = REDES.find(
+    (r) => r.nome.toLowerCase() === alvo || r.palavrasChave.some((p) => alvo.includes(p))
+  );
   return (encontrada || REDE_PADRAO).agendaIndex;
 }
 

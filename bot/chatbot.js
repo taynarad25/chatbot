@@ -106,7 +106,8 @@ const agendasParaLer = [
   "8eae57daa28963736c7ab1c343e2d8e973b4c5caecf78caa8f38255662aa9f17@group.calendar.google.com", // Rede de Casais
   "384215b0335082cfde0c5f5f98b75ca59612a77a5123544f15bd41dd60d238d4@group.calendar.google.com", // Rede de Homens
   "b02048ebc98f7504e086cf4b2a54881a4e645189b565c90b5f7c477a4d0de10f@group.calendar.google.com", // Rede de Mulheres
-  "b0aae19433652d50d04ae2290889cf7f905cc226ae103eb839ff3ca511acd6af@group.calendar.google.com"  // Rede Kids
+  "b0aae19433652d50d04ae2290889cf7f905cc226ae103eb839ff3ca511acd6af@group.calendar.google.com", // Rede Kids
+  "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com"  // Eventos Externos
 ];
 
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
