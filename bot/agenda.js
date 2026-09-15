@@ -152,6 +152,43 @@ function interpretarPeriodoPersonalizado(entrada, agora) {
   return { ok: true, inicio, fim };
 }
 
+/**
+ * Verifica estritamente se um evento é futuro (que ainda não aconteceu).
+ * Eventos cujo início já ocorreu antes do momento atual retornam false.
+ * Eventos de dia inteiro que já terminaram antes de hoje retornam false.
+ *
+ * @param {object} ev - Objeto do evento da API do Google Calendar
+ * @param {moment.Moment} [agora] - Momento de referência (padrão: agora em São Paulo)
+ * @returns {boolean} true se o evento é futuro (ainda não aconteceu)
+ */
+function isEventoFuturo(ev, agora = moment.tz("America/Sao_Paulo")) {
+  if (!ev || !ev.start) return false;
+
+  if (ev.start.dateTime) {
+    const inicio = moment.tz(ev.start.dateTime, "America/Sao_Paulo");
+    return inicio.isSameOrAfter(agora);
+  }
+
+  if (ev.start.date) {
+    const hoje = agora.clone().startOf("day");
+    const inicio = moment.tz(ev.start.date, "YYYY-MM-DD", "America/Sao_Paulo").startOf("day");
+    let fim;
+    if (ev.end && ev.end.date) {
+      const fimMoment = moment.tz(ev.end.date, "YYYY-MM-DD", "America/Sao_Paulo");
+      if (fimMoment.isAfter(inicio)) {
+        fim = fimMoment.clone().subtract(1, "day").endOf("day");
+      } else {
+        fim = inicio.clone().endOf("day");
+      }
+    } else {
+      fim = inicio.clone().endOf("day");
+    }
+    return fim.isSameOrAfter(hoje);
+  }
+
+  return false;
+}
+
 module.exports = {
   DIAS_SEMANA_PLURAL,
   DIAS_SEMANA,
@@ -159,4 +196,5 @@ module.exports = {
   montarMensagemAgenda,
   montarDetalheEvento,
   interpretarPeriodoPersonalizado,
+  isEventoFuturo,
 };

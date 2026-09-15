@@ -1453,7 +1453,7 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
   assert.match(rFinal[0], /Solicitação de Reunião Enviada/);
   assert.match(rFinal[0], /Diretoria/);
   assert.match(rFinal[0], /Rua Benedicto de Abreu Júnior/);
-  assert.match(rFinal[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(rFinal[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.equal(etapas[NUMERO_LIDER], undefined);
 
   assert.equal(gruposEnviados.length, 1);
@@ -1462,7 +1462,7 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
   assert.match(gruposEnviados[0], /28\/11\/2026/);
   assert.match(gruposEnviados[0], /19:30 - 21:30/);
   assert.match(gruposEnviados[0], /Rua Benedicto de Abreu Júnior/);
-  assert.match(gruposEnviados[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(gruposEnviados[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   // Secretaria responde no grupo aprovando
   const msgAprovacao = criarMsgGrupo({
@@ -1470,6 +1470,7 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
     quotedBody: gruposEnviados[0],
   });
   await handleMessage(msgAprovacao);
+  assert.doesNotMatch(msgAprovacao.respostas[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   assert.equal(eventosGravados.length, 1);
   assert.equal(eventosGravados[0].calendarId, AGENDAS_INTERNAS.REUNIOES);
@@ -1634,7 +1635,7 @@ test("área do líder: validações de data, horários e local no fluxo de reuni
   const rLocalOnline = await enviar(handleMessage, NUMERO_LIDER, "2");
   assert.match(rLocalOnline[0], /Solicitação de Reunião Enviada/);
   assert.match(rLocalOnline[0], /Local:\* Online/);
-  assert.match(rLocalOnline[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(rLocalOnline[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.equal(etapas[NUMERO_LIDER], undefined);
 });
 
@@ -1661,6 +1662,34 @@ test("resolverOpcaoLocalReuniao aceita 'Na Igreja' e 'Online'", () => {
 
   assert.equal(resolverOpcaoLocalReuniao("Outro lugar"), null);
   assert.equal(resolverOpcaoLocalReuniao(""), null);
+});
+
+test("área do líder: opção 5 fluxo de consulta de disponibilidade por mês e dia da semana", async () => {
+  const agora = moment.tz("America/Sao_Paulo");
+  const mesAtual = agora.month() + 1;
+  const { handleMessage, etapas } = criarContexto({ eventos: [] });
+
+  // 1. Inicia Área do Líder
+  const r1 = await enviar(handleMessage, NUMERO_LIDER, "6");
+  assert.match(r1[0], /5️⃣ Consultar disponibilidade de dias e horários/);
+
+  // 2. Escolhe opção 5
+  const r2 = await enviar(handleMessage, NUMERO_LIDER, "5");
+  assert.match(r2[0], /Consulta de Disponibilidade/);
+  assert.match(r2[0], /Para qual mês você deseja consultar/);
+
+  // 3. Escolhe o mês atual
+  const r3 = await enviar(handleMessage, NUMERO_LIDER, String(mesAtual));
+  assert.match(r3[0], /qual \*dia da semana\* você deseja consultar/);
+  assert.match(r3[0], /2 - Terça-feira/);
+
+  // 4. Escolhe terça-feira (opção 2)
+  const r4 = await enviar(handleMessage, NUMERO_LIDER, "2");
+  assert.equal(r4.length, 2); // "🔍 Consultando..." + resultado
+  assert.match(r4[0], /Consultando disponibilidade/);
+  assert.match(r4[1], /Consulta de Disponibilidade — Terças-feiras/);
+  assert.match(r4[1], /Dia totalmente livre|Horários disponíveis|Sem horários disponíveis/);
+  assert.equal(etapas[NUMERO_LIDER], undefined);
 });
 
 

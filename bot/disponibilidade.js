@@ -301,6 +301,239 @@ function montarMensagemDataEspecificaBloqueada(resultado) {
   return `❌ O dia ${dataFormatada} não está disponível. Escolha outro dia, ou digite *menu* para recomeçar.`;
 }
 
+const DIAS_SEMANA = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+
+/**
+ * Consulta a disponibilidade de datas num determinado mês e dia da semana (ou todos),
+ * calculando para cada data apenas os horários livres/disponíveis.
+ *
+ * REGRA DE PRIVACIDADE RIGOROSA:
+ * Não inclui nem retorna nome, assunto, descrição ou departamento de eventos existentes.
+ * Retorna apenas o status da data e a lista de janelas de horários livres.
+ *
+ * @param {object} params
+ * @param {Array} params.eventos - Lista de eventos buscados nas agendas
+ * @param {string} [params.evangelismoCalendarId] - Calendar ID do evangelismo (Sábado LIVRE)
+ * @param {number} params.ano - Ano de consulta (ex: 2026)
+ * @param {number} params.mes - Mês de 1 a 12
+ * @param {number|string} params.diaSemanaFiltro - 0-6 (0=Dom, 1=Seg... 6=Sáb) ou "TODOS"
+ * @param {moment.Moment} [params.agora] - Momento atual (para não mostrar horários passados)
+ * @returns {Array<{ dataFormatada: string, diaSemanaNome: string, status: "livre"|"parcial"|"indisponivel", janelasLivres: Array<{ inicio: string, fim: string }> }>}
+ */
+function consultarDisponibilidadeMesDiaSemana({
+  eventos = [],
+  evangelismoCalendarId,
+  ano,
+  mes,
+  diaSemanaFiltro,
+  agora = moment.tz("America/Sao_Paulo"),
+}) {
+  const hojeSP = agora.clone().startOf("day");
+  const isSabadoLivreEvangelismo = (ev) =>
+    ev.calendarId === evangelismoCalendarId && ev.summary && ev.summary.toLowerCase().includes("sábado livre");
+
+  const sabadosLivres = new Set(
+    eventos
+      .filter(isSabadoLivreEvangelismo)
+      .map((ev) => moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf("day").format("YYYY-MM-DD"))
+  );
+
+  const dias = [];
+  const cursor = moment.tz([ano, mes - 1, 1], "America/Sao_Paulo");
+  const fimMes = cursor.clone().endOf("month");
+
+  while (cursor.isSameOrBefore(fimMes, "day")) {
+    const diaSemana = cursor.day(); // 0 a 6
+    const correspondeDia = diaSemanaFiltro === "TODOS" || diaSemana === diaSemanaFiltro;
+    const ehFuturoOuHoje = cursor.isSameOrAfter(hojeSP, "day");
+
+    if (correspondeDia && ehFuturoOuHoje) {
+      const dataStr = cursor.format("YYYY-MM-DD");
+      const diaNum = cursor.date();
+      const dataFormatada = cursor.format("DD/MM");
+      const diaSemanaNome = DIAS_SEMANA[diaSemana];
+
+      // 1. Sábado LIVRE?
+      if (sabadosLivres.has(dataStr)) {
+        dias.push({
+          dataFormatada,
+          diaSemanaNome,
+          status: "indisponivel",
+          janelasLivres: [],
+        });
+        cursor.add(1, "day");
+        continue;
+      }
+
+      // 2. Eventos no dia
+      const eventosNoDia = eventos.filter((ev) => {
+        if (isSabadoLivreEvangelismo(ev)) return false;
+        if (ev.status === "cancelled") return false;
+
+        const evStart = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo").startOf("day");
+        let evEnd;
+        if (ev.start.date && !ev.start.dateTime) {
+          if (ev.end?.date && moment.tz(ev.end.date, "America/Sao_Paulo").isAfter(evStart)) {
+            evEnd = moment.tz(ev.end.date, "America/Sao_Paulo").subtract(1, "day").endOf("day");
+          } else {
+            evEnd = evStart.clone().endOf("day");
+          }
+        } else {
+          evEnd = moment.tz(ev.end?.dateTime || ev.end?.date || ev.start.dateTime || ev.start.date, "America/Sao_Paulo").endOf("day");
+        }
+        return cursor.isBetween(evStart, evEnd, "day", "[]");
+      });
+
+      // 3. Evento de dia inteiro existente?
+      const temEventoDiaInteiro = eventosNoDia.some((ev) => ev.start.date && !ev.start.dateTime);
+      if (temEventoDiaInteiro) {
+        dias.push({
+          dataFormatada,
+          diaSemanaNome,
+          status: "indisponivel",
+          janelasLivres: [],
+        });
+        cursor.add(1, "day");
+        continue;
+      }
+
+      // 4. Sem eventos no dia: totalmente livre
+      if (eventosNoDia.length === 0) {
+        const isHoje = cursor.isSame(hojeSP, "day");
+        let inicioJanela = "07:00";
+        if (isHoje) {
+          const horaAgora = agora.hour();
+          const minutoAgora = agora.minute();
+          if (horaAgora >= 22) {
+            dias.push({
+              dataFormatada,
+              diaSemanaNome,
+              status: "indisponivel",
+              janelasLivres: [],
+            });
+            cursor.add(1, "day");
+            continue;
+          }
+          if (horaAgora > 7 || (horaAgora === 7 && minutoAgora > 0)) {
+            const proxMin = minutoAgora === 0 ? "00" : minutoAgora <= 30 ? "30" : "00";
+            const proxH = minutoAgora > 30 ? horaAgora + 1 : horaAgora;
+            if (proxH >= 22) {
+              dias.push({
+                dataFormatada,
+                diaSemanaNome,
+                status: "indisponivel",
+                janelasLivres: [],
+              });
+              cursor.add(1, "day");
+              continue;
+            }
+            inicioJanela = `${String(proxH).padStart(2, "0")}:${proxMin}`;
+          }
+        }
+
+        dias.push({
+          dataFormatada,
+          diaSemanaNome,
+          status: "livre",
+          janelasLivres: [{ inicio: inicioJanela, fim: "22:00" }],
+        });
+        cursor.add(1, "day");
+        continue;
+      }
+
+      // 5. Dia com eventos: calcular janelas livres
+      let janelas = calcularJanelasLivres({
+        eventosNoDia,
+        ano,
+        mes,
+        dia: diaNum,
+        inicioDiaHH: 7,
+        fimDiaHH: 22,
+      });
+
+      // Se for hoje, filtrar horários já decorridos
+      if (cursor.isSame(hojeSP, "day")) {
+        const agoraMom = agora.clone();
+        janelas = janelas
+          .map((j) => {
+            const jInicio = cursor.clone().set({ hour: Number(j.inicio.split(":")[0]), minute: Number(j.inicio.split(":")[1]) });
+            const jFim = cursor.clone().set({ hour: Number(j.fim.split(":")[0]), minute: Number(j.fim.split(":")[1]) });
+            if (jFim.isSameOrBefore(agoraMom)) return null;
+            if (jInicio.isBefore(agoraMom)) {
+              const minAgora = agoraMom.minute();
+              const proxMin = minAgora === 0 ? "00" : minAgora <= 30 ? "30" : "00";
+              const proxH = minAgora > 30 ? agoraMom.hour() + 1 : agoraMom.hour();
+              return { inicio: `${String(proxH).padStart(2, "0")}:${proxMin}`, fim: j.fim };
+            }
+            return j;
+          })
+          .filter((j) => {
+            if (!j) return false;
+            const [h1, m1] = j.inicio.split(":").map(Number);
+            const [h2, m2] = j.fim.split(":").map(Number);
+            return (h2 * 60 + m2) - (h1 * 60 + m1) >= 30;
+          });
+      }
+
+      if (janelas.length === 0) {
+        dias.push({
+          dataFormatada,
+          diaSemanaNome,
+          status: "indisponivel",
+          janelasLivres: [],
+        });
+      } else {
+        dias.push({
+          dataFormatada,
+          diaSemanaNome,
+          status: "parcial",
+          janelasLivres: janelas,
+        });
+      }
+    }
+    cursor.add(1, "day");
+  }
+
+  return dias;
+}
+
+/**
+ * Formata o relatório de disponibilidade respeitando a regra estrita de privacidade:
+ * nunca exibe títulos, assuntos ou detalhes de eventos já agendados.
+ */
+function formatarRelatorioDisponibilidade({ dias, mesNome, diaSemanaTexto }) {
+  if (!dias || dias.length === 0) {
+    return `📅 Não foram encontradas datas futuras para ${diaSemanaTexto} em ${mesNome}.\n\nDigite *menu* para voltar ao menu principal.`;
+  }
+
+  let msg = `🗓️ *Consulta de Disponibilidade — ${diaSemanaTexto} (${mesNome})*\n\n`;
+
+  dias.forEach((item) => {
+    msg += `📌 *${item.dataFormatada} (${item.diaSemanaNome}):*\n`;
+    if (item.status === "livre") {
+      const j = item.janelasLivres[0];
+      if (j && j.inicio === "07:00" && j.fim === "22:00") {
+        msg += `• ✅ Dia totalmente livre (07:00 às 22:00)\n\n`;
+      } else if (j) {
+        msg += `• ✅ Livre das ${j.inicio} às ${j.fim}\n\n`;
+      } else {
+        msg += `• ✅ Dia totalmente livre\n\n`;
+      }
+    } else if (item.status === "parcial") {
+      msg += `• 🕒 Horários disponíveis:\n`;
+      item.janelasLivres.forEach((j) => {
+        msg += `  - ${j.inicio} às ${j.fim}\n`;
+      });
+      msg += `\n`;
+    } else {
+      msg += `• ❌ Sem horários disponíveis\n\n`;
+    }
+  });
+
+  msg += `_Lembre-se: os horários consideram 1h de intervalo de segurança entre eventos._\n\nDigite *menu* para voltar ao menu principal.`;
+  return msg;
+}
+
 module.exports = {
   calcularDisponibilidade,
   montarMensagemConflito,
@@ -308,4 +541,6 @@ module.exports = {
   verificarDataEspecifica,
   calcularJanelasLivres,
   montarMensagemDataEspecificaBloqueada,
+  consultarDisponibilidadeMesDiaSemana,
+  formatarRelatorioDisponibilidade,
 };

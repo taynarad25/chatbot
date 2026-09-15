@@ -6,8 +6,17 @@ try {
   MessageMedia = null;
 }
 const moment = require("moment-timezone");
-const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("./agenda");
-const { calcularDisponibilidade, montarMensagemConflito, montarMensagemDatasDisponiveis, verificarDataEspecifica, calcularJanelasLivres, montarMensagemDataEspecificaBloqueada } = require("./disponibilidade");
+const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado, isEventoFuturo } = require("./agenda");
+const {
+  calcularDisponibilidade,
+  montarMensagemConflito,
+  montarMensagemDatasDisponiveis,
+  verificarDataEspecifica,
+  calcularJanelasLivres,
+  montarMensagemDataEspecificaBloqueada,
+  consultarDisponibilidadeMesDiaSemana,
+  formatarRelatorioDisponibilidade,
+} = require("./disponibilidade");
 const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, isAgendaInterna, AGENDAS_INTERNAS } = require("./redes");
 const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
@@ -250,7 +259,11 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         ev.calendarId === "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com" ||
         isAgendaOcultaOuInterna(ev.calendarId);
 
+      const agora = moment.tz("America/Sao_Paulo");
       const todosEventos = todosEventosRaw.filter(ev => {
+        if (!isEventoFuturo(ev, agora)) {
+          return false;
+        }
         if (ev.calendarId === agendasParaLer[0] && ev.summary && ev.summary.toLowerCase().includes("sábado livre")) {
           return false;
         }
@@ -483,7 +496,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                     const feedback = `✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo e também pode ser acessado pelo link:\n${LINK_ATA_REUNIAO}\n\nEle deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.\n\nDigite *menu* para voltar ao menu principal.`;
                     await enviarConfirmacaoReuniaoComAta(client, solicitanteId, feedback);
                     console.log(`[Secretaria] Reunião agendada automaticamente para ${mascararTelefone(solicitanteId)}`);
-                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões* e líder notificado com a Ata.\n\n🔗 Link da Ata: ${LINK_ATA_REUNIAO}`);
+                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões* e líder notificado com a Ata.`);
                   } catch (err) {
                     console.error("[ALERTA:google-calendar] Erro no agendamento de reunião:", err);
                     return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
@@ -840,7 +853,8 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               const fimAno = agora.clone().endOf('year').format();
 
               // Busca eventos especificamente na agenda do departamento selecionado
-              const filtrados = await buscarEventos(inicioBusca, fimAno, info.calendarIdBusca);
+              const eventosBuscados = await buscarEventos(inicioBusca, fimAno, info.calendarIdBusca);
+              const filtrados = (eventosBuscados || []).filter(ev => isEventoFuturo(ev, agora));
 
               if (filtrados.length === 0) {
                 delete etapas[numero];
@@ -1467,8 +1481,19 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               info.fluxo = "reunioes";
               info.etapa = "menu_reuniao";
               return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *menu* para voltar.");
+            } else if (escolha === "5") {
+              info.fluxo = "consulta_disponibilidade_lider";
+              info.etapa = "escolha_mes";
+              const agora = moment.tz("America/Sao_Paulo");
+              const mesAtual = agora.month(); // 0-indexed
+
+              let listaMeses = "📅 *Consulta de Disponibilidade*\n\nPara qual mês você deseja consultar?\n\n";
+              for (let i = mesAtual; i < 12; i++) {
+                listaMeses += `${i + 1} - ${MESES[i]}\n`;
+              }
+              return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
             } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 4, ou digite *menu* para voltar.");
+              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, ou digite *menu* para voltar.");
             }
           }
         } else if (info.fluxo === "artes_flyers") {
@@ -1557,7 +1582,7 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
                 const inicioBusca = agora.clone().startOf("day").toISOString();
                 const fimAno = agora.clone().endOf("year").toISOString();
                 const eventos = await buscarEventos(inicioBusca, fimAno, AGENDAS_INTERNAS.REUNIOES);
-                const filtrados = (eventos || []).filter(e => e.status !== "cancelled");
+                const filtrados = (eventos || []).filter(e => e.status !== "cancelled" && isEventoFuturo(e, agora));
                 if (filtrados.length === 0) {
                   delete etapas[numero];
                   return msg.reply("ℹ️ Não há reuniões agendadas no momento.\n\nDigite *menu* para voltar ao menu principal.");
@@ -1651,10 +1676,10 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
 
             try {
               const codigo = salvarPendente(dadosReuniao);
-              const resumoGrupo = `🤝 *NOVA REUNIÃO SOLICITADA*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Departamento:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n🔗 *Ata:* ${LINK_ATA_REUNIAO}\n\n_Responda a este resumo com "marcar reunião" ou "não marcar" para aprovar._\n\n_Código: ${codigo}_`;
+              const resumoGrupo = `🤝 *NOVA REUNIÃO SOLICITADA*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Departamento:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n\n_Responda a este resumo com "marcar reunião" ou "não marcar" para aprovar._\n\n_Código: ${codigo}_`;
               await notificarSecretaria(client, resumoGrupo);
 
-              const resumoLider = `✅ *Solicitação de Reunião Enviada!*\n\n🏢 *Departamento:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n\nSua solicitação foi enviada para aprovação da secretaria. Assim que confirmada, você receberá a confirmação e a Ata de Reunião. 🙏\n\n📋 *Link da Ata de Reunião:*\n${LINK_ATA_REUNIAO}\n\nDigite *menu* para voltar ao menu principal.`;
+              const resumoLider = `✅ *Solicitação de Reunião Enviada!*\n\n🏢 *Departamento:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n\nSua solicitação foi enviada para aprovação da secretaria. Assim que confirmada, você receberá a confirmação e a Ata de Reunião. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
               delete etapas[numero];
               return msg.reply(resumoLider);
             } catch (errSalvar) {
@@ -1825,6 +1850,81 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               return msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
             }
           }
+        } else if (info.fluxo === "consulta_disponibilidade_lider") {
+          if (info.etapa === "escolha_mes") {
+            const agora = moment.tz("America/Sao_Paulo");
+            const mesAtual = agora.month() + 1;
+            const escolha = parseInt(msg.body.trim());
+
+            if (isNaN(escolha) || escolha < mesAtual || escolha > 12) {
+              return msg.reply(`❌ Opção inválida. Escolha um mês de ${mesAtual} a 12.`);
+            }
+
+            info.mes = escolha;
+            info.etapa = "escolha_dia_semana";
+
+            const promptDia = `🗓️ Para *${MESES[escolha - 1]}*, qual *dia da semana* você deseja consultar?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Todos os dias da semana\n\nDigite o número da opção desejada:`;
+            return msg.reply(promptDia);
+          }
+
+          if (info.etapa === "escolha_dia_semana") {
+            const entrada = msg.body.trim().toLowerCase();
+            const mapaDias = {
+              "1": 1, "segunda": 1, "segunda-feira": 1, "seg": 1, "segundas": 1,
+              "2": 2, "terça": 2, "terca": 2, "terça-feira": 2, "terca-feira": 2, "ter": 2, "terças": 2, "tercas": 2,
+              "3": 3, "quarta": 3, "quarta-feira": 3, "qua": 3, "quartas": 3,
+              "4": 4, "quinta": 4, "quinta-feira": 4, "qui": 4, "quintas": 4,
+              "5": 5, "sexta": 5, "sexta-feira": 5, "sex": 5, "sextas": 5,
+              "6": 6, "sábado": 6, "sabado": 6, "sab": 6, "sábados": 6, "sabados": 6,
+              "7": 0, "domingo": 0, "dom": 0, "domingos": 0,
+              "8": "TODOS", "todos": "TODOS", "todos os dias": "TODOS",
+            };
+
+            const diaSemanaFiltro = mapaDias[entrada];
+            if (diaSemanaFiltro === undefined) {
+              return msg.reply("❌ Opção inválida. Escolha um número de 1 a 8 para o dia da semana.");
+            }
+
+            const rotulosDias = {
+              1: "Segundas-feiras",
+              2: "Terças-feiras",
+              3: "Quartas-feiras",
+              4: "Quintas-feiras",
+              5: "Sextas-feiras",
+              6: "Sábados",
+              0: "Domingos",
+              "TODOS": "Todos os dias da semana",
+            };
+            const diaSemanaTexto = rotulosDias[diaSemanaFiltro];
+            const mesNome = MESES[info.mes - 1];
+
+            await msg.reply(`🔍 Consultando disponibilidade para *${diaSemanaTexto}* em *${mesNome}*...`);
+
+            try {
+              const agora = moment.tz("America/Sao_Paulo");
+              const ano = agora.year();
+              const inicioBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").startOf("month").subtract(1, "minute").format();
+              const fimBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").endOf("month").format();
+
+              const todosEventos = await buscarEventos(inicioBusca, fimBusca);
+              const dias = consultarDisponibilidadeMesDiaSemana({
+                eventos: todosEventos,
+                evangelismoCalendarId: agendasParaLer[0],
+                ano,
+                mes: info.mes,
+                diaSemanaFiltro,
+                agora,
+              });
+
+              const relatorio = formatarRelatorioDisponibilidade({ dias, mesNome, diaSemanaTexto });
+              delete etapas[numero];
+              return msg.reply(relatorio);
+            } catch (errDisp) {
+              console.error(`[Disponibilidade] Erro ao consultar disponibilidade para ${identificarUsuario(contato, numero, isLider)}:`, errDisp);
+              delete etapas[numero];
+              return msg.reply("⚠️ Erro ao consultar disponibilidade na agenda. Tente novamente mais tarde.");
+            }
+          }
         }
         return;
       }
@@ -1887,7 +1987,7 @@ Digite *menu* para voltar ao menu principal.`;
       if (texto === "6" && isLider) {
         console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando Área do Líder`);
         etapas[numero] = { fluxo: "area_lider", etapa: "menu_lider" };
-        const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n4️⃣ Agendar, alterar ou desmarcar reunião\n\nDigite *menu* para voltar ao menu principal.`;
+        const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n4️⃣ Agendar, alterar ou desmarcar reunião\n5️⃣ Consultar disponibilidade de dias e horários\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
       }
 

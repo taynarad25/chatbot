@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
-const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado } = require("../bot/agenda");
+const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado, isEventoFuturo } = require("../bot/agenda");
 
 function evento({ data, hora, horaFim, summary, location, description, diaTodo = false }) {
   if (diaTodo) {
@@ -231,4 +231,49 @@ test("interpretarPeriodoPersonalizado: período que cruza o ano novo ainda respe
   const r = interpretarPeriodoPersonalizado("01/12 a 15/04", hojeDezembro);
   assert.equal(r.ok, false);
   assert.match(r.mensagem, /muito longo/);
+});
+
+// ---------------------------------------------------------------------------
+// isEventoFuturo — Filtro estrito de eventos futuros
+// ---------------------------------------------------------------------------
+
+test("isEventoFuturo: evento com horário no futuro retorna true", () => {
+  const agora = moment.tz("2026-09-15 14:00", "YYYY-MM-DD HH:mm", "America/Sao_Paulo");
+  const ev = evento({ data: "2026-09-15", hora: "19:00", horaFim: "21:00", summary: "Culto Noite" });
+  assert.equal(isEventoFuturo(ev, agora), true);
+});
+
+test("isEventoFuturo: evento com horário no passado retorna false", () => {
+  const agora = moment.tz("2026-09-15 14:00", "YYYY-MM-DD HH:mm", "America/Sao_Paulo");
+  const ev = evento({ data: "2026-09-15", hora: "10:00", horaFim: "12:00", summary: "Culto Manhã" });
+  assert.equal(isEventoFuturo(ev, agora), false);
+});
+
+test("isEventoFuturo: evento de dia anterior retorna false", () => {
+  const agora = moment.tz("2026-09-15 14:00", "YYYY-MM-DD HH:mm", "America/Sao_Paulo");
+  const ev = evento({ data: "2026-09-14", hora: "20:00", horaFim: "22:00", summary: "Ontem" });
+  assert.equal(isEventoFuturo(ev, agora), false);
+});
+
+test("isEventoFuturo: evento de dia posterior retorna true", () => {
+  const agora = moment.tz("2026-09-15 14:00", "YYYY-MM-DD HH:mm", "America/Sao_Paulo");
+  const ev = evento({ data: "2026-09-16", hora: "09:00", horaFim: "11:00", summary: "Amanhã" });
+  assert.equal(isEventoFuturo(ev, agora), true);
+});
+
+test("isEventoFuturo: evento de dia todo de hoje retorna true", () => {
+  const agora = moment.tz("2026-09-15 14:00", "YYYY-MM-DD HH:mm", "America/Sao_Paulo");
+  const ev = evento({ data: "2026-09-15", diaTodo: true, summary: "Feriado" });
+  assert.equal(isEventoFuturo(ev, agora), true);
+});
+
+test("isEventoFuturo: evento de dia todo de ontem retorna false", () => {
+  const agora = moment.tz("2026-09-15 14:00", "YYYY-MM-DD HH:mm", "America/Sao_Paulo");
+  const ev = evento({ data: "2026-09-14", diaTodo: true, summary: "Feriado Ontem" });
+  assert.equal(isEventoFuturo(ev, agora), false);
+});
+
+test("isEventoFuturo: evento inválido ou nulo retorna false", () => {
+  assert.equal(isEventoFuturo(null), false);
+  assert.equal(isEventoFuturo({}), false);
 });
