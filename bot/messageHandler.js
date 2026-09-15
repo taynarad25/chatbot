@@ -21,6 +21,7 @@ const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, 
 const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
+const { iniciarFormularioEvento, processarRespostaFormulario, enviarWebhookGoogleDocs } = require("./formularioEvento");
 
 // Cada "átomo" é uma saudação isolada reconhecida. A mensagem inteira precisa ser só
 // uma sequência desses átomos (separados por vírgula/ponto/"e"/espaço) pra contar como
@@ -229,7 +230,7 @@ async function comRetry(fn, { tentativas = 2, esperaMs = 1500 } = {}) {
  * @param {() => object[]} [deps.listLideres] - retorna os líderes cadastrados no painel ({ nome, telefone }),
  *   usado para identificar o solicitante nos resumos de evento pelo nome cadastrado (não o nome do contato salvo no celular)
  */
-function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapas, buscarEventos, listLideres = () => [] }) {
+function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapas, buscarEventos, listLideres = () => [], enviarWebhook = enviarWebhookGoogleDocs }) {
   // Identifica o solicitante de um evento (criar/alterar/cancelar) pelo nome
   // cadastrado no painel de líderes, já que o nome salvo no celular do líder
   // (nomeContato) pode divergir do nome oficial usado pela secretaria. Sem
@@ -493,10 +494,11 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                     await calendar.events.insert({ calendarId: AGENDAS_INTERNAS.REUNIOES, resource });
                     removerPendente(codigo);
 
-                    const feedback = `✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo e também pode ser acessado pelo link:\n${LINK_ATA_REUNIAO}\n\nEle deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.\n\nDigite *menu* para voltar ao menu principal.`;
+                    const feedback = `✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo e também pode ser acessado pelo link:\n${LINK_ATA_REUNIAO}\n\nEle deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.`;
                     await enviarConfirmacaoReuniaoComAta(client, solicitanteId, feedback);
-                    console.log(`[Secretaria] Reunião agendada automaticamente para ${mascararTelefone(solicitanteId)}`);
-                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões* e líder notificado com a Ata.`);
+                    await iniciarFormularioEvento({ etapas, solicitanteId, dadosIniciais: dados, client });
+                    console.log(`[Secretaria] Reunião agendada automaticamente e formulário iniciado para ${mascararTelefone(solicitanteId)}`);
+                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões*, líder notificado com a Ata e formulário iniciado.`);
                   } catch (err) {
                     console.error("[ALERTA:google-calendar] Erro no agendamento de reunião:", err);
                     return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
@@ -525,10 +527,11 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
                   await calendar.events.insert({ calendarId: agendaId, resource });
                   removerPendente(codigo);
 
-                  const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏\n\n📝 *Para mais detalhes do evento, preencha o formulário:* \nhttps://forms.gle/paug7A1kx5eyA2zr6\n\nDigite *menu* para voltar ao menu principal.";
+                  const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏";
                   await client.sendMessage(solicitanteId, feedback);
-                  console.log(`[Secretaria] Agendamento automático realizado para ${mascararTelefone(solicitanteId)}`);
-                  return msg.reply(`✅ Evento gravado na agenda de *${rede}* e líder notificado.`);
+                  await iniciarFormularioEvento({ etapas, solicitanteId, dadosIniciais: dados, client });
+                  console.log(`[Secretaria] Agendamento automático realizado e formulário iniciado para ${mascararTelefone(solicitanteId)}`);
+                  return msg.reply(`✅ Evento gravado na agenda de *${rede}*, líder notificado e formulário iniciado.`);
                 } catch (err) {
                   console.error("[ALERTA:google-calendar] Erro no agendamento automático:", err);
                   return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
@@ -814,6 +817,18 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
       if (etapas[numero]) {
         const info = etapas[numero];
         console.log(`[Fluxo Ativo] ${identificarUsuario(contato, numero, isLider)} | Fluxo: ${info.fluxo} | Etapa: ${info.etapa}`);
+
+        if (info.fluxo === "formulario_evento") {
+          return await processarRespostaFormulario({
+            msg,
+            numero,
+            info,
+            client,
+            notificarSecretaria,
+            etapas,
+            enviarWebhook,
+          });
+        }
 
         if (info.fluxo === "agendamento") {
           // Lógica de agendamento (Opção 6)

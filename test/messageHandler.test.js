@@ -676,10 +676,10 @@ test("opção 6 (líder): agenda um novo evento do início ao fim, e a secretari
   assert.equal(eventosGravados[0].resource.summary, "Culto de Jovens");
   assert.match(eventosGravados[0].resource.location, /Rua Benedicto de Abreu Júnior/);
 
-  assert.equal(diretasEnviadas.length, 1);
+  assert.equal(diretasEnviadas.length, 2);
   assert.equal(diretasEnviadas[0].to, NUMERO_LIDER);
   assert.match(diretasEnviadas[0].texto, /Agendamento Confirmado e Gravado/);
-  assert.match(diretasEnviadas[0].texto, /forms\.gle\/paug7A1kx5eyA2zr6/);
+  assert.match(diretasEnviadas[1].texto, /FORMULÁRIO INTERNO DO EVENTO/);
   assert.match(aprovacao.respostas[0], /Evento gravado na agenda/);
 
   // Depois de já aprovado, responder de novo à mesma mensagem não grava outra vez
@@ -1477,7 +1477,7 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
   assert.equal(eventosGravados[0].resource.summary, "Reunião de Diretoria");
   assert.equal(eventosGravados[0].resource.location, "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi");
 
-  assert.equal(diretasEnviadas.length, 1);
+  assert.equal(diretasEnviadas.length, 2);
   assert.equal(diretasEnviadas[0].to, NUMERO_LIDER);
   assert.match(diretasEnviadas[0].texto, /Reunião Confirmada e Agendada/);
   assert.match(diretasEnviadas[0].texto, /Ata de Reunião/);
