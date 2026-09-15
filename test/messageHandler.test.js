@@ -16,7 +16,7 @@ process.env.DB_PATH = path.join(tmpDir, "dados.db");
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
-const { createMessageHandler } = require("../bot/messageHandler");
+const { createMessageHandler, LINK_ATA_REUNIAO, formatarTituloReuniao, resolverOpcaoLocalReuniao } = require("../bot/messageHandler");
 const { buscarPendente, extrairCodigo } = require("../bot/pendentesAprovacao");
 const { atualizarCacheGrupo, NOME_GRUPO_SECRETARIA } = require("../bot/secretaria");
 const { AGENDAS_INTERNAS } = require("../bot/redes");
@@ -1433,34 +1433,36 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
   assert.match(rSub[0], /1 - Agendar reunião/);
 
   const r1 = await enviar(handleMessage, NUMERO_LIDER, "1");
-  assert.match(r1[0], /1️⃣ Qual é o \*assunto ou motivo\*/);
+  assert.match(r1[0], /1️⃣ Qual é o \*departamento\* da reunião\?/);
 
-  const r2 = await enviar(handleMessage, NUMERO_LIDER, "Alinhamento de Liderança");
-  assert.match(r2[0], /2️⃣ Qual é o \*departamento ou ministério\*/);
+  const r2 = await enviar(handleMessage, NUMERO_LIDER, "Diretoria");
+  assert.match(r2[0], /2️⃣ Para qual \*data\*/);
 
-  const r3 = await enviar(handleMessage, NUMERO_LIDER, "Diretoria");
-  assert.match(r3[0], /3️⃣ Para qual \*data\*/);
+  const r3 = await enviar(handleMessage, NUMERO_LIDER, "28/11/2026");
+  assert.match(r3[0], /3️⃣ Qual é o \*horário de início\*/);
 
-  const r4 = await enviar(handleMessage, NUMERO_LIDER, "28/11/2026");
-  assert.match(r4[0], /4️⃣ Qual é o \*horário de início\*/);
+  const r4 = await enviar(handleMessage, NUMERO_LIDER, "19h30");
+  assert.match(r4[0], /4️⃣ Qual é o \*horário previsto de término\*/);
 
-  const r5 = await enviar(handleMessage, NUMERO_LIDER, "19h30");
-  assert.match(r5[0], /5️⃣ Qual é o \*horário previsto de término\*/);
+  const r5 = await enviar(handleMessage, NUMERO_LIDER, "21h30");
+  assert.match(r5[0], /5️⃣ Qual será o \*local\* da reunião/);
+  assert.match(r5[0], /1 - Na Igreja/);
+  assert.match(r5[0], /2 - Online/);
 
-  const r6 = await enviar(handleMessage, NUMERO_LIDER, "21h30");
-  assert.match(r6[0], /6️⃣ Qual será o \*local\*/);
-
-  const rFinal = await enviar(handleMessage, NUMERO_LIDER, "Sala de Reuniões");
+  const rFinal = await enviar(handleMessage, NUMERO_LIDER, "1");
   assert.match(rFinal[0], /Solicitação de Reunião Enviada/);
-  assert.match(rFinal[0], /Alinhamento de Liderança/);
+  assert.match(rFinal[0], /Diretoria/);
+  assert.match(rFinal[0], /Rua Benedicto de Abreu Júnior/);
+  assert.match(rFinal[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.equal(etapas[NUMERO_LIDER], undefined);
 
   assert.equal(gruposEnviados.length, 1);
   assert.match(gruposEnviados[0], /NOVA REUNIÃO SOLICITADA/);
-  assert.match(gruposEnviados[0], /Alinhamento de Liderança/);
   assert.match(gruposEnviados[0], /Diretoria/);
   assert.match(gruposEnviados[0], /28\/11\/2026/);
   assert.match(gruposEnviados[0], /19:30 - 21:30/);
+  assert.match(gruposEnviados[0], /Rua Benedicto de Abreu Júnior/);
+  assert.match(gruposEnviados[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   // Secretaria responde no grupo aprovando
   const msgAprovacao = criarMsgGrupo({
@@ -1471,7 +1473,8 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
 
   assert.equal(eventosGravados.length, 1);
   assert.equal(eventosGravados[0].calendarId, AGENDAS_INTERNAS.REUNIOES);
-  assert.match(eventosGravados[0].resource.summary, /Alinhamento de Liderança/);
+  assert.equal(eventosGravados[0].resource.summary, "Reunião de Diretoria");
+  assert.equal(eventosGravados[0].resource.location, "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi");
 
   assert.equal(diretasEnviadas.length, 1);
   assert.equal(diretasEnviadas[0].to, NUMERO_LIDER);
@@ -1479,6 +1482,7 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
   assert.match(diretasEnviadas[0].texto, /Ata de Reunião/);
   assert.match(diretasEnviadas[0].texto, /impresso e preenchido/);
   assert.match(diretasEnviadas[0].texto, /secretárias para arquivar/);
+  assert.match(diretasEnviadas[0].texto, new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   // Se o PDF da ata existe no ambiente de execução, deve ter sido anexado como media
   if (diretasEnviadas[0].media) {
     assert.equal(diretasEnviadas[0].media.mimetype, "application/pdf");
@@ -1491,12 +1495,11 @@ test("área do líder: agendar reunião e secretaria recusa", async () => {
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "4");
   await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Reunião de Oração");
   await enviar(handleMessage, NUMERO_LIDER, "Intercessão");
   await enviar(handleMessage, NUMERO_LIDER, "20/12/2026");
   await enviar(handleMessage, NUMERO_LIDER, "20:00");
   await enviar(handleMessage, NUMERO_LIDER, "21:00");
-  await enviar(handleMessage, NUMERO_LIDER, "no templo");
+  await enviar(handleMessage, NUMERO_LIDER, "Na Igreja");
 
   assert.equal(gruposEnviados.length, 1);
 
@@ -1598,13 +1601,12 @@ test("área do líder: desmarcar reunião existente na agenda de reuniões", asy
   assert.match(diretasEnviadas[0].texto, /Reunião Desmarcada/);
 });
 
-test("área do líder: validações de data e horários inválidos no fluxo de reunião", async () => {
-  const { handleMessage } = criarContexto();
+test("área do líder: validações de data, horários e local no fluxo de reunião", async () => {
+  const { handleMessage, etapas } = criarContexto();
 
   await enviar(handleMessage, NUMERO_LIDER, "6");
   await enviar(handleMessage, NUMERO_LIDER, "4");
   await enviar(handleMessage, NUMERO_LIDER, "1");
-  await enviar(handleMessage, NUMERO_LIDER, "Assunto Teste");
   await enviar(handleMessage, NUMERO_LIDER, "Depto Teste");
 
   const rDataInvalida = await enviar(handleMessage, NUMERO_LIDER, "31/02/2026");
@@ -1620,5 +1622,45 @@ test("área do líder: validações de data e horários inválidos no fluxo de r
 
   const rHoraFimAnterior = await enviar(handleMessage, NUMERO_LIDER, "18h");
   assert.match(rHoraFimAnterior[0], /horário de término deve ser posterior/);
+
+  const rHoraFimValida = await enviar(handleMessage, NUMERO_LIDER, "21h");
+  assert.match(rHoraFimValida[0], /5️⃣ Qual será o \*local\* da reunião/);
+
+  const rLocalInvalido = await enviar(handleMessage, NUMERO_LIDER, "Salão de festas");
+  assert.match(rLocalInvalido[0], /Opção inválida/);
+  assert.match(rLocalInvalido[0], /1 - Na Igreja/);
+  assert.match(rLocalInvalido[0], /2 - Online/);
+
+  const rLocalOnline = await enviar(handleMessage, NUMERO_LIDER, "2");
+  assert.match(rLocalOnline[0], /Solicitação de Reunião Enviada/);
+  assert.match(rLocalOnline[0], /Local:\* Online/);
+  assert.match(rLocalOnline[0], new RegExp(LINK_ATA_REUNIAO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.equal(etapas[NUMERO_LIDER], undefined);
 });
+
+test("formatarTituloReuniao gera 'Reunião de [Departamento]'", () => {
+  assert.equal(formatarTituloReuniao("Jovens"), "Reunião de Jovens");
+  assert.equal(formatarTituloReuniao("Mulheres"), "Reunião de Mulheres");
+  assert.equal(formatarTituloReuniao("Diáconos"), "Reunião de Diáconos");
+  assert.equal(formatarTituloReuniao("de Louvor"), "Reunião de Louvor");
+  assert.equal(formatarTituloReuniao("  Casais  "), "Reunião de Casais");
+});
+
+test("resolverOpcaoLocalReuniao aceita 'Na Igreja' e 'Online'", () => {
+  const ENDERECO = "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi";
+  assert.equal(resolverOpcaoLocalReuniao("1"), ENDERECO);
+  assert.equal(resolverOpcaoLocalReuniao("Na Igreja"), ENDERECO);
+  assert.equal(resolverOpcaoLocalReuniao("igreja"), ENDERECO);
+  assert.equal(resolverOpcaoLocalReuniao("templo"), ENDERECO);
+  assert.equal(resolverOpcaoLocalReuniao("1 - Na Igreja"), ENDERECO);
+
+  assert.equal(resolverOpcaoLocalReuniao("2"), "Online");
+  assert.equal(resolverOpcaoLocalReuniao("Online"), "Online");
+  assert.equal(resolverOpcaoLocalReuniao("online"), "Online");
+  assert.equal(resolverOpcaoLocalReuniao("2 - Online"), "Online");
+
+  assert.equal(resolverOpcaoLocalReuniao("Outro lugar"), null);
+  assert.equal(resolverOpcaoLocalReuniao(""), null);
+});
+
 
