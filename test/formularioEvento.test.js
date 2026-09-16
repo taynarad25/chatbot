@@ -5,7 +5,10 @@ const {
   iniciarFormularioEvento,
   processarRespostaFormulario,
   enviarWebhookGoogleDocs,
+  precisaDeValorDoMinisterio,
   PERGUNTAS_FORMULARIO,
+  ENDERECO_IGREJA,
+  CONTATO_TESOURARIA,
 } = require("../bot/formularioEvento");
 
 function criarClienteFalso() {
@@ -29,11 +32,22 @@ function criarMsgFalsa(body) {
   };
 }
 
-test("normalizarDadosIniciais: extrai e formata campos tanto de evento quanto de reunião", () => {
+test("precisaDeValorDoMinisterio: reconhece respostas afirmativas e negativas", () => {
+  assert.equal(precisaDeValorDoMinisterio("sim"), true);
+  assert.equal(precisaDeValorDoMinisterio("Sim, vamos precisar"), true);
+  assert.equal(precisaDeValorDoMinisterio("S"), true);
+  assert.equal(precisaDeValorDoMinisterio("precisa de verba"), true);
+  assert.equal(precisaDeValorDoMinisterio("não"), false);
+  assert.equal(precisaDeValorDoMinisterio("Nao"), false);
+  assert.equal(precisaDeValorDoMinisterio("Não precisa"), false);
+  assert.equal(precisaDeValorDoMinisterio(""), false);
+});
+
+test("normalizarDadosIniciais: extrai e formata campos de evento e normaliza local igreja", () => {
   const dadosEvento = {
     rede: "Rede de Jovens",
     evento: "Vigília Jovem",
-    local: "Igreja Central",
+    local: "Igreja",
     dia: 15,
     mes: 11,
     ano: 2026,
@@ -43,13 +57,13 @@ test("normalizarDadosIniciais: extrai e formata campos tanto de evento quanto de
   const normalizado = normalizarDadosIniciais(dadosEvento);
   assert.equal(normalizado.departamento, "Rede de Jovens");
   assert.equal(normalizado.evento, "Vigília Jovem");
-  assert.equal(normalizado.local, "Igreja Central");
+  assert.equal(normalizado.local, ENDERECO_IGREJA);
   assert.equal(normalizado.data, "15/11/2026");
   assert.equal(normalizado.horarioInicio, "22:00");
   assert.equal(normalizado.horarioFim, "04:00");
 });
 
-test("iniciarFormularioEvento: evento com nome pula a pergunta de nome_evento e reaproveita dados", async () => {
+test("iniciarFormularioEvento: evento com dados anteriores pula campos repetidos e inclui novos campos", async () => {
   const etapas = {};
   const client = criarClienteFalso();
   const solicitanteId = "5511999998888";
@@ -75,21 +89,36 @@ test("iniciarFormularioEvento: evento com nome pula a pergunta de nome_evento e 
   assert.equal(etapas[solicitanteId].dadosIniciais.departamento, "Rede de Mulheres");
   assert.equal(etapas[solicitanteId].dadosIniciais.evento, "Chá de Mulheres");
 
-  // Perguntas não devem conter nome_evento pois já foi definido
+  // Campos pré-existentes devem ser pulados
   const idsPerguntas = etapas[solicitanteId].perguntas.map((p) => p.id);
-  assert.ok(!idsPerguntas.includes("nome_evento"), "deveria ter pulado nome_evento");
+  assert.ok(!idsPerguntas.includes("nome_evento"), "deveria pular nome_evento");
+  assert.ok(!idsPerguntas.includes("data_solicitada"), "deveria pular data_solicitada");
+  assert.ok(!idsPerguntas.includes("horario_inicio_termino"), "deveria pular horario_inicio_termino");
+  assert.ok(!idsPerguntas.includes("local"), "deveria pular local");
 
-  // Mensagem inicial deve destacar os dados já salvos
+  // Novos campos obrigatórios devem estar presentes
+  assert.ok(idsPerguntas.includes("horario_total"), "deve conter horario_total");
+  assert.ok(idsPerguntas.includes("valor_inscricao"), "deve conter valor_inscricao");
+  assert.ok(idsPerguntas.includes("precisa_valor_ministerio"), "deve conter precisa_valor_ministerio");
+  assert.ok(idsPerguntas.includes("prazo_imagem"), "deve conter prazo_imagem");
+  assert.ok(idsPerguntas.includes("objetivo_espiritual"), "deve conter objetivo_espiritual");
+  assert.ok(!idsPerguntas.includes("resultado_esperado"), "resultado_esperado foi unificado no objetivo_espiritual");
+
+  // Total de perguntas filtradas: 24 - 4 = 20 perguntas
+  assert.equal(etapas[solicitanteId].perguntas.length, 20);
+
+  // Mensagem inicial destaca os dados já salvos
   assert.equal(client.mensagensEnviadas.length, 1);
   const msgIntro = client.mensagensEnviadas[0].content;
   assert.match(msgIntro, /Rede de Mulheres/);
   assert.match(msgIntro, /20\/10\/2026/);
   assert.match(msgIntro, /16:00 às 19:00/);
   assert.match(msgIntro, /Salão Nobre/);
-  assert.match(msgIntro, /Nome do líder responsável/);
+  assert.match(msgIntro, /Chá de Mulheres/);
+  assert.match(msgIntro, /1\/20/);
 });
 
-test("iniciarFormularioEvento: reunião inclui a pergunta de nome_evento", async () => {
+test("iniciarFormularioEvento: se dadosIniciais for de reunião, NUNCA inicia o formulário", async () => {
   const etapas = {};
   const client = criarClienteFalso();
   const solicitanteId = "5511999998888";
@@ -98,6 +127,7 @@ test("iniciarFormularioEvento: reunião inclui a pergunta de nome_evento", async
     etapas,
     solicitanteId,
     dadosIniciais: {
+      tipo: "reuniao",
       departamento: "Diáconos",
       evento: "Reunião de Diáconos",
       local: "Na Igreja",
@@ -110,11 +140,11 @@ test("iniciarFormularioEvento: reunião inclui a pergunta de nome_evento", async
     client,
   });
 
-  const idsPerguntas = etapas[solicitanteId].perguntas.map((p) => p.id);
-  assert.ok(idsPerguntas.includes("nome_evento"), "reunião genérica deve perguntar nome_evento");
+  assert.equal(etapas[solicitanteId], undefined, "reunião simples NUNCA deve iniciar o formulário de evento");
+  assert.equal(client.mensagensEnviadas.length, 0, "nenhuma mensagem deve ser enviada para reunião");
 });
 
-test("processarRespostaFormulario: fluxo conversacional completo dispara Webhook e notifica líder e secretaria", async () => {
+test("processarRespostaFormulario: fluxo completo com resposta SIM para ministério notifica tesouraria (+55 11 99111-7912)", async () => {
   const etapas = {};
   const client = criarClienteFalso();
   const solicitanteId = "5511999998888";
@@ -147,10 +177,16 @@ test("processarRespostaFormulario: fluxo conversacional completo dispara Webhook
     };
   };
 
+  let ultimaMsg;
   // Responde cada pergunta sequencialmente
   for (let i = 0; i < totalPerguntas; i++) {
     const pergunta = etapas[solicitanteId].perguntas[etapas[solicitanteId].indicePergunta];
-    const msg = criarMsgFalsa(`Resposta para ${pergunta.id}`);
+    let resposta = `Resposta para ${pergunta.id}`;
+    if (pergunta.id === "precisa_valor_ministerio") {
+      resposta = "Sim, precisaremos de apoio";
+    }
+    const msg = criarMsgFalsa(resposta);
+    ultimaMsg = msg;
 
     await processarRespostaFormulario({
       msg,
@@ -171,25 +207,128 @@ test("processarRespostaFormulario: fluxo conversacional completo dispara Webhook
   assert.equal(etapas[solicitanteId], undefined, "deve limpar o estado da etapa");
   assert.ok(payloadRecebido, "webhook deve ter sido disparado");
 
-  // Verifica reaproveitamento dos dados anteriores no payload
+  // Verifica dados anteriores no payload
   assert.equal(payloadRecebido.departamento, "Rede de Homens");
   assert.equal(payloadRecebido.nome_evento, "Café dos Homens");
   assert.equal(payloadRecebido.data, "10/11/2026");
   assert.equal(payloadRecebido.horario_inicio, "08:00");
   assert.equal(payloadRecebido.horario_termino, "11:00");
-  assert.equal(payloadRecebido.local, "Templo");
+  assert.equal(payloadRecebido.local, ENDERECO_IGREJA);
 
-  // Verifica respostas preenchidas
+  // Verifica novos campos no payload
   assert.equal(payloadRecebido.nome_lider, "Resposta para nome_lider");
-  assert.equal(payloadRecebido.publico, "Resposta para publico");
+  assert.equal(payloadRecebido.horario_total, "Resposta para horario_total");
+  assert.equal(payloadRecebido.valor_inscricao, "Resposta para valor_inscricao");
+  assert.equal(payloadRecebido.precisa_valor_ministerio, "Sim, precisaremos de apoio");
+  assert.equal(payloadRecebido.contato_tesouraria, CONTATO_TESOURARIA);
+  assert.equal(payloadRecebido.prazo_imagem, "Resposta para prazo_imagem");
   assert.equal(payloadRecebido.objetivo_espiritual, "Resposta para objetivo_espiritual");
-  assert.equal(payloadRecebido.resultado_esperado, "Resposta para resultado_esperado");
 
-  // Verifica notificação ao grupo da secretaria com o link do Google Docs
+  // Confirmação para o líder deve conter o contato da tesouraria
+  assert.match(ultimaMsg.respostas[1], new RegExp(`\\+55 11 99111-7912`));
+  assert.match(ultimaMsg.respostas[1], /https:\/\/docs\.google\.com\/document\/d\/teste-doc-123\/edit/);
+
+  // Notificação para o grupo da secretaria também deve conter o contato da tesouraria
   assert.equal(gruposNotificados.length, 1);
   assert.match(gruposNotificados[0], /FORMULÁRIO DE EVENTO PREENCHIDO/);
+  assert.match(gruposNotificados[0], new RegExp(`\\+55 11 99111-7912`));
   assert.match(gruposNotificados[0], /https:\/\/docs\.google\.com\/document\/d\/teste-doc-123\/edit/);
   assert.match(gruposNotificados[0], /Café dos Homens/);
+});
+
+test("processarRespostaFormulario: quando precisa_valor_ministerio for NÃO, não inclui aviso da tesouraria", async () => {
+  const etapas = {};
+  const client = criarClienteFalso();
+  const solicitanteId = "5511999998888";
+  const gruposNotificados = [];
+  const notificarSecretaria = async (c, texto) => {
+    gruposNotificados.push(texto);
+  };
+
+  await iniciarFormularioEvento({
+    etapas,
+    solicitanteId,
+    dadosIniciais: {
+      rede: "Rede Kids",
+      evento: "EBF",
+      local: "Igreja",
+      dataFormatada: "12/10/2026",
+      horarioInicio: "14:00",
+      horarioFim: "17:00",
+    },
+    client,
+  });
+
+  const totalPerguntas = etapas[solicitanteId].perguntas.length;
+  let ultimaMsg;
+  for (let i = 0; i < totalPerguntas; i++) {
+    const pergunta = etapas[solicitanteId].perguntas[etapas[solicitanteId].indicePergunta];
+    let resposta = `Valor ${i}`;
+    if (pergunta.id === "precisa_valor_ministerio") {
+      resposta = "Não, já temos os recursos";
+    }
+    ultimaMsg = criarMsgFalsa(resposta);
+    await processarRespostaFormulario({
+      msg: ultimaMsg,
+      numero: solicitanteId,
+      info: etapas[solicitanteId],
+      client,
+      notificarSecretaria,
+      etapas,
+      enviarWebhook: async () => ({ status: "success", url: "https://docs.google.com/doc-ebf" }),
+    });
+  }
+
+  // Não deve conter aviso da tesouraria
+  assert.doesNotMatch(ultimaMsg.respostas[1], new RegExp(`\\+55 11 99111-7912`));
+  assert.doesNotMatch(gruposNotificados[0], new RegExp(`\\+55 11 99111-7912`));
+});
+
+test("processarRespostaFormulario: se pergunta de local for feita e líder responder igreja, preenche endereço fixo", async () => {
+  const etapas = {};
+  const client = criarClienteFalso();
+  const solicitanteId = "5511999998888";
+
+  // Inicia sem local pré-definido
+  await iniciarFormularioEvento({
+    etapas,
+    solicitanteId,
+    dadosIniciais: {
+      rede: "Jovens",
+      evento: "Luau",
+      dataFormatada: "15/11/2026",
+      horarioInicio: "19:00",
+      horarioFim: "22:00",
+    },
+    client,
+  });
+
+  // A lista de perguntas deve incluir 'local'
+  const ids = etapas[solicitanteId].perguntas.map((p) => p.id);
+  assert.ok(ids.includes("local"));
+
+  let payloadRecebido = null;
+  const total = etapas[solicitanteId].perguntas.length;
+  for (let i = 0; i < total; i++) {
+    const p = etapas[solicitanteId].perguntas[etapas[solicitanteId].indicePergunta];
+    let texto = "Teste";
+    if (p.id === "local") texto = "igreja";
+    const msg = criarMsgFalsa(texto);
+    await processarRespostaFormulario({
+      msg,
+      numero: solicitanteId,
+      info: etapas[solicitanteId],
+      client,
+      notificarSecretaria: async () => {},
+      etapas,
+      enviarWebhook: async (payload) => {
+        payloadRecebido = payload;
+        return { status: "success", url: "https://docs.google.com/test" };
+      },
+    });
+  }
+
+  assert.equal(payloadRecebido.local, ENDERECO_IGREJA);
 });
 
 test("processarRespostaFormulario: em caso de falha no webhook avisa líder e secretaria sem perder dados", async () => {
@@ -265,7 +404,7 @@ test("enviarWebhookGoogleDocs: faz requisição POST e faz parse do retorno json
   assert.equal(res.url, "https://docs.google.com/document/d/exemplo/edit");
 });
 
-test("E2E: aprovação de evento inicia o formulário, líder responde tudo, webhook gera Docs e envia links", async () => {
+test("E2E: aprovação de evento inicia o formulário, líder responde tudo, webhook gera Docs e envia links com aviso da tesouraria", async () => {
   const { createMessageHandler } = require("../bot/messageHandler");
   const etapas = {};
   const gruposEnviados = [];
@@ -335,7 +474,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   await enviarPrivado("1"); // novo agendamento
   await enviarPrivado("Conferência Atos 2"); // nome
   await enviarPrivado("igreja"); // local
-  await enviarPrivado("7"); // departamento (Rede de Casais)
+  await enviarPrivado("7"); // departamento (Rede de Homens)
   await enviarPrivado("12"); // mês (Dezembro)
   await enviarPrivado("1"); // data específica
   await enviarPrivado("20"); // dia 20
@@ -365,7 +504,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   assert.match(diretasEnviadas[0].texto, /Agendamento Confirmado e Gravado/);
   assert.match(diretasEnviadas[1].texto, /FORMULÁRIO INTERNO DO EVENTO/);
   assert.match(diretasEnviadas[1].texto, /Conferência Atos 2/);
-  assert.match(diretasEnviadas[1].texto, /1\/18/); // Nome do evento já foi preenchido, logo restam 18
+  assert.match(diretasEnviadas[1].texto, /1\/20/); // 24 perguntas menos as 4 puladas (nome, data, horario, local) = 20
 
   // 3. Líder responde o formulário conversacional
   assert.ok(etapas[NUMERO_LIDER]);
@@ -373,8 +512,10 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
 
   const respostasParaEnviar = [
     "Pr. João Silva", // nome_lider
+    "17h às 23h", // horario_total
     "Casais e Famílias", // publico
-    "Gratuito", // valor
+    "Gratuito", // valor_inscricao
+    "Sim, precisaremos de recursos", // precisa_valor_ministerio
     "A Família no Altar", // tema
     "Josué 24:15", // versiculo
     "Bordeaux e Dourado", // paleta
@@ -386,21 +527,22 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     "Jantar após o evento", // alimentacao
     "Recepção: 4 pessoas, Limpeza: 3 pessoas", // equipe
     "Som, 2 microfones sem fio, projetor", // materiais
+    "10/12/2026", // prazo_imagem
     "19h Louvor, 20h Ministração, 21h30 Jantar", // cronograma
     "Chegar com 1h de antecedência", // observacoes
-    "Edificação das famílias", // objetivo_espiritual
-    "20 casais restaurados", // resultado_esperado
+    "Edificação das famílias e muitas vidas transformadas", // objetivo_espiritual
   ];
 
   for (let i = 0; i < respostasParaEnviar.length; i++) {
     const resp = await enviarPrivado(respostasParaEnviar[i]);
     if (i < respostasParaEnviar.length - 1) {
-      assert.match(resp[0], new RegExp(`\\[${i + 2}\\/18\\]`));
+      assert.match(resp[0], new RegExp(`\\[${i + 2}\\/20\\]`));
     } else {
       // Última resposta
       assert.match(resp[0], /Gerando o documento oficial no Google Docs/);
       assert.match(resp[1], /Formulário do Evento Concluído com Sucesso/);
       assert.match(resp[1], /https:\/\/docs\.google\.com\/document\/d\/doc-gerado-sucesso\/edit/);
+      assert.match(resp[1], new RegExp(`\\+55 11 99111-7912`)); // Aviso da tesouraria no líder
     }
   }
 
@@ -410,11 +552,18 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     nome_evento: "Conferência Atos 2",
     departamento: "Rede de Homens",
     data: "20/12/2026",
+    data_solicitada: "20/12/2026",
     horario_inicio: "19:00",
     horario_termino: "22:00",
+    horario_inicio_termino: "19:00 às 22:00",
+    horario_total: "17h às 23h",
     local: "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi",
     publico: "Casais e Famílias",
+    valor_inscricao: "Gratuito",
     valor: "Gratuito",
+    precisa_valor_ministerio: "Sim, precisaremos de recursos",
+    contato_tesouraria: "+55 11 99111-7912",
+    aviso_tesouraria: "Entrar em contato com a tesouraria: +55 11 99111-7912",
     tema: "A Família no Altar",
     versiculo: "Josué 24:15",
     paleta: "Bordeaux e Dourado",
@@ -426,17 +575,19 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     alimentacao: "Jantar após o evento",
     equipe: "Recepção: 4 pessoas, Limpeza: 3 pessoas",
     materiais: "Som, 2 microfones sem fio, projetor",
+    prazo_imagem: "10/12/2026",
     cronograma: "19h Louvor, 20h Ministração, 21h30 Jantar",
     observacoes: "Chegar com 1h de antecedência",
-    objetivo_espiritual: "Edificação das famílias",
-    resultado_esperado: "20 casais restaurados",
+    objetivo_espiritual: "Edificação das famílias e muitas vidas transformadas",
+    resultado_esperado: "Edificação das famílias e muitas vidas transformadas",
   });
 
-  // 5. Valida notificação do grupo com o link
+  // 5. Valida notificação do grupo com o link e aviso da tesouraria
   const ultimaMsgGrupo = gruposEnviados[gruposEnviados.length - 1];
   assert.match(ultimaMsgGrupo, /FORMULÁRIO DE EVENTO PREENCHIDO/);
   assert.match(ultimaMsgGrupo, /Conferência Atos 2/);
   assert.match(ultimaMsgGrupo, /https:\/\/docs\.google\.com\/document\/d\/doc-gerado-sucesso\/edit/);
+  assert.match(ultimaMsgGrupo, new RegExp(`\\+55 11 99111-7912`));
 
   // 6. Sessão foi encerrada
   assert.equal(etapas[NUMERO_LIDER], undefined);
@@ -481,4 +632,3 @@ test("E2E: digitar 'menu' durante o formulário cancela e volta ao menu", async 
   assert.equal(etapas[NUMERO_LIDER], undefined);
   assert.match(respostas[0], /Área do Líder/);
 });
-

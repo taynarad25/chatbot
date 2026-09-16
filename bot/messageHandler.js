@@ -496,9 +496,8 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
                     const feedback = `✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo e também pode ser acessado pelo link:\n${LINK_ATA_REUNIAO}\n\nEle deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.`;
                     await enviarConfirmacaoReuniaoComAta(client, solicitanteId, feedback);
-                    await iniciarFormularioEvento({ etapas, solicitanteId, dadosIniciais: dados, client });
-                    console.log(`[Secretaria] Reunião agendada automaticamente e formulário iniciado para ${mascararTelefone(solicitanteId)}`);
-                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões*, líder notificado com a Ata e formulário iniciado.`);
+                    console.log(`[Secretaria] Reunião agendada automaticamente para ${mascararTelefone(solicitanteId)}`);
+                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões* e líder notificado com a Ata.`);
                   } catch (err) {
                     console.error("[ALERTA:google-calendar] Erro no agendamento de reunião:", err);
                     return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
@@ -780,7 +779,7 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
       console.log(`[Mensagem Recebida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
 
-      const ehSaudacao = SAUDACOES_REGEX.test(texto);
+      const ehSaudacao = texto.length <= 50 && SAUDACOES_REGEX.test(texto);
 
       if (ehSaudacao) {
         delete etapas[numero];

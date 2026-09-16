@@ -1478,7 +1478,7 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
   assert.equal(eventosGravados[0].resource.summary, "Reunião de Diretoria");
   assert.equal(eventosGravados[0].resource.location, "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi");
 
-  assert.equal(diretasEnviadas.length, 2);
+  assert.equal(diretasEnviadas.length, 1);
   assert.equal(diretasEnviadas[0].to, NUMERO_LIDER);
   assert.match(diretasEnviadas[0].texto, /Reunião Confirmada e Agendada/);
   assert.match(diretasEnviadas[0].texto, /Ata de Reunião/);
@@ -1489,6 +1489,7 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
   if (diretasEnviadas[0].media) {
     assert.equal(diretasEnviadas[0].media.mimetype, "application/pdf");
   }
+  assert.equal(etapas[NUMERO_LIDER], undefined, "reunião não deve iniciar formulário de evento");
 });
 
 test("área do líder: agendar reunião e secretaria recusa", async () => {
