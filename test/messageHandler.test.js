@@ -167,13 +167,14 @@ async function enviar(handleMessage, numero, body, opts) {
   return msg.respostas;
 }
 
-function criarEventoIgreja(agora, mesAtual, { dia = 16, calendarId = AGENDAS[6], summary = "Culto de Casais", location = "Salão Nobre" } = {}) {
+function criarEventoIgreja(agora, mesAtual, { dia, calendarId = AGENDAS[6], summary = "Culto de Casais", location = "Salão Nobre" } = {}) {
+  const base = dia ? agora.clone().set({ month: mesAtual - 1, date: dia }) : agora.clone().add(2, "days");
   return {
     calendarId,
     summary,
     location,
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: dia, hour: 19, minute: 30 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: dia, hour: 21, minute: 0 }).format() },
+    start: { dateTime: base.clone().set({ hour: 19, minute: 30 }).format() },
+    end: { dateTime: base.clone().set({ hour: 21, minute: 0 }).format() },
   };
 }
 
@@ -424,14 +425,15 @@ test("opção 2: período personalizado em formato inválido pede para tentar de
 
 test("opção 2: eventos da agenda 'Eventos Externos' ficam ocultos na consulta da agenda da igreja", async () => {
   const agora = moment.tz("America/Sao_Paulo");
-  const mesAtual = agora.month() + 1;
+  const dataEvento = agora.clone().add(2, "days");
+  const mesAtual = dataEvento.month() + 1;
   const eventoIgreja = criarEventoIgreja(agora, mesAtual);
   const eventoExterno = {
     calendarId: AGENDAS[10], // Eventos Externos
     summary: "Congresso Regional Externo",
     location: "Ginásio Municipal",
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 17, hour: 14, minute: 0 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 17, hour: 18, minute: 0 }).format() },
+    start: { dateTime: dataEvento.clone().set({ hour: 14, minute: 0 }).format() },
+    end: { dateTime: dataEvento.clone().set({ hour: 18, minute: 0 }).format() },
   };
 
   // 1. Quando há evento da igreja e evento externo, apenas o evento da igreja aparece
@@ -450,31 +452,32 @@ test("opção 2: eventos da agenda 'Eventos Externos' ficam ocultos na consulta 
 
 test("opção 2: eventos das agendas internas (Reuniões, Atendimento, Limpeza, Ensaios) ficam ocultos na consulta da agenda da igreja", async () => {
   const agora = moment.tz("America/Sao_Paulo");
-  const mesAtual = agora.month() + 1;
+  const dataEvento = agora.clone().add(2, "days");
+  const mesAtual = dataEvento.month() + 1;
   const eventoIgreja = criarEventoIgreja(agora, mesAtual);
   const eventoReuniao = {
     calendarId: AGENDAS[11], // Reuniões
     summary: "Reunião de Líderes",
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 10, minute: 0 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 12, minute: 0 }).format() },
+    start: { dateTime: dataEvento.clone().set({ hour: 10, minute: 0 }).format() },
+    end: { dateTime: dataEvento.clone().set({ hour: 12, minute: 0 }).format() },
   };
   const eventoAtendimento = {
     calendarId: AGENDAS[12], // Atendimento
     summary: "Atendimento Individual",
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 14, minute: 0 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 16, hour: 15, minute: 0 }).format() },
+    start: { dateTime: dataEvento.clone().set({ hour: 14, minute: 0 }).format() },
+    end: { dateTime: dataEvento.clone().set({ hour: 15, minute: 0 }).format() },
   };
   const eventoLimpeza = {
     calendarId: AGENDAS[13], // Limpeza
     summary: "Faxina Geral do Templo",
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 17, hour: 8, minute: 0 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 17, hour: 12, minute: 0 }).format() },
+    start: { dateTime: dataEvento.clone().set({ hour: 8, minute: 0 }).format() },
+    end: { dateTime: dataEvento.clone().set({ hour: 12, minute: 0 }).format() },
   };
   const eventoEnsaio = {
     calendarId: AGENDAS[14], // Ensaios
     summary: "Ensaio Louvor Geral",
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 18, hour: 15, minute: 0 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 18, hour: 17, minute: 0 }).format() },
+    start: { dateTime: dataEvento.clone().set({ hour: 15, minute: 0 }).format() },
+    end: { dateTime: dataEvento.clone().set({ hour: 17, minute: 0 }).format() },
   };
 
   const ctx = criarContexto({ eventos: [eventoIgreja, eventoReuniao, eventoAtendimento, eventoLimpeza, eventoEnsaio] });
