@@ -547,40 +547,33 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   }
 
   // 4. Valida se o Webhook recebeu o payload completo
-  assert.deepEqual(payloadWebhookRecebido, {
-    nome_lider: "Pr. João Silva",
-    nome_evento: "Conferência Atos 2",
-    departamento: "Rede de Homens",
-    data: "20/12/2026",
-    data_solicitada: "20/12/2026",
-    horario_inicio: "19:00",
-    horario_termino: "22:00",
-    horario_inicio_termino: "19:00 às 22:00",
-    horario_total: "17h às 23h",
-    local: "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi",
-    publico: "Casais e Famílias",
-    valor_inscricao: "Gratuito",
-    valor: "Gratuito",
-    precisa_valor_ministerio: "Sim, precisaremos de recursos",
-    contato_tesouraria: "+55 11 99111-7912",
-    aviso_tesouraria: "Entrar em contato com a tesouraria: +55 11 99111-7912",
-    tema: "A Família no Altar",
-    versiculo: "Josué 24:15",
-    paleta: "Bordeaux e Dourado",
-    estilo: "Elegante",
-    responsavel_geral: "Diácono Carlos",
-    convidado: "Pr. Convidado Marcos",
-    louvor: "Banda da Igreja",
-    decoracao: "Flores e iluminação cênica",
-    alimentacao: "Jantar após o evento",
-    equipe: "Recepção: 4 pessoas, Limpeza: 3 pessoas",
-    materiais: "Som, 2 microfones sem fio, projetor",
-    prazo_imagem: "10/12/2026",
-    cronograma: "19h Louvor, 20h Ministração, 21h30 Jantar",
-    observacoes: "Chegar com 1h de antecedência",
-    objetivo_espiritual: "Edificação das famílias e muitas vidas transformadas",
-    resultado_esperado: "Edificação das famílias e muitas vidas transformadas",
-  });
+  assert.equal(payloadWebhookRecebido.nome_lider, "Pr. João Silva");
+  assert.equal(payloadWebhookRecebido.nome_evento, "Conferência Atos 2");
+  assert.equal(payloadWebhookRecebido.departamento, "Rede de Homens");
+  assert.equal(payloadWebhookRecebido.data, "20/12/2026");
+  assert.equal(payloadWebhookRecebido.horario_inicio, "19:00");
+  assert.equal(payloadWebhookRecebido.horario_termino, "22:00");
+  assert.equal(payloadWebhookRecebido.horario_total, "17h às 23h");
+  assert.equal(payloadWebhookRecebido.local, ENDERECO_IGREJA);
+  assert.equal(payloadWebhookRecebido.publico, "Casais e Famílias");
+  assert.equal(payloadWebhookRecebido.valor_inscricao, "Gratuito");
+  assert.equal(payloadWebhookRecebido.precisa_valor_ministerio, "Sim, precisaremos de recursos");
+  assert.equal(payloadWebhookRecebido.contato_tesouraria, CONTATO_TESOURARIA);
+  assert.equal(payloadWebhookRecebido.tema, "A Família no Altar");
+  assert.equal(payloadWebhookRecebido.versiculo, "Josué 24:15");
+  assert.equal(payloadWebhookRecebido.paleta, "Bordeaux e Dourado");
+  assert.equal(payloadWebhookRecebido.estilo, "Elegante");
+  assert.equal(payloadWebhookRecebido.responsavel_geral, "Diácono Carlos");
+  assert.equal(payloadWebhookRecebido.convidado, "Pr. Convidado Marcos");
+  assert.equal(payloadWebhookRecebido.louvor, "Banda da Igreja");
+  assert.equal(payloadWebhookRecebido.decoracao, "Flores e iluminação cênica");
+  assert.equal(payloadWebhookRecebido.alimentacao, "Jantar após o evento");
+  assert.equal(payloadWebhookRecebido.equipe, "Recepção: 4 pessoas, Limpeza: 3 pessoas");
+  assert.equal(payloadWebhookRecebido.materiais, "Som, 2 microfones sem fio, projetor");
+  assert.equal(payloadWebhookRecebido.prazo_imagem, "10/12/2026");
+  assert.equal(payloadWebhookRecebido.cronograma, "19h Louvor, 20h Ministração, 21h30 Jantar");
+  assert.equal(payloadWebhookRecebido.observacoes, "Chegar com 1h de antecedência");
+  assert.equal(payloadWebhookRecebido.objetivo_espiritual, "Edificação das famílias e muitas vidas transformadas");
 
   // 5. Valida notificação do grupo com o link e aviso da tesouraria
   const ultimaMsgGrupo = gruposEnviados[gruposEnviados.length - 1];

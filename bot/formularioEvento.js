@@ -11,18 +11,10 @@ const PERGUNTAS_DEFINICOES = [
   ["nome_lider", "👤 *Nome do líder responsável:*\nQual é o nome do líder responsável pelo evento?"],
 
   // 2. Nome do Evento (pula se já preenchido no agendamento)
-  [
-    "nome_evento",
-    "📅 *Nome do Evento:*\nQual é o nome oficial do evento?",
-    (d) => Boolean(d.evento),
-  ],
+  ["nome_evento", "📅 *Nome do Evento:*\nQual é o nome oficial do evento?", (d) => Boolean(d.evento)],
 
   // 3. Data Solicitada (DD/MM/AAAA) (pula se já preenchido no agendamento)
-  [
-    "data_solicitada",
-    "📆 *Data Solicitada (DD/MM/AAAA):*\nQual é a data do evento? (Ex: DD/MM/AAAA)",
-    (d) => Boolean(d.data),
-  ],
+  ["data_solicitada", "📆 *Data Solicitada (DD/MM/AAAA):*\nQual é a data do evento? (Ex: DD/MM/AAAA)", (d) => Boolean(d.data)],
 
   // 4. Horário de Início e Término (pula se já preenchido no agendamento)
   [
@@ -38,23 +30,13 @@ const PERGUNTAS_DEFINICOES = [
   ],
 
   // 6. Local (Lembrar: Se for na Igreja, preenche automaticamente com o endereço fixo)
-  [
-    "local",
-    "📍 *Local:*\nOnde será realizado o evento? (Se for na Igreja, basta responder *Igreja*)",
-    (d) => Boolean(d.local),
-  ],
+  ["local", "📍 *Local:*\nOnde será realizado o evento? (Se for na Igreja, basta responder *Igreja*)", (d) => Boolean(d.local)],
 
   // 7. Público-Alvo
-  [
-    "publico",
-    "🎯 *Público-Alvo:*\nQual é o público-alvo do evento? (Ex: Jovens, Mulheres, Crianças, Homens, Casais, Toda a Igreja)",
-  ],
+  ["publico", "🎯 *Público-Alvo:*\nQual é o público-alvo do evento? (Ex: Jovens, Mulheres, Crianças, Homens, Casais, Toda a Igreja)"],
 
   // 8. Valor de inscrição
-  [
-    "valor_inscricao",
-    "💰 *Valor de inscrição:*\nHaverá cobrança de taxa ou inscrição? Se sim, qual o valor? (Ou responda *Gratuito* / *Não*)",
-  ],
+  ["valor_inscricao", "💰 *Valor de inscrição:*\nHaverá cobrança de taxa ou inscrição? Se sim, qual o valor? (Ou responda *Gratuito* / *Não*)"],
 
   // 9. Vai precisar de valor do ministério? (Se sim, lembrar do contato da tesouraria: +55 11 99111-7912)
   [
@@ -63,70 +45,37 @@ const PERGUNTAS_DEFINICOES = [
   ],
 
   // 10. Tema Oficial
-  [
-    "tema",
-    "✨ *Tema Oficial:*\nQual é o tema oficial do evento? (Ou responda *Nenhum* / *A definir*)",
-  ],
+  ["tema", "✨ *Tema Oficial:*\nQual é o tema oficial do evento? (Ou responda *Nenhum* / *A definir*)"],
 
   // 11. Versículo Base (se houver)
-  [
-    "versiculo",
-    "📖 *Versículo Base (se houver):*\nQual é o versículo base do evento? (Ou responda *Nenhum* / *Não*)",
-  ],
+  ["versiculo", "📖 *Versículo Base (se houver):*\nQual é o versículo base do evento? (Ou responda *Nenhum* / *Não*)"],
 
   // 12. Paleta de Cores
-  [
-    "paleta",
-    "🎨 *Paleta de Cores:*\nQuais são as cores da identidade visual do evento? (Ex: Azul, branco e dourado / ou *A definir*)",
-  ],
+  ["paleta", "🎨 *Paleta de Cores:*\nQuais são as cores da identidade visual do evento? (Ex: Azul, branco e dourado / ou *A definir*)"],
 
   // 13. Estilo Visual (jovem, elegante, minimalista, vibrante)
-  [
-    "estilo",
-    "🖼️ *Estilo Visual:*\nQual é o estilo visual desejado? (Ex: *jovem*, *elegante*, *minimalista*, *vibrante* ou outro)",
-  ],
+  ["estilo", "🖼️ *Estilo Visual:*\nQual é o estilo visual desejado? (Ex: *jovem*, *elegante*, *minimalista*, *vibrante* ou outro)",],
 
   // 14. Responsável Geral
-  [
-    "responsavel_geral",
-    "👔 *Responsável Geral:*\nQuem será o responsável geral pela coordenação no dia do evento?",
-  ],
+  ["responsavel_geral", "👔 *Responsável Geral:*\nQuem será o responsável geral pela coordenação no dia do evento?"],
 
   // 15. Haverá convidado (banda, pregador)?
-  [
-    "convidado",
-    "🎤 *Haverá convidado (banda, pregador)?*\nHaverá algum convidado especial (banda, pregador, cantor)? Se sim, quem? (Ou responda *Não*)",
-  ],
+  ["convidado", "🎤 *Haverá convidado (banda, pregador)?*\nHaverá algum convidado especial (banda, pregador, cantor)? Se sim, quem? (Ou responda *Não*)"],
 
   // 16. Louvor definido?
-  [
-    "louvor",
-    "🎵 *Louvor definido?*\nO louvor já está definido (equipe/repertório)? (Ex: Sim / Não / A definir)",
-  ],
+  ["louvor", "🎵 *Louvor definido?*\nO louvor já está definido (equipe/repertório)? (Ex: Sim / Não / A definir)"],
 
   // 17. Decoração
-  [
-    "decoracao",
-    "🎈 *Decoração:*\nComo será a decoração ou quem ficará responsável? (Ou responda *Nenhuma* / *Simples*)",
-  ],
+  ["decoracao", "🎈 *Decoração:*\nComo será a decoração ou quem ficará responsável? (Ou responda *Nenhuma* / *Simples*)"],
 
   // 18. Alimentação
-  [
-    "alimentacao",
-    "☕ *Alimentação:*\nHaverá alimentação (lanche, coffee break, almoço, jantar)? Se sim, descreva brevemente (ou responda *Não*)",
-  ],
+  ["alimentacao", "☕ *Alimentação:*\nHaverá alimentação (lanche, coffee break, almoço, jantar)? Se sim, descreva brevemente (ou responda *Não*)"],
 
   // 19. Equipe (pré, durante e pós-evento)
-  [
-    "equipe",
-    "👥 *Equipe (pré, durante e pós-evento):*\nComo está dividida a equipe de apoio (montagem pré-evento, durante e limpeza pós-evento)?",
-  ],
+  ["equipe", "👥 *Equipe (pré, durante e pós-evento):*\nComo está dividida a equipe de apoio (montagem pré-evento, durante e limpeza pós-evento)?"],
 
   // 20. Materiais necessários
-  [
-    "materiais",
-    "📦 *Materiais necessários:*\nQuais materiais e equipamentos serão necessários? (Ex: Som, projetor, microfones, mesas / ou responda *Nenhum*)",
-  ],
+  ["materiais", "📦 *Materiais necessários:*\nQuais materiais e equipamentos serão necessários? (Ex: Som, projetor, microfones, mesas / ou responda *Nenhum*)"],
 
   // 21. Até quando precisa da imagem de divulgação?
   [
@@ -135,16 +84,10 @@ const PERGUNTAS_DEFINICOES = [
   ],
 
   // 22. Cronograma do evento
-  [
-    "cronograma",
-    "⏱️ *Cronograma do evento:*\nQual é o cronograma previsto do evento? (Ex: 19h Abertura, 19h30 Louvor, 20h Palavra, 21h Término)",
-  ],
+  ["cronograma", "⏱️ *Cronograma do evento:*\nQual é o cronograma previsto do evento? (Ex: 19h Abertura, 19h30 Louvor, 20h Palavra, 21h Término)"],
 
   // 23. Observações
-  [
-    "observacoes",
-    "📝 *Observações:*\nAlguma observação, detalhe extra ou necessidade especial? (Ou responda *Nenhuma*)",
-  ],
+  ["observacoes", "📝 *Observações:*\nAlguma observação, detalhe extra ou necessidade especial? (Ou responda *Nenhuma*)"],
 
   // 24. Objetivo espiritual do evento (pergunta única unificada)
   [
@@ -209,13 +152,11 @@ function normalizarDadosIniciais(dadosIniciais = {}) {
     dataFormatada = `${String(dadosIniciais.dia).padStart(2, "0")}/${String(dadosIniciais.mes).padStart(2, "0")}/${ano}`;
   }
 
-  const localNormalizado = normalizarTextoLocal(dadosIniciais.local || "");
-
   return {
     tipo: dadosIniciais.tipo || "",
     departamento: dadosIniciais.rede || dadosIniciais.departamento || "",
     evento: dadosIniciais.evento || "",
-    local: localNormalizado,
+    local: normalizarTextoLocal(dadosIniciais.local || ""),
     data: dataFormatada,
     horarioInicio: dadosIniciais.horarioInicio || "",
     horarioFim: dadosIniciais.horarioFim || "",
@@ -239,17 +180,20 @@ function formatarResumoEventoGrupo(payload, { incluirTesouraria = true } = {}) {
   return resumo;
 }
 
+const CAMPOS_RESPOSTAS_LIVRES = [
+  "publico", "tema", "versiculo", "paleta", "estilo",
+  "responsavel_geral", "convidado", "louvor", "decoracao",
+  "alimentacao", "equipe", "materiais", "prazo_imagem",
+  "cronograma", "observacoes", "objetivo_espiritual",
+];
+
 function montarPayloadFormulario(dadosIniciais = {}, respostas = {}) {
   const data = respostas.data_solicitada || dadosIniciais.data || "";
-  const horarioInicio = dadosIniciais.horarioInicio || "";
-  const horarioTermino = dadosIniciais.horarioFim || "";
-  const horarioInicioTermino =
-    respostas.horario_inicio_termino ||
-    (horarioInicio && horarioTermino ? `${horarioInicio} às ${horarioTermino}` : "");
-
-  const local = normalizarTextoLocal(respostas.local || dadosIniciais.local || "");
-  const valorInscricao = respostas.valor_inscricao || respostas.valor || "";
-  const precisaTesouraria = precisaDeValorDoMinisterio(respostas.precisa_valor_ministerio);
+  const hInicio = dadosIniciais.horarioInicio || "";
+  const hFim = dadosIniciais.horarioFim || "";
+  const hFaixa = respostas.horario_inicio_termino || (hInicio && hFim ? `${hInicio} às ${hFim}` : "");
+  const taxa = respostas.valor_inscricao || respostas.valor || "";
+  const querTesouraria = precisaDeValorDoMinisterio(respostas.precisa_valor_ministerio);
 
   const payload = {
     nome_lider: respostas.nome_lider || "",
@@ -257,40 +201,27 @@ function montarPayloadFormulario(dadosIniciais = {}, respostas = {}) {
     nome_evento: respostas.nome_evento || dadosIniciais.evento || "",
     data,
     data_solicitada: data,
-    horario_inicio: horarioInicio,
-    horario_termino: horarioTermino,
-    horario_inicio_termino: horarioInicioTermino,
+    horario_inicio: hInicio,
+    horario_termino: hFim,
+    horario_inicio_termino: hFaixa,
     horario_total: respostas.horario_total || "",
-    local,
-    publico: respostas.publico || "",
-    valor_inscricao: valorInscricao,
-    valor: valorInscricao, // retrocompatibilidade
+    local: normalizarTextoLocal(respostas.local || dadosIniciais.local || ""),
+    valor_inscricao: taxa,
+    valor: taxa,
     precisa_valor_ministerio: respostas.precisa_valor_ministerio || "",
-    contato_tesouraria: precisaTesouraria ? CONTATO_TESOURARIA : "",
-    aviso_tesouraria: precisaTesouraria ? `Entrar em contato com a tesouraria: ${CONTATO_TESOURARIA}` : "",
-    tema: respostas.tema || "",
-    versiculo: respostas.versiculo || "",
-    paleta: respostas.paleta || "",
-    estilo: respostas.estilo || "",
-    responsavel_geral: respostas.responsavel_geral || "",
-    convidado: respostas.convidado || "",
-    louvor: respostas.louvor || "",
-    decoracao: respostas.decoracao || "",
-    alimentacao: respostas.alimentacao || "",
-    equipe: respostas.equipe || "",
-    materiais: respostas.materiais || "",
-    prazo_imagem: respostas.prazo_imagem || "",
-    cronograma: respostas.cronograma || "",
-    observacoes: respostas.observacoes || "",
-    objetivo_espiritual: respostas.objetivo_espiritual || "",
-    resultado_esperado: respostas.objetivo_espiritual || "", // retrocompatibilidade caso o template leia resultado_esperado
+    contato_tesouraria: querTesouraria ? CONTATO_TESOURARIA : "",
+    aviso_tesouraria: querTesouraria ? `Entrar em contato com a tesouraria: ${CONTATO_TESOURARIA}` : "",
+    resultado_esperado: respostas.objetivo_espiritual || "",
   };
+
+  for (const c of CAMPOS_RESPOSTAS_LIVRES) {
+    payload[c] = respostas[c] || "";
+  }
 
   return payload;
 }
 
 async function iniciarFormularioEvento({ etapas, solicitanteId, dadosIniciais, client }) {
-  // Gatilho Exclusivo para Eventos: NUNCA exibe este formulário para reuniões simples ou outras solicitações
   if (
     dadosIniciais &&
     (dadosIniciais.tipo === "reuniao" ||
@@ -314,9 +245,7 @@ async function iniciarFormularioEvento({ etapas, solicitanteId, dadosIniciais, c
     respostas: {},
   };
 
-  const primeiraPergunta = perguntasFiltradas[0];
   const total = perguntasFiltradas.length;
-
   const intro =
     `📝 *FORMULÁRIO INTERNO DO EVENTO*\n\n` +
     `Para alinhamento completo com a secretaria e diretoria, vamos preencher os detalhes restantes do evento.\n\n` +
@@ -328,9 +257,14 @@ async function iniciarFormularioEvento({ etapas, solicitanteId, dadosIniciais, c
     (dados.evento ? `\n• *Evento:* ${dados.evento}` : "") +
     `\n\n_Esses dados não precisam ser informados novamente._\n` +
     `_(Você pode digitar *menu* a qualquer momento para cancelar)_\n\n` +
-    `---\n📋 *[1/${total}]* ${primeiraPergunta.pergunta}`;
+    `---\n📋 *[1/${total}]* ${perguntasFiltradas[0].pergunta}`;
 
   await client.sendMessage(solicitanteId, intro);
+}
+
+function comporNotificacaoSecretaria(cabecalho, payload, extra = "") {
+  const meio = extra ? `${extra}\n\n` : "";
+  return `${cabecalho}\n\n${meio}${formatarResumoEventoGrupo(payload, { incluirTesouraria: false })}`;
 }
 
 async function processarRespostaFormulario({
@@ -349,7 +283,6 @@ async function processarRespostaFormulario({
   }
 
   let respostaTexto = (msg.body || "").trim();
-  // Se for a pergunta de local, converte 'igreja' / 'templo' para o endereço fixo
   if (perguntaAtual.id === "local") {
     respostaTexto = normalizarTextoLocal(respostaTexto);
   }
@@ -363,55 +296,44 @@ async function processarRespostaFormulario({
     return msg.reply(`${progresso} ${proxima.pergunta}`);
   }
 
-  // Última pergunta respondida: consolida e dispara Webhook
   await msg.reply("⏳ *Obrigado pelas respostas!*\nGerando o documento oficial no Google Docs e notificando a secretaria, por favor aguarde um momento...");
 
   const payload = montarPayloadFormulario(info.dadosIniciais, info.respostas);
-  const precisaTesouraria = precisaDeValorDoMinisterio(info.respostas.precisa_valor_ministerio);
-  const avisoTesourariaTexto = precisaTesouraria
+  const querTesouraria = precisaDeValorDoMinisterio(info.respostas.precisa_valor_ministerio);
+  const notaTesouraria = querTesouraria
     ? `\n\n💰 *Aviso da Tesouraria:*\nComo foi informado que precisará de recursos do ministério, por favor entre em contato com a tesouraria para alinhamento: *${CONTATO_TESOURARIA}*`
     : "";
+  const tagGrupoTesouraria = querTesouraria
+    ? `\n\n💰 *Aviso da Tesouraria:* Este evento precisará de valor do ministério. Contato da tesouraria: *${CONTATO_TESOURARIA}*`
+    : "";
+
+  const responderLider = (corpo) => msg.reply(`${corpo}${notaTesouraria}\n\nDigite *menu* para voltar ao menu principal.`);
 
   try {
     const resultado = await enviarWebhook(payload);
     const linkDoc = resultado.url;
 
-    const confirmacaoLider =
+    await responderLider(
       `✅ *Formulário do Evento Concluído com Sucesso!*\n\n` +
       `O documento oficial do evento foi gerado automaticamente no Google Docs:\n` +
       `🔗 *Acesse o documento gerado:*\n${linkDoc}\n\n` +
-      `A secretaria já foi notificada com o link do documento gerado. 🙏` +
-      avisoTesourariaTexto +
-      `\n\nDigite *menu* para voltar ao menu principal.`;
-
-    await msg.reply(confirmacaoLider);
+      `A secretaria já foi notificada com o link do documento gerado. 🙏`
+    );
 
     const notificacaoGrupo =
-      `📋 *FORMULÁRIO DE EVENTO PREENCHIDO*\n\n` +
-      `${formatarResumoEventoGrupo(payload, { incluirTesouraria: false })}\n\n` +
-      `📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}` +
-      (precisaTesouraria
-        ? `\n\n💰 *Aviso da Tesouraria:* Este evento precisará de valor do ministério. Contato da tesouraria: *${CONTATO_TESOURARIA}*`
-        : "");
+      `${comporNotificacaoSecretaria("📋 *FORMULÁRIO DE EVENTO PREENCHIDO*", payload)}\n\n` +
+      `📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}${tagGrupoTesouraria}`;
 
     await notificarSecretaria(client, notificacaoGrupo);
     console.log(`[Formulário Evento] Concluído com sucesso para ${numero}. Documento: ${linkDoc}`);
   } catch (err) {
     console.error("[ALERTA:secretaria] Erro ao enviar formulário para o Webhook do Google Docs:", err);
-    await msg.reply(
-      `⚠️ Suas respostas foram salvas, mas houve uma instabilidade momentânea ao gerar o Google Docs. A secretaria já foi avisada.` +
-      avisoTesourariaTexto +
-      `\n\nDigite *menu* para voltar ao menu principal.`
+    await responderLider(
+      "⚠️ Suas respostas foram salvas, mas houve uma instabilidade momentânea ao gerar o Google Docs. A secretaria já foi avisada."
     );
 
-    const resumoGrupoFalha =
-      `⚠️ *FORMULÁRIO DE EVENTO PREENCHIDO (FALHA NO GOOGLE DOCS)*\n\n` +
-      `O líder preencheu o formulário, mas houve uma falha ao gerar o documento via Google Apps Script.\n` +
-      `Erro: ${err.message}\n\n` +
-      formatarResumoEventoGrupo(payload, { incluirTesouraria: false }) +
-      (precisaTesouraria
-        ? `\n\n💰 *Aviso da Tesouraria:* Este evento precisará de valor do ministério. Contato da tesouraria: *${CONTATO_TESOURARIA}*`
-        : "");
+    const avisoFalha = `O líder preencheu o formulário, mas houve uma falha ao gerar o documento via Google Apps Script.\nErro: ${err.message}`;
+    const resumoGrupoFalha = `${comporNotificacaoSecretaria("⚠️ *FORMULÁRIO DE EVENTO PREENCHIDO (FALHA NO GOOGLE DOCS)*", payload, avisoFalha)}${tagGrupoTesouraria}`;
 
     try {
       await notificarSecretaria(client, resumoGrupoFalha);
