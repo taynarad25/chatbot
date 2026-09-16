@@ -405,31 +405,32 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   }
 
   // 4. Valida se o Webhook recebeu o payload completo
-  assert.ok(payloadWebhookRecebido);
-  assert.equal(payloadWebhookRecebido.nome_lider, "Pr. João Silva");
-  assert.equal(payloadWebhookRecebido.nome_evento, "Conferência Atos 2");
-  assert.equal(payloadWebhookRecebido.departamento, "Rede de Homens");
-  assert.equal(payloadWebhookRecebido.data, "20/12/2026");
-  assert.equal(payloadWebhookRecebido.horario_inicio, "19:00");
-  assert.equal(payloadWebhookRecebido.horario_termino, "22:00");
-  assert.equal(payloadWebhookRecebido.local, "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi");
-  assert.equal(payloadWebhookRecebido.publico, "Casais e Famílias");
-  assert.equal(payloadWebhookRecebido.valor, "Gratuito");
-  assert.equal(payloadWebhookRecebido.tema, "A Família no Altar");
-  assert.equal(payloadWebhookRecebido.versiculo, "Josué 24:15");
-  assert.equal(payloadWebhookRecebido.paleta, "Bordeaux e Dourado");
-  assert.equal(payloadWebhookRecebido.estilo, "Elegante");
-  assert.equal(payloadWebhookRecebido.responsavel_geral, "Diácono Carlos");
-  assert.equal(payloadWebhookRecebido.convidado, "Pr. Convidado Marcos");
-  assert.equal(payloadWebhookRecebido.louvor, "Banda da Igreja");
-  assert.equal(payloadWebhookRecebido.decoracao, "Flores e iluminação cênica");
-  assert.equal(payloadWebhookRecebido.alimentacao, "Jantar após o evento");
-  assert.equal(payloadWebhookRecebido.equipe, "Recepção: 4 pessoas, Limpeza: 3 pessoas");
-  assert.equal(payloadWebhookRecebido.materiais, "Som, 2 microfones sem fio, projetor");
-  assert.equal(payloadWebhookRecebido.cronograma, "19h Louvor, 20h Ministração, 21h30 Jantar");
-  assert.equal(payloadWebhookRecebido.observacoes, "Chegar com 1h de antecedência");
-  assert.equal(payloadWebhookRecebido.objetivo_espiritual, "Edificação das famílias");
-  assert.equal(payloadWebhookRecebido.resultado_esperado, "20 casais restaurados");
+  assert.deepEqual(payloadWebhookRecebido, {
+    nome_lider: "Pr. João Silva",
+    nome_evento: "Conferência Atos 2",
+    departamento: "Rede de Homens",
+    data: "20/12/2026",
+    horario_inicio: "19:00",
+    horario_termino: "22:00",
+    local: "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi",
+    publico: "Casais e Famílias",
+    valor: "Gratuito",
+    tema: "A Família no Altar",
+    versiculo: "Josué 24:15",
+    paleta: "Bordeaux e Dourado",
+    estilo: "Elegante",
+    responsavel_geral: "Diácono Carlos",
+    convidado: "Pr. Convidado Marcos",
+    louvor: "Banda da Igreja",
+    decoracao: "Flores e iluminação cênica",
+    alimentacao: "Jantar após o evento",
+    equipe: "Recepção: 4 pessoas, Limpeza: 3 pessoas",
+    materiais: "Som, 2 microfones sem fio, projetor",
+    cronograma: "19h Louvor, 20h Ministração, 21h30 Jantar",
+    observacoes: "Chegar com 1h de antecedência",
+    objetivo_espiritual: "Edificação das famílias",
+    resultado_esperado: "20 casais restaurados",
+  });
 
   // 5. Valida notificação do grupo com o link
   const ultimaMsgGrupo = gruposEnviados[gruposEnviados.length - 1];

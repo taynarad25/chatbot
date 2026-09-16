@@ -356,14 +356,15 @@ test("opção 1: retorna a mensagem estática de horário dos cultos", async () 
 
 test("opção 2: fluxo completo por mês, incluindo o detalhe do evento", async () => {
   const agora = moment.tz("America/Sao_Paulo");
-  const mesAtual = agora.month() + 1;
+  const dataEvento = agora.clone().add(2, "days");
+  const mesAtual = dataEvento.month() + 1;
   const evento = {
     calendarId: AGENDAS[6],
     summary: "Culto de Casais",
     location: "Salão Novo",
     description: "Traga seu cônjuge!",
-    start: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 15, hour: 19, minute: 30 }).format() },
-    end: { dateTime: agora.clone().set({ month: mesAtual - 1, date: 15, hour: 21, minute: 0 }).format() },
+    start: { dateTime: dataEvento.clone().set({ hour: 19, minute: 30 }).format() },
+    end: { dateTime: dataEvento.clone().set({ hour: 21, minute: 0 }).format() },
   };
   const { handleMessage, setEventos } = criarContexto({ eventos: [evento] });
 
