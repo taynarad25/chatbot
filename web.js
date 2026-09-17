@@ -272,40 +272,42 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         }
       }
 
-      // API: Listar Líderes (Apenas Admin)
-      if (req.method === 'GET' && pathname === '/secretaria/api/admin/lideres' && isAdmin(req)) {
+      // API: Listar Líderes e Usuários por Telefone (Apenas Admin)
+      if (req.method === 'GET' && (pathname === '/secretaria/api/admin/lideres' || pathname === '/secretaria/api/admin/usuarios') && isAdmin(req)) {
         const lideres = listLideres();
-        return sendJson(res, 200, { ok: true, lideres });
+        return sendJson(res, 200, { ok: true, lideres, usuarios: lideres });
       }
 
-      // API: Adicionar Líder (Apenas Admin)
-      if (req.method === 'POST' && pathname === '/secretaria/api/admin/lideres' && isAdmin(req)) {
+      // API: Adicionar Líder / Usuário (Apenas Admin)
+      if (req.method === 'POST' && (pathname === '/secretaria/api/admin/lideres' || pathname === '/secretaria/api/admin/usuarios') && isAdmin(req)) {
         try {
           const body = await parseRequestBody(req);
           const result = addLider(body);
           return sendJson(res, result.ok ? 200 : 400, result);
         } catch (err) {
-          console.error(`[Web] Erro ao adicionar líder via Admin: ${err.message}`);
+          console.error(`[Web] Erro ao adicionar usuário/líder via Admin: ${err.message}`);
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
         }
       }
 
-      // API: Editar Líder (Apenas Admin)
-      if (req.method === 'PUT' && pathname.startsWith('/secretaria/api/admin/lideres/') && isAdmin(req)) {
+      // API: Editar Líder / Usuário (Apenas Admin)
+      if (req.method === 'PUT' && (pathname.startsWith('/secretaria/api/admin/lideres/') || pathname.startsWith('/secretaria/api/admin/usuarios/')) && isAdmin(req)) {
         try {
-          const target = decodeURIComponent(pathname.replace('/secretaria/api/admin/lideres/', ''));
+          const prefix = pathname.startsWith('/secretaria/api/admin/lideres/') ? '/secretaria/api/admin/lideres/' : '/secretaria/api/admin/usuarios/';
+          const target = decodeURIComponent(pathname.replace(prefix, ''));
           const body = await parseRequestBody(req);
           const result = updateLider(target, body);
           return sendJson(res, result.ok ? 200 : 400, result);
         } catch (err) {
-          console.error(`[Web] Erro ao editar líder via Admin: ${err.message}`);
+          console.error(`[Web] Erro ao editar usuário/líder via Admin: ${err.message}`);
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
         }
       }
 
-      // API: Remover Líder (Apenas Admin)
-      if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/admin/lideres/') && isAdmin(req)) {
-        const target = decodeURIComponent(pathname.replace('/secretaria/api/admin/lideres/', ''));
+      // API: Remover Líder / Usuário (Apenas Admin)
+      if (req.method === 'DELETE' && (pathname.startsWith('/secretaria/api/admin/lideres/') || pathname.startsWith('/secretaria/api/admin/usuarios/')) && isAdmin(req)) {
+        const prefix = pathname.startsWith('/secretaria/api/admin/lideres/') ? '/secretaria/api/admin/lideres/' : '/secretaria/api/admin/usuarios/';
+        const target = decodeURIComponent(pathname.replace(prefix, ''));
         const result = removeLider(target);
         return sendJson(res, result.ok ? 200 : 404, result);
       }

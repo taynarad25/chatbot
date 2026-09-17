@@ -185,6 +185,16 @@ function renderIndexHtml() {
     li { background: #f9f9f9; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; border-radius: 5px; }
     .filtros-lideres { display: flex; gap: 10px; margin-bottom: 1rem; }
     .filtros-lideres input { flex: 1; }
+    .cargos-container { margin: 0.8rem 0; padding: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .cargos-title { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; color: #334155; }
+    .cargos-checkboxes { display: flex; flex-wrap: wrap; gap: 16px; }
+    .cargos-checkboxes label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #1e293b; user-select: none; }
+    .cargos-checkboxes input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; accent-color: #007bff; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: capitalize; margin-left: 6px; vertical-align: middle; }
+    .badge-lider { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .badge-pastor { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .badge-diretor { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+    .badge-membro { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
     @media (max-width: 480px) {
       .filtros-lideres { flex-direction: column; gap: 0; }
     }
@@ -199,7 +209,7 @@ function renderIndexHtml() {
     <div class="tabs">
       <button class="tab-btn active" onclick="openTab(event, 'tab-whatsapp')">Whatsapp</button>
       <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">Perfil de acesso</button>
-      <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">Líderes</button>
+      <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">Usuários & Cargos</button>
       <button class="tab-btn" id="btn-tab-logs" style="display:none;" onclick="openTab(event, 'tab-logs')">Logs</button>
     </div>
     
@@ -226,18 +236,27 @@ function renderIndexHtml() {
     </div>
 
     <div id="tab-lideres" class="tab-content">
-      <h3>Líderes</h3>
+      <h3>Usuários & Cargos</h3>
       <div class="filtros-lideres">
-        <input id="filtroLiderNome" placeholder="Buscar por nome" />
+        <input id="filtroLiderNome" placeholder="Buscar por nome ou cargo" />
         <input id="filtroLiderTelefone" placeholder="Buscar por telefone" inputmode="numeric" autocomplete="off" />
       </div>
       <ul id="liderList"></ul>
       <hr>
-      <h4 id="liderFormTitle">Novo Líder</h4>
+      <h4 id="liderFormTitle">Novo Usuário / Cargo</h4>
       <div id="lideresMessage" class="message-box" style="display:none;"></div>
       <form id="addLiderForm">
-        <input name="nome" placeholder="Nome do líder" required />
+        <input name="nome" placeholder="Nome completo" required />
         <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" autocomplete="off" required />
+        <div class="cargos-container">
+          <span class="cargos-title">Cargos / Permissões:</span>
+          <div class="cargos-checkboxes">
+            <label><input type="checkbox" name="cargos" value="lider" checked /> Líder</label>
+            <label><input type="checkbox" name="cargos" value="pastor" /> Pastor</label>
+            <label><input type="checkbox" name="cargos" value="diretor" /> Diretor</label>
+            <label><input type="checkbox" name="cargos" value="membro" /> Membro</label>
+          </div>
+        </div>
         <button type="submit" id="liderSubmitBtn" class="primary">Adicionar</button>
         <button type="button" id="cancelarEdicaoLider" style="display:none;">Cancelar</button>
       </form>
@@ -420,19 +439,18 @@ function renderIndexHtml() {
     ativarMascaraTelefone(document.getElementById('filtroLiderTelefone'));
 
     let liderEmEdicao = null; // telefone (normalizado) do líder sendo editado, ou null quando é um cadastro novo
-    let lideresCache = []; // última lista carregada da API, usada para filtrar sem precisar buscar de novo a cada tecla
-
-    // Remove acentos para a busca por nome encontrar "joao" mesmo quando o líder está cadastrado como "João"
+    let lideresCache = []; // última lista     // Remove acentos para a busca por nome encontrar "joao" mesmo quando o líder está cadastrado como "João"
     function normalizarBusca(texto) {
-      return (texto || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+      return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
 
     function renderLideres() {
       const filtroNome = normalizarBusca(document.getElementById('filtroLiderNome').value);
-      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\\D/g, '');
+      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\D/g, '');
 
       const filtrados = lideresCache.filter(l => {
-        const nomeOk = !filtroNome || normalizarBusca(l.nome).includes(filtroNome);
+        const cargosStr = Array.isArray(l.cargos) ? l.cargos.join(' ') : (l.cargos || '');
+        const nomeOk = !filtroNome || normalizarBusca(l.nome).includes(filtroNome) || normalizarBusca(cargosStr).includes(filtroNome);
         const telefoneOk = !filtroTelefone || l.telefone.includes(filtroTelefone);
         return nomeOk && telefoneOk;
       });
@@ -442,7 +460,7 @@ function renderIndexHtml() {
 
       if (filtrados.length === 0) {
         const li = document.createElement('li');
-        li.textContent = lideresCache.length === 0 ? 'Nenhum líder cadastrado.' : 'Nenhum líder encontrado com esse filtro.';
+        li.textContent = lideresCache.length === 0 ? 'Nenhum usuário cadastrado.' : 'Nenhum usuário encontrado com esse filtro.';
         list.appendChild(li);
         return;
       }
@@ -450,13 +468,20 @@ function renderIndexHtml() {
       filtrados.forEach(l => {
         const li = document.createElement('li');
         const span = document.createElement('span');
-        span.textContent = (l.nome || '(sem nome)') + ' | ' + formatarTelefone(l.telefone);
+        span.textContent = (l.nome || '(sem nome)') + ' | ' + formatarTelefone(l.telefone) + ' ';
+
+        const cargos = Array.isArray(l.cargos) && l.cargos.length > 0 ? l.cargos : ['lider'];
+        cargos.forEach(c => {
+          const badge = document.createElement('span');
+          badge.className = 'badge badge-' + c.toLowerCase();
+          const nomeCargo = c.charAt(0).toUpperCase() + c.slice(1);
+          badge.textContent = nomeCargo === 'Lider' ? 'Líder' : nomeCargo;
+          span.appendChild(badge);
+        });
+
         li.appendChild(span);
 
-        // Agrupa os dois botões numa única "coluna" à direita — com os botões
-        // soltos como filhos diretos do <li> (display:flex + space-between), a
-        // posição do botão "Editar" varia conforme o tamanho do nome/telefone,
-        // porque o espaço livre é distribuído em partes iguais entre os 3 itens.
+        // Agrupa os dois botões numa única "coluna" à direita
         const acoes = document.createElement('span');
         acoes.style.display = 'flex';
 
@@ -491,8 +516,8 @@ function renderIndexHtml() {
     }
 
     async function deleteLider(telefone) {
-      if (confirm('Tem certeza que deseja remover o líder ' + telefone + '?')) {
-        console.log('Solicitando remoção do líder:', telefone);
+      if (confirm('Tem certeza que deseja remover o usuário ' + telefone + '?')) {
+        console.log('Solicitando remoção do usuário:', telefone);
         await fetch('/secretaria/api/admin/lideres/'+encodeURIComponent(telefone), { method: 'DELETE' });
         if (liderEmEdicao === telefone) cancelarEdicaoLider();
         fetchLideres();
@@ -504,15 +529,25 @@ function renderIndexHtml() {
       const form = document.getElementById('addLiderForm');
       form.nome.value = lider.nome;
       form.telefone.value = formatarTelefone(lider.telefone);
-      document.getElementById('liderFormTitle').textContent = 'Editar Líder';
+      
+      const cargos = Array.isArray(lider.cargos) ? lider.cargos : (lider.cargos ? [lider.cargos] : ['lider']);
+      form.querySelectorAll('input[name="cargos"]').forEach(cb => {
+        cb.checked = cargos.includes(cb.value);
+      });
+
+      document.getElementById('liderFormTitle').textContent = 'Editar Usuário / Cargo';
       document.getElementById('liderSubmitBtn').textContent = 'Salvar';
       document.getElementById('cancelarEdicaoLider').style.display = 'inline-block';
     }
 
     function cancelarEdicaoLider() {
       liderEmEdicao = null;
-      document.getElementById('addLiderForm').reset();
-      document.getElementById('liderFormTitle').textContent = 'Novo Líder';
+      const form = document.getElementById('addLiderForm');
+      form.reset();
+      form.querySelectorAll('input[name="cargos"]').forEach(cb => {
+        cb.checked = (cb.value === 'lider');
+      });
+      document.getElementById('liderFormTitle').textContent = 'Novo Usuário / Cargo';
       document.getElementById('liderSubmitBtn').textContent = 'Adicionar';
       document.getElementById('cancelarEdicaoLider').style.display = 'none';
     }
@@ -548,11 +583,25 @@ function renderIndexHtml() {
 
     document.getElementById('addLiderForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const data = Object.fromEntries(new FormData(e.target));
+      const form = e.target;
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData);
+      
+      const checkedBoxes = Array.from(form.querySelectorAll('input[name="cargos"]:checked')).map(cb => cb.value);
+      if (checkedBoxes.length === 0) {
+        const msgEl = document.getElementById('lideresMessage');
+        msgEl.style.display = 'block';
+        msgEl.textContent = 'Selecione ao menos uma permissão / cargo.';
+        msgEl.style.backgroundColor = '#f8d7da';
+        msgEl.style.color = '#721c24';
+        return;
+      }
+      data.cargos = checkedBoxes;
+
       const editando = !!liderEmEdicao;
       const url = editando ? '/secretaria/api/admin/lideres/' + encodeURIComponent(liderEmEdicao) : '/secretaria/api/admin/lideres';
       const method = editando ? 'PUT' : 'POST';
-      console.log((editando ? 'Editando líder:' : 'Tentando adicionar novo líder:'), data.nome);
+      console.log((editando ? 'Editando usuário:' : 'Tentando adicionar novo usuário:'), data.nome);
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -564,15 +613,14 @@ function renderIndexHtml() {
       msgEl.textContent = json.message;
 
       if (res.ok) {
-        console.log(editando ? 'Líder atualizado com sucesso.' : 'Líder adicionado com sucesso.');
+        console.log(editando ? 'Usuário atualizado com sucesso.' : 'Usuário adicionado com sucesso.');
         msgEl.style.backgroundColor = '#d4edda';
         msgEl.style.color = '#155724';
         cancelarEdicaoLider();
         fetchLideres();
       } else {
-        console.error((editando ? 'Erro ao editar líder:' : 'Erro ao adicionar líder:'), json.message);
+        console.error((editando ? 'Erro ao editar usuário:' : 'Erro ao adicionar usuário:'), json.message);
         msgEl.style.backgroundColor = '#f8d7da';
-        msgEl.style.color = '#721c24';
       }
     });
 

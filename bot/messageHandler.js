@@ -192,9 +192,24 @@ function capitalizarNome(nome) {
 }
 
 // Monta a identificação padrão usada nos logs: nome do contato + telefone
-// mascarado + papel do usuário (ex: "Taynara Diniz | +55 (11) *****-6727 (Usuário)").
-function identificarUsuario(contato, numero, isLider) {
-  return `${nomeContato(contato, numero)} | ${mascararTelefone(numero)} (${isLider ? "Líder" : "Usuário"})`;
+// mascarado + papel do usuário (ex: "Taynara Diniz | +55 (11) *****-6727 (Líder, Pastor)").
+function identificarUsuario(contato, numero, isLider, usuario = null) {
+  let papel = isLider ? "Líder" : "Usuário";
+  if (usuario && Array.isArray(usuario.cargos) && usuario.cargos.length > 0) {
+    papel = usuario.cargos
+      .map((c) => {
+        const lower = String(c).toLowerCase().trim();
+        if (lower === "lider") return "Líder";
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      })
+      .join(", ");
+  }
+  return `${nomeContato(contato, numero)} | ${mascararTelefone(numero)} (${papel})`;
+}
+
+function temPermissao(usuario, permissao) {
+  if (!usuario || !Array.isArray(usuario.cargos)) return false;
+  return usuario.cargos.includes(String(permissao || "").toLowerCase().trim());
 }
 
 // msg.getChat() (assim como outras chamadas do whatsapp-web.js que avaliam JS dentro
@@ -227,18 +242,52 @@ async function comRetry(fn, { tentativas = 2, esperaMs = 1500 } = {}) {
  * @param {string[]} deps.lideres - números de telefone com acesso às opções de líder
  * @param {object} deps.etapas - mapa mutável "número -> estado da conversa", compartilhado entre reconexões
  * @param {(inicio: string, fim: string, agendaId?: string) => Promise<object[]>} deps.buscarEventos
- * @param {() => object[]} [deps.listLideres] - retorna os líderes cadastrados no painel ({ nome, telefone }),
+ * @param {() => object[]} [deps.listLideres] - retorna os líderes cadastrados no painel ({ nome, telefone, cargos }),
  *   usado para identificar o solicitante nos resumos de evento pelo nome cadastrado (não o nome do contato salvo no celular)
  */
 function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapas, buscarEventos, listLideres = () => [], enviarWebhook = enviarWebhookGoogleDocs }) {
+  function resolverUsuario(numeroComDdi) {
+    const numeroDigitos = String(numeroComDdi || "").replace(/\D/g, "");
+    const cadastrados = (typeof listLideres === "function" ? listLideres() : []) || [];
+    const encontrado = cadastrados.find((u) => {
+      const telDigitos = String(u.telefone || "").replace(/\D/g, "");
+      return telDigitos && (numeroDigitos.includes(telDigitos) || telDigitos.includes(numeroDigitos));
+    });
+    if (encontrado) {
+      const cargos = Array.isArray(encontrado.cargos)
+        ? encontrado.cargos.map((c) => String(c).toLowerCase().trim()).filter(Boolean)
+        : (encontrado.cargos ? [String(encontrado.cargos).toLowerCase().trim()] : ["lider"]);
+      return {
+        nome: (encontrado.nome || "").trim(),
+        telefone: encontrado.telefone,
+        cargos: cargos.length > 0 ? cargos : ["lider"],
+      };
+    }
+    const ehLiderArray = lideres.some((l) => {
+      const telLider = String(l || "").replace(/\D/g, "");
+      return telLider && numeroDigitos.includes(telLider);
+    });
+    if (ehLiderArray) {
+      return {
+        nome: "",
+        telefone: numeroDigitos,
+        cargos: ["lider"],
+      };
+    }
+    return {
+      nome: "",
+      telefone: numeroDigitos,
+      cargos: [],
+    };
+  }
+
   // Identifica o solicitante de um evento (criar/alterar/cancelar) pelo nome
   // cadastrado no painel de líderes, já que o nome salvo no celular do líder
   // (nomeContato) pode divergir do nome oficial usado pela secretaria. Sem
   // correspondência (ou nome cadastrado vazio), cai de volta no nome do contato.
   function nomeSolicitante(contato, numero) {
-    const numeroDigitos = String(numero).replace(/\D/g, "");
-    const lider = listLideres().find((l) => numeroDigitos.includes(l.telefone));
-    if (lider && lider.nome && lider.nome.trim()) return lider.nome.trim();
+    const usuario = resolverUsuario(numero);
+    if (usuario && usuario.nome && usuario.nome.trim()) return usuario.nome.trim();
     return nomeContato(contato, numero);
   }
 
@@ -774,17 +823,19 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
       const contato = await msg.getContact();
       const numero = contato.id._serialized;
       const texto = msg.body.toLowerCase().trim();
-      // Verificação mais flexível para o número de líder
-      const isLider = lideres.some(l => numero.includes(l));
+      const usuario = resolverUsuario(numero);
+      const isLider = temPermissao(usuario, "lider") || lideres.some((l) => numero.includes(l));
+      const isPastor = temPermissao(usuario, "pastor");
+      const isDiretor = temPermissao(usuario, "diretor");
+      const isMembro = temPermissao(usuario, "membro");
 
-      console.log(`[Mensagem Recebida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
+      console.log(`[Mensagem Recebida] De: ${identificarUsuario(contato, numero, isLider, usuario)} | Texto: "${msg.body}"`);
 
       const ehSaudacao = texto.length <= 50 && SAUDACOES_REGEX.test(texto);
 
       if (ehSaudacao) {
         delete etapas[numero];
-        const menu = isLider
-          ? `Olá! 👋
+        let menu = `Olá! 👋
 Secretaria da Comunidade Cristã Curados.
 
 Escolha uma opção:
@@ -793,29 +844,25 @@ Escolha uma opção:
 2️⃣ Ver agenda da igreja
 3️⃣ Atendimento pastoral
 4️⃣ Aulas de música
-5️⃣ Falar com a secretaria
-6️⃣ Área do Líder
+5️⃣ Falar com a secretaria`;
 
-Digite *menu* a qualquer momento para voltar ao menu principal.`
-          : `Olá! 👋
-Secretaria da Comunidade Cristã Curados.
+        if (isLider) {
+          menu += `\n6️⃣ Área do Líder`;
+        }
+        if (isPastor) {
+          menu += `\n7️⃣ Área Pastoral`;
+        }
+        if (isDiretor) {
+          menu += `\n8️⃣ Área da Direção`;
+        }
 
-Escolha uma opção:
-
-1️⃣ Horário dos cultos
-2️⃣ Ver agenda da igreja
-3️⃣ Atendimento pastoral
-4️⃣ Aulas de música
-5️⃣ Falar com a secretaria
-
-Digite *menu* a qualquer momento para voltar ao menu principal.`;
-
+        menu += `\n\nDigite *menu* a qualquer momento para voltar ao menu principal.`;
         return msg.reply(menu);
       }
 
       if (etapas[numero]) {
         const info = etapas[numero];
-        console.log(`[Fluxo Ativo] ${identificarUsuario(contato, numero, isLider)} | Fluxo: ${info.fluxo} | Etapa: ${info.etapa}`);
+        console.log(`[Fluxo Ativo] ${identificarUsuario(contato, numero, isLider, usuario)} | Fluxo: ${info.fluxo} | Etapa: ${info.etapa}`);
 
         if (info.fluxo === "formulario_evento") {
           return await processarRespostaFormulario({
@@ -1510,6 +1557,48 @@ Digite *menu* a qualquer momento para voltar ao menu principal.`;
               return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, ou digite *menu* para voltar.");
             }
           }
+        } else if (info.fluxo === "area_pastoral") {
+          if (info.etapa === "menu_pastoral") {
+            const escolha = msg.body.trim();
+            if (escolha === "1") {
+              info.fluxo = "ver_agenda";
+              info.etapa = "escolha_mes";
+              const hoje = new Date();
+              const mesAtual = hoje.getMonth();
+              let listaMeses = "📅 *Ver Agenda*\n\nPara qual mês você deseja consultar?\n\n";
+              for (let i = mesAtual; i < 12; i++) {
+                listaMeses += `${i + 1} - ${MESES[i]}\n`;
+              }
+              listaMeses += "\n0 - Escolher um período específico";
+              return msg.reply(listaMeses + "\n\nDigite o número do mês desejado, ou 0 para outro período:");
+            } else if (escolha === "2") {
+              return msg.reply("📋 *Atendimentos Pastorais*\n\nOs pedidos de atendimento pastoral são enviados diretamente ao grupo oficial de pastores para alinhamento e confirmação.\n\nDigite *menu* para voltar ao menu principal.");
+            } else {
+              return msg.reply("❌ Opção inválida. Escolha 1 ou 2, ou digite *menu* para voltar.");
+            }
+          }
+        } else if (info.fluxo === "area_diretor") {
+          if (info.etapa === "menu_diretor") {
+            const escolha = msg.body.trim();
+            if (escolha === "1") {
+              info.fluxo = "ver_agenda";
+              info.etapa = "escolha_mes";
+              const hoje = new Date();
+              const mesAtual = hoje.getMonth();
+              let listaMeses = "📅 *Ver Agenda*\n\nPara qual mês você deseja consultar?\n\n";
+              for (let i = mesAtual; i < 12; i++) {
+                listaMeses += `${i + 1} - ${MESES[i]}\n`;
+              }
+              listaMeses += "\n0 - Escolher um período específico";
+              return msg.reply(listaMeses + "\n\nDigite o número do mês desejado, ou 0 para outro período:");
+            } else if (escolha === "2") {
+              const avisoSecretaria = `📞 *PEDIDO DA DIREÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO diretor solicitou contato da secretaria.`;
+              await notificarSecretaria(client, avisoSecretaria);
+              return msg.reply("📞 *Secretaria Notificada!*\n\nA equipe da secretaria entrará em contato em breve.\n\nDigite *menu* para voltar ao menu principal.");
+            } else {
+              return msg.reply("❌ Opção inválida. Escolha 1 ou 2, ou digite *menu* para voltar.");
+            }
+          }
         } else if (info.fluxo === "artes_flyers") {
           if (info.etapa === "artes_departamento") {
             const rede = obterRedePorNumero(msg.body);
@@ -1992,16 +2081,30 @@ Digite *menu* para voltar ao menu principal.`;
       }
 
       if (texto === "5") {
-        console.log(`Opção 5 selecionada por ${identificarUsuario(contato, numero, isLider)}`);
+        console.log(`Opção 5 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}`);
         const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO usuário solicitou falar com a secretaria.`;
         await notificarSecretaria(client, avisoSecretaria);
         return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
       }
 
       if (texto === "6" && isLider) {
-        console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider)}, iniciando Área do Líder`);
+        console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área do Líder`);
         etapas[numero] = { fluxo: "area_lider", etapa: "menu_lider" };
         const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n4️⃣ Agendar, alterar ou desmarcar reunião\n5️⃣ Consultar disponibilidade de dias e horários\n\nDigite *menu* para voltar ao menu principal.`;
+        return msg.reply(msgSubmenu);
+      }
+
+      if (texto === "7" && isPastor) {
+        console.log(`Opção 7 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área Pastoral`);
+        etapas[numero] = { fluxo: "area_pastoral", etapa: "menu_pastoral" };
+        const msgSubmenu = `⛪ *Área Pastoral*\n\nGraça e Paz, Pastor(a)! Escolha uma opção:\n\n1️⃣ Consultar agenda da igreja\n2️⃣ Solicitações de atendimento pastoral\n\nDigite *menu* para voltar ao menu principal.`;
+        return msg.reply(msgSubmenu);
+      }
+
+      if (texto === "8" && isDiretor) {
+        console.log(`Opção 8 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área da Direção`);
+        etapas[numero] = { fluxo: "area_diretor", etapa: "menu_diretor" };
+        const msgSubmenu = `📋 *Área da Direção*\n\nEscolha o que deseja fazer:\n\n1️⃣ Visão geral das agendas\n2️⃣ Falar com a secretaria\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
       }
 
@@ -2011,11 +2114,11 @@ Digite *menu* para voltar ao menu principal.`;
       // conseguir ir") pode ser parte de uma conversa com a secretaria fora do
       // fluxo do bot, então é melhor não interromper com uma mensagem de erro.
       if (!/^\d+$/.test(texto)) {
-        console.log(`[Mensagem ignorada] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
+        console.log(`[Mensagem ignorada] De: ${identificarUsuario(contato, numero, isLider, usuario)} | Texto: "${msg.body}"`);
         return;
       }
 
-      console.log(`[Mensagem não reconhecida] De: ${identificarUsuario(contato, numero, isLider)} | Texto: "${msg.body}"`);
+      console.log(`[Mensagem não reconhecida] De: ${identificarUsuario(contato, numero, isLider, usuario)} | Texto: "${msg.body}"`);
       return msg.reply("❓ Não entendi sua mensagem. Digite *menu* para ver as opções disponíveis.");
     } catch (err) {
       console.error(`[ALERTA:fatal] Erro Fatal no Listener de Mensagens (de: ${msg?.from ? mascararTelefone(msg.from) : "?"}, id: ${msg?.id?._serialized}):`, err);
@@ -2023,4 +2126,12 @@ Digite *menu* para voltar ao menu principal.`;
   };
 }
 
-module.exports = { createMessageHandler, nomeContato, LINK_ATA_REUNIAO, formatarTituloReuniao, resolverOpcaoLocalReuniao };
+module.exports = {
+  createMessageHandler,
+  nomeContato,
+  LINK_ATA_REUNIAO,
+  formatarTituloReuniao,
+  resolverOpcaoLocalReuniao,
+  temPermissao,
+  identificarUsuario,
+};

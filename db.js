@@ -28,6 +28,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS lideres (
     telefone TEXT PRIMARY KEY,
     nome TEXT NOT NULL,
+    cargos TEXT NOT NULL DEFAULT '["lider"]',
     createdAt TEXT,
     updatedAt TEXT
   );
@@ -48,5 +49,14 @@ db.exec(`
     active INTEGER NOT NULL
   );
 `);
+
+try {
+  const cols = db.prepare("PRAGMA table_info(lideres)").all();
+  if (!cols.some((c) => c.name === "cargos")) {
+    db.exec("ALTER TABLE lideres ADD COLUMN cargos TEXT NOT NULL DEFAULT '[\"lider\"]'");
+  }
+} catch {
+  // Tabela ainda sendo criada ou erro ignorável
+}
 
 module.exports = db;
