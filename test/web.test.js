@@ -59,6 +59,54 @@ test("GET /secretaria/login: retorna a página de login com status 200 e favicon
   assert.match(html, /<link rel="manifest" href="\/manifest\.json"/);
 });
 
+test("GET / e GET /home: servem a página inicial institucional com seções de essência, colunas, cultos, endereço e contatos no rodapé", async () => {
+  for (const rota of ["/", "/home"]) {
+    const res = await fetch(`${baseUrl}${rota}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "text/html; charset=utf-8");
+    const csp = res.headers.get("content-security-policy");
+    assert.match(csp, /script-src 'self' 'unsafe-inline'/);
+
+    const html = await res.text();
+    // Banner inicial
+    assert.match(html, /COMUNIDADE CRISTÃ/);
+    assert.match(html, /CURADOS/);
+
+    // Seção Quem Somos / Essência
+    assert.match(html, /expressa a Deus através das artes/);
+    assert.match(html, /Amar a Deus/);
+    assert.match(html, /Cuidar da Família/);
+    assert.match(html, /Servir Pessoas/);
+
+    // 4 Colunas
+    assert.match(html, /Acolher/);
+    assert.match(html, /Ainda há lugar na mesa para você/);
+    assert.match(html, /Integrar/);
+    assert.match(html, /De visitantes à participantes/);
+    assert.match(html, /Entregar/);
+    assert.match(html, /Totalmente entregues à Sua obra/);
+    assert.match(html, /Pertencer/);
+    assert.match(html, /Não só um lugar para frequentar, mas uma família para pertencer/);
+
+    // Horários de Culto
+    assert.match(html, /Domingos às.*18h/);
+    assert.match(html, /No primeiro domingo do mês temos Santa Ceia às 08h30 \(não há culto à noite\)/);
+
+    // Endereço
+    assert.match(html, /R\. Benedicto de Abreu Júnior, 40/);
+    assert.match(html, /Jardim Nova Itapevi, Itapevi - SP/);
+
+    // Rodapé com contatos da Secretaria e da Tesouraria
+    assert.match(html, /\(11\) 94659-3056/);
+    assert.match(html, /https:\/\/wa\.me\/5511946593056/);
+    assert.match(html, /Secretaria Pastoral/);
+
+    assert.match(html, /\(11\) 99111-7612/);
+    assert.match(html, /https:\/\/wa\.me\/5511991117612/);
+    assert.match(html, /Tesouraria & Finanças/);
+  }
+});
+
 test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404 e com Cache-Control no-cache", async () => {
   const res = await fetch(`${baseUrl}/favicon.ico`);
   assert.equal(res.status, 200);

@@ -15,16 +15,31 @@
     <!-- Importando a fonte Montserrat com as variações 400, 600 e 800 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         :root {
             --cor-ciano: #00bcd4;
+            --cor-ciano-brilho: rgba(0, 188, 212, 0.18);
             --cor-roxo: #7b2cbf;
+            --cor-roxo-brilho: rgba(123, 44, 191, 0.18);
             --cor-laranja: #ff7d00;
+            --cor-laranja-brilho: rgba(255, 125, 0, 0.18);
             --cor-magenta: #e01a4f;
-            --cor-escuro: #1e1e1e;
+            --cor-magenta-brilho: rgba(224, 26, 79, 0.18);
+            --cor-escuro: #121214;
+            --cor-escuro-suave: #1a1a1e;
+            --cor-card-dark: #222228;
             --cor-claro: #f8f9fa;
+            --cor-texto: #2d3748;
+            --cor-texto-mutado: #718096;
+            --sombra-card: 0 10px 30px rgba(0, 0, 0, 0.07);
+            --sombra-card-hover: 0 18px 40px rgba(0, 0, 0, 0.14);
+            --borda-raio: 24px;
+        }
+
+        html {
+            scroll-behavior: smooth;
         }
 
         * {
@@ -36,8 +51,80 @@
 
         body {
             background-color: var(--cor-claro);
-            color: #333;
+            color: var(--cor-texto);
             overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Barra de Navegação Superior (Header / Navbar) */
+        .navbar-curados {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(18, 18, 20, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #ffffff;
+        }
+
+        .navbar-brand img {
+            width: 38px;
+            height: 38px;
+            object-fit: contain;
+        }
+
+        .navbar-brand span {
+            font-weight: 800;
+            font-size: 1.15rem;
+            letter-spacing: 2px;
+            color: var(--cor-ciano);
+        }
+
+        .navbar-nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .navbar-nav a {
+            color: #d1d5db;
+            text-decoration: none;
+            font-size: 0.92rem;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .navbar-nav a:hover {
+            color: var(--cor-ciano);
+        }
+
+        .btn-nav-secretaria {
+            background: linear-gradient(135deg, var(--cor-roxo), #9d4edd);
+            color: #ffffff !important;
+            padding: 8px 18px;
+            border-radius: 999px;
+            font-weight: 700 !important;
+            font-size: 0.85rem !important;
+            box-shadow: 0 4px 14px rgba(123, 44, 191, 0.35);
+            transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+        }
+
+        .btn-nav-secretaria:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(123, 44, 191, 0.55);
         }
 
         /* Banner Principal (Hero) */
@@ -133,7 +220,845 @@
             text-shadow: 0 6px 32px rgba(0, 188, 212, 0.35);
         }
 
-        /* Responsividade para Tablet */
+        /* Layout Utilitários */
+        .container {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .section {
+            padding: 100px 0;
+            position: relative;
+            scroll-margin-top: 70px;
+        }
+
+        .banner-curados, .footer-curados {
+            scroll-margin-top: 70px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 56px;
+        }
+
+        .section-badge {
+            display: inline-block;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            padding: 6px 16px;
+            border-radius: 999px;
+            margin-bottom: 16px;
+        }
+
+        .badge-ciano { background: rgba(0, 188, 212, 0.12); color: var(--cor-ciano); }
+        .badge-roxo { background: rgba(123, 44, 191, 0.12); color: var(--cor-roxo); }
+        .badge-laranja { background: rgba(255, 125, 0, 0.12); color: var(--cor-laranja); }
+        .badge-magenta { background: rgba(224, 26, 79, 0.12); color: var(--cor-magenta); }
+
+        .section-title {
+            font-size: clamp(2.2rem, 3.6vw, 3.2rem);
+            font-weight: 800;
+            color: #111827;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+            margin-bottom: 16px;
+        }
+
+        .section-subtitle {
+            font-size: clamp(1.05rem, 1.6vw, 1.22rem);
+            color: var(--cor-texto-mutado);
+            max-width: 720px;
+            margin: 0 auto;
+            font-weight: 400;
+        }
+
+        /* ==================================================
+           SEÇÃO 1: QUEM SOMOS / NOSSA ESSÊNCIA
+           ================================================== */
+        .section-essencia {
+            background: #ffffff;
+            position: relative;
+        }
+
+        .frase-destaque-wrapper {
+            background: linear-gradient(135deg, #18181b 0%, #27272a 100%);
+            border-radius: var(--borda-raio);
+            padding: clamp(36px, 5vw, 64px) clamp(24px, 4vw, 56px);
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 50px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.12);
+        }
+
+        .frase-destaque-wrapper::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--cor-ciano), var(--cor-roxo), var(--cor-magenta), var(--cor-laranja));
+        }
+
+        .frase-destaque-badge {
+            display: inline-block;
+            color: var(--cor-ciano);
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .frase-destaque-texto {
+            font-size: clamp(1.8rem, 3.4vw, 2.9rem);
+            font-weight: 800;
+            line-height: 1.28;
+            letter-spacing: -0.5px;
+            max-width: 960px;
+            margin: 0 auto;
+            color: #f9fafb;
+        }
+
+        .frase-destaque-texto .gradiente {
+            background: linear-gradient(90deg, var(--cor-ciano), #60a5fa, var(--cor-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Cartões de Essência (Prioridade, Propósito, Paixão) */
+        .essencia-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 28px;
+        }
+
+        .card-essencia {
+            background: #ffffff;
+            border-radius: var(--borda-raio);
+            padding: 36px 30px;
+            box-shadow: var(--sombra-card);
+            border: 1px solid #edf2f7;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-essencia::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: transparent;
+            transition: background 0.3s ease;
+        }
+
+        .card-essencia.prioridade::before { background: var(--cor-roxo); }
+        .card-essencia.proposito::before { background: var(--cor-laranja); }
+        .card-essencia.paixao::before { background: var(--cor-magenta); }
+
+        .card-essencia:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--sombra-card-hover);
+        }
+
+        .card-essencia-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .card-essencia-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .card-essencia.prioridade .card-essencia-icon {
+            background: rgba(123, 44, 191, 0.12);
+            color: var(--cor-roxo);
+        }
+
+        .card-essencia.proposito .card-essencia-icon {
+            background: rgba(255, 125, 0, 0.12);
+            color: var(--cor-laranja);
+        }
+
+        .card-essencia.paixao .card-essencia-icon {
+            background: rgba(224, 26, 79, 0.12);
+            color: var(--cor-magenta);
+        }
+
+        .card-essencia-tag {
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .card-essencia.prioridade .card-essencia-tag { color: var(--cor-roxo); }
+        .card-essencia.proposito .card-essencia-tag { color: var(--cor-laranja); }
+        .card-essencia.paixao .card-essencia-tag { color: var(--cor-magenta); }
+
+        .card-essencia-titulo {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: 12px;
+            letter-spacing: -0.3px;
+        }
+
+        .card-essencia-desc {
+            font-size: 0.98rem;
+            color: var(--cor-texto-mutado);
+            line-height: 1.65;
+            font-weight: 400;
+        }
+
+        /* ==================================================
+           SEÇÃO 2: NOSSAS COLUNAS
+           ================================================== */
+        .section-colunas {
+            background-color: var(--cor-claro);
+            position: relative;
+        }
+
+        .colunas-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+        }
+
+        .card-coluna {
+            background: #ffffff;
+            border-radius: var(--borda-raio);
+            padding: 36px 26px 32px;
+            box-shadow: var(--sombra-card);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Borda superior de 5px com a cor institucional do pilar */
+        .card-coluna::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+        }
+
+        .card-coluna.coluna-acolher::before { background: var(--cor-roxo); }
+        .card-coluna.coluna-integrar::before { background: var(--cor-laranja); }
+        .card-coluna.coluna-entregar::before { background: var(--cor-magenta); }
+        .card-coluna.coluna-pertencer::before { background: var(--cor-ciano); }
+
+        .card-coluna:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--sombra-card-hover);
+        }
+
+        .card-coluna.coluna-acolher:hover {
+            box-shadow: 0 20px 40px var(--cor-roxo-brilho);
+        }
+
+        .card-coluna.coluna-integrar:hover {
+            box-shadow: 0 20px 40px var(--cor-laranja-brilho);
+        }
+
+        .card-coluna.coluna-entregar:hover {
+            box-shadow: 0 20px 40px var(--cor-magenta-brilho);
+        }
+
+        .card-coluna.coluna-pertencer:hover {
+            box-shadow: 0 20px 40px var(--cor-ciano-brilho);
+        }
+
+        .card-coluna-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+        }
+
+        .coluna-numero {
+            font-size: 1.1rem;
+            font-weight: 800;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-coluna.coluna-acolher .coluna-numero {
+            background: rgba(123, 44, 191, 0.12);
+            color: var(--cor-roxo);
+        }
+
+        .card-coluna.coluna-integrar .coluna-numero {
+            background: rgba(255, 125, 0, 0.12);
+            color: var(--cor-laranja);
+        }
+
+        .card-coluna.coluna-entregar .coluna-numero {
+            background: rgba(224, 26, 79, 0.12);
+            color: var(--cor-magenta);
+        }
+
+        .card-coluna.coluna-pertencer .coluna-numero {
+            background: rgba(0, 188, 212, 0.12);
+            color: var(--cor-ciano);
+        }
+
+        .coluna-icon-symbol {
+            font-size: 1.4rem;
+            opacity: 0.85;
+        }
+
+        .coluna-titulo {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: 12px;
+            letter-spacing: -0.3px;
+        }
+
+        .coluna-subtitulo {
+            font-size: 1.05rem;
+            font-weight: 700;
+            font-style: italic;
+            margin-bottom: 16px;
+            line-height: 1.45;
+        }
+
+        .card-coluna.coluna-acolher .coluna-subtitulo { color: var(--cor-roxo); }
+        .card-coluna.coluna-integrar .coluna-subtitulo { color: var(--cor-laranja); }
+        .card-coluna.coluna-entregar .coluna-subtitulo { color: var(--cor-magenta); }
+        .card-coluna.coluna-pertencer .coluna-subtitulo { color: var(--cor-ciano); }
+
+        .coluna-texto {
+            font-size: 0.92rem;
+            color: var(--cor-texto-mutado);
+            line-height: 1.6;
+            font-weight: 400;
+            margin-top: auto;
+        }
+
+        /* ==================================================
+           SEÇÃO 3: NOSSOS HORÁRIOS DE CULTO
+           ================================================== */
+        .section-cultos {
+            background: #ffffff;
+            position: relative;
+        }
+
+        .cultos-container-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            align-items: stretch;
+        }
+
+        .card-culto-principal {
+            background: linear-gradient(145deg, #1c1c21 0%, #24242b 100%);
+            border-radius: var(--borda-raio);
+            padding: 44px 38px;
+            color: #ffffff;
+            position: relative;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .card-culto-principal::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: var(--cor-ciano);
+            border-radius: var(--borda-raio) var(--borda-raio) 0 0;
+        }
+
+        .culto-badge-topo {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(0, 188, 212, 0.16);
+            color: var(--cor-ciano);
+            margin-bottom: 24px;
+            align-self: flex-start;
+        }
+
+        .culto-horario-grande {
+            font-size: clamp(2.4rem, 4vw, 3.4rem);
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.1;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+
+        .culto-horario-grande span {
+            color: var(--cor-ciano);
+        }
+
+        .culto-nome {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #e5e7eb;
+            margin-bottom: 16px;
+        }
+
+        .culto-info-detalhe {
+            color: #9ca3af;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-top: 16px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Card Destaque Santa Ceia */
+        .card-culto-ceia {
+            background: linear-gradient(145deg, #fff7ed 0%, #ffedd5 100%);
+            border-radius: var(--borda-raio);
+            padding: 44px 38px;
+            position: relative;
+            box-shadow: 0 16px 36px rgba(255, 125, 0, 0.12);
+            border: 2px solid rgba(255, 125, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-culto-ceia::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: var(--cor-laranja);
+            border-radius: var(--borda-raio) var(--borda-raio) 0 0;
+        }
+
+        .ceia-badge-aviso {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(255, 125, 0, 0.18);
+            color: #c2410c;
+            margin-bottom: 24px;
+            align-self: flex-start;
+        }
+
+        .ceia-horario-grande {
+            font-size: clamp(2.4rem, 4vw, 3.4rem);
+            font-weight: 800;
+            color: #7c2d12;
+            line-height: 1.1;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+
+        .ceia-horario-grande span {
+            color: var(--cor-laranja);
+        }
+
+        .ceia-nome {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #9a3412;
+            margin-bottom: 16px;
+        }
+
+        .ceia-aviso-box {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            border-left: 5px solid var(--cor-laranja);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-top: 16px;
+        }
+
+        .ceia-aviso-texto {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #9a3412;
+            line-height: 1.45;
+        }
+
+        /* ==================================================
+           SEÇÃO 4: ONDE ESTAMOS (ENDEREÇO & LOCALIZAÇÃO)
+           ================================================== */
+        .section-onde-estamos {
+            background-color: var(--cor-claro);
+            position: relative;
+        }
+
+        .endereco-card {
+            background: #ffffff;
+            border-radius: var(--borda-raio);
+            box-shadow: var(--sombra-card);
+            padding: clamp(36px, 5vw, 56px);
+            border: 1px solid #edf2f7;
+            text-align: center;
+            max-width: 960px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .endereco-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--cor-roxo), var(--cor-ciano));
+        }
+
+        .endereco-pin-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(0, 188, 212, 0.12);
+            color: var(--cor-ciano);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            margin: 0 auto 24px;
+        }
+
+        .endereco-texto-principal {
+            font-size: clamp(1.4rem, 2.6vw, 2.1rem);
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+
+        .endereco-cidade-cep {
+            font-size: 1.15rem;
+            color: var(--cor-texto-mutado);
+            font-weight: 600;
+            margin-bottom: 36px;
+        }
+
+        .endereco-acoes-grid {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .btn-acao-mapa {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 28px;
+            border-radius: 999px;
+            font-size: 0.98rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.25s ease;
+        }
+
+        .btn-maps-primario {
+            background: linear-gradient(135deg, var(--cor-ciano), #0097a7);
+            color: #ffffff;
+            box-shadow: 0 6px 20px rgba(0, 188, 212, 0.35);
+        }
+
+        .btn-maps-primario:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 188, 212, 0.55);
+        }
+
+        .btn-maps-copiar {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+        }
+
+        .btn-maps-copiar:hover {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .btn-maps-copiar.btn-copiado {
+            background: #10b981 !important;
+            color: #ffffff !important;
+            border-color: #10b981 !important;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-maps-waze {
+            background: #33ccff;
+            color: #ffffff;
+            box-shadow: 0 6px 20px rgba(51, 204, 255, 0.3);
+        }
+
+        .btn-maps-waze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(51, 204, 255, 0.5);
+        }
+
+        .feedback-copia {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #10b981;
+            margin-top: 14px;
+            min-height: 22px;
+            transition: opacity 0.2s ease;
+        }
+
+        /* ==================================================
+           RODAPÉ (FOOTER) & CONTATOS DA SECRETARIA E TESOURARIA
+           ================================================== */
+        .footer-curados {
+            background-color: var(--cor-escuro);
+            color: #d1d5db;
+            padding: 80px 0 36px;
+            position: relative;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1.4fr 1.6fr 1fr;
+            gap: 48px;
+            margin-bottom: 60px;
+        }
+
+        .footer-col-sobre {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .footer-logo-box {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .footer-logo-box img {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+        }
+
+        .footer-logo-text {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: 2px;
+        }
+
+        .footer-logo-text span {
+            color: var(--cor-ciano);
+        }
+
+        .footer-sobre-desc {
+            font-size: 0.92rem;
+            color: #9ca3af;
+            line-height: 1.65;
+        }
+
+        .footer-titulo-col {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 22px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .footer-titulo-col::after {
+            content: "";
+            position: absolute;
+            bottom: -6px;
+            left: 0;
+            width: 32px;
+            height: 3px;
+            background: var(--cor-ciano);
+            border-radius: 2px;
+        }
+
+        /* Cards de Contato (Secretaria e Tesouraria) */
+        .contatos-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .card-contato-footer {
+            background: var(--cor-card-dark);
+            border-radius: 18px;
+            padding: 20px 22px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            transition: all 0.25s ease;
+        }
+
+        .card-contato-footer:hover {
+            border-color: rgba(255, 255, 255, 0.22);
+            transform: translateX(4px);
+        }
+
+        .contato-info-texto {
+            flex: 1;
+        }
+
+        .contato-cargo-tag {
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .contato-cargo-tag.secretaria { color: var(--cor-ciano); }
+        .contato-cargo-tag.tesouraria { color: var(--cor-laranja); }
+
+        .contato-numero-tel {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #ffffff;
+            text-decoration: none;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .contato-desc-funcao {
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+
+        .btn-whatsapp-contato {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #25d366;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-whatsapp-contato:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 18px rgba(37, 211, 102, 0.5);
+        }
+
+        /* Coluna Links Rápidos */
+        .footer-links-lista {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .footer-links-lista a {
+            color: #9ca3af;
+            text-decoration: none;
+            font-size: 0.92rem;
+            font-weight: 500;
+            transition: color 0.2s ease, transform 0.2s ease;
+            display: inline-block;
+        }
+
+        .footer-links-lista a:hover {
+            color: var(--cor-ciano);
+            transform: translateX(4px);
+        }
+
+        .link-destaque-secretaria {
+            color: #c084fc !important;
+            font-weight: 700 !important;
+        }
+
+        /* Linha Inferior de Copyright */
+        .footer-bottom {
+            padding-top: 32px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+
+        .footer-bottom a {
+            color: #9ca3af;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-bottom a:hover {
+            color: var(--cor-ciano);
+        }
+
+        /* ==================================================
+           RESPONSIVIDADE
+           ================================================== */
         @media (max-width: 1024px) {
             .banner-curados {
                 min-height: 620px;
@@ -156,10 +1081,31 @@
             .banner-text h1 {
                 font-size: 6rem;
             }
+            .essencia-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            .colunas-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
+            .cultos-container-grid {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+            .footer-grid {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
         }
 
-        /* Responsividade para Celular e Telas Menores */
         @media (max-width: 768px) {
+            .navbar-nav {
+                display: none; /* Em telas compactas, foco no botão de ação */
+            }
+            #btn-mobile-sec {
+                display: inline-flex !important;
+            }
             .banner-curados {
                 min-height: auto;
                 padding: 65px 20px 75px;
@@ -198,13 +1144,61 @@
                 font-size: clamp(4.4rem, 13vw, 5.8rem);
                 letter-spacing: 2px;
             }
+            .section {
+                padding: 70px 0;
+            }
+            .colunas-grid {
+                grid-template-columns: 1fr;
+            }
+            .endereco-acoes-grid {
+                flex-direction: column;
+                width: 100%;
+            }
+            .btn-acao-mapa {
+                width: 100%;
+                justify-content: center;
+            }
+            .card-contato-footer {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .btn-whatsapp-contato {
+                align-self: flex-start;
+                width: 100%;
+                border-radius: 12px;
+                height: 40px;
+                gap: 8px;
+                font-size: 0.95rem;
+                font-weight: 700;
+            }
+            .btn-whatsapp-contato span {
+                display: inline;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- Seção do Banner Inicial -->
-    <section class="banner-curados">
+    <!-- Barra de Navegação Superior -->
+    <nav class="navbar-curados">
+        <a href="#top" class="navbar-brand">
+            <img src="logo.png" alt="Logo Curados">
+            <span>CURADOS</span>
+        </a>
+        <ul class="navbar-nav">
+            <li><a href="#quem-somos">Quem Somos</a></li>
+            <li><a href="#colunas">Nossas Colunas</a></li>
+            <li><a href="#cultos">Horários de Culto</a></li>
+            <li><a href="#onde-estamos">Onde Estamos</a></li>
+            <li><a href="#contato">Contatos</a></li>
+            <li><a href="/secretaria" class="btn-nav-secretaria">Painel Secretaria</a></li>
+        </ul>
+        <a href="/secretaria" class="btn-nav-secretaria" style="display: none;" id="btn-mobile-sec">Painel</a>
+    </nav>
+
+    <!-- 1. Seção do Banner Inicial (Hero) -->
+    <section class="banner-curados" id="top">
         <div class="banner-container">
             <!-- Logotipo oficial posicionado na borda com efeito bleed -->
             <div class="logo-wrapper">
@@ -220,5 +1214,377 @@
         </div>
     </section>
 
+    <!-- 2. Seção "Quem Somos / Nossa Essência" -->
+    <section class="section section-essencia" id="quem-somos">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge badge-ciano">Nossa Essência</span>
+                <h2 class="section-title">Quem Somos</h2>
+                <p class="section-subtitle">Conheça o coração e o chamado que norteiam cada passo da Comunidade Cristã Curados.</p>
+            </div>
+
+            <!-- Bloco de Frase Principal em Destaque -->
+            <div class="frase-destaque-wrapper">
+                <span class="frase-destaque-badge">Nosso Chamado</span>
+                <h3 class="frase-destaque-texto">
+                    "Somos uma igreja que <span class="gradiente">expressa a Deus através das artes</span>."
+                </h3>
+            </div>
+
+            <!-- 3 Cartões de Essência (Prioridade, Propósito, Paixão) -->
+            <div class="essencia-grid">
+                <!-- Card 1: Prioridade -->
+                <div class="card-essencia prioridade">
+                    <div class="card-essencia-header">
+                        <div class="card-essencia-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                        </div>
+                        <span class="card-essencia-tag">Prioridade</span>
+                    </div>
+                    <h4 class="card-essencia-titulo">Amar a Deus</h4>
+                    <p class="card-essencia-desc">
+                        Nosso primeiro e mais alto chamado. Tudo o que fazemos, cada louvor, serviço e expressão artística, nasce de uma devoção profunda e sincera ao Criador.
+                    </p>
+                </div>
+
+                <!-- Card 2: Propósito -->
+                <div class="card-essencia proposito">
+                    <div class="card-essencia-header">
+                        <div class="card-essencia-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                            </svg>
+                        </div>
+                        <span class="card-essencia-tag">Propósito</span>
+                    </div>
+                    <h4 class="card-essencia-titulo">Cuidar da Família</h4>
+                    <p class="card-essencia-desc">
+                        A família é a base e o projeto sagrado de Deus. Investimos na formação de lares fortes, restaurados e edificados na rocha, acolhendo gerações inteiras.
+                    </p>
+                </div>
+
+                <!-- Card 3: Paixão -->
+                <div class="card-essencia paixao">
+                    <div class="card-essencia-header">
+                        <div class="card-essencia-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                            </svg>
+                        </div>
+                        <span class="card-essencia-tag">Paixão</span>
+                    </div>
+                    <h4 class="card-essencia-titulo">Servir Pessoas</h4>
+                    <p class="card-essencia-desc">
+                        Amor prático traduzido em serviço. Nossa alegria está em estender as mãos, curar feridas, compartilhar graça e fazer a diferença na vida do nosso próximo.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Seção "Nossas Colunas" -->
+    <section class="section section-colunas" id="colunas">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge badge-roxo">Pilares Fundamentais</span>
+                <h2 class="section-title">Nossas Colunas</h2>
+                <p class="section-subtitle">Os alicerces que sustentam a nossa fé, os nossos ministérios e a nossa vida em comunidade.</p>
+            </div>
+
+            <div class="colunas-grid">
+                <!-- Coluna 1: Acolher -->
+                <div class="card-coluna coluna-acolher">
+                    <div class="card-coluna-header">
+                        <span class="coluna-numero">01</span>
+                        <span class="coluna-icon-symbol">🤝</span>
+                    </div>
+                    <h3 class="coluna-titulo">Acolher</h3>
+                    <p class="coluna-subtitulo">"Ainda há lugar na mesa para você"</p>
+                    <p class="coluna-texto">
+                        Recebemos cada pessoa de braços abertos, celebrando vidas sem qualquer preconceito. A mesa da comunhão tem sempre espaço para você e sua família.
+                    </p>
+                </div>
+
+                <!-- Coluna 2: Integrar -->
+                <div class="card-coluna coluna-integrar">
+                    <div class="card-coluna-header">
+                        <span class="coluna-numero">02</span>
+                        <span class="coluna-icon-symbol">🌱</span>
+                    </div>
+                    <h3 class="coluna-titulo">Integrar</h3>
+                    <p class="coluna-subtitulo">"De visitantes à participantes."</p>
+                    <p class="coluna-texto">
+                        Mais do que assistir a um culto: caminhar juntos. Conectamos corações em redes de discipulado, aprendizado bíblico e relacionamentos verdadeiros.
+                    </p>
+                </div>
+
+                <!-- Coluna 3: Entregar -->
+                <div class="card-coluna coluna-entregar">
+                    <div class="card-coluna-header">
+                        <span class="coluna-numero">03</span>
+                        <span class="coluna-icon-symbol">✨</span>
+                    </div>
+                    <h3 class="coluna-titulo">Entregar</h3>
+                    <p class="coluna-subtitulo">"Totalmente entregues à Sua obra."</p>
+                    <p class="coluna-texto">
+                        Colocamos nossos dons, talentos artísticos e recursos à disposição do Reino de Deus com excelência, paixão e total dedicação ao propósito eterno.
+                    </p>
+                </div>
+
+                <!-- Coluna 4: Pertencer -->
+                <div class="card-coluna coluna-pertencer">
+                    <div class="card-coluna-header">
+                        <span class="coluna-numero">04</span>
+                        <span class="coluna-icon-symbol">🛡️</span>
+                    </div>
+                    <h3 class="coluna-titulo">Pertencer</h3>
+                    <p class="coluna-subtitulo">"Não só um lugar para frequentar, mas uma família para pertencer."</p>
+                    <p class="coluna-texto">
+                        Criamos raízes e laços inquebráveis de fraternidade. Aqui você encontra suporte espiritual, pastoreio zeloso e o calor acolhedor de uma verdadeira família.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Seção "Nossos Horários de Culto" -->
+    <section class="section section-cultos" id="cultos">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge badge-laranja">Celebração & Comunhão</span>
+                <h2 class="section-title">Horários de Culto</h2>
+                <p class="section-subtitle">Reunimo-nos semanalmente para adorar a Deus, ouvir a Palavra e celebrar o amor de Cristo.</p>
+            </div>
+
+            <div class="cultos-container-grid">
+                <!-- Culto Principal -->
+                <div class="card-culto-principal">
+                    <div>
+                        <span class="culto-badge-topo">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/>
+                            </svg>
+                            Culto Semanal
+                        </span>
+                        <h3 class="culto-horario-grande">Domingos às <span>18h</span></h3>
+                        <h4 class="culto-nome">Culto de Celebração</h4>
+                    </div>
+                    <p class="culto-info-detalhe">
+                        Ambiente acolhedor e preparado para toda a sua família. Contamos com ministério infantil dedicado para que as crianças também vivenciem o evangelho com alegria.
+                    </p>
+                </div>
+
+                <!-- Destaque Especial: Santa Ceia -->
+                <div class="card-culto-ceia">
+                    <div>
+                        <span class="ceia-badge-aviso">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                            </svg>
+                            Aviso Especial do Mês
+                        </span>
+                        <h3 class="ceia-horario-grande">1º Domingo às <span>08h30</span></h3>
+                        <h4 class="ceia-nome">Culto da Santa Ceia</h4>
+                    </div>
+                    <div class="ceia-aviso-box">
+                        <p class="ceia-aviso-texto">
+                            "No primeiro domingo do mês temos Santa Ceia às 08h30 (não há culto à noite)."
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. Seção "Onde Estamos" -->
+    <section class="section section-onde-estamos" id="onde-estamos">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge badge-magenta">Localização</span>
+                <h2 class="section-title">Onde Estamos</h2>
+                <p class="section-subtitle">Venha nos visitar! Ficaremos muito felizes em receber você e sua família na nossa casa.</p>
+            </div>
+
+            <div class="endereco-card">
+                <div class="endereco-pin-icon">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                </div>
+                <h3 class="endereco-texto-principal">
+                    R. Benedicto de Abreu Júnior, 40
+                </h3>
+                <p class="endereco-cidade-cep">
+                    Jardim Nova Itapevi, Itapevi - SP, 06694-000
+                </p>
+
+                <div class="endereco-acoes-grid">
+                    <a href="https://maps.google.com/?q=Rua+Benedicto+de+Abreu+J%C3%BAnior,+40+-+Jardim+Nova+Itapevi,+Itapevi+-+SP,+06694-000" 
+                       target="_blank" rel="noopener noreferrer" class="btn-acao-mapa btn-maps-primario">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                        </svg>
+                        Abrir no Google Maps
+                    </a>
+
+                    <a href="https://waze.com/ul?q=Rua+Benedicto+de+Abreu+Junior+40+Itapevi" 
+                       target="_blank" rel="noopener noreferrer" class="btn-acao-mapa btn-maps-waze">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                        </svg>
+                        Como Chegar via Waze
+                    </a>
+
+                    <button type="button" class="btn-acao-mapa btn-maps-copiar" id="btnCopiarEndereco" onclick="copiarEndereco()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                        Copiar Endereço
+                    </button>
+                </div>
+
+                <div id="feedbackCopia" class="feedback-copia"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. Rodapé com Informações Institucionais e Contatos (Secretaria e Tesouraria) -->
+    <footer class="footer-curados" id="contato">
+        <div class="container">
+            <div class="footer-grid">
+                <!-- Coluna 1: Sobre e Logo -->
+                <div class="footer-col-sobre">
+                    <div class="footer-logo-box">
+                        <img src="logo.png" alt="Logotipo Curados">
+                        <span class="footer-logo-text">CURADOS</span>
+                    </div>
+                    <p class="footer-sobre-desc">
+                        Uma igreja que expressa a Deus através das artes. Lugar de cura, restauração e propósito para toda a sua família.
+                    </p>
+                    <p class="footer-sobre-desc" style="font-size: 0.85rem; color: #6b7280;">
+                        R. Benedicto de Abreu Júnior, 40<br>
+                        Jardim Nova Itapevi, Itapevi - SP
+                    </p>
+                </div>
+
+                <!-- Coluna 2: Canais de Contato Diretos (Secretaria & Tesouraria) -->
+                <div>
+                    <h3 class="footer-titulo-col">Canais de Contato</h3>
+                    <div class="contatos-wrapper">
+                        <!-- Contato Secretaria -->
+                        <div class="card-contato-footer">
+                            <div class="contato-info-texto">
+                                <span class="contato-cargo-tag secretaria">Secretaria Pastoral & Administrativa</span>
+                                <a href="https://wa.me/5511946593056" class="contato-numero-tel" target="_blank" rel="noopener noreferrer">
+                                    (11) 94659-3056
+                                </a>
+                                <span class="contato-desc-funcao">Atendimento geral, informações, agenda e oração</span>
+                            </div>
+                            <a href="https://wa.me/5511946593056" target="_blank" rel="noopener noreferrer" 
+                               class="btn-whatsapp-contato" title="Conversar no WhatsApp com a Secretaria" aria-label="WhatsApp Secretaria">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24m4.52 11.64c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.03-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.12-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.59.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z"/>
+                                </svg>
+                                <span style="display: none; font-size: 0.85rem;">Falar no WhatsApp</span>
+                            </a>
+                        </div>
+
+                        <!-- Contato Tesouraria -->
+                        <div class="card-contato-footer">
+                            <div class="contato-info-texto">
+                                <span class="contato-cargo-tag tesouraria">Tesouraria & Finanças</span>
+                                <a href="https://wa.me/5511991117612" class="contato-numero-tel" target="_blank" rel="noopener noreferrer">
+                                    (11) 99111-7612
+                                </a>
+                                <span class="contato-desc-funcao">Dízimos, ofertas, apoios ministeriais e demandas financeiras</span>
+                            </div>
+                            <a href="https://wa.me/5511991117612" target="_blank" rel="noopener noreferrer" 
+                               class="btn-whatsapp-contato" title="Conversar no WhatsApp com a Tesouraria" aria-label="WhatsApp Tesouraria">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24m4.52 11.64c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.03-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.12-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.59.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z"/>
+                                </svg>
+                                <span style="display: none; font-size: 0.85rem;">Falar no WhatsApp</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coluna 3: Links Rápidos -->
+                <div>
+                    <h3 class="footer-titulo-col">Navegação</h3>
+                    <ul class="footer-links-lista">
+                        <li><a href="#top">Início</a></li>
+                        <li><a href="#quem-somos">Quem Somos / Essência</a></li>
+                        <li><a href="#colunas">Nossas Colunas</a></li>
+                        <li><a href="#cultos">Horários de Culto</a></li>
+                        <li><a href="#onde-estamos">Onde Estamos</a></li>
+                        <li><a href="/secretaria" class="link-destaque-secretaria">Painel da Secretaria & Líderes</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Faixa Inferior -->
+            <div class="footer-bottom">
+                <p>&copy; 2026 Comunidade Cristã Curados. Todos os direitos reservados.</p>
+                <div>
+                    <a href="#top">Voltar ao topo &uarr;</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Script para cópia ágil do endereço -->
+    <script>
+        function copiarEndereco() {
+            const texto = "R. Benedicto de Abreu Júnior, 40 - Jardim Nova Itapevi, Itapevi - SP, 06694-000";
+            const btn = document.getElementById("btnCopiarEndereco");
+            const feedback = document.getElementById("feedbackCopia");
+            const htmlOriginal = btn ? btn.innerHTML : "";
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(texto).then(() => {
+                    exibirFeedback();
+                }).catch(() => fallbackCopiar(texto));
+            } else {
+                fallbackCopiar(texto);
+            }
+
+            function exibirFeedback() {
+                if (btn) {
+                    btn.classList.add("btn-copiado");
+                    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Copiado!';
+                    setTimeout(() => {
+                        btn.classList.remove("btn-copiado");
+                        btn.innerHTML = htmlOriginal;
+                    }, 3500);
+                }
+                if (feedback) {
+                    feedback.textContent = "✓ Endereço copiado para a área de transferência!";
+                    setTimeout(() => {
+                        feedback.textContent = "";
+                    }, 4000);
+                }
+            }
+
+            function fallbackCopiar(val) {
+                const tempInput = document.createElement("textarea");
+                tempInput.value = val;
+                tempInput.style.position = "fixed";
+                tempInput.style.left = "-9999px";
+                document.body.appendChild(tempInput);
+                tempInput.focus();
+                tempInput.select();
+                try {
+                    document.execCommand("copy");
+                    exibirFeedback();
+                } catch (e) {
+                    alert("Endereço: " + val);
+                }
+                document.body.removeChild(tempInput);
+            }
+        }
+    </script>
 </body>
 </html>
