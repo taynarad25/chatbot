@@ -139,13 +139,37 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 
       // Navegadores pedem isso sozinhos em toda navegação; sem essa rota, cai no
       // fallback de "404 Not Found" e loga um aviso a cada login/troca de página.
-      if (pathname === '/favicon.ico') {
-        if (faviconBuffer) {
+      if (pathname === '/favicon.ico' || pathname === '/favicon.png') {
+        const iconBuf = fs.existsSync(FAVICON_FILE) ? fs.readFileSync(FAVICON_FILE) : faviconBuffer;
+        if (iconBuf) {
           res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
-          return res.end(faviconBuffer);
+          return res.end(iconBuf);
         }
         res.writeHead(204);
         return res.end();
+      }
+
+      // Servir imagens estáticas (logo, favicon sob /images/)
+      if (req.method === 'GET' && (pathname === '/images/logo.png' || pathname === '/images/favicon.png' || pathname === '/public/images/logo.png')) {
+        const cleanPath = pathname.replace(/^\/public/, '');
+        const imgPath = path.join(__dirname, 'public', cleanPath);
+        const webImgPath = path.join(__dirname, 'web', 'public', cleanPath);
+        const fileToRead = fs.existsSync(imgPath) ? imgPath : (fs.existsSync(webImgPath) ? webImgPath : null);
+        if (fileToRead) {
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+          return res.end(fs.readFileSync(fileToRead));
+        }
+      }
+
+      // Servir manifest.json (PWA)
+      if (req.method === 'GET' && (pathname === '/manifest.json' || pathname === '/site.webmanifest')) {
+        const manifestPath = fs.existsSync(path.join(__dirname, 'public', 'manifest.json'))
+          ? path.join(__dirname, 'public', 'manifest.json')
+          : path.join(__dirname, 'web', 'public', 'manifest.json');
+        if (fs.existsSync(manifestPath)) {
+          res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8' });
+          return res.end(fs.readFileSync(manifestPath));
+        }
       }
 
       // Servir logo da Comunidade Cristã Curados

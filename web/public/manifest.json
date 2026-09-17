@@ -1,0 +1,22 @@
+{
+  "name": "Comunidade Cristã Curados",
+  "short_name": "Curados",
+  "description": "Comunidade Cristã Curados - Sistema de Controle e Secretaria",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e1e1e",
+  "theme_color": "#00bcd4",
+  "icons": [
+    {
+      "src": "/images/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png"
+    }
+  ]
+}

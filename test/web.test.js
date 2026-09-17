@@ -50,11 +50,13 @@ async function fazerLogin(username, password) {
   return { res, cookie: extraiCookie(res) };
 }
 
-test("GET /secretaria/login: retorna a página de login com status 200", async () => {
+test("GET /secretaria/login: retorna a página de login com status 200 e favicon atualizado", async () => {
   const res = await fetch(`${baseUrl}/secretaria/login`);
   assert.equal(res.status, 200);
   const html = await res.text();
   assert.match(html, /<form id="loginForm">/);
+  assert.match(html, /<link rel="icon" type="image\/png" href="\/images\/logo\.png"/);
+  assert.match(html, /<link rel="manifest" href="\/manifest\.json"/);
 });
 
 test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404", async () => {
@@ -63,6 +65,23 @@ test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404", async () => {
   assert.equal(res.headers.get("content-type"), "image/png");
   const buffer = Buffer.from(await res.arrayBuffer());
   assert.ok(buffer.length > 0, "o favicon deveria ter conteúdo");
+});
+
+test("GET /images/logo.png: serve a imagem do favicon/logo com status 200", async () => {
+  const res = await fetch(`${baseUrl}/images/logo.png`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/png");
+  const buffer = Buffer.from(await res.arrayBuffer());
+  assert.ok(buffer.length > 0, "o ícone em /images/logo.png deveria ter conteúdo");
+});
+
+test("GET /manifest.json: serve o manifesto PWA com status 200", async () => {
+  const res = await fetch(`${baseUrl}/manifest.json`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type"), /application\/manifest\+json/);
+  const json = await res.json();
+  assert.equal(json.name, "Comunidade Cristã Curados");
+  assert.ok(json.icons.some(i => i.src === "/images/logo.png"));
 });
 
 test("GET /home: retorna a página institucional da Comunidade Cristã Curados com status 200", async () => {
