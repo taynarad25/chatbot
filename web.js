@@ -15,6 +15,13 @@ const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 
 const LOG_FILE = process.env.COMBINED_LOG_PATH || path.join(__dirname, "combined.log");
 const FAVICON_FILE = path.join(__dirname, "web", "public", "favicon.png");
 const faviconBuffer = fs.existsSync(FAVICON_FILE) ? fs.readFileSync(FAVICON_FILE) : null;
+const LOGO_FILE = fs.existsSync(path.join(__dirname, "public", "logo.png"))
+  ? path.join(__dirname, "public", "logo.png")
+  : path.join(__dirname, "web", "public", "logo.png");
+const logoBuffer = fs.existsSync(LOGO_FILE) ? fs.readFileSync(LOGO_FILE) : null;
+const HOME_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "home.html"))
+  ? path.join(__dirname, "public", "home.html")
+  : path.join(__dirname, "web", "public", "home.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -139,6 +146,33 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         }
         res.writeHead(204);
         return res.end();
+      }
+
+      // Servir logo da Comunidade Cristã Curados
+      if (req.method === 'GET' && (pathname === '/logo.png' || pathname === '/public/logo.png' || pathname === '/home/logo.png')) {
+        if (logoBuffer) {
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+          return res.end(logoBuffer);
+        }
+        if (fs.existsSync(LOGO_FILE)) {
+          const buf = fs.readFileSync(LOGO_FILE);
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+          return res.end(buf);
+        }
+      }
+
+      // Rota /home: Página institucional da Comunidade Cristã Curados
+      if (req.method === 'GET' && (pathname === '/home' || pathname === '/home/' || pathname === '/home.html')) {
+        if (fs.existsSync(HOME_HTML_FILE)) {
+          const content = fs.readFileSync(HOME_HTML_FILE, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
+          });
+          return res.end(content);
+        }
       }
 
       if (req.method === 'GET' && pathname === '/secretaria/login') {

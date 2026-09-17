@@ -65,6 +65,25 @@ test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404", async () => {
   assert.ok(buffer.length > 0, "o favicon deveria ter conteúdo");
 });
 
+test("GET /home: retorna a página institucional da Comunidade Cristã Curados com status 200", async () => {
+  const res = await fetch(`${baseUrl}/home`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type"), /text\/html/);
+  const html = await res.text();
+  assert.match(html, /COMUNIDADE CRISTÃ/);
+  assert.match(html, /CURADOS/);
+  assert.match(html, /<img\s+src="(\/)?logo\.png"/);
+  assert.match(html, /logo-img-anim/);
+});
+
+test("GET /logo.png: serve a imagem oficial do logotipo (PNG) com status 200", async () => {
+  const res = await fetch(`${baseUrl}/logo.png`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/png");
+  const buffer = Buffer.from(await res.arrayBuffer());
+  assert.ok(buffer.length > 0, "o logo deveria ter conteúdo");
+});
+
 test("GET /secretaria/register: retorna a página de cadastro com status 200", async () => {
   const res = await fetch(`${baseUrl}/secretaria/register`);
   assert.equal(res.status, 200);

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comunidade Cristã Curados</title>
+    
+    <!-- Importando a fonte Montserrat com as variações 400, 600 e 800 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --cor-ciano: #00bcd4;
+            --cor-roxo: #7b2cbf;
+            --cor-laranja: #ff7d00;
+            --cor-magenta: #e01a4f;
+            --cor-escuro: #1e1e1e;
+            --cor-claro: #f8f9fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        body {
+            background-color: var(--cor-claro);
+            color: #333;
+        }
+
+        /* Banner Principal (Hero) */
+        .banner-curados {
+            background-color: var(--cor-escuro);
+            padding: 100px 5%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 500px;
+            overflow: hidden;
+        }
+
+        .banner-container {
+            display: flex;
+            align-items: center;
+            gap: 50px;
+            max-width: 1000px;
+            width: 100%;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Animações */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(25px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Textos do Banner */
+        .banner-text {
+            animation: fadeInUp 1s ease-out forwards;
+            color: #ffffff;
+            text-align: left;
+        }
+
+        .banner-text h2 {
+            font-size: 2.2rem;
+            font-weight: 400; /* Regular */
+            margin-bottom: 5px;
+        }
+
+        .banner-text h2 .highlight {
+            color: var(--cor-magenta);
+            font-weight: 600; /* SemiBold */
+        }
+
+        .banner-text h3 {
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+            color: #b0b0b0;
+            margin-bottom: 10px;
+            font-weight: 600; /* SemiBold */
+        }
+
+        .banner-text h1 {
+            font-size: 4rem;
+            font-weight: 800; /* ExtraBold */
+            color: var(--cor-ciano);
+            letter-spacing: 1px;
+        }
+
+        /* Logotipo com Animação de Flutuação Suave */
+        .logo-img-anim {
+            width: 200px;
+            height: 200px;
+            max-width: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.4));
+            animation: float 4s ease-in-out infinite;
+            user-select: none;
+        }
+
+        /* Responsividade para Celular */
+        @media (max-width: 768px) {
+            .banner-text h1 { font-size: 2.8rem; }
+            .banner-text h2 { font-size: 1.6rem; }
+            .banner-container { text-align: center; }
+            .banner-text { text-align: center; }
+            .logo-img-anim {
+                width: 150px;
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Seção do Banner Inicial -->
+    <section class="banner-curados">
+        <div class="banner-container">
+            <!-- Imagem oficial do logo com animação suave -->
+            <img src="logo.png" alt="Logotipo Comunidade Cristã Curados" class="logo-img-anim">
+
+            <!-- Textos estilizados com Montserrat -->
+            <div class="banner-text">
+                <h2>Seja <span class="highlight">bem-vindo</span> à</h2>
+                <h3>COMUNIDADE CRISTÃ</h3>
+                <h1>CURADOS</h1>
+            </div>
+        </div>
+    </section>
+
+</body>
+</html>
