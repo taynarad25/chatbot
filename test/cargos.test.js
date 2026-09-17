@@ -168,7 +168,7 @@ test("Rota alias /secretaria/api/admin/usuarios funciona de forma idêntica", as
 // 3. LÓGICA DO BOT & VALIDAÇÃO DE MÚLTIPLAS PERMISSÕES
 // ============================================================================
 
-function criarBotHarness(usuariosCadastrados = []) {
+function criarBotHarness(usuariosCadastrados = [], { calendarEvents = [], agendasParaLer = [] } = {}) {
   const etapas = {};
   const respostasEnviadas = [];
 
@@ -181,10 +181,10 @@ function criarBotHarness(usuariosCadastrados = []) {
   const handleMessage = createMessageHandler({
     client,
     calendar: {},
-    agendasParaLer: [],
+    agendasParaLer,
     lideres: [],
     etapas,
-    buscarEventos: async () => [],
+    buscarEventos: async () => calendarEvents,
     listLideres: () => usuariosCadastrados,
   });
 
@@ -320,4 +320,51 @@ test("Simulação Bot: usuário com cargo 'diretor' recebe e acessa Área da Dir
 
   const [resp8] = await bot.enviarMsg(NUMERO, "8");
   assert.match(resp8, /📋 \*Área da Direção\*/);
+  assert.match(resp8, /1️⃣ Ver todos os eventos da igreja/);
+});
+
+test("Simulação Bot: diretor consulta 'Ver todos os eventos da igreja' e visualiza agendas internas", async () => {
+  const { AGENDAS_INTERNAS } = require("../bot/agendasInternas");
+  const eventoDiretoria = {
+    id: "reuniao-diretoria-1",
+    summary: "Reunião de Diretoria e Planejamento",
+    calendarId: AGENDAS_INTERNAS.REUNIOES,
+    start: { dateTime: "2026-11-20T19:30:00-03:00" },
+    end: { dateTime: "2026-11-20T21:30:00-03:00" },
+    location: "Igreja",
+  };
+
+  const bot = criarBotHarness(
+    [
+      {
+        nome: "Diretora Fabiana",
+        telefone: "5511977770004",
+        cargos: ["diretor"],
+      },
+    ],
+    {
+      calendarEvents: [eventoDiretoria],
+      agendasParaLer: [
+        "agenda-0", "agenda-1", "agenda-2", "agenda-3", "agenda-4",
+        "agenda-5", "agenda-6", "agenda-7", "agenda-8", "agenda-9",
+        "agenda-10", AGENDAS_INTERNAS.REUNIOES, AGENDAS_INTERNAS.ATENDIMENTO,
+      ],
+    }
+  );
+
+  const NUMERO = "5511977770004@c.us";
+
+  // 1. Entra na Área da Direção
+  const [resp8] = await bot.enviarMsg(NUMERO, "8");
+  assert.match(resp8, /1️⃣ Ver todos os eventos da igreja/);
+
+  // 2. Escolhe opção 1 (Ver todos os eventos)
+  const [r1] = await bot.enviarMsg(NUMERO, "1");
+  assert.match(r1, /Ver Todos os Eventos da Igreja/);
+
+  // 3. Escolhe o mês de Novembro (mês 11)
+  const [r2, r3] = await bot.enviarMsg(NUMERO, "11");
+  const msgEventos = r3 || r2;
+  // A reunião de diretoria DEVE constar para o diretor
+  assert.match(msgEventos, /Reunião de Diretoria e Planejamento/);
 });

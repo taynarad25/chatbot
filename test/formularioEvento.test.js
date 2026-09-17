@@ -250,6 +250,13 @@ test("processarRespostaFormulario: fluxo completo com resposta SIM para ministé
   assert.match(gruposNotificados[0], new RegExp(`\\+55 11 99111-7612`));
   assert.match(gruposNotificados[0], /https:\/\/docs\.google\.com\/document\/d\/teste-doc-123\/edit/);
   assert.match(gruposNotificados[0], /Café dos Homens/);
+  assert.match(gruposNotificados[0], /08:00 às 11:00/);
+  assert.match(gruposNotificados[0], /Rua Benedicto de Abreu Júnior, 40/);
+  assert.match(gruposNotificados[0], /Resposta para tema/);
+  assert.match(gruposNotificados[0], /Resposta para versiculo/);
+  assert.match(gruposNotificados[0], /Resposta para paleta/);
+  assert.match(gruposNotificados[0], /Resposta para estilo/);
+  assert.match(gruposNotificados[0], /Resposta para prazo_imagem/);
 
   // Notificação direta enviada para o número da tesouraria
   const msgTesouraria = client.mensagensEnviadas.find((m) => m.to && m.to.includes("5511991117612"));

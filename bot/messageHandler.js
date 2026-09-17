@@ -28,6 +28,8 @@ const {
   notificarTesouraria,
   CONTATO_TESOURARIA,
   precisaDeValorDoMinisterio,
+  salvarFormularioEvento,
+  obterFormularioEvento,
 } = require("./formularioEvento");
 
 // Cada "átomo" é uma saudação isolada reconhecida. A mensagem inteira precisa ser só
@@ -1280,12 +1282,119 @@ Escolha uma opção:
             const campo = info.campoParaAtualizar;
             const evento = info.eventoParaAlterar;
             const d = moment.tz(evento.start.dateTime || evento.start.date, "America/Sao_Paulo");
+            const dFim = moment.tz(evento.end?.dateTime || evento.start.dateTime || evento.start.date, "America/Sao_Paulo");
 
             const querTesouraria = campo.id === "precisa_valor_ministerio" && precisaDeValorDoMinisterio(novoValor);
 
             const avisoTesourariaLider = querTesouraria
               ? `\n\n💰 *Aviso da Tesouraria:*\nComo você informou que precisará de recursos do ministério, por favor entre em contato com a tesouraria para alinhamento: *${CONTATO_TESOURARIA}*`
               : "";
+
+            // 1. Carrega formulário existente ou cria base de dados a partir do evento
+            const formExistente = obterFormularioEvento(evento.summary);
+            let payload;
+            if (formExistente && formExistente.payload) {
+              payload = { ...formExistente.payload };
+            } else {
+              payload = {
+                nome_lider: nomeSolicitante(contato, numero),
+                departamento: info.departamento || "",
+                nome_evento: evento.summary,
+                data: d.format("DD/MM/YYYY"),
+                data_solicitada: d.format("DD/MM/YYYY"),
+                horario_inicio: d.format("HH:mm"),
+                horario_termino: dFim.format("HH:mm"),
+                horario_inicio_termino: `${d.format("HH:mm")} às ${dFim.format("HH:mm")}`,
+                local: evento.location || ENDERECO_IGREJA,
+              };
+            }
+
+            // Atualiza campos no payload
+            if (campo.id === "horario_total") {
+              payload.horario_total = novoValor;
+            } else if (campo.id === "publico") {
+              payload.publico = novoValor;
+            } else if (campo.id === "valor_inscricao") {
+              payload.valor_inscricao = novoValor;
+              payload.valor = novoValor;
+            } else if (campo.id === "precisa_valor_ministerio") {
+              payload.precisa_valor_ministerio = novoValor;
+              payload.contato_tesouraria = querTesouraria ? CONTATO_TESOURARIA : "";
+              payload.aviso_tesouraria = querTesouraria ? `Entrar em contato com a tesouraria: ${CONTATO_TESOURARIA}` : "";
+            } else if (campo.id === "tema_versiculo") {
+              payload.tema = novoValor;
+              payload.versiculo = novoValor;
+            } else if (campo.id === "identidade_visual") {
+              payload.paleta = novoValor;
+              payload.cores = novoValor;
+              payload.estilo = novoValor;
+              payload.midias = novoValor;
+            } else if (campo.id === "convidado_louvor") {
+              payload.convidado = novoValor;
+              payload.louvor = novoValor;
+            } else if (campo.id === "decoracao_alimentacao") {
+              payload.decoracao = novoValor;
+              payload.alimentacao = novoValor;
+            } else if (campo.id === "equipe_materiais") {
+              payload.equipe = novoValor;
+              payload.materiais = novoValor;
+            } else if (campo.id === "prazo_imagem") {
+              payload.prazo_imagem = novoValor;
+              payload.divulgacao = novoValor;
+            } else if (campo.id === "cronograma_observacoes") {
+              payload.cronograma = novoValor;
+              payload.observacoes = novoValor;
+            } else if (campo.id === "objetivo_espiritual") {
+              payload.objetivo_espiritual = novoValor;
+              payload.resultado_esperado = novoValor;
+            } else {
+              payload[campo.id] = novoValor;
+              payload.observacoes = payload.observacoes ? `${payload.observacoes} | ${novoValor}` : novoValor;
+            }
+
+            let linkDoc = formExistente?.docUrl || "";
+            let erroDoc = false;
+
+            try {
+              const resDoc = await enviarWebhook(payload);
+              if (resDoc && resDoc.url) {
+                linkDoc = resDoc.url;
+              }
+            } catch (errDoc) {
+              console.error("[Formulário Evento] Erro ao atualizar documento no Webhook:", errDoc);
+              erroDoc = true;
+            }
+
+            salvarFormularioEvento({
+              evento: evento.summary,
+              departamento: info.departamento,
+              data: d.format("DD/MM/YYYY"),
+              solicitanteId: numero,
+              payload,
+              docUrl: linkDoc,
+            });
+
+            // Monta o bloco de mídia e divulgação para o grupo da secretaria
+            const coresVal = payload.cores || payload.paleta;
+            const midiasVal = payload.midias || payload.estilo;
+            const divulgacaoVal = payload.divulgacao || payload.prazo_imagem;
+            const temaVal = payload.tema;
+            const versiculoVal = payload.versiculo;
+
+            const blocoMidiaSecretaria =
+              `\n\n📢 *INFORMAÇÕES DE MÍDIA & COMUNICAÇÃO:*\n` +
+              `📅 *Evento:* ${evento.summary}\n` +
+              `⏰ *Horário:* ${payload.horario_inicio_termino || `${payload.horario_inicio} às ${payload.horario_termino}`}\n` +
+              `📍 *Endereço / Local:* ${payload.local || evento.location || ENDERECO_IGREJA}` +
+              (temaVal ? `\n✨ *Tema:* ${temaVal}` : "") +
+              (versiculoVal ? `\n📖 *Versículo Base:* ${versiculoVal}` : "") +
+              (coresVal ? `\n🎨 *Cores:* ${coresVal}` : "") +
+              (midiasVal ? `\n📱 *Mídias:* ${midiasVal}` : "") +
+              (divulgacaoVal ? `\n📢 *Divulgação:* ${divulgacaoVal}` : "");
+
+            const linhaDocSecretaria = linkDoc
+              ? `\n\n📄 *Documento Oficial Atualizado (Google Docs):*\n${linkDoc}`
+              : (erroDoc ? `\n\n⚠️ *Aviso:* Houve instabilidade ao atualizar o Google Docs automaticamente.` : "");
 
             const notifSecretaria =
               `📝 *ATUALIZAÇÃO DE FORMULÁRIO DE EVENTO*\n\n` +
@@ -1295,6 +1404,8 @@ Escolha uma opção:
               `📆 *Data:* ${d.format("DD/MM/YYYY")}\n` +
               `✏️ *Informação Atualizada:* ${campo.label}\n` +
               `📝 *Novo Conteúdo:* ${novoValor}` +
+              linhaDocSecretaria +
+              blocoMidiaSecretaria +
               (querTesouraria ? `\n\n💰 *Tesouraria:* O líder informou necessidade de verba do ministério. Contato: ${CONTATO_TESOURARIA}` : "");
 
             await notificarSecretaria(client, notifSecretaria);
@@ -1308,16 +1419,18 @@ Escolha uma opção:
                 `🏢 *Depto:* ${info.departamento}\n` +
                 `📆 *Data:* ${d.format("DD/MM/YYYY")}\n` +
                 `📝 *Detalhes:* ${novoValor}\n\n` +
+                (linkDoc ? `📄 *Documento Oficial (Google Docs):*\n${linkDoc}\n\n` : "") +
                 `O líder foi orientado a entrar em contato com você. 🙏`;
               await notificarTesouraria(client, msgTesouraria);
             }
 
             delete etapas[numero];
+            const msgDocLider = linkDoc ? `\n\n📄 *Documento Oficial Atualizado (Google Docs):*\n${linkDoc}` : "";
             return msg.reply(
               `✅ *Formulário Atualizado com Sucesso!*\n\n` +
               `• *Evento:* ${evento.summary}\n` +
               `• *Item Alterado:* ${campo.label}\n` +
-              `• *Novo Valor:* ${novoValor}\n\n` +
+              `• *Novo Valor:* ${novoValor}${msgDocLider}\n\n` +
               `A secretaria foi notificada com a sua atualização. 🙏${avisoTesourariaLider}\n\n` +
               `Digite *menu* para voltar ao menu principal.`
             );
@@ -1877,10 +1990,11 @@ Escolha uma opção:
             const escolha = msg.body.trim();
             if (escolha === "1") {
               info.fluxo = "ver_agenda";
+              info.agendaCompleta = true;
               info.etapa = "escolha_mes";
               const hoje = new Date();
               const mesAtual = hoje.getMonth();
-              let listaMeses = "📅 *Ver Agenda*\n\nPara qual mês você deseja consultar?\n\n";
+              let listaMeses = "📅 *Ver Todos os Eventos da Igreja*\n\nPara qual mês você deseja consultar?\n\n";
               for (let i = mesAtual; i < 12; i++) {
                 listaMeses += `${i + 1} - ${MESES[i]}\n`;
               }
@@ -2399,7 +2513,7 @@ Digite *menu* para voltar ao menu principal.`;
       if (texto === "8" && isDiretor) {
         console.log(`Opção 8 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área da Direção`);
         etapas[numero] = { fluxo: "area_diretor", etapa: "menu_diretor" };
-        const msgSubmenu = `📋 *Área da Direção*\n\nEscolha o que deseja fazer:\n\n1️⃣ Visão geral das agendas\n2️⃣ Falar com a secretaria\n\nDigite *menu* para voltar ao menu principal.`;
+        const msgSubmenu = `📋 *Área da Direção*\n\nEscolha o que deseja fazer:\n\n1️⃣ Ver todos os eventos da igreja\n2️⃣ Falar com a secretaria\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
       }
 

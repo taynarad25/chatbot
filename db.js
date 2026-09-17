@@ -48,6 +48,20 @@ db.exec(`
     id INTEGER PRIMARY KEY CHECK (id = 1),
     active INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS formularios_eventos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evento TEXT NOT NULL,
+    departamento TEXT,
+    data TEXT,
+    solicitanteId TEXT,
+    payload TEXT NOT NULL,
+    docUrl TEXT,
+    criadoEm TEXT,
+    atualizadoEm TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_formularios_evento ON formularios_eventos(evento);
 `);
 
 try {

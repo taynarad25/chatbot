@@ -1,3 +1,5 @@
+const db = require("../db");
+
 const WEBHOOK_GOOGLE_DOCS_URL =
   process.env.WEBHOOK_GOOGLE_DOCS_URL ||
   "https://script.google.com/macros/s/AKfycbxUafGASn73Xvj77v_hzy7A3EzGXCwpEz7S1fzM1KMgFwXM4-HrUn3-VVzM6kjW6yeu6A/exec";
@@ -5,6 +7,66 @@ const WEBHOOK_GOOGLE_DOCS_URL =
 const ENDERECO_IGREJA = "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi";
 const LOCAL_IGREJA_REGEX = /\bigreja\b|\btemplo\b|\bsal[aã]o\b/i;
 const CONTATO_TESOURARIA = "+55 11 99111-7612";
+
+function temConteudoRelevante(valor) {
+  if (!valor) return false;
+  const v = String(valor).trim().toLowerCase();
+  return (
+    v !== "" &&
+    v !== "não" &&
+    v !== "nao" &&
+    v !== "n" &&
+    v !== "nenhum" &&
+    v !== "nenhuma" &&
+    v !== "a definir" &&
+    v !== "a combinar" &&
+    v !== "não tem" &&
+    v !== "nao tem" &&
+    v !== "-"
+  );
+}
+
+function salvarFormularioEvento({ evento, departamento, data, solicitanteId, payload, docUrl }) {
+  try {
+    const agora = new Date().toISOString();
+    const payloadStr = typeof payload === "string" ? payload : JSON.stringify(payload);
+    const existing = db.prepare("SELECT id FROM formularios_eventos WHERE evento = ? ORDER BY id DESC LIMIT 1").get(evento);
+
+    if (existing) {
+      db.prepare(`
+        UPDATE formularios_eventos
+        SET departamento = ?, data = ?, solicitanteId = ?, payload = ?, docUrl = ?, atualizadoEm = ?
+        WHERE id = ?
+      `).run(departamento || "", data || "", solicitanteId || "", payloadStr, docUrl || "", agora, existing.id);
+      return existing.id;
+    } else {
+      const info = db.prepare(`
+        INSERT INTO formularios_eventos (evento, departamento, data, solicitanteId, payload, docUrl, criadoEm, atualizadoEm)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(evento, departamento || "", data || "", solicitanteId || "", payloadStr, docUrl || "", agora, agora);
+      return info.lastInsertRowid;
+    }
+  } catch (err) {
+    console.error("[Formulário Evento] Erro ao salvar formulário no banco:", err.message);
+    return null;
+  }
+}
+
+function obterFormularioEvento(evento) {
+  try {
+    if (!evento) return null;
+    const row = db.prepare("SELECT * FROM formularios_eventos WHERE evento = ? ORDER BY id DESC LIMIT 1").get(evento);
+    if (!row) return null;
+    let payload = {};
+    try {
+      payload = JSON.parse(row.payload);
+    } catch {}
+    return { ...row, payload };
+  } catch (err) {
+    console.error("[Formulário Evento] Erro ao buscar formulário no banco:", err.message);
+    return null;
+  }
+}
 
 function formatarJidWhatsApp(telefone) {
   if (!telefone) return "";
@@ -71,11 +133,17 @@ const PERGUNTAS_DEFINICOES = [
   // 11. Versículo Base (se houver)
   ["versiculo", "📖 *Versículo Base (se houver):*\nQual é o versículo base do evento? (Ou responda *Nenhum* / *Não*)"],
 
-  // 12. Paleta de Cores
-  ["paleta", "🎨 *Paleta de Cores:*\nQuais são as cores da identidade visual do evento? (Ex: Azul, branco e dourado / ou *A definir*)"],
+  // 12. Cores da Identidade Visual (Paleta de Cores)
+  [
+    "paleta",
+    "🎨 *Paleta de Cores (Identidade Visual):*\nQuais são as cores da identidade visual do evento? (Ex: Azul, branco e dourado / ou *A definir*)",
+  ],
 
-  // 13. Estilo Visual (jovem, elegante, minimalista, vibrante)
-  ["estilo", "🖼️ *Estilo Visual:*\nQual é o estilo visual desejado? (Ex: *jovem*, *elegante*, *minimalista*, *vibrante* ou outro)",],
+  // 13. Mídias e Estilo Visual
+  [
+    "estilo",
+    "📱 *Mídias e Estilo Visual:*\nQuais mídias serão necessárias e qual o estilo visual desejado? (Ex: Flyer feed/stories, telão, vídeo teaser; jovem, elegante, minimalista / ou *Padrão*)",
+  ],
 
   // 14. Responsável Geral
   ["responsavel_geral", "👔 *Responsável Geral:*\nQuem será o responsável geral pela coordenação no dia do evento?"],
@@ -98,10 +166,10 @@ const PERGUNTAS_DEFINICOES = [
   // 20. Materiais necessários
   ["materiais", "📦 *Materiais necessários:*\nQuais materiais e equipamentos serão necessários? (Ex: Som, projetor, microfones, mesas / ou responda *Nenhum*)"],
 
-  // 21. Até quando precisa da imagem de divulgação?
+  // 21. Divulgação e Prazo da Imagem
   [
     "prazo_imagem",
-    "🖼️ *Até quando precisa da imagem de divulgação?*\nAté quando você precisa da imagem/arte de divulgação pronta para a mídia? (Informe a data limite ou prazo desejado)",
+    "📢 *Divulgação e Prazo:*\nAté quando você precisa da imagem/arte de divulgação pronta para a mídia e quais os canais? (Informe a data limite ou prazo desejado)",
   ],
 
   // 22. Cronograma do evento
@@ -185,14 +253,43 @@ function normalizarDadosIniciais(dadosIniciais = {}) {
 }
 
 function formatarResumoEventoGrupo(payload, { incluirTesouraria = true } = {}) {
+  const horario =
+    payload.horario_inicio_termino ||
+    (payload.horario_inicio && payload.horario_termino
+      ? `${payload.horario_inicio} às ${payload.horario_termino}`
+      : payload.horario_inicio || "");
+  const local = payload.local || "";
+  const cores = payload.cores || payload.paleta || "";
+  const midias = payload.midias || payload.estilo || "";
+  const divulgacao = payload.divulgacao || payload.prazo_imagem || "";
+
   let resumo =
     `👤 *Líder:* ${payload.nome_lider}\n` +
     `📅 *Evento:* ${payload.nome_evento}\n` +
     `🏢 *Depto:* ${payload.departamento}\n` +
     `📆 *Data:* ${payload.data}\n` +
-    `⏰ *Horário:* ${payload.horario_inicio} às ${payload.horario_termino}\n` +
+    `⏰ *Horário:* ${horario}\n` +
     (payload.horario_total ? `⏱️ *Horário Total:* ${payload.horario_total}\n` : "") +
-    `📍 *Local:* ${payload.local}`;
+    `📍 *Endereço / Local:* ${local}`;
+
+  // Informações de Tema e Versículo Base (se houver)
+  if (temConteudoRelevante(payload.tema)) {
+    resumo += `\n✨ *Tema:* ${payload.tema}`;
+  }
+  if (temConteudoRelevante(payload.versiculo)) {
+    resumo += `\n📖 *Versículo Base:* ${payload.versiculo}`;
+  }
+
+  // Informações de Divulgação, Mídias e Cores
+  if (cores) {
+    resumo += `\n🎨 *Cores:* ${cores}`;
+  }
+  if (midias) {
+    resumo += `\n📱 *Mídias:* ${midias}`;
+  }
+  if (divulgacao) {
+    resumo += `\n📢 *Divulgação:* ${divulgacao}`;
+  }
 
   if (incluirTesouraria && precisaDeValorDoMinisterio(payload.precisa_valor_ministerio)) {
     resumo += `\n💰 *Tesouraria:* Solicita valor do ministério (Contato: ${CONTATO_TESOURARIA})`;
@@ -238,6 +335,10 @@ function montarPayloadFormulario(dadosIniciais = {}, respostas = {}) {
   for (const c of CAMPOS_RESPOSTAS_LIVRES) {
     payload[c] = respostas[c] || "";
   }
+
+  if (respostas.cores && !payload.paleta) payload.paleta = respostas.cores;
+  if (respostas.midias && !payload.estilo) payload.estilo = respostas.midias;
+  if (respostas.divulgacao && !payload.prazo_imagem) payload.prazo_imagem = respostas.divulgacao;
 
   return payload;
 }
@@ -334,6 +435,15 @@ async function processarRespostaFormulario({
     const resultado = await enviarWebhook(payload);
     const linkDoc = resultado.url;
 
+    salvarFormularioEvento({
+      evento: payload.nome_evento,
+      departamento: payload.departamento,
+      data: payload.data,
+      solicitanteId: numero,
+      payload,
+      docUrl: linkDoc,
+    });
+
     await responderLider(
       `✅ *Formulário do Evento Concluído com Sucesso!*\n\n` +
       `O documento oficial do evento foi gerado automaticamente no Google Docs:\n` +
@@ -417,4 +527,7 @@ module.exports = {
   processarRespostaFormulario,
   notificarTesouraria,
   formatarJidWhatsApp,
+  salvarFormularioEvento,
+  obterFormularioEvento,
+  temConteudoRelevante,
 };

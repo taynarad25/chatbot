@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createMessageHandler } = require("../bot/messageHandler");
 
-function criarHarness({ usuarios = [], calendarEvents = [] } = {}) {
+function criarHarness({ usuarios = [], calendarEvents = [], enviarWebhook } = {}) {
   const etapas = {};
   const diretasEnviadas = [];
   const gruposEnviados = [];
@@ -38,6 +38,7 @@ function criarHarness({ usuarios = [], calendarEvents = [] } = {}) {
     etapas,
     buscarEventos: async () => calendarEvents,
     listLideres: () => usuarios,
+    enviarWebhook: enviarWebhook || (async () => ({ status: "success", url: "https://docs.google.com/document/d/doc-alterado-123/edit" })),
   });
 
   async function enviar(numero, texto) {
@@ -122,12 +123,14 @@ test("Menu Líder: fluxo completo de alteração de campo do formulário com sol
   assert.match(rFinal, /Verba do ministério \/ tesouraria/);
   assert.match(rFinal, /\+55 11 99111-7612/);
 
-  // Notificação para a secretaria
+  // Notificação para a secretaria com link do documento oficial atualizado
   const msgSec = harness.gruposEnviados.find((g) => g.texto.includes("ATUALIZAÇÃO DE FORMULÁRIO DE EVENTO"));
   assert.ok(msgSec, "deve notificar o grupo da secretaria");
   assert.match(msgSec.texto, /Café com Deus/);
   assert.match(msgSec.texto, /Verba do ministério \/ tesouraria/);
   assert.match(msgSec.texto, /\+55 11 99111-7612/);
+  assert.match(msgSec.texto, /Documento Oficial Atualizado \(Google Docs\):/);
+  assert.match(msgSec.texto, /https:\/\/docs\.google\.com\/document\/d\/doc-alterado-123\/edit/);
 
   // Notificação direta para a tesouraria
   const msgTes = harness.diretasEnviadas.find((d) => d.to && d.to.includes("5511991117612"));
@@ -169,4 +172,96 @@ test("Menu Líder: opção 14 permite reiniciar e preencher novamente o formulá
   assert.ok(etapaAtual);
   assert.equal(etapaAtual.fluxo, "formulario_evento");
   assert.equal(etapaAtual.dadosIniciais.evento, "Luau da Juventude");
+});
+
+test("Menu Líder: alteração de informação do formulário (identidade visual/cores) regera o documento, reenvia novo link e envia dados completos de mídia para o grupo da secretaria", async () => {
+  const NUMERO_LIDER = "5511999994444";
+  const eventoCulto = {
+    id: "evento-culto-1",
+    summary: "Culto de Celebração e Avivamento",
+    start: { dateTime: "2026-11-28T19:00:00-03:00" },
+    end: { dateTime: "2026-11-28T21:30:00-03:00" },
+    location: "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi",
+  };
+
+  const { salvarFormularioEvento } = require("../bot/formularioEvento");
+  salvarFormularioEvento({
+    evento: "Culto de Celebração e Avivamento",
+    departamento: "Rede da Família",
+    data: "28/11/2026",
+    solicitanteId: NUMERO_LIDER,
+    docUrl: "https://docs.google.com/document/d/doc-antigo-456/edit",
+    payload: {
+      nome_lider: "Líder Marcos",
+      departamento: "Rede da Família",
+      nome_evento: "Culto de Celebração e Avivamento",
+      data: "28/11/2026",
+      horario_inicio: "19:00",
+      horario_termino: "21:30",
+      horario_inicio_termino: "19:00 às 21:30",
+      local: "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi",
+      tema: "Aviva a Tua Obra",
+      versiculo: "Habacuque 3:2",
+      paleta: "Branco e Ouro",
+      estilo: "Vibrante / Telão e Banner",
+      prazo_imagem: "20/11/2026",
+    },
+  });
+
+  let payloadEnviadoWebhook = null;
+  const mockWebhook = async (payload) => {
+    payloadEnviadoWebhook = payload;
+    return {
+      status: "success",
+      url: "https://docs.google.com/document/d/doc-novo-atualizado-789/edit",
+    };
+  };
+
+  const harness = criarHarness({
+    usuarios: [{ nome: "Líder Marcos", telefone: NUMERO_LIDER, cargos: ["lider"] }],
+    calendarEvents: [eventoCulto],
+    enviarWebhook: mockWebhook,
+  });
+
+  // 1. Acessa área do líder -> Menu de Eventos -> Alterar formulário
+  await harness.enviar(NUMERO_LIDER, "6");
+  await harness.enviar(NUMERO_LIDER, "1");
+  await harness.enviar(NUMERO_LIDER, "4");
+
+  // 2. Escolhe departamento 9 (Rede da Família)
+  await harness.enviar(NUMERO_LIDER, "9");
+
+  // 3. Seleciona o evento 1
+  await harness.enviar(NUMERO_LIDER, "1");
+
+  // 4. Seleciona campo 6 (Identidade visual / cores)
+  await harness.enviar(NUMERO_LIDER, "6");
+
+  // 5. Envia novas cores / identidade visual
+  const [rFinal] = await harness.enviar(NUMERO_LIDER, "Azul Marinho, Prata e Branco Neon");
+
+  // Validação para o líder: recebe confirmação com o documento atualizado
+  assert.match(rFinal, /Formulário Atualizado com Sucesso!/);
+  assert.match(rFinal, /Documento Oficial Atualizado \(Google Docs\):/);
+  assert.match(rFinal, /https:\/\/docs\.google\.com\/document\/d\/doc-novo-atualizado-789\/edit/);
+
+  // Validação do payload enviado ao webhook: cores atualizadas
+  assert.ok(payloadEnviadoWebhook, "deve ter chamado o webhook com o payload atualizado");
+  assert.equal(payloadEnviadoWebhook.cores, "Azul Marinho, Prata e Branco Neon");
+  assert.equal(payloadEnviadoWebhook.paleta, "Azul Marinho, Prata e Branco Neon");
+
+  // Validação para o grupo da secretaria:
+  const msgSec = harness.gruposEnviados.find((g) => g.texto.includes("ATUALIZAÇÃO DE FORMULÁRIO DE EVENTO"));
+  assert.ok(msgSec, "deve notificar o grupo da secretaria");
+  assert.match(msgSec.texto, /Documento Oficial Atualizado \(Google Docs\):/);
+  assert.match(msgSec.texto, /https:\/\/docs\.google\.com\/document\/d\/doc-novo-atualizado-789\/edit/);
+
+  // Validação dos dados obrigatórios de mídia / divulgação enviados para o grupo da secretaria:
+  assert.match(msgSec.texto, /Culto de Celebração e Avivamento/, "deve conter nome do evento");
+  assert.match(msgSec.texto, /19:00 às 21:30/, "deve conter horário");
+  assert.match(msgSec.texto, /Rua Benedicto de Abreu Júnior, 40/, "deve conter endereço");
+  assert.match(msgSec.texto, /Habacuque 3:2/, "deve conter versículo base");
+  assert.match(msgSec.texto, /Aviva a Tua Obra/, "deve conter tema");
+  assert.match(msgSec.texto, /Azul Marinho, Prata e Branco Neon/, "deve conter cores atualizadas");
+  assert.match(msgSec.texto, /INFORMAÇÕES DE MÍDIA & COMUNICAÇÃO:/, "deve conter bloco de mídia");
 });
