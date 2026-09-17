@@ -405,6 +405,11 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           "marcar evento", "não marcar", "nao marcar",
           "marcar reuniao", "marcar reunião",
           "confirmar reuniao", "confirmar reunião",
+          "aprovar salão", "aprovar salao",
+          "marcar salão", "marcar salao",
+          "confirmar salão", "confirmar salao",
+          "recusar salão", "recusar salao",
+          "não aprovar salão", "nao aprovar salao",
           "alterar evento", "não alterar", "nao alterar",
           "alterar reuniao", "alterar reunião",
           "cancelar evento", "manter evento",
@@ -506,13 +511,23 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             textoMsg === "marcar reuniao" ||
             textoMsg === "marcar reunião" ||
             textoMsg === "confirmar reuniao" ||
-            textoMsg === "confirmar reunião";
+            textoMsg === "confirmar reunião" ||
+            textoMsg === "aprovar salão" ||
+            textoMsg === "aprovar salao" ||
+            textoMsg === "marcar salão" ||
+            textoMsg === "marcar salao" ||
+            textoMsg === "confirmar salão" ||
+            textoMsg === "confirmar salao";
           const isRecusarMarcar =
             textoMsg === "não marcar" ||
             textoMsg === "nao marcar" ||
             textoMsg === "não confirmar" ||
             textoMsg === "nao confirmar" ||
-            textoMsg === "recusar";
+            textoMsg === "recusar" ||
+            textoMsg === "recusar salão" ||
+            textoMsg === "recusar salao" ||
+            textoMsg === "não aprovar salão" ||
+            textoMsg === "nao aprovar salao";
 
           const isAlterar =
             textoMsg === "alterar evento" ||
@@ -539,6 +554,66 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
+              }
+
+              if (dados.tipo === "uso_salao") {
+                const { solicitanteId } = dados;
+                if (isMarcar) {
+                  try {
+                    const ano = dados.ano || moment().tz("America/Sao_Paulo").year();
+                    const dataIsoInicio = moment.tz(
+                      `${dados.dia}/${dados.mes}/${ano} ${dados.horarioInicio}`,
+                      "D/M/YYYY HH:mm",
+                      "America/Sao_Paulo"
+                    ).format();
+                    const dataIsoFim = moment.tz(
+                      `${dados.dia}/${dados.mes}/${ano} ${dados.horarioFim}`,
+                      "D/M/YYYY HH:mm",
+                      "America/Sao_Paulo"
+                    ).format();
+
+                    const resource = {
+                      summary: `Uso do Salão - ${dados.nomeSolicitante || "Membro"}`,
+                      description: `Uso do Salão solicitado por membro.\n👤 Solicitante: ${dados.nomeSolicitante}\n📞 Contato: ${dados.solicitanteId}\n🎯 Finalidade: ${dados.finalidade || "Uso Geral"}\n📜 Termo de responsabilidade aceito.`,
+                      location: ENDERECO_IGREJA,
+                      start: { dateTime: dataIsoInicio, timeZone: "America/Sao_Paulo" },
+                      end: { dateTime: dataIsoFim, timeZone: "America/Sao_Paulo" },
+                    };
+
+                    const calendarId = AGENDAS_INTERNAS.USO_SALAO || agendasParaLer[15];
+                    await calendar.events.insert({ calendarId, resource });
+                    removerPendente(codigo);
+
+                    const feedback =
+                      `✅ *Solicitação de Uso do Salão Aprovada!*\n\n` +
+                      `Sua solicitação para uso do salão no dia *${dados.dataFormatada}* das *${dados.horarioInicio} às ${dados.horarioFim}* foi *aprovada* pela secretaria!\n\n` +
+                      `⚠️ *Lembrete Importante:* Todas as coisas e dependências do salão devem ser mantidas intactas e o espaço deve ser entregue limpo e organizado nas mesmas condições em que for encontrado. 🙏\n\n` +
+                      `Digite *menu* para voltar ao menu principal.`;
+                    try {
+                      await client.sendMessage(solicitanteId, feedback);
+                      console.log(`[Secretaria] Confirmação de uso do salão enviada para ${mascararTelefone(solicitanteId)}`);
+                    } catch (sendErr) {
+                      console.error(`[ALERTA:whatsapp] Erro ao enviar confirmação de salão para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                    }
+                    return msg.reply(`✅ Uso do Salão aprovado, registrado na agenda do salão e membro notificado com sucesso.`);
+                  } catch (err) {
+                    console.error("[ALERTA:google-calendar] Erro no agendamento de uso do salão:", err);
+                    return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
+                  }
+                } else {
+                  removerPendente(codigo);
+                  const feedback =
+                    `❌ *Solicitação de Uso do Salão*\n\n` +
+                    `Infelizmente não pudemos aprovar sua solicitação para uso do salão no dia *${dados.dataFormatada}*. Para mais informações, entre em contato diretamente com a secretaria.\n\n` +
+                    `Digite *menu* para voltar ao menu principal.`;
+                  try {
+                    await client.sendMessage(solicitanteId, feedback);
+                    console.log(`[Secretaria] Recusa de uso do salão enviada para ${mascararTelefone(solicitanteId)}`);
+                  } catch (sendErr) {
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar recusa de salão para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Solicitante notificado sobre a recusa do uso do salão.`);
+                }
               }
 
               if (dados.tipo === "reuniao") {
@@ -876,6 +951,9 @@ Escolha uma opção:
         }
         if (isDiretor) {
           menu += `\n8️⃣ Área da Direção`;
+        }
+        if (isMembro) {
+          menu += `\n9️⃣ Solicitar uso do salão`;
         }
 
         menu += `\n\nDigite *menu* a qualquer momento para voltar ao menu principal.`;
@@ -1904,10 +1982,203 @@ Escolha uma opção:
             } else if (escolha === "2") {
               info.etapa = "pastoral_add_nome";
               return msg.reply("🤝 *Adicionar Atendimento Pastoral*\n\nQual é o nome da pessoa / discípulo a ser atendido(a)?");
-            } else if (escolha === "3") {
+            } else if (escolha === "3" || escolha === "4") {
+              info.acaoPastoral = escolha === "4" ? "desmarcar" : "alterar";
+              await msg.reply("🔍 Buscando atendimentos agendados...");
+              try {
+                const agora = moment.tz("America/Sao_Paulo");
+                const inicioBusca = agora.clone().startOf("day").toISOString();
+                const fimAno = agora.clone().endOf("year").toISOString();
+                const calendarId = AGENDAS_INTERNAS.ATENDIMENTO || agendasParaLer[11];
+                const eventos = await buscarEventos(inicioBusca, fimAno, calendarId);
+                const filtrados = (eventos || []).filter(e => e.status !== "cancelled" && isEventoFuturo(e, agora));
+                if (filtrados.length === 0) {
+                  delete etapas[numero];
+                  return msg.reply("ℹ️ Não há atendimentos pastorais agendados no momento.\n\nDigite *menu* para voltar ao menu principal.");
+                }
+
+                info.eventosEncontrados = filtrados.slice(0, 15);
+                info.etapa = info.acaoPastoral === "desmarcar" ? "pastoral_desmarcar_selecionar" : "pastoral_alterar_selecionar";
+                const acaoVerbo = info.acaoPastoral === "desmarcar" ? "desmarcar" : "alterar";
+                let lista = `📋 *Atendimentos Pastorais Agendados*\nQual atendimento você deseja ${acaoVerbo}?\n\n`;
+                info.eventosEncontrados.forEach((ev, i) => {
+                  const d = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo");
+                  lista += `${i + 1} - ${d.format("DD/MM [às] HH:mm")}: ${ev.summary}\n`;
+                });
+                lista += `\nDigite o número do atendimento ou *menu* para voltar.`;
+                return msg.reply(lista);
+              } catch (errList) {
+                console.error("[Pastoral] Erro ao listar atendimentos:", errList);
+                delete etapas[numero];
+                return msg.reply("⚠️ Erro ao acessar a agenda de atendimentos. Tente novamente mais tarde.");
+              }
+            } else if (escolha === "5") {
               return msg.reply("📋 *Atendimentos Pastorais*\n\nOs pedidos de atendimento pastoral são enviados diretamente ao grupo oficial de pastores para alinhamento e confirmação.\n\nDigite *menu* para voltar ao menu principal.");
             } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 3, ou digite *menu* para voltar.");
+              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, ou digite *menu* para voltar.");
+            }
+          }
+
+          // Subfluxo Desmarcar Atendimento Pastoral
+          if (info.etapa === "pastoral_desmarcar_selecionar") {
+            const index = parseInt(msg.body.trim()) - 1;
+            if (isNaN(index) || !info.eventosEncontrados[index]) {
+              return msg.reply("❌ Escolha um número válido da lista.");
+            }
+            info.atendimentoSelecionado = info.eventosEncontrados[index];
+            info.etapa = "pastoral_desmarcar_confirmar";
+            const d = moment.tz(info.atendimentoSelecionado.start.dateTime || info.atendimentoSelecionado.start.date, "America/Sao_Paulo");
+            return msg.reply(`⚠️ Confirma o cancelamento do atendimento pastoral:\n\n📌 *${info.atendimentoSelecionado.summary}*\n🗓️ *Data:* ${d.format("DD/MM/YYYY [às] HH:mm")}\n\nDigite *SIM* para confirmar ou *menu* para desistir.`);
+          }
+
+          if (info.etapa === "pastoral_desmarcar_confirmar") {
+            if (msg.body.trim().toLowerCase() !== "sim") {
+              return msg.reply("❌ Desmarcação não confirmada. Digite *SIM* para confirmar ou *menu* para desistir.");
+            }
+            const calendarId = AGENDAS_INTERNAS.ATENDIMENTO || agendasParaLer[11];
+            const eventId = info.atendimentoSelecionado.id;
+            try {
+              if (calendar && calendar.events && typeof calendar.events.delete === "function") {
+                await calendar.events.delete({ calendarId, eventId });
+              }
+              const nomePastor = usuario?.nome || (contato ? nomeContato(contato, numero) : "Pastor");
+              const d = moment.tz(info.atendimentoSelecionado.start.dateTime || info.atendimentoSelecionado.start.date, "America/Sao_Paulo");
+              const msgGrupo = `🗑️ *ATENDIMENTO PASTORAL DESMARCADO*\n\n👤 *Pastor:* ${nomePastor}\n📌 *Atendimento:* ${info.atendimentoSelecionado.summary}\n📆 *Data Original:* ${d.format("DD/MM/YYYY [às] HH:mm")}`;
+              await notificarPastoral(client, msgGrupo);
+
+              delete etapas[numero];
+              return msg.reply(`✅ *Atendimento Pastoral Desmarcado com Sucesso!*\n\nO atendimento foi removido da agenda e a equipe pastoral foi comunicada. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
+            } catch (errDel) {
+              console.error("[Pastoral] Erro ao desmarcar atendimento:", errDel);
+              delete etapas[numero];
+              return msg.reply("⚠️ Ocorreu um erro ao desmarcar o atendimento na agenda do Google. Tente novamente em instantes.");
+            }
+          }
+
+          // Subfluxo Alterar Atendimento Pastoral
+          if (info.etapa === "pastoral_alterar_selecionar") {
+            const index = parseInt(msg.body.trim()) - 1;
+            if (isNaN(index) || !info.eventosEncontrados[index]) {
+              return msg.reply("❌ Escolha um número válido da lista.");
+            }
+            info.atendimentoSelecionado = info.eventosEncontrados[index];
+            info.etapa = "pastoral_alterar_o_que";
+            return msg.reply(`📝 Você selecionou: *${info.atendimentoSelecionado.summary}*\n\nO que você deseja alterar?\n\n1 - Horário\n2 - Data\n3 - Local\n\nDigite o número da opção desejada ou *menu* para cancelar:`);
+          }
+
+          if (info.etapa === "pastoral_alterar_o_que") {
+            const opc = msg.body.trim();
+            if (opc === "1") {
+              info.etapa = "pastoral_alterar_novo_horario";
+              return msg.reply("⏰ Digite o *novo horário de início* do atendimento (ex: 15:00 ou 19:30):");
+            } else if (opc === "2") {
+              info.etapa = "pastoral_alterar_nova_data";
+              return msg.reply("📆 Digite a *nova data* do atendimento (ex: 25/10 ou 25/10/2026):");
+            } else if (opc === "3") {
+              info.etapa = "pastoral_alterar_novo_local";
+              return msg.reply("📍 Qual será o *novo local* do atendimento? (Ex: *Gabinete Pastoral*, *Igreja*, *Online*, etc):");
+            } else {
+              return msg.reply("❌ Opção inválida. Escolha 1 para Horário, 2 para Data ou 3 para Local.");
+            }
+          }
+
+          if (info.etapa === "pastoral_alterar_novo_horario") {
+            const horario = msg.body.trim();
+            if (!HORARIO_REGEX.test(horario)) {
+              return msg.reply("❌ Formato inválido. Use HH:MM (ex: 15:00 ou 19:30).");
+            }
+            info.novoHorario = horario;
+            info.campoAlterar = "horario";
+            info.etapa = "pastoral_alterar_finalizar";
+          }
+
+          if (info.etapa === "pastoral_alterar_nova_data") {
+            const entrada = msg.body.trim();
+            const partes = entrada.split("/");
+            if (partes.length < 2) {
+              return msg.reply("❌ Formato de data inválido. Use DD/MM (ex: 25/10) ou DD/MM/AAAA (ex: 25/10/2026).");
+            }
+            const dia = parseInt(partes[0], 10);
+            const mes = parseInt(partes[1], 10);
+            const ano = partes[2] ? parseInt(partes[2], 10) : moment.tz("America/Sao_Paulo").year();
+            if (isNaN(dia) || isNaN(mes) || dia < 1 || dia > 31 || mes < 1 || mes > 12) {
+              return msg.reply("❌ Data inválida. Digite uma data real no formato DD/MM (ex: 25/10).");
+            }
+            info.novoDia = dia;
+            info.novoMes = mes;
+            info.novoAno = ano;
+            info.novaDataFormatada = `${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}/${ano}`;
+            info.campoAlterar = "data";
+            info.etapa = "pastoral_alterar_finalizar";
+          }
+
+          if (info.etapa === "pastoral_alterar_novo_local") {
+            let local = msg.body.trim();
+            if (/^(?:1\s*[-–]\s*)?(?:na\s+igreja|igreja|no\s+templo|templo)$/i.test(local)) {
+              local = ENDERECO_IGREJA;
+            } else if (!local) {
+              local = "Gabinete Pastoral";
+            }
+            info.novoLocal = local;
+            info.campoAlterar = "local";
+            info.etapa = "pastoral_alterar_finalizar";
+          }
+
+          if (info.etapa === "pastoral_alterar_finalizar") {
+            const calendarId = AGENDAS_INTERNAS.ATENDIMENTO || agendasParaLer[11];
+            const eventId = info.atendimentoSelecionado.id;
+            const nomePastor = usuario?.nome || (contato ? nomeContato(contato, numero) : "Pastor");
+            const dataOriginal = moment.tz(info.atendimentoSelecionado.start.dateTime || info.atendimentoSelecionado.start.date, "America/Sao_Paulo");
+            const patchResource = {};
+            let descricaoDetalhe = "";
+
+            if (info.campoAlterar === "horario") {
+              const [h, m] = info.novoHorario.split(":").map(Number);
+              const dataIsoIni = dataOriginal.clone().hour(h).minute(m).second(0).format();
+              const dataIsoFim = dataOriginal.clone().hour((h + 1) % 24).minute(m).second(0).format();
+              patchResource.start = { dateTime: dataIsoIni, timeZone: "America/Sao_Paulo" };
+              patchResource.end = { dateTime: dataIsoFim, timeZone: "America/Sao_Paulo" };
+              descricaoDetalhe = `⏰ *Novo Horário:* ${info.novoHorario}`;
+            } else if (info.campoAlterar === "data") {
+              const hora = dataOriginal.hour();
+              const minuto = dataOriginal.minute();
+              const novaDataIni = moment.tz(
+                `${info.novoDia}/${info.novoMes}/${info.novoAno} ${String(hora).padStart(2, "0")}:${String(minuto).padStart(2, "0")}`,
+                "D/M/YYYY HH:mm",
+                "America/Sao_Paulo"
+              );
+              patchResource.start = { dateTime: novaDataIni.format(), timeZone: "America/Sao_Paulo" };
+              patchResource.end = { dateTime: novaDataIni.clone().add(1, "hour").format(), timeZone: "America/Sao_Paulo" };
+              descricaoDetalhe = `📆 *Nova Data:* ${info.novaDataFormatada}`;
+            } else if (info.campoAlterar === "local") {
+              patchResource.location = info.novoLocal;
+              descricaoDetalhe = `📍 *Novo Local:* ${info.novoLocal}`;
+            }
+
+            try {
+              if (calendar && calendar.events && typeof calendar.events.patch === "function") {
+                await calendar.events.patch({ calendarId, eventId, resource: patchResource });
+              }
+
+              const msgGrupo =
+                `🔄 *ATENDIMENTO PASTORAL ALTERADO*\n\n` +
+                `👤 *Pastor:* ${nomePastor}\n` +
+                `📌 *Atendimento:* ${info.atendimentoSelecionado.summary}\n` +
+                `${descricaoDetalhe}`;
+              await notificarPastoral(client, msgGrupo);
+
+              delete etapas[numero];
+              return msg.reply(
+                `✅ *Atendimento Pastoral Alterado com Sucesso!*\n\n` +
+                `• *Atendimento:* ${info.atendimentoSelecionado.summary}\n` +
+                `• ${descricaoDetalhe}\n\n` +
+                `A alteração foi gravada na agenda e comunicada à equipe pastoral. 🙏\n\n` +
+                `Digite *menu* para voltar ao menu principal.`
+              );
+            } catch (errPatch) {
+              console.error("[Pastoral] Erro ao alterar atendimento:", errPatch);
+              delete etapas[numero];
+              return msg.reply("⚠️ Ocorreu um erro ao atualizar o atendimento na agenda do Google. Tente novamente em instantes.");
             }
           }
 
@@ -2470,6 +2741,126 @@ Escolha uma opção:
               return msg.reply("⚠️ Erro ao consultar disponibilidade na agenda. Tente novamente mais tarde.");
             }
           }
+        } else if (info.fluxo === "uso_salao") {
+          if (info.etapa === "uso_salao_data") {
+            const entrada = msg.body.trim();
+            const partes = entrada.split("/");
+            if (partes.length < 2) {
+              return msg.reply("❌ Formato de data inválido. Use DD/MM (ex: 25/10) ou DD/MM/AAAA (ex: 25/10/2026).");
+            }
+            const dia = parseInt(partes[0], 10);
+            const mes = parseInt(partes[1], 10);
+            const ano = partes[2] ? parseInt(partes[2], 10) : moment.tz("America/Sao_Paulo").year();
+
+            if (isNaN(dia) || isNaN(mes) || dia < 1 || dia > 31 || mes < 1 || mes > 12) {
+              return msg.reply("❌ Data inválida. Digite uma data real no formato DD/MM (ex: 25/10).");
+            }
+
+            const agora = moment.tz("America/Sao_Paulo");
+            const dataEscolhida = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo").endOf("day");
+            if (dataEscolhida.isBefore(agora)) {
+              return msg.reply("❌ Essa data já passou! Por favor, informe uma data futura para o uso do salão:");
+            }
+
+            info.dia = dia;
+            info.mes = mes;
+            info.ano = ano;
+            info.dataFormatada = `${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}/${ano}`;
+            info.etapa = "uso_salao_horario_inicio";
+            return msg.reply(`⏰ Qual é o *horário de início* do uso do salão? (Ex: 14:00 ou 18h)`);
+          }
+
+          if (info.etapa === "uso_salao_horario_inicio") {
+            const hInicio = normalizarHorarioReuniao(msg.body) || (HORARIO_REGEX.test(msg.body.trim()) ? msg.body.trim() : null);
+            if (!hInicio) {
+              return msg.reply("❌ Formato inválido. Use HH:MM ou HHh (ex: 14:00 ou 18h).");
+            }
+            info.horarioInicio = hInicio;
+            info.etapa = "uso_salao_horario_fim";
+            return msg.reply(`⏰ Qual é o *horário total / término* do uso do salão? (Ex: 18:00 ou 22h)`);
+          }
+
+          if (info.etapa === "uso_salao_horario_fim") {
+            const hFim = normalizarHorarioReuniao(msg.body) || (HORARIO_REGEX.test(msg.body.trim()) ? msg.body.trim() : null);
+            if (!hFim) {
+              return msg.reply("❌ Formato de horário de término inválido. Use HH:MM ou HHh (ex: 18:00 ou 22h).");
+            }
+            const [hi, mi] = info.horarioInicio.split(":").map(Number);
+            const [hf, mf] = hFim.split(":").map(Number);
+            if (hf < hi || (hf === hi && mf <= mi)) {
+              return msg.reply("❌ O horário de término deve ser posterior ao horário de início. Digite novamente:");
+            }
+            info.horarioFim = hFim;
+            info.etapa = "uso_salao_finalidade";
+            return msg.reply(`📝 Qual será a *finalidade* do uso do salão? (Ex: Aniversário, Confraternização, Ensaio, Reunião de família, etc.)`);
+          }
+
+          if (info.etapa === "uso_salao_finalidade") {
+            const finalidade = msg.body.trim();
+            if (!finalidade) {
+              return msg.reply("❌ Por favor, informe a finalidade ou motivo do uso do salão:");
+            }
+            info.finalidade = finalidade;
+            info.etapa = "uso_salao_termo";
+            const termoTexto =
+              `📜 *Termo de Uso e Responsabilidade do Salão*\n\n` +
+              `⚠️ *Atenção aos cuidados com a Casa de Deus:*\n` +
+              `• Todas as coisas do salão devem ser mantidas intactas.\n` +
+              `• O salão deve ser entregue nas mesmas condições em que for encontrado.\n` +
+              `• O solicitante é responsável pela integridade e conservação de todo o espaço durante o uso.\n\n` +
+              `Você concorda com estes termos e se compromete a zelar pelo salão?\n\n` +
+              `Digite *SIM* para aceitar e enviar a solicitação à secretaria, ou *menu* para cancelar.`;
+            return msg.reply(termoTexto);
+          }
+
+          if (info.etapa === "uso_salao_termo") {
+            if (msg.body.trim().toLowerCase() !== "sim") {
+              return msg.reply("❌ Para solicitar o uso do salão, é necessário aceitar o termo de responsabilidade.\n\nDigite *SIM* para concordar e enviar a solicitação, ou *menu* para cancelar.");
+            }
+
+            const nomeSol = usuario?.nome || (contato ? nomeContato(contato, numero) : "Membro");
+            const dadosUso = {
+              tipo: "uso_salao",
+              solicitanteId: numero,
+              nomeSolicitante: nomeSol,
+              dia: info.dia,
+              mes: info.mes,
+              ano: info.ano,
+              dataFormatada: info.dataFormatada,
+              horarioInicio: info.horarioInicio,
+              horarioFim: info.horarioFim,
+              finalidade: info.finalidade,
+            };
+
+            try {
+              const codigo = salvarPendente(dadosUso);
+              const resumoGrupo =
+                `🏛️ *NOVA SOLICITAÇÃO DE USO DO SALÃO*\n\n` +
+                `👤 *Solicitante:* ${nomeSol}\n` +
+                `📆 *Data:* ${dadosUso.dataFormatada}\n` +
+                `⏰ *Horário:* ${dadosUso.horarioInicio} às ${dadosUso.horarioFim}\n` +
+                `📝 *Finalidade:* ${dadosUso.finalidade}\n` +
+                `📜 *Termo de Responsabilidade:* Aceito pelo solicitante.\n\n` +
+                `_Responda a este resumo com "aprovar salão" ou "recusar salão" para confirmar._\n\n` +
+                `_Código: ${codigo}_`;
+              await notificarSecretaria(client, resumoGrupo);
+
+              const resumoMembro =
+                `✅ *Solicitação de Uso do Salão Enviada!*\n\n` +
+                `📆 *Data:* ${dadosUso.dataFormatada}\n` +
+                `⏰ *Horário:* ${dadosUso.horarioInicio} às ${dadosUso.horarioFim}\n` +
+                `📝 *Finalidade:* ${dadosUso.finalidade}\n\n` +
+                `Sua solicitação foi enviada para a secretaria para análise e confirmação. Você receberá uma notificação assim que for aprovada! 🙏\n\n` +
+                `Digite *menu* para voltar ao menu principal.`;
+
+              delete etapas[numero];
+              return msg.reply(resumoMembro);
+            } catch (errSalvar) {
+              console.error("[Uso do Salão] Erro ao salvar solicitação:", errSalvar);
+              delete etapas[numero];
+              return msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
+            }
+          }
         }
         return;
       }
@@ -2539,7 +2930,7 @@ Digite *menu* para voltar ao menu principal.`;
       if (texto === "7" && isPastor) {
         console.log(`Opção 7 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área Pastoral`);
         etapas[numero] = { fluxo: "area_pastoral", etapa: "menu_pastoral" };
-        const msgSubmenu = `⛪ *Área Pastoral*\n\nGraça e Paz, Pastor(a)! Escolha uma opção:\n\n1️⃣ Ver agenda completa da igreja\n2️⃣ Adicionar atendimento pastoral\n3️⃣ Consultar solicitações de atendimento pastoral\n\nDigite *menu* para voltar ao menu principal.`;
+        const msgSubmenu = `⛪ *Área Pastoral*\n\nGraça e Paz, Pastor(a)! Escolha uma opção:\n\n1️⃣ Ver agenda completa da igreja\n2️⃣ Adicionar atendimento pastoral\n3️⃣ Alterar atendimento pastoral existente\n4️⃣ Desmarcar atendimento pastoral existente\n5️⃣ Consultar solicitações de atendimento pastoral\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
       }
 
@@ -2548,6 +2939,17 @@ Digite *menu* para voltar ao menu principal.`;
         etapas[numero] = { fluxo: "area_diretor", etapa: "menu_diretor" };
         const msgSubmenu = `📋 *Área da Direção*\n\nEscolha o que deseja fazer:\n\n1️⃣ Ver todos os eventos da igreja\n2️⃣ Falar com a secretaria\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
+      }
+
+      if (((texto === "9" || texto === "opção 9" || texto === "opcao 9") && isMembro) || /^(?:solicitar\s+)?(?:uso\s+do\s+)?sal[aã]o$/i.test(texto.trim())) {
+        console.log(`[Uso do Salão] Iniciado por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+        etapas[numero] = { fluxo: "uso_salao", etapa: "uso_salao_data" };
+        return msg.reply(
+          `🏛️ *Solicitação de Uso do Salão*\n\n` +
+          `Para solicitar o uso do salão da igreja, vamos precisar de algumas informações.\n\n` +
+          `📅 Qual é a *data* desejada? (Ex: 25/10 ou 25/10/2026)\n\n` +
+          `Digite *menu* a qualquer momento para cancelar.`
+        );
       }
 
       if (isLider && /^(pedir|solicitar)?\s*(m[ií]dias?|artes?|flyers?)$/i.test(texto.trim())) {

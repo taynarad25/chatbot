@@ -8,6 +8,8 @@ function criarHarness({ usuarios = [], calendarEvents = [] } = {}) {
   const diretasEnviadas = [];
   const gruposEnviados = [];
   const eventosGravados = [];
+  const eventosAlterados = [];
+  const eventosDeletados = [];
 
   const JID_GRUPO_SECRETARIA = "111111111111111@g.us";
   const JID_GRUPO_PASTORAL = "222222222222222@g.us";
@@ -32,6 +34,14 @@ function criarHarness({ usuarios = [], calendarEvents = [] } = {}) {
       insert: async ({ calendarId, resource }) => {
         eventosGravados.push({ calendarId, resource });
         return { data: { id: "evento-pastoral-123" } };
+      },
+      patch: async ({ calendarId, eventId, resource }) => {
+        eventosAlterados.push({ calendarId, eventId, resource });
+        return { data: { id: eventId, ...resource } };
+      },
+      delete: async ({ calendarId, eventId }) => {
+        eventosDeletados.push({ calendarId, eventId });
+        return { data: {} };
       },
     },
   };
@@ -73,7 +83,7 @@ function criarHarness({ usuarios = [], calendarEvents = [] } = {}) {
     return respostas;
   }
 
-  return { etapas, client, calendar, handleMessage, enviar, diretasEnviadas, gruposEnviados, eventosGravados };
+  return { etapas, client, calendar, handleMessage, enviar, diretasEnviadas, gruposEnviados, eventosGravados, eventosAlterados, eventosDeletados };
 }
 
 test("Área Pastoral: somente usuário com cargo 'pastor' visualiza menu pastoral e acessa opção 7", async () => {
@@ -100,6 +110,8 @@ test("Área Pastoral: somente usuário com cargo 'pastor' visualiza menu pastora
   assert.match(resp7Pastor, /Graça e Paz, Pastor\(a\)!/);
   assert.match(resp7Pastor, /1️⃣ Ver agenda completa da igreja/);
   assert.match(resp7Pastor, /2️⃣ Adicionar atendimento pastoral/);
+  assert.match(resp7Pastor, /3️⃣ Alterar atendimento pastoral existente/);
+  assert.match(resp7Pastor, /4️⃣ Desmarcar atendimento pastoral existente/);
 
   // Líder comum tenta opção 7 e não acessa
   const [resp7Lider] = await harness.enviar(NUMERO_LIDER_COMUM, "7");
@@ -192,4 +204,107 @@ test("Área Pastoral: pastor consulta agenda completa da igreja incluindo agenda
   const msgEventos = r3 || r2;
   // A reunião interna DEVE ser exibida na agenda completa do pastor
   assert.match(msgEventos, /Reunião de Obreiros/);
+});
+
+test("Área Pastoral: pastor altera horário de atendimento existente com sucesso", async () => {
+  const NUMERO_PASTOR = "5511999991111";
+
+  const atendimentoExistente = {
+    id: "atend-123",
+    summary: "Atendimento Pastoral - Marcos Vinicius",
+    calendarId: AGENDAS_INTERNAS.ATENDIMENTO,
+    start: { dateTime: "2026-11-25T14:00:00-03:00" },
+    end: { dateTime: "2026-11-25T15:00:00-03:00" },
+    location: "Gabinete Pastoral",
+  };
+
+  const harness = criarHarness({
+    usuarios: [
+      { nome: "Pr. Paulo", telefone: NUMERO_PASTOR, cargos: ["pastor"] },
+    ],
+    calendarEvents: [atendimentoExistente],
+  });
+
+  // 1. Entra na Área Pastoral
+  await harness.enviar(NUMERO_PASTOR, "7");
+
+  // 2. Escolhe opção 3 (Alterar atendimento)
+  const [r1, r2] = await harness.enviar(NUMERO_PASTOR, "3");
+  const msgLista = r2 || r1;
+  assert.match(msgLista, /Atendimentos Pastorais Agendados/);
+  assert.match(msgLista, /Marcos Vinicius/);
+
+  // 3. Seleciona o item 1
+  const [rOQue] = await harness.enviar(NUMERO_PASTOR, "1");
+  assert.match(rOQue, /O que você deseja alterar\?/);
+  assert.match(rOQue, /1 - Horário/);
+
+  // 4. Escolhe alterar Horário (1)
+  const [rNovoHorario] = await harness.enviar(NUMERO_PASTOR, "1");
+  assert.match(rNovoHorario, /novo horário de início/);
+
+  // 5. Envia novo horário (16:30)
+  const [rFinal] = await harness.enviar(NUMERO_PASTOR, "16:30");
+  assert.match(rFinal, /Atendimento Pastoral Alterado com Sucesso!/);
+  assert.match(rFinal, /16:30/);
+
+  // Valida que o patch foi chamado no calendar
+  assert.equal(harness.eventosAlterados.length, 1);
+  assert.equal(harness.eventosAlterados[0].calendarId, AGENDAS_INTERNAS.ATENDIMENTO);
+  assert.equal(harness.eventosAlterados[0].eventId, "atend-123");
+  assert.match(harness.eventosAlterados[0].resource.start.dateTime, /16:30:00/);
+
+  // Notificação no grupo pastoral
+  const msgGrupo = harness.gruposEnviados.find((g) => g.texto.includes("ATENDIMENTO PASTORAL ALTERADO"));
+  assert.ok(msgGrupo);
+  assert.match(msgGrupo.texto, /Marcos Vinicius/);
+  assert.match(msgGrupo.texto, /16:30/);
+});
+
+test("Área Pastoral: pastor desmarca atendimento existente após confirmação com SIM", async () => {
+  const NUMERO_PASTOR = "5511999991111";
+
+  const atendimentoExistente = {
+    id: "atend-456",
+    summary: "Atendimento Pastoral - Carla Silveira",
+    calendarId: AGENDAS_INTERNAS.ATENDIMENTO,
+    start: { dateTime: "2026-11-28T10:00:00-03:00" },
+    end: { dateTime: "2026-11-28T11:00:00-03:00" },
+    location: "Gabinete Pastoral",
+  };
+
+  const harness = criarHarness({
+    usuarios: [
+      { nome: "Pr. Paulo", telefone: NUMERO_PASTOR, cargos: ["pastor"] },
+    ],
+    calendarEvents: [atendimentoExistente],
+  });
+
+  // 1. Entra na Área Pastoral
+  await harness.enviar(NUMERO_PASTOR, "7");
+
+  // 2. Escolhe opção 4 (Desmarcar atendimento)
+  const [r1, r2] = await harness.enviar(NUMERO_PASTOR, "4");
+  const msgLista = r2 || r1;
+  assert.match(msgLista, /Qual atendimento você deseja desmarcar\?/);
+  assert.match(msgLista, /Carla Silveira/);
+
+  // 3. Seleciona o item 1
+  const [rConfirma] = await harness.enviar(NUMERO_PASTOR, "1");
+  assert.match(rConfirma, /Confirma o cancelamento do atendimento pastoral/);
+  assert.match(rConfirma, /Carla Silveira/);
+
+  // 4. Confirma com SIM
+  const [rSucesso] = await harness.enviar(NUMERO_PASTOR, "SIM");
+  assert.match(rSucesso, /Atendimento Pastoral Desmarcado com Sucesso!/);
+
+  // Valida que delete foi chamado no calendar
+  assert.equal(harness.eventosDeletados.length, 1);
+  assert.equal(harness.eventosDeletados[0].calendarId, AGENDAS_INTERNAS.ATENDIMENTO);
+  assert.equal(harness.eventosDeletados[0].eventId, "atend-456");
+
+  // Notificação no grupo pastoral
+  const msgGrupo = harness.gruposEnviados.find((g) => g.texto.includes("ATENDIMENTO PASTORAL DESMARCADO"));
+  assert.ok(msgGrupo);
+  assert.match(msgGrupo.texto, /Carla Silveira/);
 });

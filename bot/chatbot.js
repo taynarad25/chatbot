@@ -112,6 +112,7 @@ const agendasParaLer = [
   "0a55126694643f39944faf173fe3acd127b2a52074c6ecc9e9ed4dc23edf8b57@group.calendar.google.com", // Atendimento
   "7975950de545f60f585bc041682c6564ce4c29d0ef7e06cdeffa21ffc0ffd572@group.calendar.google.com", // Limpeza
   "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com", // Ensaios
+  "49b999ac91607d07310d7e36a26fe088ddc3cd2b34ff741a0e139b43a18bdabc@group.calendar.google.com", // Uso do Salão
 ];
 
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);
