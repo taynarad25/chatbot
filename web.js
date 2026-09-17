@@ -185,8 +185,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         }
       }
 
-      // Rota /home: Página institucional da Comunidade Cristã Curados
-      if (req.method === 'GET' && (pathname === '/home' || pathname === '/home/' || pathname === '/home.html')) {
+      // Rota raiz (/) e /home: Página institucional da Comunidade Cristã Curados
+      if (req.method === 'GET' && (pathname === '/' || pathname === '/home' || pathname === '/home/' || pathname === '/home.html')) {
         if (fs.existsSync(HOME_HTML_FILE)) {
           const content = fs.readFileSync(HOME_HTML_FILE, 'utf8');
           res.writeHead(200, {
@@ -279,12 +279,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
         }
       }
-      // Placeholder até existir uma landing page de verdade em "/" — nesse caso, troque
-      // este redirect por um handler que sirva a página institucional.
-      if (req.method === 'GET' && pathname === '/') {
-        res.writeHead(302, { Location: '/secretaria' });
-        return res.end();
-      }
+
       if (req.method === 'GET' && pathname === '/secretaria') {
         try {
           const html = renderIndexHtml();

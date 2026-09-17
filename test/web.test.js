@@ -95,6 +95,16 @@ test("GET /home: retorna a página institucional da Comunidade Cristã Curados c
   assert.match(html, /logo-img-anim/);
 });
 
+test("GET / (raiz): retorna a página institucional da Comunidade Cristã Curados por padrão com status 200", async () => {
+  const res = await fetch(`${baseUrl}/`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type"), /text\/html/);
+  const html = await res.text();
+  assert.match(html, /COMUNIDADE CRISTÃ/);
+  assert.match(html, /CURADOS/);
+  assert.match(html, /logo-wrapper/);
+});
+
 test("GET /logo.png: serve a imagem oficial do logotipo (PNG) com status 200", async () => {
   const res = await fetch(`${baseUrl}/logo.png`);
   assert.equal(res.status, 200);

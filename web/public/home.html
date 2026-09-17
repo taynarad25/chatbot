@@ -32,51 +32,77 @@
         body {
             background-color: var(--cor-claro);
             color: #333;
+            overflow-x: hidden;
         }
 
         /* Banner Principal (Hero) */
         .banner-curados {
             background-color: var(--cor-escuro);
-            padding: 100px 5%;
+            min-height: 680px;
             display: flex;
-            justify-content: center;
             align-items: center;
-            min-height: 500px;
+            position: relative;
             overflow: hidden;
+            padding: 80px 4vw 80px 0;
         }
 
         .banner-container {
             display: flex;
             align-items: center;
-            gap: 50px;
-            max-width: 1000px;
             width: 100%;
-            flex-wrap: wrap;
+            max-width: 1600px;
+            gap: clamp(40px, 5vw, 90px);
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Logotipo com Efeito Bleed (Cortado na borda esquerda) */
+        .logo-wrapper {
+            flex-shrink: 0;
+            margin-left: -110px; /* Sangrando para fora da lateral esquerda */
+            display: flex;
+            align-items: center;
             justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo-img-anim {
+            width: clamp(420px, 34vw, 560px);
+            height: clamp(420px, 34vw, 560px);
+            object-fit: contain;
+            filter: drop-shadow(0 20px 45px rgba(0, 0, 0, 0.65));
+            animation: float 5s ease-in-out infinite;
+            user-select: none;
+            display: block;
         }
 
         /* Animações */
         @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(25px); }
+            from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes float {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+            50% { transform: translateY(-16px); }
         }
 
-        /* Textos do Banner */
+        /* Textos do Banner - Escala Imponente e Destaque */
         .banner-text {
             animation: fadeInUp 1s ease-out forwards;
             color: #ffffff;
             text-align: left;
+            flex: 1;
+            min-width: 0;
         }
 
         .banner-text h2 {
-            font-size: 2.2rem;
+            font-size: clamp(2.2rem, 3.2vw, 3.6rem);
             font-weight: 400; /* Regular */
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            line-height: 1.2;
+            letter-spacing: -0.5px;
         }
 
         .banner-text h2 .highlight {
@@ -85,40 +111,80 @@
         }
 
         .banner-text h3 {
-            font-size: 1.2rem;
-            letter-spacing: 3px;
-            color: #b0b0b0;
-            margin-bottom: 10px;
+            font-size: clamp(1.3rem, 1.8vw, 2.2rem);
+            letter-spacing: clamp(4px, 0.6vw, 8px);
+            color: #d1d5db;
+            margin-bottom: 12px;
             font-weight: 600; /* SemiBold */
+            text-transform: uppercase;
         }
 
         .banner-text h1 {
-            font-size: 4rem;
+            font-size: clamp(4.5rem, 7.5vw, 8.2rem);
             font-weight: 800; /* ExtraBold */
             color: var(--cor-ciano);
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            line-height: 0.95;
+            text-shadow: 0 4px 24px rgba(0, 188, 212, 0.28);
         }
 
-        /* Logotipo com Animação de Flutuação Suave */
-        .logo-img-anim {
-            width: 200px;
-            height: 200px;
-            max-width: 100%;
-            object-fit: contain;
-            filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.4));
-            animation: float 4s ease-in-out infinite;
-            user-select: none;
+        /* Responsividade para Tablet */
+        @media (max-width: 1024px) {
+            .banner-curados {
+                min-height: 580px;
+                padding: 60px 30px 60px 0;
+            }
+            .logo-wrapper {
+                margin-left: -70px;
+            }
+            .logo-img-anim {
+                width: 360px;
+                height: 360px;
+            }
+            .banner-text h1 {
+                font-size: 5rem;
+            }
         }
 
         /* Responsividade para Celular */
         @media (max-width: 768px) {
-            .banner-text h1 { font-size: 2.8rem; }
-            .banner-text h2 { font-size: 1.6rem; }
-            .banner-container { text-align: center; }
-            .banner-text { text-align: center; }
+            .banner-curados {
+                min-height: auto;
+                padding: 70px 24px 80px;
+                justify-content: center;
+            }
+            .banner-container {
+                flex-direction: column;
+                text-align: center;
+                gap: 35px;
+                margin: 0 auto;
+                justify-content: center;
+            }
+            .logo-wrapper {
+                margin-left: 0;
+                display: flex;
+                justify-content: center;
+            }
             .logo-img-anim {
-                width: 150px;
-                height: 150px;
+                width: 240px;
+                height: 240px;
+                filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.5));
+            }
+            .banner-text {
+                text-align: center;
+            }
+            .banner-text h2 {
+                font-size: 1.9rem;
+                margin-bottom: 6px;
+            }
+            .banner-text h3 {
+                font-size: 1.15rem;
+                letter-spacing: 4px;
+                margin-bottom: 8px;
+            }
+            .banner-text h1 {
+                font-size: 3.8rem;
+                letter-spacing: 1px;
             }
         }
     </style>
@@ -128,10 +194,12 @@
     <!-- Seção do Banner Inicial -->
     <section class="banner-curados">
         <div class="banner-container">
-            <!-- Imagem oficial do logo com animação suave -->
-            <img src="logo.png" alt="Logotipo Comunidade Cristã Curados" class="logo-img-anim">
+            <!-- Logotipo oficial posicionado na borda com efeito bleed -->
+            <div class="logo-wrapper">
+                <img src="logo.png" alt="Logotipo Comunidade Cristã Curados" class="logo-img-anim">
+            </div>
 
-            <!-- Textos estilizados com Montserrat -->
+            <!-- Textos estilizados em escala imponente -->
             <div class="banner-text">
                 <h2>Seja <span class="highlight">bem-vindo</span> à</h2>
                 <h3>COMUNIDADE CRISTÃ</h3>
