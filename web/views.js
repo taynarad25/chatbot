@@ -2,39 +2,216 @@ function renderLoginHtml(message = "") {
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login - Controle WhatsApp</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secretaria - Comunidade Cristã Curados</title>
   <link rel="icon" type="image/png" href="/images/logo.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVTSURBVFhH7ZYLbFNlFMevCig+wO32EXq7oRECIdnargwT1JBA104cRBRwXTeFvdjaTcNLQTCNtOwRGQy7rXsg0Q2QgILIGMpTIm9QYI++xrY4hqMbbZmDDRE4nu/uo1FnCdmDxMRf0tyb//fde873v+ecjfnPItxR84LgQHOS8FCLnq1qiKTyw0FQaVsoONjcLT7XDeILv4PwyK/A7nV+xmyDx+iWwUNQ5ZwuOtYOoqNtwFY6qtlK+1HhwV9A/HMXsFUuE902eAj2OPaTk7N7XVsZgEeIxlY5l4iOe0BQ5fCy39if4TcOFuweR73obCcEVzpVVGKCtp0dic7cFexrBMHuurFUHhwwgR96HHBuoBK64kwhnwWvHUH7G0ZSeeCIV5fNZ5geuwWVjrmiU76ewttjP4JBdwm+qwc+qSpnPv8A4jNwb9LbvjNlinGIVl20Nm3WDtBprJupzLC7bWbh4RYQV98Ccc0fIDqB33+vaydzuOkJsu7Rcxth+Wi4qpd8BEbmUf6hvpAaU/KkNqrop8QZmyBpxmaIjbJk0yV0wq7E6l8mONRsFO5r1FCZcaeN+hiWhAIsDQWPXnK+eaF0OF3qG7ro9SN0mpIz82PK4Z3pG+EtTdErdKkXnnTJ5JvvSQEWh0CHQXqhwyBh6VL/wCSk8ZoSL3FBG1VwjMq9aE/nfiQn78zgrrUuED9H5YEhVlWwODGmAuKjSyFumiWMyn48BmnYjcye07enSZZSeeCIVVkkceqibuJCnLoghcp+0P40cnqvXtLVlhI6isoDR6qyZKg2ytKaMnMrFmPh+1T2gxW/Ej4IhbY0rrlflR8Irco6VqcpvZUYswl0qgItlf1gAonEgWsGrvtqJiel8oMROzVf/IYq/74jFO3fTtoxLsp6U6cp7mVxa0bo8z49dweWhGD7cf4p+W/Uz5OENKQG9UzMhGkWNk5jPZPw6gZPnKbIP9/vMXt23nBsw9J5r30ByTO3YBcUrqNLvWgnAwhduL0whDiRCwzDT8+/4skY9VLXu9JWr4E74NYLn2Zw0qUveH07kNMlRJeRibdTqypKxqEzS6suXBGvLnbMx+BJ5PRq6wUynOi7etGcJA3GwI3EhbuLcBZkcGe86RK9L4ObikNp7jWDpAI14AfVh6MBOyeZMU45PCRWZdVie9lIm5FkyEnJPan4e7+E6NKTpBNorIBcWsCNvZHJ2YgTfCBMhjjC3+N4Jvr1TK7Jh8H/NiXnTDAOi4/eEIuJfK1TFzfp1NZOvHoTNGWnsfgWKZWpQ+lWpiEiN+aiImeNS571pUuR/XlDRM7yixHZSrrMnNQFj+jM5EwYyI51cRPtvo3OuHFAfX89U5rMW38/5szZNix+VrkoSV0WTCWe02ErxzVG5BxvnbgWfJMs8NukQv7njbRAU0QuXIzI2Xpq/DL/+CXt2LVIEtKNBXp36bj+/aNyTmbm6uVZl9sj18NlZR7Y5GZ3ndx01CY3ncL7660T14En8lNwyrOqq8Oyg+hjA0eNzLSLBGjEkzoVWSuaZMZn6RJTq8wJdSmyylqUa/gkamWrvqJLA4NTZpaTwO6J+VAnM/v/JP8TdKLiCjpxCROpDTe9TOX+gy/OJd8cr177uNyA39I2Pot1yFd3EBcw0S1U7j91MtOJjkkF+FLTt1QKiE1mLucTkJvcZ5XGgDPjgTkf/slTGLjNhwkQJ6gcENzzNilU0hV14dkKKvedOoVpNPY8dL9YTBxYReWA1MhNk0m9tCjz7tSEm2dQue8QB+zhZs2VyDXTSDJUDohrzPrHHcrV492KvDG1E4z3Hzj/wzDMn2N8oxpmYIOXAAAAAElFTkSuQmCC" />
   <link rel="manifest" href="/manifest.json" />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
-    .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
-    input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #007bff; color: #fff; font-size: 1rem; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
-    button:hover { background-color: #0056b3; }
-    button:active { background-color: #004085; transform: scale(0.98); }
+    :root {
+      --cor-ciano: #00bcd4;
+      --cor-roxo: #7b2cbf;
+      --cor-laranja: #ff7d00;
+      --cor-magenta: #e01a4f;
+      --cor-escuro: #101014;
+      --cor-card: #18181e;
+      --cor-borda: rgba(255, 255, 255, 0.09);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
+    body {
+      background: radial-gradient(circle at top, #1a1a24 0%, #0d0d10 100%);
+      color: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .container {
+      max-width: 440px;
+      width: 100%;
+      background: var(--cor-card);
+      padding: 2.8rem 2.2rem;
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      border: 1px solid var(--cor-borda);
+      position: relative;
+      overflow: hidden;
+    }
+    .container::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--cor-ciano), var(--cor-roxo), var(--cor-magenta));
+    }
+    .brand-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .brand-logo {
+      width: 68px;
+      height: 68px;
+      object-fit: contain;
+      margin-bottom: 12px;
+      filter: drop-shadow(0 6px 14px rgba(0, 188, 212, 0.35));
+    }
+    .brand-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #ffffff;
+    }
+    .brand-title span {
+      color: var(--cor-ciano);
+    }
+    .brand-subtitle {
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+    .input-label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #d1d5db;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 0.95rem 1.1rem;
+      margin-bottom: 1.2rem;
+      background: #22222a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      font-size: 0.95rem;
+      color: #ffffff;
+      transition: all 0.25s ease;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--cor-ciano);
+      box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.25);
+      background: #262630;
+    }
+    button {
+      width: 100%;
+      padding: 1rem;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--cor-roxo), #9d4edd);
+      color: #ffffff;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      box-shadow: 0 8px 22px rgba(123, 44, 191, 0.4);
+      transition: all 0.25s ease;
+      margin-top: 0.5rem;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(123, 44, 191, 0.6);
+    }
+    button:active {
+      transform: translateY(0);
+    }
     .password-wrapper { position: relative; }
-    .toggle-password { position: absolute; right: 12px; top: 18px; cursor: pointer; user-select: none; font-size: 1.2rem; }
-    .error { color: #dc3545; margin-bottom: 1rem; }
-    .info { color: #004085; background-color: #cce5ff; border-color: #b8daff; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
-    .success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
-    .links { margin-top: 1rem; text-align: center; font-size: 0.9rem; }
-    .links a { color: #007bff; text-decoration: none; }
+    .toggle-password {
+      position: absolute;
+      right: 14px;
+      top: 13px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 1.1rem;
+      opacity: 0.75;
+      transition: opacity 0.2s ease;
+    }
+    .toggle-password:hover { opacity: 1; }
+    .error {
+      color: #fca5a5;
+      background: rgba(220, 38, 38, 0.15);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 1.2rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .error:empty { display: none; }
+    .info {
+      color: #93c5fd;
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(37, 99, 235, 0.3);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 1.2rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .success {
+      color: #86efac;
+      background: rgba(22, 163, 74, 0.15);
+      border: 1px solid rgba(22, 163, 74, 0.3);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 1.2rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .links {
+      margin-top: 1.5rem;
+      text-align: center;
+      font-size: 0.88rem;
+      color: #9ca3af;
+    }
+    .links a {
+      color: var(--cor-ciano);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s ease;
+    }
+    .links a:hover {
+      color: #67e8f9;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Login</h1>
+    <div class="brand-header">
+      <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
+      <h1 class="brand-title"><span>CURADOS</span></h1>
+      <p class="brand-subtitle">Secretaria & Gestão Pastoral</p>
+    </div>
+
     <div id="loginMessage" class="error">${message}</div>
     <form id="loginForm">
-      <input name="username" placeholder="Usuário" required />
+      <label class="input-label" for="loginUsername">Usuário</label>
+      <input id="loginUsername" name="username" placeholder="Digite seu usuário" required autocomplete="username" />
+      
+      <label class="input-label" for="password">Senha</label>
       <div class="password-wrapper">
-        <input id="password" name="password" type="password" placeholder="Senha" required />
-        <span id="togglePassword" class="toggle-password">👀</span>
+        <input id="password" name="password" type="password" placeholder="Digite sua senha" required autocomplete="current-password" />
+        <span id="togglePassword" class="toggle-password" title="Ver senha">👀</span>
       </div>
-      <button type="submit">Entrar</button>
-      <div class="links">Não tem conta? <a href="/secretaria/register">Cadastre-se</a></div>
+      
+      <button type="submit">Acessar Painel</button>
+      <div class="links">
+        Primeiro acesso como líder? <a href="/secretaria/register">Concluir cadastro</a>
+      </div>
     </form>
   </div>
   <script>
@@ -80,38 +257,218 @@ function renderRegisterHtml(message = "") {
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Concluir Cadastro - Controle WhatsApp</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concluir Cadastro - Comunidade Cristã Curados</title>
   <link rel="icon" type="image/png" href="/images/logo.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVTSURBVFhH7ZYLbFNlFMevCig+wO32EXq7oRECIdnargwT1JBA104cRBRwXTeFvdjaTcNLQTCNtOwRGQy7rXsg0Q2QgILIGMpTIm9QYI++xrY4hqMbbZmDDRE4nu/uo1FnCdmDxMRf0tyb//fde873v+ecjfnPItxR84LgQHOS8FCLnq1qiKTyw0FQaVsoONjcLT7XDeILv4PwyK/A7nV+xmyDx+iWwUNQ5ZwuOtYOoqNtwFY6qtlK+1HhwV9A/HMXsFUuE902eAj2OPaTk7N7XVsZgEeIxlY5l4iOe0BQ5fCy39if4TcOFuweR73obCcEVzpVVGKCtp0dic7cFexrBMHuurFUHhwwgR96HHBuoBK64kwhnwWvHUH7G0ZSeeCIV5fNZ5geuwWVjrmiU76ewttjP4JBdwm+qwc+qSpnPv8A4jNwb9LbvjNlinGIVl20Nm3WDtBprJupzLC7bWbh4RYQV98Ccc0fIDqB33+vaydzuOkJsu7Rcxth+Wi4qpd8BEbmUf6hvpAaU/KkNqrop8QZmyBpxmaIjbJk0yV0wq7E6l8mONRsFO5r1FCZcaeN+hiWhAIsDQWPXnK+eaF0OF3qG7ro9SN0mpIz82PK4Z3pG+EtTdErdKkXnnTJ5JvvSQEWh0CHQXqhwyBh6VL/wCSk8ZoSL3FBG1VwjMq9aE/nfiQn78zgrrUuED9H5YEhVlWwODGmAuKjSyFumiWMyn48BmnYjcye07enSZZSeeCIVVkkceqibuJCnLoghcp+0P40cnqvXtLVlhI6isoDR6qyZKg2ytKaMnMrFmPh+1T2gxW/Ej4IhbY0rrlflR8Irco6VqcpvZUYswl0qgItlf1gAonEgWsGrvtqJiel8oMROzVf/IYq/74jFO3fTtoxLsp6U6cp7mVxa0bo8z49dweWhGD7cf4p+W/Uz5OENKQG9UzMhGkWNk5jPZPw6gZPnKbIP9/vMXt23nBsw9J5r30ByTO3YBcUrqNLvWgnAwhduL0whDiRCwzDT8+/4skY9VLXu9JWr4E74NYLn2Zw0qUveH07kNMlRJeRibdTqypKxqEzS6suXBGvLnbMx+BJ5PRq6wUynOi7etGcJA3GwI3EhbuLcBZkcGe86RK9L4ObikNp7jWDpAI14AfVh6MBOyeZMU45PCRWZdVie9lIm5FkyEnJPan4e7+E6NKTpBNorIBcWsCNvZHJ2YgTfCBMhjjC3+N4Jvr1TK7Jh8H/NiXnTDAOi4/eEIuJfK1TFzfp1NZOvHoTNGWnsfgWKZWpQ+lWpiEiN+aiImeNS571pUuR/XlDRM7yixHZSrrMnNQFj+jM5EwYyI51cRPtvo3OuHFAfX89U5rMW38/5szZNix+VrkoSV0WTCWe02ErxzVG5BxvnbgWfJMs8NukQv7njbRAU0QuXIzI2Xpq/DL/+CXt2LVIEtKNBXp36bj+/aNyTmbm6uVZl9sj18NlZR7Y5GZ3ndx01CY3ncL7660T14En8lNwyrOqq8Oyg+hjA0eNzLSLBGjEkzoVWSuaZMZn6RJTq8wJdSmyylqUa/gkamWrvqJLA4NTZpaTwO6J+VAnM/v/JP8TdKLiCjpxCROpDTe9TOX+gy/OJd8cr177uNyA39I2Pot1yFd3EBcw0S1U7j91MtOJjkkF+FLTt1QKiE1mLucTkJvcZ5XGgDPjgTkf/slTGLjNhwkQJ6gcENzzNilU0hV14dkKKvedOoVpNPY8dL9YTBxYReWA1MhNk0m9tCjz7tSEm2dQue8QB+zhZs2VyDXTSDJUDohrzPrHHcrV492KvDG1E4z3Hzj/wzDMn2N8oxpmYIOXAAAAAElFTkSuQmCC" />
+  <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVTSURBVFhH7ZYLbFNlFMevCig+wO32EXq7oRECIdnargwT1JBA104cRBRwXTeFvdjaTcNLQTCNtOwRGQy7rXsg0Q2QgILIGMpTIm9QYI++xrY4hqMbbZmDDRE4nu/uo1FnCdmDxMRf0tyb//fde873v+ecjfnPItxR84LgQHOS8FCLnq1qiKTyw0FQaVsoONjcLT7XDeILv4PwyK/A7nV+xmyDx+iWwUNQ5ZwuOtYOoqNtwFY6qtlK+1HhwV9A/HMXsFUuE902eAj2OPaTk7N7XVsZgEeIxlY5l4iOe0BQ5fCy39if4TcOFuweR73obCcEVzpVVGKCtp0dic7cFexrBMHuurFUHhwwgR96HHBuoBK64kwhnwWvHUH7G0ZSeeCIV5fNZ5geuwWVjrmiU76ewttjP4JBdwm+qwc+qSpnPv8A4jNwb9LbvjNlinGIVl20Nm3WDtBprJupzLC7bWbh4RYQV98Ccc0fIDqB33+vaydzuOkJsu7Rcxth+Wi4qpd8BEbmUf6hvpAaU/KkNqrop8QZmyBpxmaIjbJk0yV0wq7E6l8mONRsFO5r1FCZcaeN+hiWhAIsDQWPXnK+eaF0OF3qG7ro9SN0mpIz82PK4Z3pG+EtTdErdKkXnnTJ5JvvSQEWh0CHQXqhwyBh6VL/wCSk8ZoSL3FBG1VwjMq9aE/nfiQn78zgrrUuED9H5YEhVlWwODGmAuKjSyFumiWMyn48BmnYjcye07enSZZSeeCIVVkkceqibuJCnLoghcp+0P40cnqvXtLVlhI6isoDR6qyZKg2ytKaMnMrFmPh+1T2gxW/Ej4IhbY0rrlflR8Irco6VqcpvZUYswl0qgItlf1gAonEgWsGrvtqJiel8oMROzVf/IYq/74jFO3fTtoxLsp6U6cp7mVxa0bo8z49dweWhGD7cf4p+W/Uz5OENKQG9UzMhGkWNk5jPZPw6gZPnKbIP9/vMXt23nBsw9J5r30ByTO3YBcUrqNLvWgnAwhduL0whDiRCwzDT8+/4skY9VLXu9JWr4E74NYLn2Zw0qUveH07kNMlRJeRibdTqypKxqEzS6suXBGvLnbMx+BJ5PRq6wUynOi7etGcJA3GwI3EhbuLcBZkcGe86RK9L4ObikNp7jWDpAI14AfVh6MBOyeZMU45PCRWZdVie9lIm5FkyEnJPan4e7+E6NKTpBNorIBcWsCNvZHJ2YgTfCBMhjjC3+N4Jvr1TK7Jh8H/NiXnTDAOi4/eEIuJfK1TFzfp1NZOvHoTNGWnsfgWKZWpQ+lWpiEiN+aiImeNS571pUuR/XlDRM7yixHZSrrMnNQFj+jM5EwYyI51cRPtvo3OuHFAfX89U5rMW38/5szZNix+VrkoSV0WTCWe02ErxzVG5BxvnbgWfJMs8NukQv7njbRAU0QuXIzI2Xpq/DL/+CXt2LVIEtKNBXp36bj+/aNyTmbm6uVZl9sj18NlZR7Y5GZ3ndx01CY3ncL7660T14En8lNwyrOqq8Oyg+hjA0eNzLSLBGjEkzoVWSuaZMZn6RJTq8wJdSmyylqUa/gkamWrvqJLA4NTZpaTwO6J+VAnM/v/JP8TdKLiCjpxCROpDTe9TOX+gy/OJd8cr177uNyA39I2Pot1yFd3EBcw0S1U7j91MtOJjkkF+FLTt1QKiE1mLucTkJvcZ5XGgDPjgTkf/slTGLjNhwkQJ6gcENzzNilU0hV14dkKKvedOoVpNPY8dL9YTBxYReWA1MhNk0m9tCjz7tSEm2dQue8QB+zhZs2VyDXTSDJUDohrzPrHHcrV492KvDG1E4z3Hzj/wzDMn2N8oxpmYIOXAAAAAElFTkSuQmCC" />
   <link rel="manifest" href="/manifest.json" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 1.5rem; background: #f5f5f5; color: #111; }
-    .container { max-width: 420px; margin: 4rem auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
-    input { width: 100%; padding: .8rem; margin: .5rem 0 1rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-    button { width: 100%; padding: .9rem; border: none; border-radius: 8px; background: #28a745; color: #fff; font-size: 1rem; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
-    button:hover { background-color: #218838; }
-    button:active { background-color: #1e7e34; transform: scale(0.98); }
+    :root {
+      --cor-ciano: #00bcd4;
+      --cor-roxo: #7b2cbf;
+      --cor-laranja: #ff7d00;
+      --cor-magenta: #e01a4f;
+      --cor-escuro: #101014;
+      --cor-card: #18181e;
+      --cor-borda: rgba(255, 255, 255, 0.09);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
+    body {
+      background: radial-gradient(circle at top, #1a1a24 0%, #0d0d10 100%);
+      color: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .container {
+      max-width: 440px;
+      width: 100%;
+      background: var(--cor-card);
+      padding: 2.8rem 2.2rem;
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      border: 1px solid var(--cor-borda);
+      position: relative;
+      overflow: hidden;
+    }
+    .container::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--cor-laranja), var(--cor-magenta));
+    }
+    .brand-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .brand-logo {
+      width: 68px;
+      height: 68px;
+      object-fit: contain;
+      margin-bottom: 12px;
+      filter: drop-shadow(0 6px 14px rgba(255, 125, 0, 0.35));
+    }
+    .brand-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #ffffff;
+    }
+    .brand-title span {
+      color: var(--cor-laranja);
+    }
+    .brand-subtitle {
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+    .input-label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #d1d5db;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 0.95rem 1.1rem;
+      margin-bottom: 1.2rem;
+      background: #22222a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      font-size: 0.95rem;
+      color: #ffffff;
+      transition: all 0.25s ease;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--cor-laranja);
+      box-shadow: 0 0 0 3px rgba(255, 125, 0, 0.25);
+      background: #262630;
+    }
+    button {
+      width: 100%;
+      padding: 1rem;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--cor-laranja), var(--cor-magenta));
+      color: #ffffff;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      box-shadow: 0 8px 22px rgba(255, 125, 0, 0.35);
+      transition: all 0.25s ease;
+      margin-top: 0.5rem;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(255, 125, 0, 0.55);
+    }
+    button:active {
+      transform: translateY(0);
+    }
     .password-wrapper { position: relative; }
-    .toggle-password { position: absolute; right: 12px; top: 18px; cursor: pointer; user-select: none; font-size: 1.2rem; }
-    .error { color: #dc3545; margin-bottom: 1rem; }
-    .info { color: #004085; background-color: #cce5ff; border-color: #b8daff; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
-    .success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: .75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: .25rem; }
+    .toggle-password {
+      position: absolute;
+      right: 14px;
+      top: 13px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 1.1rem;
+      opacity: 0.75;
+      transition: opacity 0.2s ease;
+    }
+    .toggle-password:hover { opacity: 1; }
+    .error {
+      color: #fca5a5;
+      background: rgba(220, 38, 38, 0.15);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 1.2rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .info {
+      color: #93c5fd;
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(37, 99, 235, 0.3);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 1.2rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .success {
+      color: #86efac;
+      background: rgba(22, 163, 74, 0.15);
+      border: 1px solid rgba(22, 163, 74, 0.3);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 1.2rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .links {
+      margin-top: 1.5rem;
+      text-align: center;
+      font-size: 0.88rem;
+      color: #9ca3af;
+    }
+    .links a {
+      color: var(--cor-laranja);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s ease;
+    }
+    .links a:hover {
+      color: #fdba74;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Concluir Cadastro</h1>
-    <div id="regMessage" class="info">${message || 'Defina sua senha para acessar o painel.'}</div>
+    <div class="brand-header">
+      <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
+      <h1 class="brand-title"><span>CURADOS</span></h1>
+      <p class="brand-subtitle">Concluir Cadastro de Líder</p>
+    </div>
+
+    <div id="regMessage" class="info">${message || 'Defina sua senha pessoal para acessar o painel.'}</div>
     <form id="regForm">
-      <input name="username" placeholder="Seu usuário (conforme criado pelo Admin)" required />
+      <label class="input-label" for="regUsername">Seu Usuário</label>
+      <input id="regUsername" name="username" placeholder="Usuário cadastrado pelo Admin" required autocomplete="username" />
+      
+      <label class="input-label" for="password">Nova Senha</label>
       <div class="password-wrapper">
-        <input id="password" name="password" type="password" placeholder="Nova Senha" required minlength="6" />
-        <span id="togglePassword" class="toggle-password">👀</span>
+        <input id="password" name="password" type="password" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="new-password" />
+        <span id="togglePassword" class="toggle-password" title="Ver senha">👀</span>
       </div>
-      <input name="confirmPassword" type="password" placeholder="Confirmar Senha" required minlength="6" />
+
+      <label class="input-label" for="confirmPassword">Confirmar Nova Senha</label>
+      <input id="confirmPassword" name="confirmPassword" type="password" placeholder="Repita a nova senha" required minlength="6" autocomplete="new-password" />
+      
       <button type="submit">Definir Senha e Entrar</button>
-      <div style="margin-top:1rem; text-align:center;"><a href="/secretaria/login">Voltar ao login</a></div>
+      <div class="links">
+        Já possui senha? <a href="/secretaria/login">Voltar ao login</a>
+      </div>
     </form>
   </div>
   <script>
@@ -161,101 +518,387 @@ function renderIndexHtml() {
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Controle WhatsApp</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secretaria & Gestão - Comunidade Cristã Curados</title>
   <link rel="icon" type="image/png" href="/images/logo.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVTSURBVFhH7ZYLbFNlFMevCig+wO32EXq7oRECIdnargwT1JBA104cRBRwXTeFvdjaTcNLQTCNtOwRGQy7rXsg0Q2QgILIGMpTIm9QYI++xrY4hqMbbZmDDRE4nu/uo1FnCdmDxMRf0tyb//fde873v+ecjfnPItxR84LgQHOS8FCLnq1qiKTyw0FQaVsoONjcLT7XDeILv4PwyK/A7nV+xmyDx+iWwUNQ5ZwuOtYOoqNtwFY6qtlK+1HhwV9A/HMXsFUuE902eAj2OPaTk7N7XVsZgEeIxlY5l4iOe0BQ5fCy39if4TcOFuweR73obCcEVzpVVGKCtp0dic7cFexrBMHuurFUHhwwgR96HHBuoBK64kwhnwWvHUH7G0ZSeeCIV5fNZ5geuwWVjrmiU76ewttjP4JBdwm+qwc+qSpnPv8A4jNwb9LbvjNlinGIVl20Nm3WDtBprJupzLC7bWbh4RYQV98Ccc0fIDqB33+vaydzuOkJsu7Rcxth+Wi4qpd8BEbmUf6hvpAaU/KkNqrop8QZmyBpxmaIjbJk0yV0wq7E6l8mONRsFO5r1FCZcaeN+hiWhAIsDQWPXnK+eaF0OF3qG7ro9SN0mpIz82PK4Z3pG+EtTdErdKkXnnTJ5JvvSQEWh0CHQXqhwyBh6VL/wCSk8ZoSL3FBG1VwjMq9aE/nfiQn78zgrrUuED9H5YEhVlWwODGmAuKjSyFumiWMyn48BmnYjcye07enSZZSeeCIVVkkceqibuJCnLoghcp+0P40cnqvXtLVlhI6isoDR6qyZKg2ytKaMnMrFmPh+1T2gxW/Ej4IhbY0rrlflR8Irco6VqcpvZUYswl0qgItlf1gAonEgWsGrvtqJiel8oMROzVf/IYq/74jFO3fTtoxLsp6U6cp7mVxa0bo8z49dweWhGD7cf4p+W/Uz5OENKQG9UzMhGkWNk5jPZPw6gZPnKbIP9/vMXt23nBsw9J5r30ByTO3YBcUrqNLvWgnAwhduL0whDiRCwzDT8+/4skY9VLXu9JWr4E74NYLn2Zw0qUveH07kNMlRJeRibdTqypKxqEzS6suXBGvLnbMx+BJ5PRq6wUynOi7etGcJA3GwI3EhbuLcBZkcGe86RK9L4ObikNp7jWDpAI14AfVh6MBOyeZMU45PCRWZdVie9lIm5FkyEnJPan4e7+E6NKTpBNorIBcWsCNvZHJ2YgTfCBMhjjC3+N4Jvr1TK7Jh8H/NiXnTDAOi4/eEIuJfK1TFzfp1NZOvHoTNGWnsfgWKZWpQ+lWpiEiN+aiImeNS571pUuR/XlDRM7yixHZSrrMnNQFj+jM5EwYyI51cRPtvo3OuHFAfX89U5rMW38/5szZNix+VrkoSV0WTCWe02ErxzVG5BxvnbgWfJMs8NukQv7njbRAU0QuXIzI2Xpq/DL/+CXt2LVIEtKNBXp36bj+/aNyTmbm6uVZl9sj18NlZR7Y5GZ3ndx01CY3ncL7660T14En8lNwyrOqq8Oyg+hjA0eNzLSLBGjEkzoVWSuaZMZn6RJTq8wJdSmyylqUa/gkamWrvqJLA4NTZpaTwO6J+VAnM/v/JP8TdKLiCjpxCROpDTe9TOX+gy/OJd8cr177uNyA39I2Pot1yFd3EBcw0S1U7j91MtOJjkkF+FLTt1QKiE1mLucTkJvcZ5XGgDPjgTkf/slTGLjNhwkQJ6gcENzzNilU0hV14dkKKvedOoVpNPY8dL9YTBxYReWA1MhNk0m9tCjz7tSEm2dQue8QB+zhZs2VyDXTSDJUDohrzPrHHcrV492KvDG1E4z3Hzj/wzDMn2N8oxpmYIOXAAAAAElFTkSuQmCC" />
   <link rel="manifest" href="/manifest.json" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <style>
-    body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 1rem; background: #f0f2f5; }
-    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.1); }
-    .tabs { display: flex; border-bottom: 2px solid #e4e6eb; margin-bottom: 1.5rem; }
-    .tab-btn { padding: 1rem; cursor: pointer; border: none; background: none; font-weight: 600; color: #65676b; border-radius: 0; margin-right: 0; }
-    .tab-btn:hover { color: #050505; background: rgba(0,0,0,0.05); transform: none; }
-    .tab-btn:active { background: rgba(0,0,0,0.08); transform: none; }
-    .tab-btn.active { color: #007bff; border-bottom: 3px solid #007bff; background: none; }
-    .tab-btn.active:hover { background: none; }
+    :root {
+      --cor-ciano: #00bcd4;
+      --cor-ciano-brilho: rgba(0, 188, 212, 0.18);
+      --cor-roxo: #7b2cbf;
+      --cor-roxo-brilho: rgba(123, 44, 191, 0.25);
+      --cor-laranja: #ff7d00;
+      --cor-magenta: #e01a4f;
+      --cor-escuro: #0e0e12;
+      --cor-card: #18181f;
+      --cor-card-alt: #202028;
+      --cor-borda: rgba(255, 255, 255, 0.08);
+      --cor-texto: #f3f4f6;
+      --cor-texto-mutado: #9ca3af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
+    body {
+      background-color: var(--cor-escuro);
+      color: var(--cor-texto);
+      margin: 0;
+      padding: 1.5rem;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      background: var(--cor-card);
+      padding: 2.2rem;
+      border-radius: 24px;
+      box-shadow: 0 16px 45px rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--cor-borda);
+      position: relative;
+    }
+    .container::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--cor-ciano), var(--cor-roxo), var(--cor-magenta));
+      border-radius: 24px 24px 0 0;
+    }
+    .header-painel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.2rem;
+      border-bottom: 1px solid var(--cor-borda);
+    }
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-logo-small {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+    }
+    .brand-text h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: #ffffff;
+      margin: 0;
+    }
+    .brand-text h1 span {
+      color: var(--cor-ciano);
+    }
+    .brand-text p {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--cor-texto-mutado);
+      margin: 0;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--cor-borda);
+      margin-bottom: 2rem;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 0.85rem 1.4rem;
+      cursor: pointer;
+      border: none;
+      background: none;
+      font-weight: 600;
+      font-size: 0.92rem;
+      color: var(--cor-texto-mutado);
+      border-radius: 12px 12px 0 0;
+      transition: all 0.2s ease;
+      position: relative;
+      white-space: nowrap;
+    }
+    .tab-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .tab-btn.active {
+      color: var(--cor-ciano);
+      font-weight: 700;
+      background: rgba(0, 188, 212, 0.08);
+      border-bottom: 3px solid var(--cor-ciano);
+    }
     .tab-content { display: none; }
-    .tab-content.active { display: block; }
-    .message-box { padding: 10px; margin-bottom: 10px; border-radius: 5px; }
-    button { padding: .8rem; border-radius: 8px; border: none; cursor: pointer; margin-right: 5px; transition: background-color 0.2s, transform 0.1s, color 0.2s; background: #e4e6eb; color: #050505; }
-    button:hover { background-color: #d8dadf; }
-    button:active { background-color: #ccd0d5; transform: scale(0.98); }
-    .primary { background: #007bff; color: white; }
-    .primary:hover { background-color: #0056b3; }
-    .primary:active { background-color: #004085; }
-    .danger { background: #dc3545; color: white; }
-    .danger:hover { background-color: #c82333; }
-    .danger:active { background-color: #bd2130; }
-    #logsContainer { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; height: 300px; overflow-y: auto; font-family: monospace; }
-    li { background: #f9f9f9; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; border-radius: 5px; }
-    .filtros-lideres { display: flex; gap: 10px; margin-bottom: 1rem; }
-    .filtros-lideres input { flex: 1; }
-    .cargos-container { margin: 0.8rem 0; padding: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
-    .cargos-title { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; color: #334155; }
-    .cargos-checkboxes { display: flex; flex-wrap: wrap; gap: 16px; }
-    .cargos-checkboxes label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #1e293b; user-select: none; }
-    .cargos-checkboxes input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; accent-color: #007bff; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: capitalize; margin-left: 6px; vertical-align: middle; }
-    .badge-lider { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-    .badge-pastor { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-    .badge-diretor { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
-    .badge-membro { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-    @media (max-width: 480px) {
+    .tab-content.active { display: block; animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .section-title-tab {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 1.2rem;
+      letter-spacing: -0.3px;
+    }
+    .message-box {
+      padding: 12px 16px;
+      margin-bottom: 1rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    button {
+      padding: 0.75rem 1.4rem;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+      background: #2b2b36;
+      color: #ffffff;
+    }
+    button:hover {
+      background: #383846;
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .primary {
+      background: linear-gradient(135deg, var(--cor-roxo), #9d4edd);
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: 0 4px 14px var(--cor-roxo-brilho);
+    }
+    .primary:hover {
+      background: linear-gradient(135deg, #8a34d6, #ad5eff);
+      box-shadow: 0 6px 18px rgba(123, 44, 191, 0.45);
+    }
+    .danger {
+      background: var(--cor-magenta);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .danger:hover {
+      background: #c51443;
+    }
+    #logout {
+      background: rgba(224, 26, 79, 0.12);
+      color: #f87171;
+      border: 1px solid rgba(224, 26, 79, 0.3);
+      font-size: 0.85rem;
+      padding: 0.55rem 1.2rem;
+    }
+    #logout:hover {
+      background: var(--cor-magenta);
+      color: #ffffff;
+    }
+    #status {
+      font-size: 1.05rem;
+      padding: 16px 20px;
+      background: var(--cor-card-alt);
+      border-radius: 14px;
+      border: 1px solid var(--cor-borda);
+      margin-bottom: 1rem;
+      display: inline-block;
+      width: 100%;
+    }
+    #qr {
+      margin: 1.5rem 0;
+      padding: 1.5rem;
+      background: #ffffff;
+      border-radius: 18px;
+      display: inline-block;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    }
+    #qr:empty { display: none; }
+    #qr img { display: block; max-width: 250px; height: auto; }
+    #logsContainer {
+      background: #09090c;
+      color: #34d399;
+      padding: 1.2rem;
+      border-radius: 14px;
+      height: 380px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    ul { list-style: none; }
+    li {
+      background: var(--cor-card-alt);
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 12px;
+      border: 1px solid var(--cor-borda);
+      font-size: 0.95rem;
+      transition: background 0.2s ease;
+    }
+    li:hover {
+      background: #252530;
+    }
+    .filtros-lideres {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 1.4rem;
+    }
+    .filtros-lideres input { flex: 1; margin-bottom: 0; }
+    input, select {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      margin: 0.4rem 0 1rem;
+      background: #202028;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      color: #ffffff;
+      transition: all 0.2s ease;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--cor-ciano);
+      box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.2);
+    }
+    select { cursor: pointer; }
+    hr {
+      border: none;
+      height: 1px;
+      background: var(--cor-borda);
+      margin: 2rem 0;
+    }
+    .cargos-container {
+      margin: 0.8rem 0 1.2rem;
+      padding: 1.1rem;
+      background: var(--cor-card-alt);
+      border: 1px solid var(--cor-borda);
+      border-radius: 12px;
+    }
+    .cargos-title {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      font-size: 0.88rem;
+      color: #e5e7eb;
+    }
+    .cargos-checkboxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
+    .cargos-checkboxes label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #d1d5db;
+      user-select: none;
+    }
+    .cargos-checkboxes input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+      accent-color: var(--cor-ciano);
+      transform: scale(1.15);
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .badge-lider { background: rgba(0, 188, 212, 0.15); color: #00bcd4; border: 1px solid rgba(0, 188, 212, 0.35); }
+    .badge-pastor { background: rgba(255, 125, 0, 0.15); color: #ff7d00; border: 1px solid rgba(255, 125, 0, 0.35); }
+    .badge-diretor { background: rgba(123, 44, 191, 0.18); color: #c084fc; border: 1px solid rgba(123, 44, 191, 0.35); }
+    .badge-membro { background: rgba(255, 255, 255, 0.08); color: #9ca3af; border: 1px solid rgba(255, 255, 255, 0.15); }
+    @media (max-width: 600px) {
+      .header-painel { flex-direction: column; align-items: flex-start; gap: 14px; }
       .filtros-lideres { flex-direction: column; gap: 0; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h1>Painel de Controle</h1>
-      <button id="logout">Sair</button>
+    <div class="header-painel">
+      <div class="brand-group">
+        <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo-small" />
+        <div class="brand-text">
+          <h1><span>CURADOS</span></h1>
+          <p>Secretaria & Painel de Controle</p>
+        </div>
+      </div>
+      <button id="logout">Sair do Painel</button>
     </div>
+
     <div class="tabs">
-      <button class="tab-btn active" onclick="openTab(event, 'tab-whatsapp')">Whatsapp</button>
-      <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">Perfil de acesso</button>
+      <button class="tab-btn active" onclick="openTab(event, 'tab-whatsapp')">WhatsApp</button>
+      <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">Perfil de Acesso</button>
       <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">Usuários & Cargos</button>
       <button class="tab-btn" id="btn-tab-logs" style="display:none;" onclick="openTab(event, 'tab-logs')">Logs</button>
     </div>
     
     <div id="tab-whatsapp" class="tab-content active">
       <div id="status">Carregando...</div>
-      <div id="actionMessage" style="color: #007bff; margin: 0.5rem 0;"></div>
+      <div id="actionMessage" style="color: var(--cor-ciano); margin: 0.5rem 0; font-weight:600;"></div>
       <div id="qr"></div>
-      <button class="primary" id="requestQr" style="display:none">Solicitar QR Code</button>
-      <button id="cancelQr" style="display:none">Cancelar QR Code</button>
-      <button class="danger" id="disconnect" style="display:none">Desconectar WhatsApp</button>
+      <div>
+        <button class="primary" id="requestQr" style="display:none">Solicitar QR Code</button>
+        <button id="cancelQr" style="display:none">Cancelar QR Code</button>
+        <button class="danger" id="disconnect" style="display:none">Desconectar WhatsApp</button>
+      </div>
     </div>
 
     <div id="tab-admin" class="tab-content">
-      <h3>Usuários</h3>
+      <h3 class="section-title-tab">Usuários do Sistema</h3>
       <ul id="userList"></ul>
       <hr>
-      <h4>Novo Usuário</h4>
+      <h4 style="font-size: 1.1rem; color: #ffffff; margin-bottom: 0.75rem;">Novo Usuário</h4>
       <div id="adminMessage" class="message-box" style="display:none;"></div>
       <form id="addUserForm">
-        <input name="username" placeholder="Usuário" required />
-        <select name="role"><option value="user">Usuário</option><option value="admin">Administrador</option></select>
-        <button type="submit" class="primary">Adicionar</button>
+        <input name="username" placeholder="Nome de usuário" required />
+        <select name="role">
+          <option value="user">Usuário Líder</option>
+          <option value="admin">Administrador</option>
+        </select>
+        <button type="submit" class="primary">Adicionar Usuário</button>
       </form>
     </div>
 
     <div id="tab-lideres" class="tab-content">
-      <h3>Usuários & Cargos</h3>
+      <h3 class="section-title-tab">Gestão de Usuários & Cargos</h3>
       <div class="filtros-lideres">
-        <input id="filtroLiderNome" placeholder="Buscar por nome ou cargo" />
-        <input id="filtroLiderTelefone" placeholder="Buscar por telefone" inputmode="numeric" autocomplete="off" />
+        <input id="filtroLiderNome" placeholder="🔍 Buscar por nome ou cargo" />
+        <input id="filtroLiderTelefone" placeholder="📱 Buscar por telefone" inputmode="numeric" autocomplete="off" />
       </div>
       <ul id="liderList"></ul>
       <hr>
-      <h4 id="liderFormTitle">Novo Usuário / Cargo</h4>
+      <h4 id="liderFormTitle" style="font-size: 1.1rem; color: #ffffff; margin-bottom: 0.75rem;">Novo Usuário / Cargo</h4>
       <div id="lideresMessage" class="message-box" style="display:none;"></div>
       <form id="addLiderForm">
         <input name="nome" placeholder="Nome completo" required />
         <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" autocomplete="off" required />
         <div class="cargos-container">
-          <span class="cargos-title">Cargos / Permissões:</span>
+          <span class="cargos-title">Cargos / Permissões Ministeriais:</span>
           <div class="cargos-checkboxes">
             <label><input type="checkbox" name="cargos" value="lider" checked /> Líder</label>
             <label><input type="checkbox" name="cargos" value="pastor" /> Pastor</label>
@@ -263,15 +906,17 @@ function renderIndexHtml() {
             <label><input type="checkbox" name="cargos" value="membro" /> Membro</label>
           </div>
         </div>
-        <button type="submit" id="liderSubmitBtn" class="primary">Adicionar</button>
-        <button type="button" id="cancelarEdicaoLider" style="display:none;">Cancelar</button>
+        <div style="display: flex; gap: 10px;">
+          <button type="submit" id="liderSubmitBtn" class="primary">Adicionar</button>
+          <button type="button" id="cancelarEdicaoLider" style="display:none;">Cancelar</button>
+        </div>
       </form>
     </div>
 
     <div id="tab-logs" class="tab-content">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-        <h3 style="margin:0;">Logs</h3>
-        <button class="danger" id="clearLogsBtn" style="padding: 5px 10px; font-size: 0.8rem; width: auto;">Limpar Logs</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+        <h3 class="section-title-tab" style="margin:0;">Logs do Sistema</h3>
+        <button class="danger" id="clearLogsBtn" style="padding: 6px 14px; font-size: 0.82rem; width: auto;">Limpar Logs</button>
       </div>
       <pre id="logsContainer">Carregando logs...</pre>
     </div>
@@ -445,14 +1090,16 @@ function renderIndexHtml() {
     ativarMascaraTelefone(document.getElementById('filtroLiderTelefone'));
 
     let liderEmEdicao = null; // telefone (normalizado) do líder sendo editado, ou null quando é um cadastro novo
-    let lideresCache = []; // última lista     // Remove acentos para a busca por nome encontrar "joao" mesmo quando o líder está cadastrado como "João"
+    let lideresCache = []; // última lista carregada do servidor
+
+    // Remove acentos para a busca por nome encontrar "joao" mesmo quando o líder está cadastrado como "João"
     function normalizarBusca(texto) {
-      return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return (texto || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
     }
 
     function renderLideres() {
       const filtroNome = normalizarBusca(document.getElementById('filtroLiderNome').value);
-      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\D/g, '');
+      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\\D/g, '');
 
       const filtrados = lideresCache.filter(l => {
         const cargosStr = Array.isArray(l.cargos) ? l.cargos.join(' ') : (l.cargos || '');
@@ -490,6 +1137,7 @@ function renderIndexHtml() {
         // Agrupa os dois botões numa única "coluna" à direita
         const acoes = document.createElement('span');
         acoes.style.display = 'flex';
+        acoes.style.gap = '8px';
 
         const btnEditar = document.createElement('button');
         btnEditar.textContent = 'Editar';
@@ -576,14 +1224,14 @@ function renderIndexHtml() {
       
       if (res.ok) {
         console.log('Usuário criado com sucesso.');
-        msgEl.style.backgroundColor = '#d4edda';
-        msgEl.style.color = '#155724';
+        msgEl.style.backgroundColor = 'rgba(22, 163, 74, 0.2)';
+        msgEl.style.color = '#86efac';
         e.target.reset();
         fetchUsers();
       } else {
         console.error('Erro ao criar usuário:', json.message);
-        msgEl.style.backgroundColor = '#f8d7da';
-        msgEl.style.color = '#721c24';
+        msgEl.style.backgroundColor = 'rgba(220, 38, 38, 0.2)';
+        msgEl.style.color = '#fca5a5';
       }
     });
 
@@ -598,8 +1246,8 @@ function renderIndexHtml() {
         const msgEl = document.getElementById('lideresMessage');
         msgEl.style.display = 'block';
         msgEl.textContent = 'Selecione ao menos uma permissão / cargo.';
-        msgEl.style.backgroundColor = '#f8d7da';
-        msgEl.style.color = '#721c24';
+        msgEl.style.backgroundColor = 'rgba(220, 38, 38, 0.2)';
+        msgEl.style.color = '#fca5a5';
         return;
       }
       data.cargos = checkedBoxes;
@@ -620,13 +1268,14 @@ function renderIndexHtml() {
 
       if (res.ok) {
         console.log(editando ? 'Usuário atualizado com sucesso.' : 'Usuário adicionado com sucesso.');
-        msgEl.style.backgroundColor = '#d4edda';
-        msgEl.style.color = '#155724';
+        msgEl.style.backgroundColor = 'rgba(22, 163, 74, 0.2)';
+        msgEl.style.color = '#86efac';
         cancelarEdicaoLider();
         fetchLideres();
       } else {
         console.error((editando ? 'Erro ao editar usuário:' : 'Erro ao adicionar usuário:'), json.message);
-        msgEl.style.backgroundColor = '#f8d7da';
+        msgEl.style.backgroundColor = 'rgba(220, 38, 38, 0.2)';
+        msgEl.style.color = '#fca5a5';
       }
     });
 
@@ -665,4 +1314,5 @@ function renderIndexHtml() {
   </script>
 </body></html>`;
 }
+
 module.exports = { renderLoginHtml, renderRegisterHtml, renderIndexHtml };

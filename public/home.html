@@ -969,6 +969,7 @@
 
         .contato-cargo-tag.secretaria { color: var(--cor-ciano); }
         .contato-cargo-tag.tesouraria { color: var(--cor-laranja); }
+        .contato-cargo-tag.email { color: #60a5fa; }
 
         .contato-numero-tel {
             font-size: 1.15rem;
@@ -1004,6 +1005,27 @@
         .btn-whatsapp-contato:hover {
             transform: scale(1.1);
             box-shadow: 0 6px 18px rgba(37, 211, 102, 0.5);
+        }
+
+        .btn-email-contato {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #2563eb;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-email-contato:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.5);
         }
 
         /* Coluna Links Rápidos */
@@ -1101,10 +1123,7 @@
 
         @media (max-width: 768px) {
             .navbar-nav {
-                display: none; /* Em telas compactas, foco no botão de ação */
-            }
-            #btn-mobile-sec {
-                display: inline-flex !important;
+                display: none; /* Em telas compactas, foco no logotipo e links */
             }
             .banner-curados {
                 min-height: auto;
@@ -1192,9 +1211,7 @@
             <li><a href="#cultos">Horários de Culto</a></li>
             <li><a href="#onde-estamos">Onde Estamos</a></li>
             <li><a href="#contato">Contatos</a></li>
-            <li><a href="/secretaria" class="btn-nav-secretaria">Painel Secretaria</a></li>
         </ul>
-        <a href="/secretaria" class="btn-nav-secretaria" style="display: none;" id="btn-mobile-sec">Painel</a>
     </nav>
 
     <!-- 1. Seção do Banner Inicial (Hero) -->
@@ -1477,12 +1494,12 @@
                         <div class="card-contato-footer">
                             <div class="contato-info-texto">
                                 <span class="contato-cargo-tag secretaria">Secretaria Pastoral & Administrativa</span>
-                                <a href="https://wa.me/5511946593056" class="contato-numero-tel" target="_blank" rel="noopener noreferrer">
-                                    (11) 94659-3056
+                                <a href="https://wa.me/5511937613279" class="contato-numero-tel" target="_blank" rel="noopener noreferrer">
+                                    (11) 93761-3279
                                 </a>
                                 <span class="contato-desc-funcao">Atendimento geral, informações, agenda e oração</span>
                             </div>
-                            <a href="https://wa.me/5511946593056" target="_blank" rel="noopener noreferrer" 
+                            <a href="https://wa.me/5511937613279" target="_blank" rel="noopener noreferrer" 
                                class="btn-whatsapp-contato" title="Conversar no WhatsApp com a Secretaria" aria-label="WhatsApp Secretaria">
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24m4.52 11.64c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.03-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.12-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.59.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z"/>
@@ -1508,6 +1525,22 @@
                                 <span style="display: none; font-size: 0.85rem;">Falar no WhatsApp</span>
                             </a>
                         </div>
+
+                        <!-- Contato E-mail -->
+                        <div class="card-contato-footer">
+                            <div class="contato-info-texto">
+                                <span class="contato-cargo-tag email">E-mail Oficial</span>
+                                <a href="mailto:secretaria.curados@gmail.com" class="contato-numero-tel" style="font-size: 1.02rem; word-break: break-all;">
+                                    secretaria.curados@gmail.com
+                                </a>
+                                <span class="contato-desc-funcao">Envio de comunicados, documentos e mensagens</span>
+                            </div>
+                            <a href="mailto:secretaria.curados@gmail.com" class="btn-email-contato" title="Enviar e-mail para a Secretaria" aria-label="E-mail Secretaria">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                                </svg>
+                            </a>
+                        </div>
                     </div>
                 </div>
 
@@ -1520,7 +1553,6 @@
                         <li><a href="#colunas">Nossas Colunas</a></li>
                         <li><a href="#cultos">Horários de Culto</a></li>
                         <li><a href="#onde-estamos">Onde Estamos</a></li>
-                        <li><a href="/secretaria" class="link-destaque-secretaria">Painel da Secretaria & Líderes</a></li>
                     </ul>
                 </div>
             </div>

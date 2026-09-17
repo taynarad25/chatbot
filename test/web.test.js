@@ -96,14 +96,19 @@ test("GET / e GET /home: servem a página inicial institucional com seções de 
     assert.match(html, /R\. Benedicto de Abreu Júnior, 40/);
     assert.match(html, /Jardim Nova Itapevi, Itapevi - SP/);
 
-    // Rodapé com contatos da Secretaria e da Tesouraria
-    assert.match(html, /\(11\) 94659-3056/);
-    assert.match(html, /https:\/\/wa\.me\/5511946593056/);
+    // Rodapé com contatos da Secretaria, Tesouraria e E-mail
+    assert.match(html, /\(11\) 93761-3279/);
+    assert.match(html, /https:\/\/wa\.me\/5511937613279/);
     assert.match(html, /Secretaria Pastoral/);
 
     assert.match(html, /\(11\) 99111-7612/);
     assert.match(html, /https:\/\/wa\.me\/5511991117612/);
     assert.match(html, /Tesouraria & Finanças/);
+
+    assert.match(html, /secretaria\.curados@gmail\.com/);
+
+    // O link para a secretaria é confidencial e não deve estar visível na home pública
+    assert.doesNotMatch(html, /href="\/secretaria"/, "link da secretaria não deve estar exposto na home");
   }
 });
 
