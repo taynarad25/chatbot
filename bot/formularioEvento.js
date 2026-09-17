@@ -4,7 +4,28 @@ const WEBHOOK_GOOGLE_DOCS_URL =
 
 const ENDERECO_IGREJA = "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi";
 const LOCAL_IGREJA_REGEX = /\bigreja\b|\btemplo\b|\bsal[aã]o\b/i;
-const CONTATO_TESOURARIA = "+55 11 99111-7912";
+const CONTATO_TESOURARIA = "+55 11 99111-7612";
+
+function formatarJidWhatsApp(telefone) {
+  if (!telefone) return "";
+  const digits = String(telefone).replace(/\D/g, "");
+  return digits.endsWith("@c.us") ? digits : `${digits}@c.us`;
+}
+
+async function notificarTesouraria(client, mensagem, { jidTesouraria } = {}) {
+  const destino = jidTesouraria || formatarJidWhatsApp(CONTATO_TESOURARIA);
+  if (!client || typeof client.sendMessage !== "function" || !destino) {
+    return false;
+  }
+  try {
+    await client.sendMessage(destino, mensagem);
+    console.log(`[Tesouraria] Notificação enviada com sucesso para ${destino}`);
+    return true;
+  } catch (err) {
+    console.error(`[Tesouraria] Erro ao enviar mensagem para tesouraria (${destino}):`, err.message);
+    return false;
+  }
+}
 
 const PERGUNTAS_DEFINICOES = [
   // 1. Nome do líder responsável
@@ -38,7 +59,7 @@ const PERGUNTAS_DEFINICOES = [
   // 8. Valor de inscrição
   ["valor_inscricao", "💰 *Valor de inscrição:*\nHaverá cobrança de taxa ou inscrição? Se sim, qual o valor? (Ou responda *Gratuito* / *Não*)"],
 
-  // 9. Vai precisar de valor do ministério? (Se sim, lembrar do contato da tesouraria: +55 11 99111-7912)
+  // 9. Vai precisar de valor do ministério? (Se sim, lembrar do contato da tesouraria: +55 11 99111-7612)
   [
     "precisa_valor_ministerio",
     "🏛️ *Vai precisar de valor do ministério?*\nO evento precisará de verba ou investimento financeiro do ministério? (Responda *Sim* ou *Não*)",
@@ -325,6 +346,22 @@ async function processarRespostaFormulario({
       `📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}${tagGrupoTesouraria}`;
 
     await notificarSecretaria(client, notificacaoGrupo);
+
+    if (querTesouraria) {
+      const msgTesouraria =
+        `🏛️ *AVISO DE EVENTO - DEMANDA DA TESOURARIA*\n\n` +
+        `Olá! Foi preenchido um formulário de evento que informou *necessidade de verba/apoio do ministério*:\n\n` +
+        `👤 *Líder:* ${payload.nome_lider}\n` +
+        `📅 *Evento:* ${payload.nome_evento}\n` +
+        `🏢 *Depto:* ${payload.departamento}\n` +
+        `📆 *Data:* ${payload.data}\n` +
+        `⏰ *Horário:* ${payload.horario_inicio} às ${payload.horario_termino}\n` +
+        `📍 *Local:* ${payload.local}\n\n` +
+        `📄 *Documento Oficial (Google Docs):*\n${linkDoc}\n\n` +
+        `O líder foi orientado a entrar em contato com a tesouraria. 🙏`;
+      await notificarTesouraria(client, msgTesouraria);
+    }
+
     console.log(`[Formulário Evento] Concluído com sucesso para ${numero}. Documento: ${linkDoc}`);
   } catch (err) {
     console.error("[ALERTA:secretaria] Erro ao enviar formulário para o Webhook do Google Docs:", err);
@@ -339,6 +376,24 @@ async function processarRespostaFormulario({
       await notificarSecretaria(client, resumoGrupoFalha);
     } catch (notifErr) {
       console.error("[ALERTA:secretaria] Erro ao notificar secretaria da falha:", notifErr);
+    }
+
+    if (querTesouraria) {
+      const msgTesouraria =
+        `🏛️ *AVISO DE EVENTO - DEMANDA DA TESOURARIA*\n\n` +
+        `Olá! Foi preenchido um formulário de evento que informou *necessidade de verba/apoio do ministério*:\n\n` +
+        `👤 *Líder:* ${payload.nome_lider}\n` +
+        `📅 *Evento:* ${payload.nome_evento}\n` +
+        `🏢 *Depto:* ${payload.departamento}\n` +
+        `📆 *Data:* ${payload.data}\n` +
+        `⏰ *Horário:* ${payload.horario_inicio} às ${payload.horario_termino}\n` +
+        `📍 *Local:* ${payload.local}\n\n` +
+        `O líder foi orientado a entrar em contato com a tesouraria. 🙏`;
+      try {
+        await notificarTesouraria(client, msgTesouraria);
+      } catch (notifTesErr) {
+        console.error("[ALERTA:tesouraria] Erro ao notificar tesouraria:", notifTesErr);
+      }
     }
   } finally {
     delete etapas[numero];
@@ -360,4 +415,6 @@ module.exports = {
   enviarWebhookGoogleDocs,
   iniciarFormularioEvento,
   processarRespostaFormulario,
+  notificarTesouraria,
+  formatarJidWhatsApp,
 };

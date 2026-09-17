@@ -191,7 +191,7 @@ test("iniciarFormularioEvento: se dadosIniciais for de reunião, NUNCA inicia o 
   assert.equal(client.mensagensEnviadas.length, 0, "nenhuma mensagem deve ser enviada para reunião");
 });
 
-test("processarRespostaFormulario: fluxo completo com resposta SIM para ministério notifica tesouraria (+55 11 99111-7912)", async () => {
+test("processarRespostaFormulario: fluxo completo com resposta SIM para ministério notifica tesouraria (+55 11 99111-7612)", async () => {
   let payloadRecebido = null;
   const mockEnviarWebhook = async (payload) => {
     payloadRecebido = payload;
@@ -201,7 +201,7 @@ test("processarRespostaFormulario: fluxo completo com resposta SIM para ministé
     };
   };
 
-  const { etapas, solicitanteId, gruposNotificados, ultimaMsg } = await simularPreenchimentoFormulario({
+  const { etapas, client, solicitanteId, gruposNotificados, ultimaMsg } = await simularPreenchimentoFormulario({
     dadosIniciais: {
       rede: "Rede de Homens",
       evento: "Café dos Homens",
@@ -241,15 +241,21 @@ test("processarRespostaFormulario: fluxo completo com resposta SIM para ministé
   assert.equal(payloadRecebido.objetivo_espiritual, "Resposta para objetivo_espiritual");
 
   // Confirmação para o líder deve conter o contato da tesouraria
-  assert.match(ultimaMsg.respostas[1], new RegExp(`\\+55 11 99111-7912`));
+  assert.match(ultimaMsg.respostas[1], new RegExp(`\\+55 11 99111-7612`));
   assert.match(ultimaMsg.respostas[1], /https:\/\/docs\.google\.com\/document\/d\/teste-doc-123\/edit/);
 
   // Notificação para o grupo da secretaria também deve conter o contato da tesouraria
   assert.equal(gruposNotificados.length, 1);
   assert.match(gruposNotificados[0], /FORMULÁRIO DE EVENTO PREENCHIDO/);
-  assert.match(gruposNotificados[0], new RegExp(`\\+55 11 99111-7912`));
+  assert.match(gruposNotificados[0], new RegExp(`\\+55 11 99111-7612`));
   assert.match(gruposNotificados[0], /https:\/\/docs\.google\.com\/document\/d\/teste-doc-123\/edit/);
   assert.match(gruposNotificados[0], /Café dos Homens/);
+
+  // Notificação direta enviada para o número da tesouraria
+  const msgTesouraria = client.mensagensEnviadas.find((m) => m.to && m.to.includes("5511991117612"));
+  assert.ok(msgTesouraria, "deve notificar o número da tesouraria diretamente");
+  assert.match(msgTesouraria.content, /AVISO DE EVENTO - DEMANDA DA TESOURARIA/);
+  assert.match(msgTesouraria.content, /Café dos Homens/);
 });
 
 test("processarRespostaFormulario: quando precisa_valor_ministerio for NÃO, não inclui aviso da tesouraria", async () => {
@@ -272,8 +278,8 @@ test("processarRespostaFormulario: quando precisa_valor_ministerio for NÃO, nã
   });
 
   // Não deve conter aviso da tesouraria
-  assert.doesNotMatch(ultimaMsg.respostas[1], new RegExp(`\\+55 11 99111-7912`));
-  assert.doesNotMatch(gruposNotificados[0], new RegExp(`\\+55 11 99111-7912`));
+  assert.doesNotMatch(ultimaMsg.respostas[1], new RegExp(`\\+55 11 99111-7612`));
+  assert.doesNotMatch(gruposNotificados[0], new RegExp(`\\+55 11 99111-7612`));
 });
 
 test("processarRespostaFormulario: se pergunta de local for feita e líder responder igreja, preenche endereço fixo", async () => {
@@ -484,7 +490,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
       assert.match(resp[0], /Gerando o documento oficial no Google Docs/);
       assert.match(resp[1], /Formulário do Evento Concluído com Sucesso/);
       assert.match(resp[1], /https:\/\/docs\.google\.com\/document\/d\/doc-gerado-sucesso\/edit/);
-      assert.match(resp[1], new RegExp(`\\+55 11 99111-7912`)); // Aviso da tesouraria no líder
+      assert.match(resp[1], new RegExp(`\\+55 11 99111-7612`)); // Aviso da tesouraria no líder
     }
   }
 
@@ -529,7 +535,12 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   assert.match(ultimaMsgGrupo, /FORMULÁRIO DE EVENTO PREENCHIDO/);
   assert.match(ultimaMsgGrupo, /Conferência Atos 2/);
   assert.match(ultimaMsgGrupo, /https:\/\/docs\.google\.com\/document\/d\/doc-gerado-sucesso\/edit/);
-  assert.match(ultimaMsgGrupo, new RegExp(`\\+55 11 99111-7912`));
+  assert.match(ultimaMsgGrupo, new RegExp(`\\+55 11 99111-7612`));
+
+  // 5.1 Valida se mensagem direta para a tesouraria também foi enviada
+  const msgTesourariaDireta = diretasEnviadas.find((m) => m.to && m.to.includes("5511991117612"));
+  assert.ok(msgTesourariaDireta, "deve enviar notificação direta para a tesouraria");
+  assert.match(msgTesourariaDireta.texto, /AVISO DE EVENTO - DEMANDA DA TESOURARIA/);
 
   // 6. Sessão foi encerrada
   assert.equal(etapas[NUMERO_LIDER], undefined);
