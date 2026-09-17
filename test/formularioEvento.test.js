@@ -32,6 +32,53 @@ function criarMsgFalsa(body) {
   };
 }
 
+async function simularPreenchimentoFormulario({
+  dadosIniciais,
+  solicitanteId = "5511999998888",
+  obterResposta = (pergunta, i) => `Valor ${i}`,
+  enviarWebhook,
+}) {
+  const etapas = {};
+  const client = criarClienteFalso();
+  const gruposNotificados = [];
+  const notificarSecretaria = async (c, texto) => {
+    gruposNotificados.push(texto);
+  };
+
+  await iniciarFormularioEvento({
+    etapas,
+    solicitanteId,
+    dadosIniciais,
+    client,
+  });
+
+  const perguntasIniciais = etapas[solicitanteId]?.perguntas ? [...etapas[solicitanteId].perguntas] : [];
+  const totalPerguntas = perguntasIniciais.length;
+  let ultimaMsg;
+
+  for (let i = 0; i < totalPerguntas; i++) {
+    const pergunta = etapas[solicitanteId].perguntas[etapas[solicitanteId].indicePergunta];
+    const resposta = obterResposta(pergunta, i);
+    ultimaMsg = criarMsgFalsa(resposta);
+
+    await processarRespostaFormulario({
+      msg: ultimaMsg,
+      numero: solicitanteId,
+      info: etapas[solicitanteId],
+      client,
+      notificarSecretaria,
+      etapas,
+      enviarWebhook,
+    });
+
+    if (i < totalPerguntas - 1) {
+      assert.ok(etapas[solicitanteId], "deve manter o estado até a última pergunta");
+    }
+  }
+
+  return { etapas, client, solicitanteId, gruposNotificados, ultimaMsg, perguntasIniciais };
+}
+
 test("precisaDeValorDoMinisterio: reconhece respostas afirmativas e negativas", () => {
   assert.equal(precisaDeValorDoMinisterio("sim"), true);
   assert.equal(precisaDeValorDoMinisterio("Sim, vamos precisar"), true);
@@ -145,29 +192,6 @@ test("iniciarFormularioEvento: se dadosIniciais for de reunião, NUNCA inicia o 
 });
 
 test("processarRespostaFormulario: fluxo completo com resposta SIM para ministério notifica tesouraria (+55 11 99111-7912)", async () => {
-  const etapas = {};
-  const client = criarClienteFalso();
-  const solicitanteId = "5511999998888";
-  const gruposNotificados = [];
-  const notificarSecretaria = async (c, texto) => {
-    gruposNotificados.push(texto);
-  };
-
-  await iniciarFormularioEvento({
-    etapas,
-    solicitanteId,
-    dadosIniciais: {
-      rede: "Rede de Homens",
-      evento: "Café dos Homens",
-      local: "Templo",
-      dataFormatada: "10/11/2026",
-      horarioInicio: "08:00",
-      horarioFim: "11:00",
-    },
-    client,
-  });
-
-  const totalPerguntas = etapas[solicitanteId].perguntas.length;
   let payloadRecebido = null;
   const mockEnviarWebhook = async (payload) => {
     payloadRecebido = payload;
@@ -177,31 +201,23 @@ test("processarRespostaFormulario: fluxo completo com resposta SIM para ministé
     };
   };
 
-  let ultimaMsg;
-  // Responde cada pergunta sequencialmente
-  for (let i = 0; i < totalPerguntas; i++) {
-    const pergunta = etapas[solicitanteId].perguntas[etapas[solicitanteId].indicePergunta];
-    let resposta = `Resposta para ${pergunta.id}`;
-    if (pergunta.id === "precisa_valor_ministerio") {
-      resposta = "Sim, precisaremos de apoio";
-    }
-    const msg = criarMsgFalsa(resposta);
-    ultimaMsg = msg;
-
-    await processarRespostaFormulario({
-      msg,
-      numero: solicitanteId,
-      info: etapas[solicitanteId],
-      client,
-      notificarSecretaria,
-      etapas,
-      enviarWebhook: mockEnviarWebhook,
-    });
-
-    if (i < totalPerguntas - 1) {
-      assert.ok(etapas[solicitanteId], "deve manter o estado até a última pergunta");
-    }
-  }
+  const { etapas, solicitanteId, gruposNotificados, ultimaMsg } = await simularPreenchimentoFormulario({
+    dadosIniciais: {
+      rede: "Rede de Homens",
+      evento: "Café dos Homens",
+      local: "Templo",
+      dataFormatada: "10/11/2026",
+      horarioInicio: "08:00",
+      horarioFim: "11:00",
+    },
+    obterResposta: (pergunta) => {
+      if (pergunta.id === "precisa_valor_ministerio") {
+        return "Sim, precisaremos de apoio";
+      }
+      return `Resposta para ${pergunta.id}`;
+    },
+    enviarWebhook: mockEnviarWebhook,
+  });
 
   // Após responder a última:
   assert.equal(etapas[solicitanteId], undefined, "deve limpar o estado da etapa");
@@ -237,17 +253,7 @@ test("processarRespostaFormulario: fluxo completo com resposta SIM para ministé
 });
 
 test("processarRespostaFormulario: quando precisa_valor_ministerio for NÃO, não inclui aviso da tesouraria", async () => {
-  const etapas = {};
-  const client = criarClienteFalso();
-  const solicitanteId = "5511999998888";
-  const gruposNotificados = [];
-  const notificarSecretaria = async (c, texto) => {
-    gruposNotificados.push(texto);
-  };
-
-  await iniciarFormularioEvento({
-    etapas,
-    solicitanteId,
+  const { gruposNotificados, ultimaMsg } = await simularPreenchimentoFormulario({
     dadosIniciais: {
       rede: "Rede Kids",
       evento: "EBF",
@@ -256,28 +262,14 @@ test("processarRespostaFormulario: quando precisa_valor_ministerio for NÃO, nã
       horarioInicio: "14:00",
       horarioFim: "17:00",
     },
-    client,
+    obterResposta: (pergunta, i) => {
+      if (pergunta.id === "precisa_valor_ministerio") {
+        return "Não, já temos os recursos";
+      }
+      return `Valor ${i}`;
+    },
+    enviarWebhook: async () => ({ status: "success", url: "https://docs.google.com/doc-ebf" }),
   });
-
-  const totalPerguntas = etapas[solicitanteId].perguntas.length;
-  let ultimaMsg;
-  for (let i = 0; i < totalPerguntas; i++) {
-    const pergunta = etapas[solicitanteId].perguntas[etapas[solicitanteId].indicePergunta];
-    let resposta = `Valor ${i}`;
-    if (pergunta.id === "precisa_valor_ministerio") {
-      resposta = "Não, já temos os recursos";
-    }
-    ultimaMsg = criarMsgFalsa(resposta);
-    await processarRespostaFormulario({
-      msg: ultimaMsg,
-      numero: solicitanteId,
-      info: etapas[solicitanteId],
-      client,
-      notificarSecretaria,
-      etapas,
-      enviarWebhook: async () => ({ status: "success", url: "https://docs.google.com/doc-ebf" }),
-    });
-  }
 
   // Não deve conter aviso da tesouraria
   assert.doesNotMatch(ultimaMsg.respostas[1], new RegExp(`\\+55 11 99111-7912`));
@@ -285,14 +277,8 @@ test("processarRespostaFormulario: quando precisa_valor_ministerio for NÃO, nã
 });
 
 test("processarRespostaFormulario: se pergunta de local for feita e líder responder igreja, preenche endereço fixo", async () => {
-  const etapas = {};
-  const client = criarClienteFalso();
-  const solicitanteId = "5511999998888";
-
-  // Inicia sem local pré-definido
-  await iniciarFormularioEvento({
-    etapas,
-    solicitanteId,
+  let payloadRecebido = null;
+  const { perguntasIniciais } = await simularPreenchimentoFormulario({
     dadosIniciais: {
       rede: "Jovens",
       evento: "Luau",
@@ -300,49 +286,21 @@ test("processarRespostaFormulario: se pergunta de local for feita e líder respo
       horarioInicio: "19:00",
       horarioFim: "22:00",
     },
-    client,
+    obterResposta: (p) => (p.id === "local" ? "igreja" : "Teste"),
+    enviarWebhook: async (payload) => {
+      payloadRecebido = payload;
+      return { status: "success", url: "https://docs.google.com/test" };
+    },
   });
 
   // A lista de perguntas deve incluir 'local'
-  const ids = etapas[solicitanteId].perguntas.map((p) => p.id);
+  const ids = perguntasIniciais.map((p) => p.id);
   assert.ok(ids.includes("local"));
-
-  let payloadRecebido = null;
-  const total = etapas[solicitanteId].perguntas.length;
-  for (let i = 0; i < total; i++) {
-    const p = etapas[solicitanteId].perguntas[etapas[solicitanteId].indicePergunta];
-    let texto = "Teste";
-    if (p.id === "local") texto = "igreja";
-    const msg = criarMsgFalsa(texto);
-    await processarRespostaFormulario({
-      msg,
-      numero: solicitanteId,
-      info: etapas[solicitanteId],
-      client,
-      notificarSecretaria: async () => {},
-      etapas,
-      enviarWebhook: async (payload) => {
-        payloadRecebido = payload;
-        return { status: "success", url: "https://docs.google.com/test" };
-      },
-    });
-  }
-
   assert.equal(payloadRecebido.local, ENDERECO_IGREJA);
 });
 
 test("processarRespostaFormulario: em caso de falha no webhook avisa líder e secretaria sem perder dados", async () => {
-  const etapas = {};
-  const client = criarClienteFalso();
-  const solicitanteId = "5511999998888";
-  const gruposNotificados = [];
-  const notificarSecretaria = async (c, texto) => {
-    gruposNotificados.push(texto);
-  };
-
-  await iniciarFormularioEvento({
-    etapas,
-    solicitanteId,
+  const { etapas, solicitanteId, gruposNotificados, ultimaMsg } = await simularPreenchimentoFormulario({
     dadosIniciais: {
       rede: "Rede Kids",
       evento: "EBF",
@@ -351,27 +309,11 @@ test("processarRespostaFormulario: em caso de falha no webhook avisa líder e se
       horarioInicio: "14:00",
       horarioFim: "17:00",
     },
-    client,
+    obterResposta: (pergunta, i) => `Valor ${i}`,
+    enviarWebhook: async () => {
+      throw new Error("Timeout na conexão");
+    },
   });
-
-  const totalPerguntas = etapas[solicitanteId].perguntas.length;
-  const mockWebhookFalho = async () => {
-    throw new Error("Timeout na conexão");
-  };
-
-  let ultimaMsg;
-  for (let i = 0; i < totalPerguntas; i++) {
-    ultimaMsg = criarMsgFalsa(`Valor ${i}`);
-    await processarRespostaFormulario({
-      msg: ultimaMsg,
-      numero: solicitanteId,
-      info: etapas[solicitanteId],
-      client,
-      notificarSecretaria,
-      etapas,
-      enviarWebhook: mockWebhookFalho,
-    });
-  }
 
   assert.equal(etapas[solicitanteId], undefined);
   assert.match(ultimaMsg.respostas[1], /instabilidade momentânea ao gerar o Google Docs/);
@@ -547,33 +489,40 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   }
 
   // 4. Valida se o Webhook recebeu o payload completo
-  assert.equal(payloadWebhookRecebido.nome_lider, "Pr. João Silva");
-  assert.equal(payloadWebhookRecebido.nome_evento, "Conferência Atos 2");
-  assert.equal(payloadWebhookRecebido.departamento, "Rede de Homens");
-  assert.equal(payloadWebhookRecebido.data, "20/12/2026");
-  assert.equal(payloadWebhookRecebido.horario_inicio, "19:00");
-  assert.equal(payloadWebhookRecebido.horario_termino, "22:00");
-  assert.equal(payloadWebhookRecebido.horario_total, "17h às 23h");
-  assert.equal(payloadWebhookRecebido.local, ENDERECO_IGREJA);
-  assert.equal(payloadWebhookRecebido.publico, "Casais e Famílias");
-  assert.equal(payloadWebhookRecebido.valor_inscricao, "Gratuito");
-  assert.equal(payloadWebhookRecebido.precisa_valor_ministerio, "Sim, precisaremos de recursos");
-  assert.equal(payloadWebhookRecebido.contato_tesouraria, CONTATO_TESOURARIA);
-  assert.equal(payloadWebhookRecebido.tema, "A Família no Altar");
-  assert.equal(payloadWebhookRecebido.versiculo, "Josué 24:15");
-  assert.equal(payloadWebhookRecebido.paleta, "Bordeaux e Dourado");
-  assert.equal(payloadWebhookRecebido.estilo, "Elegante");
-  assert.equal(payloadWebhookRecebido.responsavel_geral, "Diácono Carlos");
-  assert.equal(payloadWebhookRecebido.convidado, "Pr. Convidado Marcos");
-  assert.equal(payloadWebhookRecebido.louvor, "Banda da Igreja");
-  assert.equal(payloadWebhookRecebido.decoracao, "Flores e iluminação cênica");
-  assert.equal(payloadWebhookRecebido.alimentacao, "Jantar após o evento");
-  assert.equal(payloadWebhookRecebido.equipe, "Recepção: 4 pessoas, Limpeza: 3 pessoas");
-  assert.equal(payloadWebhookRecebido.materiais, "Som, 2 microfones sem fio, projetor");
-  assert.equal(payloadWebhookRecebido.prazo_imagem, "10/12/2026");
-  assert.equal(payloadWebhookRecebido.cronograma, "19h Louvor, 20h Ministração, 21h30 Jantar");
-  assert.equal(payloadWebhookRecebido.observacoes, "Chegar com 1h de antecedência");
-  assert.equal(payloadWebhookRecebido.objetivo_espiritual, "Edificação das famílias e muitas vidas transformadas");
+  assert.deepEqual(payloadWebhookRecebido, {
+    nome_lider: "Pr. João Silva",
+    departamento: "Rede de Homens",
+    nome_evento: "Conferência Atos 2",
+    data: "20/12/2026",
+    data_solicitada: "20/12/2026",
+    horario_inicio: "19:00",
+    horario_termino: "22:00",
+    horario_inicio_termino: "19:00 às 22:00",
+    horario_total: "17h às 23h",
+    local: ENDERECO_IGREJA,
+    valor_inscricao: "Gratuito",
+    valor: "Gratuito",
+    precisa_valor_ministerio: "Sim, precisaremos de recursos",
+    contato_tesouraria: CONTATO_TESOURARIA,
+    aviso_tesouraria: `Entrar em contato com a tesouraria: ${CONTATO_TESOURARIA}`,
+    resultado_esperado: "Edificação das famílias e muitas vidas transformadas",
+    publico: "Casais e Famílias",
+    tema: "A Família no Altar",
+    versiculo: "Josué 24:15",
+    paleta: "Bordeaux e Dourado",
+    estilo: "Elegante",
+    responsavel_geral: "Diácono Carlos",
+    convidado: "Pr. Convidado Marcos",
+    louvor: "Banda da Igreja",
+    decoracao: "Flores e iluminação cênica",
+    alimentacao: "Jantar após o evento",
+    equipe: "Recepção: 4 pessoas, Limpeza: 3 pessoas",
+    materiais: "Som, 2 microfones sem fio, projetor",
+    prazo_imagem: "10/12/2026",
+    cronograma: "19h Louvor, 20h Ministração, 21h30 Jantar",
+    observacoes: "Chegar com 1h de antecedência",
+    objetivo_espiritual: "Edificação das famílias e muitas vidas transformadas",
+  });
 
   // 5. Valida notificação do grupo com o link e aviso da tesouraria
   const ultimaMsgGrupo = gruposEnviados[gruposEnviados.length - 1];
