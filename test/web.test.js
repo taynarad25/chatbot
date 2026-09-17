@@ -59,18 +59,29 @@ test("GET /secretaria/login: retorna a página de login com status 200 e favicon
   assert.match(html, /<link rel="manifest" href="\/manifest\.json"/);
 });
 
-test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404", async () => {
+test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404 e com Cache-Control no-cache", async () => {
   const res = await fetch(`${baseUrl}/favicon.ico`);
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-type"), "image/png");
+  assert.match(res.headers.get("cache-control") || "", /no-cache/);
   const buffer = Buffer.from(await res.arrayBuffer());
   assert.ok(buffer.length > 0, "o favicon deveria ter conteúdo");
 });
 
-test("GET /images/logo.png: serve a imagem do favicon/logo com status 200", async () => {
+test("GET /favicon-32x32.png: serve a variante 32x32 com status 200", async () => {
+  const res = await fetch(`${baseUrl}/favicon-32x32.png`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/png");
+  assert.match(res.headers.get("cache-control") || "", /no-cache/);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  assert.ok(buffer.length > 0, "o favicon-32x32 deveria ter conteúdo");
+});
+
+test("GET /images/logo.png: serve a imagem do favicon/logo com status 200 e Cache-Control no-cache", async () => {
   const res = await fetch(`${baseUrl}/images/logo.png`);
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-type"), "image/png");
+  assert.match(res.headers.get("cache-control") || "", /no-cache/);
   const buffer = Buffer.from(await res.arrayBuffer());
   assert.ok(buffer.length > 0, "o ícone em /images/logo.png deveria ter conteúdo");
 });

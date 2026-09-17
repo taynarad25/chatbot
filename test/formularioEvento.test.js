@@ -41,8 +41,12 @@ async function simularPreenchimentoFormulario({
   const etapas = {};
   const client = criarClienteFalso();
   const gruposNotificados = [];
+  const multimidiasNotificados = [];
   const notificarSecretaria = async (c, texto) => {
     gruposNotificados.push(texto);
+  };
+  const notificarMultimidia = async (c, texto) => {
+    multimidiasNotificados.push(texto);
   };
 
   await iniciarFormularioEvento({
@@ -67,6 +71,7 @@ async function simularPreenchimentoFormulario({
       info: etapas[solicitanteId],
       client,
       notificarSecretaria,
+      notificarMultimidia,
       etapas,
       enviarWebhook,
     });
@@ -76,7 +81,7 @@ async function simularPreenchimentoFormulario({
     }
   }
 
-  return { etapas, client, solicitanteId, gruposNotificados, ultimaMsg, perguntasIniciais };
+  return { etapas, client, solicitanteId, gruposNotificados, multimidiasNotificados, ultimaMsg, perguntasIniciais };
 }
 
 test("precisaDeValorDoMinisterio: reconhece respostas afirmativas e negativas", () => {
@@ -591,4 +596,30 @@ test("E2E: digitar 'menu' durante o formulário cancela e volta ao menu", async 
 
   assert.equal(etapas[NUMERO_LIDER], undefined);
   assert.match(respostas[0], /Área do Líder/);
+});
+
+test("processarRespostaFormulario: envia notificação estruturada ao grupo MULTIMÍDIAS quando há pedidos de mídia", async () => {
+  const { multimidiasNotificados } = await simularPreenchimentoFormulario({
+    dadosIniciais: {
+      rede: "Rede de Mulheres",
+      evento: "Chá de Mulheres",
+      local: "Salão",
+      dataFormatada: "20/10/2026",
+      horarioInicio: "16:00",
+      horarioFim: "19:00",
+    },
+    enviarWebhook: async () => ({ status: "success", url: "https://docs.google.com/document/d/midia-123" }),
+    obterResposta: (pergunta) => {
+      if (pergunta.id === "midias" || pergunta.id === "estilo") return "Flyer para feed e stories";
+      if (pergunta.id === "prazo_imagem" || pergunta.id === "divulgacao") return "Divulgar 10 dias antes";
+      if (pergunta.id === "paleta" || pergunta.id === "cores") return "Azul e branco";
+      return "Resposta teste";
+    }
+  });
+
+  assert.equal(multimidiasNotificados.length, 1);
+  assert.match(multimidiasNotificados[0], /DEMANDA DE MÍDIA & COMUNICAÇÃO DE EVENTO/);
+  assert.match(multimidiasNotificados[0], /Flyer para feed e stories/);
+  assert.match(multimidiasNotificados[0], /Divulgar 10 dias antes/);
+  assert.match(multimidiasNotificados[0], /Azul e branco/);
 });

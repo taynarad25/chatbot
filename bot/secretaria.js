@@ -2,6 +2,8 @@ const db = require("../db");
 
 const NOME_GRUPO_SECRETARIA = "Mensagens Secretaria";
 const NOME_GRUPO_PASTORAL = "Atendimento Pastoral";
+const NOME_GRUPO_MULTIMIDIA = "MULTIMÍDIAS";
+const CONVITE_PADRAO_MULTIMIDIA = "https://chat.whatsapp.com/D7exjarQTrcGSAjzCvM5QV";
 
 // client.getChats() (que lista TODOS os chats de uma vez) provou ser não-confiável em
 // produção — falha de forma consistente com um erro opaco ("r: r") vindo de dentro da
@@ -13,6 +15,9 @@ function jidPorEnv(nome) {
   const chave = nome.trim().toLowerCase();
   if (chave === NOME_GRUPO_SECRETARIA.trim().toLowerCase()) return process.env.GRUPO_JID_SECRETARIA || null;
   if (chave === NOME_GRUPO_PASTORAL.trim().toLowerCase()) return process.env.GRUPO_JID_PASTORAL || null;
+  if (chave === NOME_GRUPO_MULTIMIDIA.trim().toLowerCase() || chave === "multimidias" || chave === "multimídia" || chave === "multimidia") {
+    return process.env.GRUPO_JID_MULTIMIDIA || CONVITE_PADRAO_MULTIMIDIA;
+  }
   return null;
 }
 
@@ -87,6 +92,15 @@ function encontrarGrupoPastoral(chats) {
   const grupo = chats.find((chat) => chat.isGroup && chat.name && chat.name.trim().toLowerCase().includes(target)) || null;
   if (grupo && grupo.id && grupo.id._serialized) {
     atualizarCacheGrupo(NOME_GRUPO_PASTORAL, grupo.id._serialized);
+  }
+  return grupo;
+}
+
+function encontrarGrupoMultimidia(chats) {
+  const target = "multim";
+  const grupo = chats.find((chat) => chat.isGroup && chat.name && chat.name.trim().toLowerCase().includes(target)) || null;
+  if (grupo && grupo.id && grupo.id._serialized) {
+    atualizarCacheGrupo(NOME_GRUPO_MULTIMIDIA, grupo.id._serialized);
   }
   return grupo;
 }
@@ -200,6 +214,77 @@ async function notificarPastoral(client, mensagem) {
   }
 }
 
+async function notificarMultimidia(client, mensagem, midiaAnexa = null) {
+  try {
+    let cachedJid = obterJidCached(NOME_GRUPO_MULTIMIDIA);
+
+    if (cachedJid && !cachedJid.includes("@")) {
+      const codigoConvite = extrairCodigoConvite(cachedJid);
+      if (codigoConvite) {
+        console.log(`[Multimídia] Resolvendo convite '${codigoConvite}' para obter o JID do grupo '${NOME_GRUPO_MULTIMIDIA}'...`);
+        try {
+          const info = await client.getInviteInfo(codigoConvite);
+          const resolvedJid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
+          if (resolvedJid) {
+            console.log(`[Multimídia] JID obtido com sucesso do convite para '${NOME_GRUPO_MULTIMIDIA}': ${resolvedJid}`);
+            atualizarCacheGrupo(NOME_GRUPO_MULTIMIDIA, resolvedJid);
+            cachedJid = resolvedJid;
+          }
+        } catch (err) {
+          console.error(`[ALERTA:secretaria] Erro ao resolver código de convite '${codigoConvite}' para '${NOME_GRUPO_MULTIMIDIA}':`, err.message);
+        }
+      }
+    }
+
+    if (cachedJid && cachedJid.includes("@")) {
+      try {
+        if (midiaAnexa) {
+          try {
+            await client.sendMessage(cachedJid, midiaAnexa, { caption: mensagem });
+          } catch (mErr) {
+            console.warn(`[Multimídia] Falha ao enviar mídia anexa pelo JID ${cachedJid}, enviando texto:`, mErr.message);
+            await client.sendMessage(cachedJid, mensagem + "\n\n⚠️ _Nota: Não foi possível anexar o arquivo de mídia diretamente._");
+          }
+        } else {
+          await client.sendMessage(cachedJid, mensagem);
+        }
+        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_MULTIMIDIA}' via JID.`);
+        return true;
+      } catch (err) {
+        console.warn(`[Aviso] Falha ao enviar para o grupo '${NOME_GRUPO_MULTIMIDIA}' pelo JID cached ${cachedJid}:`, err.message);
+      }
+    }
+
+    // Fallback de busca em chats
+    try {
+      const chats = await client.getChats();
+      const grupo = encontrarGrupoMultimidia(chats);
+      if (grupo && grupo.id && grupo.id._serialized) {
+        if (midiaAnexa) {
+          try {
+            await client.sendMessage(grupo.id._serialized, midiaAnexa, { caption: mensagem });
+          } catch (mErr) {
+            console.warn(`[Multimídia] Falha ao enviar mídia anexa via busca, enviando texto:`, mErr.message);
+            await client.sendMessage(grupo.id._serialized, mensagem + "\n\n⚠️ _Nota: Não foi possível anexar o arquivo de mídia diretamente._");
+          }
+        } else {
+          await client.sendMessage(grupo.id._serialized, mensagem);
+        }
+        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_MULTIMIDIA}' via fallback de busca.`);
+        return true;
+      }
+    } catch (err) {
+      console.warn(`[Aviso] Falha ao obter todos os chats via client.getChats() para '${NOME_GRUPO_MULTIMIDIA}':`, err.message || err);
+    }
+
+    console.warn(`[Aviso] Grupo '${NOME_GRUPO_MULTIMIDIA}' não encontrado para envio da notificação.`);
+    return false;
+  } catch (error) {
+    console.error(`[ALERTA:secretaria] Falha ao enviar notificação para o grupo '${NOME_GRUPO_MULTIMIDIA}':`, error);
+    return false;
+  }
+}
+
 module.exports = {
   NOME_GRUPO_SECRETARIA,
   encontrarGrupoSecretaria,
@@ -207,6 +292,9 @@ module.exports = {
   NOME_GRUPO_PASTORAL,
   encontrarGrupoPastoral,
   notificarPastoral,
+  NOME_GRUPO_MULTIMIDIA,
+  encontrarGrupoMultimidia,
+  notificarMultimidia,
   atualizarCacheGrupo,
   obterJidCached,
 };

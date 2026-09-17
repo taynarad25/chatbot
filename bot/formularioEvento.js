@@ -1,4 +1,5 @@
 const db = require("../db");
+const { notificarMultimidia: notificarMultimidiaDefault } = require("./secretaria");
 
 const WEBHOOK_GOOGLE_DOCS_URL =
   process.env.WEBHOOK_GOOGLE_DOCS_URL ||
@@ -395,6 +396,7 @@ async function processarRespostaFormulario({
   info,
   client,
   notificarSecretaria,
+  notificarMultimidia = notificarMultimidiaDefault,
   etapas,
   enviarWebhook = enviarWebhookGoogleDocs,
 }) {
@@ -456,6 +458,39 @@ async function processarRespostaFormulario({
       `📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}${tagGrupoTesouraria}`;
 
     await notificarSecretaria(client, notificacaoGrupo);
+
+    // Notifica o grupo MULTIMÍDIAS caso o formulário contenha pedidos/informações de mídia ou divulgação
+    const temMidia = temConteudoRelevante(payload.midias || payload.estilo);
+    const temDivulgacao = temConteudoRelevante(payload.divulgacao || payload.prazo_imagem);
+    const temCores = temConteudoRelevante(payload.cores || payload.paleta);
+    if (temMidia || temDivulgacao || temCores) {
+      const horario =
+        payload.horario_inicio_termino ||
+        (payload.horario_inicio && payload.horario_termino
+          ? `${payload.horario_inicio} às ${payload.horario_termino}`
+          : payload.horario_inicio || "");
+      let resumoMultimidia =
+        `📢 *DEMANDA DE MÍDIA & COMUNICAÇÃO DE EVENTO*\n\n` +
+        `👤 *Líder:* ${payload.nome_lider}\n` +
+        `📅 *Evento:* ${payload.nome_evento}\n` +
+        `🏢 *Depto:* ${payload.departamento}\n` +
+        `📆 *Data:* ${payload.data}\n` +
+        `⏰ *Horário:* ${horario}\n` +
+        `📍 *Endereço / Local:* ${payload.local}`;
+
+      if (temConteudoRelevante(payload.tema)) resumoMultimidia += `\n✨ *Tema:* ${payload.tema}`;
+      if (temConteudoRelevante(payload.versiculo)) resumoMultimidia += `\n📖 *Versículo Base:* ${payload.versiculo}`;
+      if (temCores) resumoMultimidia += `\n🎨 *Cores/Estilo:* ${payload.cores || payload.paleta}`;
+      if (temMidia) resumoMultimidia += `\n📱 *Mídias Solicitadas:* ${payload.midias || payload.estilo}`;
+      if (temDivulgacao) resumoMultimidia += `\n📢 *Divulgação / Prazo:* ${payload.divulgacao || payload.prazo_imagem}`;
+      if (linkDoc) resumoMultimidia += `\n\n📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}`;
+
+      try {
+        await notificarMultimidia(client, resumoMultimidia);
+      } catch (errM) {
+        console.error("[Multimídia] Erro ao notificar grupo MULTIMÍDIAS sobre formulário de evento:", errM);
+      }
+    }
 
     if (querTesouraria) {
       const msgTesouraria =

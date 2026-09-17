@@ -139,10 +139,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 
       // Navegadores pedem isso sozinhos em toda navegação; sem essa rota, cai no
       // fallback de "404 Not Found" e loga um aviso a cada login/troca de página.
-      if (pathname === '/favicon.ico' || pathname === '/favicon.png') {
-        const iconBuf = fs.existsSync(FAVICON_FILE) ? fs.readFileSync(FAVICON_FILE) : faviconBuffer;
+      if (pathname === '/favicon.ico' || pathname === '/favicon.png' || pathname.startsWith('/favicon-')) {
+        const iconName = pathname.replace(/^\//, '');
+        const pubPath = path.join(__dirname, 'public', iconName.endsWith('.ico') ? 'favicon.ico' : iconName);
+        const webPubPath = path.join(__dirname, 'web', 'public', iconName.endsWith('.ico') ? 'favicon.ico' : iconName);
+        const fileToRead = fs.existsSync(pubPath) ? pubPath : (fs.existsSync(webPubPath) ? webPubPath : FAVICON_FILE);
+        const iconBuf = fs.existsSync(fileToRead) ? fs.readFileSync(fileToRead) : faviconBuffer;
         if (iconBuf) {
-          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0' });
           return res.end(iconBuf);
         }
         res.writeHead(204);
@@ -156,7 +160,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         const webImgPath = path.join(__dirname, 'web', 'public', cleanPath);
         const fileToRead = fs.existsSync(imgPath) ? imgPath : (fs.existsSync(webImgPath) ? webImgPath : null);
         if (fileToRead) {
-          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0' });
           return res.end(fs.readFileSync(fileToRead));
         }
       }
@@ -174,14 +178,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 
       // Servir logo da Comunidade Cristã Curados
       if (req.method === 'GET' && (pathname === '/logo.png' || pathname === '/public/logo.png' || pathname === '/home/logo.png')) {
-        if (logoBuffer) {
-          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
-          return res.end(logoBuffer);
-        }
         if (fs.existsSync(LOGO_FILE)) {
           const buf = fs.readFileSync(LOGO_FILE);
-          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0' });
           return res.end(buf);
+        }
+        if (logoBuffer) {
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0' });
+          return res.end(logoBuffer);
         }
       }
 

@@ -1,5 +1,5 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
-const { NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, encontrarGrupoSecretaria, encontrarGrupoPastoral } = require("./bot/secretaria");
+const { NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, encontrarGrupoSecretaria, encontrarGrupoPastoral, encontrarGrupoMultimidia } = require("./bot/secretaria");
 
 console.log("Iniciando cliente temporário para descobrir os JIDs dos grupos...");
 console.log("⚠️  Aviso: Certifique-se de que o bot principal esteja parado antes de rodar este script para evitar conflitos de sessão!");
@@ -33,16 +33,20 @@ client.on("ready", async () => {
     const chats = await client.getChats();
     console.log(`Total de chats carregados: ${chats.length}`);
 
-    // encontrarGrupoSecretaria/encontrarGrupoPastoral já salvam o JID encontrado
+    // encontrarGrupoSecretaria/encontrarGrupoPastoral/encontrarGrupoMultimidia já salvam o JID encontrado
     // no banco (mesma lógica usada pelo bot em produção) — só chamar já basta.
     const secretaria = encontrarGrupoSecretaria(chats);
     const pastoral = encontrarGrupoPastoral(chats);
+    const multimidia = encontrarGrupoMultimidia(chats);
 
     if (secretaria) console.log(`📌 Encontrado grupo '${secretaria.name}' -> ${secretaria.id._serialized}`);
     else console.log(`⚠️  Grupo '${NOME_GRUPO_SECRETARIA}' não encontrado.`);
 
     if (pastoral) console.log(`📌 Encontrado grupo '${pastoral.name}' -> ${pastoral.id._serialized}`);
     else console.log(`⚠️  Grupo '${NOME_GRUPO_PASTORAL}' não encontrado.`);
+
+    if (multimidia) console.log(`📌 Encontrado grupo '${multimidia.name}' -> ${multimidia.id._serialized}`);
+    else console.log(`⚠️  Grupo '${NOME_GRUPO_MULTIMIDIA}' não encontrado.`);
 
     console.log("✅ Banco (dados.db) atualizado com os JIDs encontrados!");
   } catch (err) {

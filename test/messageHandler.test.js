@@ -53,33 +53,42 @@ const NUMERO_COMUM = "5511888888888@c.us";
 // notificação cairia silenciosamente no bucket errado.
 const JID_GRUPO_SECRETARIA = "111111111111111@g.us";
 const JID_GRUPO_PASTORAL = "222222222222222@g.us";
+const JID_GRUPO_MULTIMIDIA = "333333333333333@g.us";
 
 // Monta um novo "servidor" de teste: handler + espiões de tudo que ele chamaria
 // de verdade (mensagens de grupo, mensagens diretas, gravação na Google Agenda).
 function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
   const etapas = {};
-  const gruposEnviados = []; // mensagens que o bot mandou para "Mensagens Secretaria"
+  const gruposEnviados = []; // mensagens que o bot mandou para os grupos
+  const multimidiaEnviados = []; // mensagens que o bot mandou para MULTIMÍDIAS
   const diretasEnviadas = []; // client.sendMessage(solicitanteId, texto)
   const eventosGravados = []; // calendar.events.insert(...)
   const eventosAlterados = []; // calendar.events.patch(...)
   const eventosCancelados = []; // calendar.events.delete(...)
   let eventosAtuais = eventos;
 
-  // notificarSecretaria/notificarPastoral (bot/secretaria.js) mandam a mensagem de
-  // grupo direto por JID via client.sendMessage(jid, texto) — não mais buscando o
-  // chat e chamando chat.sendMessage(texto) — então o mock precisa rotear pelo "to"
-  // pra separar mensagem de grupo de mensagem direta ao solicitante, com o mesmo
-  // client.sendMessage único usado pelos dois casos.
-  const JIDS_DE_GRUPO = new Set([JID_GRUPO_SECRETARIA, JID_GRUPO_PASTORAL]);
+  // notificarSecretaria/notificarPastoral/notificarMultimidia mandam a mensagem de
+  // grupo direto por JID via client.sendMessage(jid, texto) — então o mock precisa rotear pelo "to"
+  // pra separar mensagem de grupo de mensagem direta ao solicitante.
+  const JIDS_DE_GRUPO = new Set([JID_GRUPO_SECRETARIA, JID_GRUPO_PASTORAL, JID_GRUPO_MULTIMIDIA]);
 
   const client = {
     sendMessage: async (to, texto, options) => {
       const conteudo = options?.caption || (typeof texto === "string" ? texto : texto?.caption || texto);
+      if (to === JID_GRUPO_MULTIMIDIA) {
+        multimidiaEnviados.push(conteudo);
+      }
       if (JIDS_DE_GRUPO.has(to)) {
         gruposEnviados.push(conteudo);
       } else {
         diretasEnviadas.push({ to, texto: conteudo, media: typeof texto !== "string" ? texto : null });
       }
+    },
+    getInviteInfo: async (code) => {
+      if (code === "D7exjarQTrcGSAjzCvM5QV") {
+        return { id: { _serialized: JID_GRUPO_MULTIMIDIA } };
+      }
+      return { id: { _serialized: "999999999999999@g.us" } };
     },
     getChats: async () => [
       {
@@ -91,6 +100,11 @@ function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
         id: { _serialized: JID_GRUPO_PASTORAL },
         isGroup: true,
         name: "Atendimento Pastoral",
+      },
+      {
+        id: { _serialized: JID_GRUPO_MULTIMIDIA },
+        isGroup: true,
+        name: "MULTIMÍDIAS",
       }
     ],
   };
@@ -123,6 +137,7 @@ function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
     handleMessage,
     etapas,
     gruposEnviados,
+    multimidiaEnviados,
     diretasEnviadas,
     eventosGravados,
     eventosAlterados,
@@ -1377,7 +1392,7 @@ test("fluxo artes_flyers: solicita com sucesso sem imagem anexa", async () => {
   assert.match(r9[0], /Solicitação enviada com sucesso/);
   assert.match(r9[0], /prazo de \*25\/08\*/);
 
-  // Verifica se a notificação foi enviada ao grupo da secretaria
+  // Verifica se a notificação foi enviada ao grupo MULTIMÍDIAS
   assert.equal(gruposEnviados.length, 1);
   assert.match(gruposEnviados[0], /NOVA SOLICITAÇÃO DE ARTE\/FLYER/);
   assert.match(gruposEnviados[0], /Rede de Homens/);
@@ -1390,7 +1405,7 @@ test("fluxo artes_flyers: solicita com sucesso sem imagem anexa", async () => {
 });
 
 test("fluxo artes_flyers: solicita com sucesso anexando imagem/mídia", async () => {
-  const { handleMessage, gruposEnviados, etapas } = criarContexto();
+  const { handleMessage, gruposEnviados, multimidiaEnviados, etapas } = criarContexto();
 
   // Inicia e avança até a etapa da foto
   await enviar(handleMessage, NUMERO_LIDER, "6");
@@ -1417,10 +1432,20 @@ test("fluxo artes_flyers: solicita com sucesso anexando imagem/mídia", async ()
   const rFinal = await enviar(handleMessage, NUMERO_LIDER, "25/08");
   assert.match(rFinal[0], /Solicitação enviada com sucesso/);
 
-  // Deve ter enviado ao grupo da secretaria
+  // Deve ter enviado ao grupo MULTIMÍDIAS
   assert.equal(gruposEnviados.length, 1);
   assert.match(gruposEnviados[0], /NOVA SOLICITAÇÃO DE ARTE\/FLYER/);
   assert.equal(etapas[NUMERO_LIDER], undefined);
+});
+
+test("atalho líder: digitando 'pedir midia' inicia diretamente o fluxo de artes e flyers", async () => {
+  const { handleMessage, etapas } = criarContexto();
+
+  const r = await enviar(handleMessage, NUMERO_LIDER, "pedir mídia");
+  assert.match(r[0], /🎨 \*Solicitar artes e flyers\*/);
+  assert.match(r[0], /De qual departamento é a solicitação\?/);
+  assert.equal(etapas[NUMERO_LIDER].fluxo, "artes_flyers");
+  assert.equal(etapas[NUMERO_LIDER].etapa, "artes_departamento");
 });
 
 // ---------------------------------------------------------------------------

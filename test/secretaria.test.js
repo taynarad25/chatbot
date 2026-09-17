@@ -11,6 +11,9 @@ const {
   notificarSecretaria,
   encontrarGrupoPastoral,
   notificarPastoral,
+  encontrarGrupoMultimidia,
+  notificarMultimidia,
+  NOME_GRUPO_MULTIMIDIA,
   obterJidCached,
   atualizarCacheGrupo,
 } = require("../bot/secretaria");
@@ -225,4 +228,50 @@ test("notificarSecretaria: resolve o código de convite via getInviteInfo, atual
     delete process.env.GRUPO_JID_SECRETARIA;
   }
 });
+
+test("encontrarGrupoMultimidia: encontra o grupo contendo 'multim'", () => {
+  const chats = [
+    fakeChat({ isGroup: false, name: "João" }),
+    fakeChat({ isGroup: true, name: "MULTIMÍDIAS" }),
+  ];
+  const grupo = encontrarGrupoMultimidia(chats);
+  assert.ok(grupo);
+  assert.equal(grupo.name, "MULTIMÍDIAS");
+});
+
+test("encontrarGrupoMultimidia: retorna null quando não encontrado", () => {
+  const chats = [
+    fakeChat({ isGroup: true, name: "Outro Grupo Qualquer" }),
+  ];
+  const grupo = encontrarGrupoMultimidia(chats);
+  assert.equal(grupo, null);
+});
+
+test("notificarMultimidia: resolve convite padrão D7exjarQTrcGSAjzCvM5QV e envia com mídia anexa", async () => {
+  let inviteResolvido = null;
+  let jidDestino = null;
+  let midiaRecebida = null;
+  let captionRecebido = null;
+
+  const client = {
+    getInviteInfo: async (code) => {
+      inviteResolvido = code;
+      return { id: { _serialized: "120363999999999999@g.us" } };
+    },
+    sendMessage: async (jid, midia, options) => {
+      jidDestino = jid;
+      midiaRecebida = midia;
+      captionRecebido = options?.caption;
+    }
+  };
+
+  const resultado = await notificarMultimidia(client, "Solicitação de flyer", { data: "base64" });
+  assert.equal(resultado, true);
+  assert.equal(inviteResolvido, "D7exjarQTrcGSAjzCvM5QV");
+  assert.equal(jidDestino, "120363999999999999@g.us");
+  assert.deepEqual(midiaRecebida, { data: "base64" });
+  assert.equal(captionRecebido, "Solicitação de flyer");
+  assert.equal(obterJidCached("MULTIMÍDIAS"), "120363999999999999@g.us");
+});
+
 

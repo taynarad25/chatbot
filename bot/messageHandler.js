@@ -18,7 +18,7 @@ const {
   formatarRelatorioDisponibilidade,
 } = require("./disponibilidade");
 const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, isAgendaInterna, AGENDAS_INTERNAS } = require("./redes");
-const { notificarSecretaria, notificarPastoral, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
+const { notificarSecretaria, notificarPastoral, notificarMultimidia, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
 const {
@@ -437,12 +437,15 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
 
         const cachedSecretaria = obterJidCached(NOME_GRUPO_SECRETARIA);
         const cachedPastoral = obterJidCached(NOME_GRUPO_PASTORAL);
+        const cachedMultimidia = obterJidCached(NOME_GRUPO_MULTIMIDIA);
 
         let grupoPertence = null;
         if (msg.from === cachedSecretaria) {
           grupoPertence = NOME_GRUPO_SECRETARIA;
         } else if (msg.from === cachedPastoral) {
           grupoPertence = NOME_GRUPO_PASTORAL;
+        } else if (msg.from === cachedMultimidia) {
+          grupoPertence = NOME_GRUPO_MULTIMIDIA;
         }
 
         let chat = null;
@@ -456,6 +459,9 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             } else if (nomeChatNormalizado.includes(NOME_GRUPO_PASTORAL.trim().toLowerCase())) {
               grupoPertence = NOME_GRUPO_PASTORAL;
               atualizarCacheGrupo(NOME_GRUPO_PASTORAL, msg.from);
+            } else if (nomeChatNormalizado.includes("multim") || nomeChatNormalizado.includes(NOME_GRUPO_MULTIMIDIA.trim().toLowerCase())) {
+              grupoPertence = NOME_GRUPO_MULTIMIDIA;
+              atualizarCacheGrupo(NOME_GRUPO_MULTIMIDIA, msg.from);
             }
           } catch (err) {
             console.warn(`[Grupo] Não foi possível carregar o chat de uma mensagem (de: ${mascararTelefone(msg.from)}, id: ${msg.id?._serialized}) — ignorando. Detalhe: ${err.message}`);
@@ -464,7 +470,13 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
         }
 
         if (!grupoPertence) {
-          return; // Não pertence a nenhum dos dois grupos
+          return; // Não pertence a nenhum dos grupos monitorados
+        }
+
+        if (grupoPertence === NOME_GRUPO_MULTIMIDIA) {
+          atualizarCacheGrupo(NOME_GRUPO_MULTIMIDIA, msg.from);
+          console.log(`[Multimídia] Mensagem recebida no grupo Multimídias (de: ${mascararTelefone(msg.from)})`);
+          return;
         }
 
         const nomeParaExibicao = chat?.name || grupoPertence;
@@ -881,6 +893,7 @@ Escolha uma opção:
             info,
             client,
             notificarSecretaria,
+            notificarMultimidia,
             etapas,
             enviarWebhook,
           });
@@ -1409,6 +1422,26 @@ Escolha uma opção:
               (querTesouraria ? `\n\n💰 *Tesouraria:* O líder informou necessidade de verba do ministério. Contato: ${CONTATO_TESOURARIA}` : "");
 
             await notificarSecretaria(client, notifSecretaria);
+
+            // Notifica o grupo MULTIMÍDIAS quando a alteração envolver demandas de comunicação/mídia
+            const camposMidia = ["midias", "cores", "divulgacao", "tema", "versiculo", "paleta", "estilo", "prazo_imagem"];
+            if (camposMidia.includes(campo.chave) || midiasVal || divulgacaoVal) {
+              const notifMultimidia =
+                `📢 *ATUALIZAÇÃO DE MÍDIA / FORMULÁRIO DE EVENTO*\n\n` +
+                `👤 *Líder:* ${nomeSolicitante(contato, numero)}\n` +
+                `📅 *Evento:* ${evento.summary}\n` +
+                `🏢 *Depto:* ${info.departamento}\n` +
+                `📆 *Data:* ${d.format("DD/MM/YYYY")}\n` +
+                `✏️ *Informação Atualizada:* ${campo.label}\n` +
+                `📝 *Novo Conteúdo:* ${novoValor}` +
+                blocoMidiaSecretaria +
+                linhaDocSecretaria;
+              try {
+                await notificarMultimidia(client, notifMultimidia);
+              } catch (errM) {
+                console.error("[Multimídia] Erro ao notificar alteração de mídia:", errM);
+              }
+            }
 
             if (querTesouraria) {
               const msgTesouraria =
@@ -2065,15 +2098,15 @@ Escolha uma opção:
 
             try {
               if (info.midiaAnexa) {
-                const groupJid = obterJidCached(NOME_GRUPO_SECRETARIA);
-                await client.sendMessage(groupJid, info.midiaAnexa, { caption: resumoGrupo });
-                console.log(`[Artes] Solicitação com imagem enviada para o grupo via JID.`);
+                await notificarMultimidia(client, resumoGrupo, info.midiaAnexa);
+                console.log(`[Artes] Solicitação com imagem enviada para o grupo MULTIMÍDIAS.`);
               } else {
-                await notificarSecretaria(client, resumoGrupo);
+                await notificarMultimidia(client, resumoGrupo);
+                console.log(`[Artes] Solicitação enviada para o grupo MULTIMÍDIAS.`);
               }
             } catch (errSend) {
-              console.error("[Artes] Erro ao notificar secretaria com imagem:", errSend);
-              await notificarSecretaria(client, resumoGrupo + "\n\n⚠️ _Nota: Não foi possível enviar a imagem anexa devido a uma falha de transmissão._");
+              console.error("[Artes] Erro ao notificar grupo MULTIMÍDIAS:", errSend);
+              await notificarMultimidia(client, resumoGrupo + "\n\n⚠️ _Nota: Não foi possível enviar a imagem anexa devido a uma falha de transmissão._");
             }
 
             await msg.reply(`✅ *Solicitação enviada com sucesso!*\n\nSeu pedido de arte/material foi encaminhado para a equipe com o prazo de *${info.prazoEntrega}*. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
@@ -2515,6 +2548,12 @@ Digite *menu* para voltar ao menu principal.`;
         etapas[numero] = { fluxo: "area_diretor", etapa: "menu_diretor" };
         const msgSubmenu = `📋 *Área da Direção*\n\nEscolha o que deseja fazer:\n\n1️⃣ Ver todos os eventos da igreja\n2️⃣ Falar com a secretaria\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
+      }
+
+      if (isLider && /^(pedir|solicitar)?\s*(m[ií]dias?|artes?|flyers?)$/i.test(texto.trim())) {
+        console.log(`[Atalho Mídia] Iniciado por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+        etapas[numero] = { fluxo: "artes_flyers", etapa: "artes_departamento" };
+        return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedes()}`);
       }
 
       // Nenhuma opção reconhecida e nenhum fluxo ativo. Se a mensagem for só
