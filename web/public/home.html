@@ -98,10 +98,10 @@
         }
 
         .banner-text h2 {
-            font-size: clamp(2.2rem, 3.2vw, 3.6rem);
+            font-size: clamp(2.8rem, 3.8vw, 4.6rem);
             font-weight: 400; /* Regular */
-            margin-bottom: 8px;
-            line-height: 1.2;
+            margin-bottom: 12px;
+            line-height: 1.15;
             letter-spacing: -0.5px;
         }
 
@@ -111,52 +111,59 @@
         }
 
         .banner-text h3 {
-            font-size: clamp(1.3rem, 1.8vw, 2.2rem);
-            letter-spacing: clamp(4px, 0.6vw, 8px);
+            font-size: clamp(1.5rem, 2.2vw, 2.7rem);
+            letter-spacing: clamp(6px, 0.8vw, 12px);
             color: #d1d5db;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
             font-weight: 600; /* SemiBold */
             text-transform: uppercase;
         }
 
         .banner-text h1 {
-            font-size: clamp(4.5rem, 7.5vw, 8.2rem);
+            font-size: clamp(5.6rem, 9.2vw, 10.5rem);
             font-weight: 800; /* ExtraBold */
             color: var(--cor-ciano);
-            letter-spacing: 2px;
-            line-height: 0.95;
-            text-shadow: 0 4px 24px rgba(0, 188, 212, 0.28);
+            letter-spacing: 3px;
+            line-height: 0.92;
+            text-shadow: 0 6px 32px rgba(0, 188, 212, 0.35);
         }
 
         /* Responsividade para Tablet */
         @media (max-width: 1024px) {
             .banner-curados {
-                min-height: 580px;
+                min-height: 620px;
                 padding: 60px 30px 60px 0;
             }
             .logo-wrapper {
-                margin-left: -70px;
+                margin-left: -80px;
             }
             .logo-img-anim {
-                width: 360px;
-                height: 360px;
+                width: 380px;
+                height: 380px;
+            }
+            .banner-text h2 {
+                font-size: 2.6rem;
+            }
+            .banner-text h3 {
+                font-size: 1.5rem;
+                letter-spacing: 5px;
             }
             .banner-text h1 {
-                font-size: 5rem;
+                font-size: 6rem;
             }
         }
 
-        /* Responsividade para Celular */
+        /* Responsividade para Celular e Telas Menores */
         @media (max-width: 768px) {
             .banner-curados {
                 min-height: auto;
-                padding: 70px 24px 80px;
+                padding: 65px 20px 75px;
                 justify-content: center;
             }
             .banner-container {
                 flex-direction: column;
                 text-align: center;
-                gap: 35px;
+                gap: 28px;
                 margin: 0 auto;
                 justify-content: center;
             }
@@ -166,25 +173,25 @@
                 justify-content: center;
             }
             .logo-img-anim {
-                width: 240px;
-                height: 240px;
+                width: clamp(220px, 48vw, 280px);
+                height: clamp(220px, 48vw, 280px);
                 filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.5));
             }
             .banner-text {
                 text-align: center;
             }
             .banner-text h2 {
-                font-size: 1.9rem;
-                margin-bottom: 6px;
-            }
-            .banner-text h3 {
-                font-size: 1.15rem;
-                letter-spacing: 4px;
+                font-size: clamp(2.1rem, 6vw, 2.7rem);
                 margin-bottom: 8px;
             }
+            .banner-text h3 {
+                font-size: clamp(1.25rem, 3.6vw, 1.6rem);
+                letter-spacing: clamp(4px, 1.2vw, 7px);
+                margin-bottom: 10px;
+            }
             .banner-text h1 {
-                font-size: 3.8rem;
-                letter-spacing: 1px;
+                font-size: clamp(4.4rem, 13vw, 5.8rem);
+                letter-spacing: 2px;
             }
         }
     </style>
