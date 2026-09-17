@@ -68,6 +68,79 @@ function montarMensagemAgenda(itens, tituloPeriodo) {
   return msgAgenda;
 }
 
+const SECOES_AGENDA = [
+  { key: "IGREJA", titulo: "⛪ *Eventos e Cultos da Igreja*" },
+  { key: "USO_SALAO", titulo: "🏛️ *Uso do Salão*" },
+  { key: "REUNIOES", titulo: "🤝 *Reuniões*" },
+  { key: "ATENDIMENTOS", titulo: "🙏 *Atendimentos Pastorais*" },
+  { key: "ENSAIOS", titulo: "🎵 *Ensaios*" },
+  { key: "LIMPEZA", titulo: "🧹 *Limpeza*" },
+  { key: "EXTERNOS", titulo: "🌐 *Eventos Externos*" },
+];
+
+function classificarSecaoEvento(item, agendasInternas = {}) {
+  const ev = item.eventos && item.eventos[0];
+  const calId = ev ? ev.calendarId : "";
+  const summaryLower = (item.summary || "").toLowerCase();
+
+  if (calId === agendasInternas.USO_SALAO || summaryLower.includes("uso do salão") || summaryLower.includes("uso do salao")) {
+    return "USO_SALAO";
+  }
+  if (calId === agendasInternas.ATENDIMENTO || summaryLower.includes("atendimento pastoral")) {
+    return "ATENDIMENTOS";
+  }
+  if (calId === agendasInternas.REUNIOES || summaryLower.startsWith("reunião") || summaryLower.startsWith("reuniao")) {
+    return "REUNIOES";
+  }
+  if (calId === agendasInternas.ENSAIOS || summaryLower.includes("ensaio") || summaryLower.includes("epifania")) {
+    return "ENSAIOS";
+  }
+  if (calId === agendasInternas.LIMPEZA || summaryLower.includes("limpeza")) {
+    return "LIMPEZA";
+  }
+  if (calId === "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com" || summaryLower.includes("externo")) {
+    return "EXTERNOS";
+  }
+  return "IGREJA";
+}
+
+function montarMensagemAgendaCompletaPorSecoes(itens, tituloPeriodo, agendasInternas = {}) {
+  let msgAgenda = `📋 *Agenda Completa — ${tituloPeriodo}*\n`;
+
+  const itensPorSecao = {};
+  SECOES_AGENDA.forEach(s => {
+    itensPorSecao[s.key] = [];
+  });
+
+  itens.forEach((item, i) => {
+    const numero = i + 1;
+    const secaoKey = classificarSecaoEvento(item, agendasInternas);
+    if (!itensPorSecao[secaoKey]) {
+      itensPorSecao[secaoKey] = [];
+    }
+    itensPorSecao[secaoKey].push({ item, numero });
+  });
+
+  SECOES_AGENDA.forEach(secao => {
+    const lista = itensPorSecao[secao.key];
+    if (lista && lista.length > 0) {
+      msgAgenda += `\n${secao.titulo}\n`;
+      lista.forEach(({ item, numero }) => {
+        const horaStr = item.horaFmt ? ` às ${item.horaFmt}` : "";
+        if (item.tipo === "recorrente") {
+          const prefixo = (item.weekday === 0 || item.weekday === 6) ? "Todos os" : "Todas as";
+          msgAgenda += `${numero} - 🗓️ *${prefixo} ${DIAS_SEMANA_PLURAL[item.weekday]}*${horaStr} | ${item.summary}\n`;
+        } else {
+          msgAgenda += `${numero} - 📌 *${item.dataFmt}*${horaStr} | ${item.summary}\n`;
+        }
+      });
+    }
+  });
+
+  msgAgenda += `\nQuer o endereço ou mais detalhes de algum evento? Digite o número dele.\nDigite *menu* para voltar ao menu principal.`;
+  return msgAgenda;
+}
+
 // Monta o detalhe de um item da agenda. Para itens recorrentes, mostra a
 // próxima ocorrência a partir de hoje (ou a última, se todas já passaram).
 function montarDetalheEvento(item) {
@@ -194,6 +267,7 @@ module.exports = {
   DIAS_SEMANA,
   agruparEventosAgenda,
   montarMensagemAgenda,
+  montarMensagemAgendaCompletaPorSecoes,
   montarDetalheEvento,
   interpretarPeriodoPersonalizado,
   isEventoFuturo,

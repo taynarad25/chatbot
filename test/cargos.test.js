@@ -234,21 +234,21 @@ test("Simulação Bot: usuário com múltiplos cargos ('lider', 'pastor') recebe
 
   const NUMERO = "5511977770001@c.us";
 
-  // 1. Saudação / Menu: deve conter Área do Líder (6) E Área Pastoral (7)
+  // 1. Saudação / Menu: Pastor tem Área Pastoral com todas as opções de liderança integradas (sem menus separados duplicados)
   const [menu] = await bot.enviarMsg(NUMERO, "Olá");
-  assert.match(menu, /6️⃣ Área do Líder/, "Deveria exibir Área do Líder para quem tem cargo lider");
   assert.match(menu, /7️⃣ Área Pastoral/, "Deveria exibir Área Pastoral para quem tem cargo pastor");
+  assert.doesNotMatch(menu, /6️⃣ Área do Líder/, "Não deve exibir Área do Líder duplicada para quem já é pastor");
 
-  // 2. Acesso à Área do Líder (comando 6)
-  const [respLider] = await bot.enviarMsg(NUMERO, "6");
-  assert.match(respLider, /👑 \*Área do Líder\*/, "Usuário com cargo lider deve conseguir acessar a Área do Líder");
-
-  // Volta ao menu
-  await bot.enviarMsg(NUMERO, "menu");
-
-  // 3. Acesso à Área Pastoral (comando 7)
+  // 2. Acesso à Área Pastoral (comando 7) contém todas as opções de liderança
   const [respPastoral] = await bot.enviarMsg(NUMERO, "7");
   assert.match(respPastoral, /⛪ \*Área Pastoral\*/, "Usuário com cargo pastor deve conseguir acessar a Área Pastoral");
+  assert.match(respPastoral, /Agendar, alterar ou cancelar evento/);
+  assert.match(respPastoral, /Agendar, alterar ou desmarcar reunião/);
+
+  // 3. Pastor também consegue acessar atalho direto de líder caso digite 6
+  await bot.enviarMsg(NUMERO, "menu");
+  const [respLider] = await bot.enviarMsg(NUMERO, "6");
+  assert.match(respLider, /👑 \*Área do Líder\*/);
 });
 
 test("Simulação Bot: usuário com apenas 'lider' acessa opção 6 mas não opção 7", async () => {
@@ -279,7 +279,7 @@ test("Simulação Bot: usuário com apenas 'lider' acessa opção 6 mas não op�
   assert.match(resp7, /Não entendi sua mensagem/);
 });
 
-test("Simulação Bot: usuário com apenas 'membro' não acessa nem opção 6 nem 7", async () => {
+test("Simulação Bot: usuário com apenas 'membro' visualiza uso do salão no 5 e secretaria no 6", async () => {
   const bot = criarBotHarness([
     {
       nome: "Membro Gabriel",
@@ -290,16 +290,21 @@ test("Simulação Bot: usuário com apenas 'membro' não acessa nem opção 6 ne
 
   const NUMERO = "5511977770003@c.us";
 
-  // Menu: opções básicas 1 a 5 apenas
+  // Menu: exibe opções 1 a 4, uso do salão no 5 e secretaria no 6 (sem espaço vago)
   const [menu] = await bot.enviarMsg(NUMERO, "bom dia");
-  assert.doesNotMatch(menu, /6️⃣ Área do Líder/);
+  assert.match(menu, /5️⃣ Solicitar uso do salão/);
+  assert.match(menu, /6️⃣ Falar com a secretaria/);
+  assert.doesNotMatch(menu, /Área do Líder/);
   assert.doesNotMatch(menu, /7️⃣ Área Pastoral/);
   assert.doesNotMatch(menu, /8️⃣ Área da Direção/);
 
-  // Opções 6 e 7 não são reconhecidas
+  // Opção 6 para membro é Falar com a Secretaria (não acessa Área do Líder)
   const [resp6] = await bot.enviarMsg(NUMERO, "6");
-  assert.match(resp6, /Não entendi sua mensagem/);
+  assert.match(resp6, /📞 \*Secretaria\*/);
+  assert.doesNotMatch(resp6, /Área do Líder/);
 
+  // Opção 7 não é reconhecida (não acessa Área Pastoral)
+  await bot.enviarMsg(NUMERO, "menu");
   const [resp7] = await bot.enviarMsg(NUMERO, "7");
   assert.match(resp7, /Não entendi sua mensagem/);
 });

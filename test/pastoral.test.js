@@ -109,9 +109,13 @@ test("Área Pastoral: somente usuário com cargo 'pastor' visualiza menu pastora
   const [resp7Pastor] = await harness.enviar(NUMERO_PASTOR, "7");
   assert.match(resp7Pastor, /Graça e Paz, Pastor\(a\)!/);
   assert.match(resp7Pastor, /1️⃣ Ver agenda completa da igreja/);
-  assert.match(resp7Pastor, /2️⃣ Adicionar atendimento pastoral/);
-  assert.match(resp7Pastor, /3️⃣ Alterar atendimento pastoral existente/);
-  assert.match(resp7Pastor, /4️⃣ Desmarcar atendimento pastoral existente/);
+  assert.match(resp7Pastor, /2️⃣ Atendimento pastoral \(agendar, alterar ou desmarcar\)/);
+  assert.match(resp7Pastor, /3️⃣ Agendar, alterar ou cancelar evento/);
+  assert.match(resp7Pastor, /4️⃣ Solicitar aviso \/ comunicado no culto/);
+  assert.match(resp7Pastor, /5️⃣ Solicitar artes e flyers/);
+  assert.match(resp7Pastor, /6️⃣ Agendar, alterar ou desmarcar reunião/);
+  assert.match(resp7Pastor, /7️⃣ Consultar disponibilidade de dias e horários/);
+  assert.match(resp7Pastor, /8️⃣ Consultar orientações de atendimento pastoral/);
 
   // Líder comum tenta opção 7 e não acessa
   const [resp7Lider] = await harness.enviar(NUMERO_LIDER_COMUM, "7");
@@ -130,23 +134,30 @@ test("Área Pastoral: pastor adiciona atendimento pastoral diretamente no Google
   // 1. Entra na área pastoral
   await harness.enviar(NUMERO_PASTOR, "7");
 
-  // 2. Escolhe opção 2 (Adicionar atendimento pastoral)
-  const [r1] = await harness.enviar(NUMERO_PASTOR, "2");
+  // 2. Escolhe opção 2 (Atendimento pastoral -> abre submenu)
+  const [rSubmenu] = await harness.enviar(NUMERO_PASTOR, "2");
+  assert.match(rSubmenu, /Atendimento Pastoral/);
+  assert.match(rSubmenu, /1 - Agendar novo atendimento/);
+  assert.match(rSubmenu, /2 - Alterar atendimento existente/);
+  assert.match(rSubmenu, /3 - Desmarcar atendimento existente/);
+
+  // 3. Escolhe 1 (Agendar novo atendimento)
+  const [r1] = await harness.enviar(NUMERO_PASTOR, "1");
   assert.match(r1, /Qual é o nome da pessoa \/ discípulo a ser atendido\(a\)\?/);
 
-  // 3. Informa nome
+  // 4. Informa nome
   const [r2] = await harness.enviar(NUMERO_PASTOR, "Ana Paula Souza");
   assert.match(r2, /Qual é a \*data\* do atendimento para \*Ana Paula Souza\*\?/);
 
-  // 4. Informa data
+  // 5. Informa data
   const [r3] = await harness.enviar(NUMERO_PASTOR, "20/11/2026");
   assert.match(r3, /Qual é o \*horário de início\* do atendimento\?/);
 
-  // 5. Informa horário
+  // 6. Informa horário
   const [r4] = await harness.enviar(NUMERO_PASTOR, "15:30");
   assert.match(r4, /Onde será o atendimento\?/);
 
-  // 6. Informa local
+  // 7. Informa local
   const [r5] = await harness.enviar(NUMERO_PASTOR, "Gabinete Pastoral");
   assert.match(r5, /Atendimento Pastoral Agendado com Sucesso!/);
   assert.match(r5, /Ana Paula Souza/);
@@ -228,22 +239,25 @@ test("Área Pastoral: pastor altera horário de atendimento existente com sucess
   // 1. Entra na Área Pastoral
   await harness.enviar(NUMERO_PASTOR, "7");
 
-  // 2. Escolhe opção 3 (Alterar atendimento)
-  const [r1, r2] = await harness.enviar(NUMERO_PASTOR, "3");
+  // 2. Escolhe opção 2 (Atendimento pastoral -> abre submenu)
+  await harness.enviar(NUMERO_PASTOR, "2");
+
+  // 3. Escolhe subopção 2 (Alterar atendimento)
+  const [r1, r2] = await harness.enviar(NUMERO_PASTOR, "2");
   const msgLista = r2 || r1;
   assert.match(msgLista, /Atendimentos Pastorais Agendados/);
   assert.match(msgLista, /Marcos Vinicius/);
 
-  // 3. Seleciona o item 1
+  // 4. Seleciona o item 1
   const [rOQue] = await harness.enviar(NUMERO_PASTOR, "1");
   assert.match(rOQue, /O que você deseja alterar\?/);
   assert.match(rOQue, /1 - Horário/);
 
-  // 4. Escolhe alterar Horário (1)
+  // 5. Escolhe alterar Horário (1)
   const [rNovoHorario] = await harness.enviar(NUMERO_PASTOR, "1");
   assert.match(rNovoHorario, /novo horário de início/);
 
-  // 5. Envia novo horário (16:30)
+  // 6. Envia novo horário (16:30)
   const [rFinal] = await harness.enviar(NUMERO_PASTOR, "16:30");
   assert.match(rFinal, /Atendimento Pastoral Alterado com Sucesso!/);
   assert.match(rFinal, /16:30/);
@@ -283,18 +297,21 @@ test("Área Pastoral: pastor desmarca atendimento existente após confirmação 
   // 1. Entra na Área Pastoral
   await harness.enviar(NUMERO_PASTOR, "7");
 
-  // 2. Escolhe opção 4 (Desmarcar atendimento)
-  const [r1, r2] = await harness.enviar(NUMERO_PASTOR, "4");
+  // 2. Escolhe opção 2 (Atendimento pastoral -> abre submenu)
+  await harness.enviar(NUMERO_PASTOR, "2");
+
+  // 3. Escolhe subopção 3 (Desmarcar atendimento)
+  const [r1, r2] = await harness.enviar(NUMERO_PASTOR, "3");
   const msgLista = r2 || r1;
   assert.match(msgLista, /Qual atendimento você deseja desmarcar\?/);
   assert.match(msgLista, /Carla Silveira/);
 
-  // 3. Seleciona o item 1
+  // 4. Seleciona o item 1
   const [rConfirma] = await harness.enviar(NUMERO_PASTOR, "1");
   assert.match(rConfirma, /Confirma o cancelamento do atendimento pastoral/);
   assert.match(rConfirma, /Carla Silveira/);
 
-  // 4. Confirma com SIM
+  // 5. Confirma com SIM
   const [rSucesso] = await harness.enviar(NUMERO_PASTOR, "SIM");
   assert.match(rSucesso, /Atendimento Pastoral Desmarcado com Sucesso!/);
 
@@ -307,4 +324,29 @@ test("Área Pastoral: pastor desmarca atendimento existente após confirmação 
   const msgGrupo = harness.gruposEnviados.find((g) => g.texto.includes("ATENDIMENTO PASTORAL DESMARCADO"));
   assert.ok(msgGrupo);
   assert.match(msgGrupo.texto, /Carla Silveira/);
+});
+
+test("Área Pastoral: pastor acessa ferramentas de liderança (eventos e reuniões) diretamente no menu pastoral", async () => {
+  const NUMERO_PASTOR = "5511999991111";
+
+  const harness = criarHarness({
+    usuarios: [
+      { nome: "Pr. Roberto", telefone: NUMERO_PASTOR, cargos: ["pastor"] },
+    ],
+  });
+
+  // 1. Acessa menu de eventos diretamente da Área Pastoral (opção 3)
+  await harness.enviar(NUMERO_PASTOR, "7");
+  const [rEventos] = await harness.enviar(NUMERO_PASTOR, "3");
+  assert.match(rEventos, /Menu de Eventos/);
+  assert.match(rEventos, /1 - Agendar novo evento/);
+
+  // Volta ao menu principal
+  await harness.enviar(NUMERO_PASTOR, "menu");
+
+  // 2. Acessa menu de reuniões diretamente da Área Pastoral (opção 6)
+  await harness.enviar(NUMERO_PASTOR, "7");
+  const [rReunioes] = await harness.enviar(NUMERO_PASTOR, "6");
+  assert.match(rReunioes, /Reuniões/);
+  assert.match(rReunioes, /1 - Agendar reunião/);
 });

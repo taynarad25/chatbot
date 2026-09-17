@@ -112,12 +112,13 @@ test("Uso do Salão: membro solicita uso do salão e termo de responsabilidade �
     usuarios: [{ nome: "Mariana Costa", telefone: NUMERO_MEMBRO, cargos: ["membro"] }],
   });
 
-  // 1. Menu exibe opção 9
+  // 1. Menu exibe opção 5 para membros (e opção 6 para secretaria, sem salto de números)
   const [menu] = await harness.enviar(NUMERO_MEMBRO, "olá");
-  assert.match(menu, /9️⃣ Solicitar uso do salão/);
+  assert.match(menu, /5️⃣ Solicitar uso do salão/);
+  assert.match(menu, /6️⃣ Falar com a secretaria/);
 
-  // 2. Acessa via opção 9
-  const [r1] = await harness.enviar(NUMERO_MEMBRO, "9");
+  // 2. Acessa via opção 5 (opção 9 também continua compatível)
+  const [r1] = await harness.enviar(NUMERO_MEMBRO, "5");
   assert.match(r1, /Solicitação de Uso do Salão/);
   assert.match(r1, /Qual é a \*data\* desejada\?/);
 
@@ -282,7 +283,9 @@ test("Regra de visibilidade: eventos de Uso do Salão NÃO aparecem na agenda de
   const [rPastor1, rPastor2] = await harness.enviar(NUMERO_PASTOR, "10");
   const msgPastor = rPastor2 || rPastor1;
 
-  // Ambos devem aparecer na agenda completa/total
+  // Ambos devem aparecer na agenda completa/total, agrupados pelas respectivas seções
+  assert.match(msgPastor, /⛪ \*Eventos e Cultos da Igreja\*/);
+  assert.match(msgPastor, /🏛️ \*Uso do Salão\*/);
   assert.match(msgPastor, /Culto de Celebração/);
   assert.match(msgPastor, /Uso do Salão/);
 });
