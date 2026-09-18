@@ -19,14 +19,23 @@
 
     <style>
         :root {
-            --cor-ciano: #00bcd4;
-            --cor-ciano-brilho: rgba(0, 188, 212, 0.18);
-            --cor-roxo: #7b2cbf;
-            --cor-roxo-brilho: rgba(123, 44, 191, 0.18);
-            --cor-laranja: #ff7d00;
-            --cor-laranja-brilho: rgba(255, 125, 0, 0.18);
-            --cor-magenta: #e01a4f;
-            --cor-magenta-brilho: rgba(224, 26, 79, 0.18);
+            /* Paleta Oficial Comunidade Cristã Curados */
+            --cor-roxo: #7A2BE2;
+            --cor-roxo-brilho: rgba(122, 43, 226, 0.18);
+            --cor-rosa: #D63384;
+            --cor-rosa-brilho: rgba(214, 51, 132, 0.18);
+            --cor-laranja: #FF6A00;
+            --cor-laranja-brilho: rgba(255, 106, 0, 0.18);
+            --cor-azul: #00B7D9;
+            --cor-azul-brilho: rgba(0, 183, 217, 0.18);
+
+            /* Aliases para compatibilidade total */
+            --cor-ciano: var(--cor-azul);
+            --cor-ciano-brilho: var(--cor-azul-brilho);
+            --cor-magenta: var(--cor-rosa);
+            --cor-magenta-brilho: var(--cor-rosa-brilho);
+
+            /* Neutros e Estruturais */
             --cor-escuro: #121214;
             --cor-escuro-suave: #1a1a1e;
             --cor-card-dark: #222228;
@@ -89,7 +98,7 @@
             font-weight: 800;
             font-size: 1.15rem;
             letter-spacing: 2px;
-            color: var(--cor-ciano);
+            color: var(--cor-azul);
         }
 
         .navbar-nav {
@@ -108,42 +117,42 @@
         }
 
         .navbar-nav a:hover {
-            color: var(--cor-ciano);
+            color: var(--cor-azul);
         }
 
         .btn-nav-secretaria {
-            background: linear-gradient(135deg, var(--cor-roxo), #9d4edd);
+            background: linear-gradient(135deg, var(--cor-roxo), #9b4edd);
             color: #ffffff !important;
             padding: 8px 18px;
             border-radius: 999px;
             font-weight: 700 !important;
             font-size: 0.85rem !important;
-            box-shadow: 0 4px 14px rgba(123, 44, 191, 0.35);
+            box-shadow: 0 4px 14px rgba(122, 43, 226, 0.35);
             transition: transform 0.2s ease, box-shadow 0.2s ease !important;
         }
 
         .btn-nav-secretaria:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 18px rgba(123, 44, 191, 0.55);
+            box-shadow: 0 6px 18px rgba(122, 43, 226, 0.55);
         }
 
-        /* Banner Principal (Hero) */
+        /* Banner Principal (Hero) - Altura e Espaçamento Equilibrados */
         .banner-curados {
             background-color: var(--cor-escuro);
-            min-height: 680px;
+            min-height: 480px;
             display: flex;
             align-items: center;
             position: relative;
             overflow: hidden;
-            padding: 80px 4vw 80px 0;
+            padding: 44px 4vw 44px 0;
         }
 
         .banner-container {
             display: flex;
             align-items: center;
             width: 100%;
-            max-width: 1600px;
-            gap: clamp(40px, 5vw, 90px);
+            max-width: 1400px;
+            gap: clamp(32px, 4vw, 64px);
             position: relative;
             z-index: 2;
         }
@@ -151,7 +160,7 @@
         /* Logotipo com Efeito Bleed (Cortado na borda esquerda) */
         .logo-wrapper {
             flex-shrink: 0;
-            margin-left: -110px; /* Sangrando para fora da lateral esquerda */
+            margin-left: -70px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -160,10 +169,10 @@
         }
 
         .logo-img-anim {
-            width: clamp(420px, 34vw, 560px);
-            height: clamp(420px, 34vw, 560px);
+            width: clamp(260px, 22vw, 360px);
+            height: clamp(260px, 22vw, 360px);
             object-fit: contain;
-            filter: drop-shadow(0 20px 45px rgba(0, 0, 0, 0.65));
+            filter: drop-shadow(0 16px 36px rgba(0, 0, 0, 0.65));
             animation: float 5s ease-in-out infinite;
             user-select: none;
             display: block;
@@ -180,7 +189,7 @@
             50% { transform: translateY(-16px); }
         }
 
-        /* Textos do Banner - Escala Imponente e Destaque */
+        /* Textos do Banner - Escala Imponente, Elegante e Proporcional */
         .banner-text {
             animation: fadeInUp 1s ease-out forwards;
             color: #ffffff;
@@ -190,34 +199,34 @@
         }
 
         .banner-text h2 {
-            font-size: clamp(2.8rem, 3.8vw, 4.6rem);
-            font-weight: 400; /* Regular */
-            margin-bottom: 12px;
-            line-height: 1.15;
-            letter-spacing: -0.5px;
+            font-size: clamp(1.6rem, 2.2vw, 2.4rem);
+            font-weight: 400;
+            margin-bottom: 8px;
+            line-height: 1.2;
+            letter-spacing: -0.3px;
         }
 
         .banner-text h2 .highlight {
-            color: var(--cor-magenta);
-            font-weight: 600; /* SemiBold */
+            color: var(--cor-rosa);
+            font-weight: 600;
         }
 
         .banner-text h3 {
-            font-size: clamp(1.5rem, 2.2vw, 2.7rem);
-            letter-spacing: clamp(6px, 0.8vw, 12px);
+            font-size: clamp(1.0rem, 1.35vw, 1.45rem);
+            letter-spacing: clamp(4px, 0.6vw, 8px);
             color: #d1d5db;
-            margin-bottom: 14px;
-            font-weight: 600; /* SemiBold */
+            margin-bottom: 8px;
+            font-weight: 600;
             text-transform: uppercase;
         }
 
         .banner-text h1 {
-            font-size: clamp(5.6rem, 9.2vw, 10.5rem);
-            font-weight: 800; /* ExtraBold */
-            color: var(--cor-ciano);
-            letter-spacing: 3px;
-            line-height: 0.92;
-            text-shadow: 0 6px 32px rgba(0, 188, 212, 0.35);
+            font-size: clamp(2.8rem, 4.4vw, 4.2rem);
+            font-weight: 800;
+            color: var(--cor-azul);
+            letter-spacing: 2.5px;
+            line-height: 1.0;
+            text-shadow: 0 4px 24px rgba(0, 183, 217, 0.35);
         }
 
         /* Layout Utilitários */
@@ -228,7 +237,7 @@
         }
 
         .section {
-            padding: 100px 0;
+            padding: 90px 0;
             position: relative;
             scroll-margin-top: 70px;
         }
@@ -239,7 +248,7 @@
 
         .section-header {
             text-align: center;
-            margin-bottom: 56px;
+            margin-bottom: 52px;
         }
 
         .section-badge {
@@ -253,10 +262,10 @@
             margin-bottom: 16px;
         }
 
-        .badge-ciano { background: rgba(0, 188, 212, 0.12); color: var(--cor-ciano); }
-        .badge-roxo { background: rgba(123, 44, 191, 0.12); color: var(--cor-roxo); }
-        .badge-laranja { background: rgba(255, 125, 0, 0.12); color: var(--cor-laranja); }
-        .badge-magenta { background: rgba(224, 26, 79, 0.12); color: var(--cor-magenta); }
+        .badge-ciano, .badge-azul { background: rgba(0, 183, 217, 0.12); color: var(--cor-azul); }
+        .badge-roxo { background: rgba(122, 43, 226, 0.12); color: var(--cor-roxo); }
+        .badge-laranja { background: rgba(255, 106, 0, 0.12); color: var(--cor-laranja); }
+        .badge-magenta, .badge-rosa { background: rgba(214, 51, 132, 0.12); color: var(--cor-rosa); }
 
         .section-title {
             font-size: clamp(2.2rem, 3.6vw, 3.2rem);
@@ -303,12 +312,12 @@
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, var(--cor-ciano), var(--cor-roxo), var(--cor-magenta), var(--cor-laranja));
+            background: linear-gradient(90deg, var(--cor-azul), var(--cor-roxo), var(--cor-rosa), var(--cor-laranja));
         }
 
         .frase-destaque-badge {
             display: inline-block;
-            color: var(--cor-ciano);
+            color: var(--cor-azul);
             font-size: 0.8rem;
             font-weight: 800;
             letter-spacing: 3px;
@@ -327,7 +336,7 @@
         }
 
         .frase-destaque-texto .gradiente {
-            background: linear-gradient(90deg, var(--cor-ciano), #60a5fa, var(--cor-magenta));
+            background: linear-gradient(90deg, var(--cor-azul), #38c8e8, var(--cor-rosa));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -365,7 +374,7 @@
 
         .card-essencia.prioridade::before { background: var(--cor-roxo); }
         .card-essencia.proposito::before { background: var(--cor-laranja); }
-        .card-essencia.paixao::before { background: var(--cor-magenta); }
+        .card-essencia.paixao::before { background: var(--cor-rosa); }
 
         .card-essencia:hover {
             transform: translateY(-8px);
@@ -390,18 +399,18 @@
         }
 
         .card-essencia.prioridade .card-essencia-icon {
-            background: rgba(123, 44, 191, 0.12);
+            background: rgba(122, 43, 226, 0.12);
             color: var(--cor-roxo);
         }
 
         .card-essencia.proposito .card-essencia-icon {
-            background: rgba(255, 125, 0, 0.12);
+            background: rgba(255, 106, 0, 0.12);
             color: var(--cor-laranja);
         }
 
         .card-essencia.paixao .card-essencia-icon {
-            background: rgba(224, 26, 79, 0.12);
-            color: var(--cor-magenta);
+            background: rgba(214, 51, 132, 0.12);
+            color: var(--cor-rosa);
         }
 
         .card-essencia-tag {
@@ -413,7 +422,7 @@
 
         .card-essencia.prioridade .card-essencia-tag { color: var(--cor-roxo); }
         .card-essencia.proposito .card-essencia-tag { color: var(--cor-laranja); }
-        .card-essencia.paixao .card-essencia-tag { color: var(--cor-magenta); }
+        .card-essencia.paixao .card-essencia-tag { color: var(--cor-rosa); }
 
         .card-essencia-titulo {
             font-size: 1.6rem;
@@ -457,7 +466,7 @@
             transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Borda superior de 5px com a cor institucional do pilar */
+        /* Borda superior de 6px com a cor institucional do pilar */
         .card-coluna::before {
             content: "";
             position: absolute;
@@ -469,8 +478,8 @@
 
         .card-coluna.coluna-acolher::before { background: var(--cor-roxo); }
         .card-coluna.coluna-integrar::before { background: var(--cor-laranja); }
-        .card-coluna.coluna-entregar::before { background: var(--cor-magenta); }
-        .card-coluna.coluna-pertencer::before { background: var(--cor-ciano); }
+        .card-coluna.coluna-entregar::before { background: var(--cor-rosa); }
+        .card-coluna.coluna-pertencer::before { background: var(--cor-azul); }
 
         .card-coluna:hover {
             transform: translateY(-10px);
@@ -486,11 +495,11 @@
         }
 
         .card-coluna.coluna-entregar:hover {
-            box-shadow: 0 20px 40px var(--cor-magenta-brilho);
+            box-shadow: 0 20px 40px var(--cor-rosa-brilho);
         }
 
         .card-coluna.coluna-pertencer:hover {
-            box-shadow: 0 20px 40px var(--cor-ciano-brilho);
+            box-shadow: 0 20px 40px var(--cor-azul-brilho);
         }
 
         .card-coluna-header {
@@ -512,23 +521,23 @@
         }
 
         .card-coluna.coluna-acolher .coluna-numero {
-            background: rgba(123, 44, 191, 0.12);
+            background: rgba(122, 43, 226, 0.12);
             color: var(--cor-roxo);
         }
 
         .card-coluna.coluna-integrar .coluna-numero {
-            background: rgba(255, 125, 0, 0.12);
+            background: rgba(255, 106, 0, 0.12);
             color: var(--cor-laranja);
         }
 
         .card-coluna.coluna-entregar .coluna-numero {
-            background: rgba(224, 26, 79, 0.12);
-            color: var(--cor-magenta);
+            background: rgba(214, 51, 132, 0.12);
+            color: var(--cor-rosa);
         }
 
         .card-coluna.coluna-pertencer .coluna-numero {
-            background: rgba(0, 188, 212, 0.12);
-            color: var(--cor-ciano);
+            background: rgba(0, 183, 217, 0.12);
+            color: var(--cor-azul);
         }
 
         .coluna-icon-symbol {
@@ -554,8 +563,8 @@
 
         .card-coluna.coluna-acolher .coluna-subtitulo { color: var(--cor-roxo); }
         .card-coluna.coluna-integrar .coluna-subtitulo { color: var(--cor-laranja); }
-        .card-coluna.coluna-entregar .coluna-subtitulo { color: var(--cor-magenta); }
-        .card-coluna.coluna-pertencer .coluna-subtitulo { color: var(--cor-ciano); }
+        .card-coluna.coluna-entregar .coluna-subtitulo { color: var(--cor-rosa); }
+        .card-coluna.coluna-pertencer .coluna-subtitulo { color: var(--cor-azul); }
 
         .coluna-texto {
             font-size: 0.92rem;
@@ -600,7 +609,7 @@
             left: 0;
             right: 0;
             height: 5px;
-            background: var(--cor-ciano);
+            background: var(--cor-azul);
             border-radius: var(--borda-raio) var(--borda-raio) 0 0;
         }
 
@@ -614,8 +623,8 @@
             text-transform: uppercase;
             padding: 6px 14px;
             border-radius: 999px;
-            background: rgba(0, 188, 212, 0.16);
-            color: var(--cor-ciano);
+            background: rgba(0, 183, 217, 0.16);
+            color: var(--cor-azul);
             margin-bottom: 24px;
             align-self: flex-start;
         }
@@ -630,7 +639,7 @@
         }
 
         .culto-horario-grande span {
-            color: var(--cor-ciano);
+            color: var(--cor-azul);
         }
 
         .culto-nome {
@@ -651,12 +660,12 @@
 
         /* Card Destaque Santa Ceia */
         .card-culto-ceia {
-            background: linear-gradient(145deg, #fff7ed 0%, #ffedd5 100%);
+            background: linear-gradient(145deg, #fff9f5 0%, #ffede0 100%);
             border-radius: var(--borda-raio);
             padding: 44px 38px;
             position: relative;
-            box-shadow: 0 16px 36px rgba(255, 125, 0, 0.12);
-            border: 2px solid rgba(255, 125, 0, 0.25);
+            box-shadow: 0 16px 36px rgba(255, 106, 0, 0.12);
+            border: 2px solid rgba(255, 106, 0, 0.25);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -683,8 +692,8 @@
             text-transform: uppercase;
             padding: 6px 14px;
             border-radius: 999px;
-            background: rgba(255, 125, 0, 0.18);
-            color: #c2410c;
+            background: rgba(255, 106, 0, 0.16);
+            color: var(--cor-laranja);
             margin-bottom: 24px;
             align-self: flex-start;
         }
@@ -692,7 +701,7 @@
         .ceia-horario-grande {
             font-size: clamp(2.4rem, 4vw, 3.4rem);
             font-weight: 800;
-            color: #7c2d12;
+            color: #5a2300;
             line-height: 1.1;
             margin-bottom: 8px;
             letter-spacing: -1px;
@@ -705,7 +714,7 @@
         .ceia-nome {
             font-size: 1.35rem;
             font-weight: 700;
-            color: #9a3412;
+            color: #782e00;
             margin-bottom: 16px;
         }
 
@@ -721,7 +730,7 @@
         .ceia-aviso-texto {
             font-size: 1.05rem;
             font-weight: 700;
-            color: #9a3412;
+            color: #782e00;
             line-height: 1.45;
         }
 
@@ -753,15 +762,15 @@
             left: 0;
             right: 0;
             height: 5px;
-            background: linear-gradient(90deg, var(--cor-roxo), var(--cor-ciano));
+            background: linear-gradient(90deg, var(--cor-roxo), var(--cor-azul));
         }
 
         .endereco-pin-icon {
             width: 72px;
             height: 72px;
             border-radius: 50%;
-            background: rgba(0, 188, 212, 0.12);
-            color: var(--cor-ciano);
+            background: rgba(0, 183, 217, 0.12);
+            color: var(--cor-azul);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -807,14 +816,14 @@
         }
 
         .btn-maps-primario {
-            background: linear-gradient(135deg, var(--cor-ciano), #0097a7);
+            background: linear-gradient(135deg, var(--cor-azul), #0090ab);
             color: #ffffff;
-            box-shadow: 0 6px 20px rgba(0, 188, 212, 0.35);
+            box-shadow: 0 6px 20px rgba(0, 183, 217, 0.35);
         }
 
         .btn-maps-primario:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 188, 212, 0.55);
+            box-shadow: 0 8px 24px rgba(0, 183, 217, 0.55);
         }
 
         .btn-maps-copiar {
@@ -829,27 +838,27 @@
         }
 
         .btn-maps-copiar.btn-copiado {
-            background: #10b981 !important;
+            background: var(--cor-azul) !important;
             color: #ffffff !important;
-            border-color: #10b981 !important;
-            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+            border-color: var(--cor-azul) !important;
+            box-shadow: 0 4px 14px rgba(0, 183, 217, 0.4);
         }
 
         .btn-maps-waze {
-            background: #33ccff;
+            background: linear-gradient(135deg, var(--cor-roxo), #9b4edd);
             color: #ffffff;
-            box-shadow: 0 6px 20px rgba(51, 204, 255, 0.3);
+            box-shadow: 0 6px 20px rgba(122, 43, 226, 0.35);
         }
 
         .btn-maps-waze:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(51, 204, 255, 0.5);
+            box-shadow: 0 8px 24px rgba(122, 43, 226, 0.55);
         }
 
         .feedback-copia {
             font-size: 0.88rem;
             font-weight: 700;
-            color: #10b981;
+            color: var(--cor-azul);
             margin-top: 14px;
             min-height: 22px;
             transition: opacity 0.2s ease;
@@ -899,7 +908,7 @@
         }
 
         .footer-logo-text span {
-            color: var(--cor-ciano);
+            color: var(--cor-azul);
         }
 
         .footer-sobre-desc {
@@ -926,7 +935,7 @@
             left: 0;
             width: 32px;
             height: 3px;
-            background: var(--cor-ciano);
+            background: var(--cor-azul);
             border-radius: 2px;
         }
 
@@ -967,9 +976,9 @@
             display: block;
         }
 
-        .contato-cargo-tag.secretaria { color: var(--cor-ciano); }
+        .contato-cargo-tag.secretaria { color: var(--cor-azul); }
         .contato-cargo-tag.tesouraria { color: var(--cor-laranja); }
-        .contato-cargo-tag.email { color: #60a5fa; }
+        .contato-cargo-tag.email { color: var(--cor-rosa); }
 
         .contato-numero-tel {
             font-size: 1.15rem;
@@ -1014,18 +1023,18 @@
             width: 44px;
             height: 44px;
             border-radius: 50%;
-            background: #2563eb;
+            background: var(--cor-roxo);
             color: #ffffff;
             text-decoration: none;
             font-size: 1.25rem;
             flex-shrink: 0;
-            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+            box-shadow: 0 4px 14px rgba(122, 43, 226, 0.35);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .btn-email-contato:hover {
             transform: scale(1.1);
-            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.5);
+            box-shadow: 0 6px 18px rgba(122, 43, 226, 0.55);
         }
 
         /* Coluna Links Rápidos */
@@ -1046,12 +1055,12 @@
         }
 
         .footer-links-lista a:hover {
-            color: var(--cor-ciano);
+            color: var(--cor-azul);
             transform: translateX(4px);
         }
 
         .link-destaque-secretaria {
-            color: #c084fc !important;
+            color: var(--cor-roxo) !important;
             font-weight: 700 !important;
         }
 
@@ -1075,33 +1084,33 @@
         }
 
         .footer-bottom a:hover {
-            color: var(--cor-ciano);
+            color: var(--cor-azul);
         }
 
         /* ==================================================
-           RESPONSIVIDADE
+           RESPONSIVIDADE (FOCADO EM TELEMÓVEIS / MOBILE)
            ================================================== */
         @media (max-width: 1024px) {
             .banner-curados {
-                min-height: 620px;
-                padding: 60px 30px 60px 0;
+                min-height: 420px;
+                padding: 36px 24px 36px 0;
             }
             .logo-wrapper {
-                margin-left: -80px;
+                margin-left: -50px;
             }
             .logo-img-anim {
-                width: 380px;
-                height: 380px;
+                width: 250px;
+                height: 250px;
             }
             .banner-text h2 {
-                font-size: 2.6rem;
+                font-size: 1.8rem;
             }
             .banner-text h3 {
-                font-size: 1.5rem;
+                font-size: 1.15rem;
                 letter-spacing: 5px;
             }
             .banner-text h1 {
-                font-size: 6rem;
+                font-size: 3.2rem;
             }
             .essencia-grid {
                 grid-template-columns: 1fr;
@@ -1122,18 +1131,22 @@
         }
 
         @media (max-width: 768px) {
-            .navbar-nav {
-                display: none; /* Em telas compactas, foco no logotipo e links */
+            .navbar-curados {
+                padding: 10px 18px;
             }
+            .navbar-nav {
+                display: none; /* Foco no mobile */
+            }
+            /* Redução drástica da altura e espaçamentos do hero para não ocupar espaço vertical excessivo */
             .banner-curados {
                 min-height: auto;
-                padding: 65px 20px 75px;
+                padding: 24px 16px 28px;
                 justify-content: center;
             }
             .banner-container {
                 flex-direction: column;
                 text-align: center;
-                gap: 28px;
+                gap: 14px;
                 margin: 0 auto;
                 justify-content: center;
             }
@@ -1143,28 +1156,36 @@
                 justify-content: center;
             }
             .logo-img-anim {
-                width: clamp(220px, 48vw, 280px);
-                height: clamp(220px, 48vw, 280px);
-                filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.5));
+                width: clamp(105px, 26vw, 140px);
+                height: clamp(105px, 26vw, 140px);
+                filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.5));
+                animation: float 4s ease-in-out infinite;
             }
             .banner-text {
                 text-align: center;
             }
             .banner-text h2 {
-                font-size: clamp(2.1rem, 6vw, 2.7rem);
-                margin-bottom: 8px;
+                font-size: clamp(1.15rem, 3.8vw, 1.45rem);
+                margin-bottom: 4px;
+                line-height: 1.25;
             }
             .banner-text h3 {
-                font-size: clamp(1.25rem, 3.6vw, 1.6rem);
-                letter-spacing: clamp(4px, 1.2vw, 7px);
-                margin-bottom: 10px;
+                font-size: clamp(0.82rem, 2.5vw, 1.02rem);
+                letter-spacing: clamp(3px, 1vw, 5px);
+                margin-bottom: 6px;
             }
+            /* Palavra 'CURADOS' significativamente diminuída, elegante e proporcional */
             .banner-text h1 {
-                font-size: clamp(4.4rem, 13vw, 5.8rem);
-                letter-spacing: 2px;
+                font-size: clamp(1.85rem, 6.2vw, 2.5rem);
+                letter-spacing: 2.5px;
+                line-height: 1.05;
+                text-shadow: 0 3px 16px rgba(0, 183, 217, 0.35);
             }
             .section {
-                padding: 70px 0;
+                padding: 48px 0;
+            }
+            .section-header {
+                margin-bottom: 34px;
             }
             .colunas-grid {
                 grid-template-columns: 1fr;
@@ -1193,6 +1214,33 @@
             }
             .btn-whatsapp-contato span {
                 display: inline;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .banner-curados {
+                padding: 18px 12px 22px;
+            }
+            .banner-container {
+                gap: 10px;
+            }
+            .logo-img-anim {
+                width: 90px;
+                height: 90px;
+            }
+            .banner-text h2 {
+                font-size: 1.1rem;
+            }
+            .banner-text h3 {
+                font-size: 0.78rem;
+                letter-spacing: 3px;
+            }
+            .banner-text h1 {
+                font-size: 1.85rem;
+                letter-spacing: 1.5px;
+            }
+            .section {
+                padding: 38px 0;
             }
         }
     </style>
