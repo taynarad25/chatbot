@@ -12,12 +12,23 @@ const {
   montarMensagemConflito,
   montarMensagemDatasDisponiveis,
   verificarDataEspecifica,
+  verificarConflitoCultoDomingo,
   calcularJanelasLivres,
   montarMensagemDataEspecificaBloqueada,
   consultarDisponibilidadeMesDiaSemana,
   formatarRelatorioDisponibilidade,
 } = require("./disponibilidade");
-const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, isAgendaInterna, AGENDAS_INTERNAS } = require("./redes");
+const {
+  REDES,
+  montarListaRedes,
+  montarListaRedesParaUsuario,
+  obterRedesParaUsuario,
+  obterRedeDaLista,
+  obterRedePorNumero,
+  mapearRedeParaAgendaIndex,
+  isAgendaInterna,
+  AGENDAS_INTERNAS,
+} = require("./redes");
 const { notificarSecretaria, notificarPastoral, notificarMultimidia, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
@@ -466,10 +477,16 @@ function createMessageHandler({
       const cargos = Array.isArray(encontrado.cargos)
         ? encontrado.cargos.map((c) => String(c).toLowerCase().trim()).filter(Boolean)
         : (encontrado.cargos ? [String(encontrado.cargos).toLowerCase().trim()] : ["lider"]);
+      const deptos = Array.isArray(encontrado.departamentos)
+        ? encontrado.departamentos
+        : (encontrado.departamento ? [encontrado.departamento] : []);
       return {
         nome: (encontrado.nome || "").trim(),
         telefone: encontrado.telefone,
         cargos: cargos.length > 0 ? cargos : ["lider"],
+        departamentos: deptos,
+        departamento: deptos.join(", "),
+        registradoNoBanco: true,
       };
     }
     const ehLiderArray = lideres.some((l) => {
@@ -481,12 +498,18 @@ function createMessageHandler({
         nome: "",
         telefone: numeroDigitos,
         cargos: ["lider"],
+        departamentos: [],
+        departamento: "",
+        registradoNoBanco: false,
       };
     }
     return {
       nome: "",
       telefone: numeroDigitos,
       cargos: [],
+      departamentos: [],
+      departamento: "",
+      registradoNoBanco: false,
     };
   }
 
@@ -1348,18 +1371,24 @@ Escolha uma opção:
             } else if (msg.body === "2") {
               info.acaoEvento = "alterar";
               info.etapa = "alterar_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou alteração de evento.`);
-              return msg.reply(`🏢 De qual departamento é o evento que deseja alterar?\n\n${montarListaRedes()}`);
+              return msg.reply(`🏢 De qual departamento é o evento que deseja alterar?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else if (msg.body === "3") {
               info.acaoEvento = "cancelar";
               info.etapa = "alterar_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou cancelamento de evento.`);
-              return msg.reply(`🏢 De qual departamento é o evento que deseja cancelar?\n\n${montarListaRedes()}`);
+              return msg.reply(`🏢 De qual departamento é o evento que deseja cancelar?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else if (msg.body === "4") {
               info.acaoEvento = "atualizar_formulario";
               info.etapa = "form_alterar_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou alteração de formulário de evento.`);
-              return msg.reply(`📝 *Atualizar Formulário de Evento*\n\n🏢 De qual departamento é o evento que você deseja alterar o formulário?\n\n${montarListaRedes()}`);
+              return msg.reply(`📝 *Atualizar Formulário de Evento*\n\n🏢 De qual departamento é o evento que você deseja alterar o formulário?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else if (msg.body === "5") {
               info.fluxo = "evento_externo";
               info.etapa = "evento_externo_nome";
@@ -1367,16 +1396,19 @@ Escolha uma opção:
             } else if (msg.body === "6") {
               info.acaoEvento = "preparacao_espaco";
               info.etapa = "alterar_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou informe de preparação/decoração de evento.`);
-              return msg.reply(`🏢 De qual departamento é o evento que você precisa de horários para montagem/decoração?\n\n${montarListaRedes()}`);
+              return msg.reply(`🏢 De qual departamento é o evento que você precisa de horários para montagem/decoração?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else {
               return msg.reply("❌ Opção inválida. Digite 1 para Agendar, 2 para Alterar, 3 para Cancelar, 4 para Atualizar Formulário, 5 para Evento Externo ou 6 para Informar montagem/decoração.");
             }
           }
 
           if (info.etapa === "alterar_departamento") {
-            const rede = obterRedePorNumero(msg.body);
-            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${REDES.length}).`);
+            const redesDisp = info.redesDisponiveis || obterRedesParaUsuario(usuario);
+            const rede = obterRedeDaLista(msg.body.trim(), redesDisp);
+            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${redesDisp.length}).`);
 
             info.departamento = rede.nome;
             info.calendarIdBusca = agendasParaLer[rede.agendaIndex];
@@ -1688,8 +1720,9 @@ Escolha uma opção:
           }
 
           if (info.etapa === "form_alterar_departamento") {
-            const rede = obterRedePorNumero(msg.body.trim());
-            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${REDES.length}).`);
+            const redesDisp = info.redesDisponiveis || obterRedesParaUsuario(usuario);
+            const rede = obterRedeDaLista(msg.body.trim(), redesDisp);
+            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${redesDisp.length}).`);
 
             info.departamento = rede.nome;
             info.calendarIdBusca = agendasParaLer[rede.agendaIndex];
@@ -1991,12 +2024,15 @@ Escolha uma opção:
             info.local = resolverLocalEvento(msg.body);
             console.log(`[Agendamento] Local do evento: ${info.local}`);
             info.etapa = "evento_rede";
-            return msg.reply(`🏢 Qual departamento está organizando?\n\n${montarListaRedes()}`);
+            const redesUsuario = obterRedesParaUsuario(usuario);
+            info.redesDisponiveis = redesUsuario;
+            return msg.reply(`🏢 Qual departamento está organizando?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
           }
 
           if (info.etapa === "evento_rede") {
-            const rede = obterRedePorNumero(msg.body.trim());
-            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${REDES.length}).`);
+            const redesDisp = info.redesDisponiveis || obterRedesParaUsuario(usuario);
+            const rede = obterRedeDaLista(msg.body.trim(), redesDisp);
+            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${redesDisp.length}).`);
 
             info.rede = rede.nome;
             console.log(`[Agendamento] Rede selecionada: ${info.rede}`);
@@ -2382,7 +2418,9 @@ Escolha uma opção:
             } else if (escolha === "3") {
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
-              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedes()}`);
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else if (escolha === "4") {
               info.fluxo = "reunioes";
               info.etapa = "menu_reuniao";
@@ -2453,7 +2491,9 @@ Escolha uma opção:
             } else if (escolha === "5") {
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
-              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedes()}`);
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else if (escolha === "6") {
               info.fluxo = "reunioes";
               info.etapa = "menu_reuniao";
@@ -2815,6 +2855,18 @@ Escolha uma opção:
                 console.error("[Pastoral] Erro ao verificar atividades concorrentes:", e);
               }
 
+              const conflitoDomingo = verificarConflitoCultoDomingo({
+                ano: info.anoAtendimento,
+                mes: info.mesAtendimento,
+                dia: info.diaAtendimento,
+                isDiaInteiro: false,
+                horarioInicio: info.horarioInicio,
+                horarioFim: info.horarioFim,
+              });
+              if (conflitoDomingo.conflito) {
+                eventosConcorrentes.push({ summary: conflitoDomingo.subtipo === "ceia" ? "Culto de Santa Ceia" : "Culto de Celebração" });
+              }
+
               if (eventosConcorrentes.length > 0) {
                 const nomes = eventosConcorrentes.map(e => e.summary || "Atividade").slice(0, 3).join(", ");
                 info.etapa = "pastoral_confirmar_conflito_gabinete";
@@ -2834,6 +2886,19 @@ Escolha uma opção:
 
             if (escolhaEspaco === "2" || /todo/i.test(escolhaEspaco)) {
               info.localAtendimento = "Todo o espaço da igreja";
+
+              const conflitoDomingo = verificarConflitoCultoDomingo({
+                ano: info.anoAtendimento,
+                mes: info.mesAtendimento,
+                dia: info.diaAtendimento,
+                isDiaInteiro: false,
+                horarioInicio: info.horarioInicio,
+                horarioFim: info.horarioFim,
+              });
+              if (conflitoDomingo.conflito) {
+                info.etapa = "pastoral_add_horario";
+                return msg.reply(conflitoDomingo.mensagem);
+              }
 
               let eventosConcorrentes = [];
               try {
@@ -2936,7 +3001,9 @@ Escolha uma opção:
             } else if (escolha === "4") {
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
-              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedes()}`);
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else if (escolha === "5") {
               info.fluxo = "reunioes";
               info.etapa = "menu_reuniao";
@@ -2966,8 +3033,9 @@ Escolha uma opção:
           }
         } else if (info.fluxo === "artes_flyers") {
           if (info.etapa === "artes_departamento") {
-            const rede = obterRedePorNumero(msg.body);
-            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${REDES.length}).`);
+            const redesDisp = info.redesDisponiveis || obterRedesParaUsuario(usuario);
+            const rede = obterRedeDaLista(msg.body.trim(), redesDisp);
+            if (!rede) return msg.reply(`❌ Escolha um departamento da lista (1 a ${redesDisp.length}).`);
 
             info.departamento = rede.nome;
             info.etapa = "artes_tipo";
@@ -3123,6 +3191,19 @@ Escolha uma opção:
             if (hf < hi || (hf === hi && mf <= mi)) {
               return msg.reply("❌ O horário de término deve ser posterior ao horário de início. Digite novamente:");
             }
+
+            const conflitoDomingo = verificarConflitoCultoDomingo({
+              ano: info.reuniaoData.ano,
+              mes: info.reuniaoData.mes,
+              dia: info.reuniaoData.dia,
+              isDiaInteiro: false,
+              horarioInicio: info.reuniaoHorarioInicio,
+              horarioFim: hFim,
+            });
+            if (conflitoDomingo.conflito) {
+              return msg.reply(conflitoDomingo.mensagem);
+            }
+
             info.reuniaoHorarioFim = hFim;
             info.etapa = "reuniao_local";
             return msg.reply("5️⃣ Qual será o *local* da reunião?\n\n1 - Na Igreja\n2 - Online");
@@ -3254,6 +3335,20 @@ Escolha uma opção:
             if (hf < hi || (hf === hi && mf <= mi)) {
               return msg.reply("❌ O horário de término deve ser posterior ao horário de início. Digite novamente:");
             }
+
+            const dOriginal = moment.tz(info.reuniaoSelecionada.start.dateTime || info.reuniaoSelecionada.start.date, "America/Sao_Paulo");
+            const conflitoDomingo = verificarConflitoCultoDomingo({
+              ano: dOriginal.year(),
+              mes: dOriginal.month() + 1,
+              dia: dOriginal.date(),
+              isDiaInteiro: false,
+              horarioInicio: info.novoHorarioInicio,
+              horarioFim: hFim,
+            });
+            if (conflitoDomingo.conflito) {
+              return msg.reply(conflitoDomingo.mensagem);
+            }
+
             info.novoHorarioFim = hFim;
             info.campoAlterar = "horario";
             info.descricaoAlteracao = `Novo horário: ${info.novoHorarioInicio} às ${info.novoHorarioFim}`;
@@ -3450,6 +3545,19 @@ Escolha uma opção:
             if (hf < hi || (hf === hi && mf <= mi)) {
               return msg.reply("❌ O horário de término deve ser posterior ao horário de início. Digite novamente:");
             }
+
+            const conflitoDomingo = verificarConflitoCultoDomingo({
+              ano: info.ano,
+              mes: info.mes,
+              dia: info.dia,
+              isDiaInteiro: false,
+              horarioInicio: info.horarioInicio,
+              horarioFim: hFim,
+            });
+            if (conflitoDomingo.conflito) {
+              return msg.reply(conflitoDomingo.mensagem);
+            }
+
             info.horarioFim = hFim;
             info.etapa = "uso_salao_finalidade";
             return msg.reply(`📝 Qual será a *finalidade* do uso do salão? (Ex: Aniversário, Confraternização, Ensaio, Reunião de família, etc.)`);

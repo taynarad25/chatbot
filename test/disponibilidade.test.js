@@ -4,6 +4,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
 const {
+  verificarConflitoCultoDomingo,
   calcularDisponibilidade,
   montarMensagemConflito,
   montarMensagemDatasDisponiveis,
@@ -47,8 +48,8 @@ function baseParams(overrides = {}) {
     mes: MES,
     diaSemanaFiltro: "TODOS",
     isDiaInteiro: false,
-    horarioInicio: "19:00",
-    horarioFim: "20:00",
+    horarioInicio: "14:00",
+    horarioFim: "15:00",
     rede: "Rede de Casais",
     agora: AGORA_FIXO,
     ...overrides,
@@ -93,8 +94,9 @@ test("calcularDisponibilidade: 'Sábado LIVRE' do Evangelismo bloqueia aquele s�
 });
 
 test("calcularDisponibilidade: novo evento de dia inteiro é bloqueado por qualquer evento existente no dia", () => {
+  // 10/07/2026 é sexta-feira (diaSemanaFiltro: 5)
   const eventos = [eventoHorario({ data: "2026-07-10", horaInicio: "10:00", horaFim: "11:00", summary: "Reunião qualquer" })];
-  const { disponiveis, conflito } = calcularDisponibilidade(baseParams({ eventos, isDiaInteiro: true }));
+  const { disponiveis, conflito } = calcularDisponibilidade(baseParams({ eventos, isDiaInteiro: true, diaSemanaFiltro: 5 }));
 
   assert.ok(!disponiveis.some((d) => d.getDate() === 10));
   assert.equal(conflito.type, "day_long_conflict");
@@ -383,3 +385,112 @@ test("montarMensagemDataEspecificaBloqueada: mensagens específicas por motivo",
     /Culto.*19:00.*20:00.*10\/07/s
   );
 });
+
+// ============================================================================
+// TESTES DE BLOQUEIO DOS CULTOS AOS DOMINGOS E SANTA CEIA
+// ============================================================================
+
+test("verificarConflitoCultoDomingo: dias de semana (segunda a sábado) não têm conflito", () => {
+  // 04/07/2026 é sábado, 06/07/2026 é segunda-feira
+  const sab = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 4, horarioInicio: "19:00", horarioFim: "21:00" });
+  assert.equal(sab.conflito, false);
+
+  const seg = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 6, isDiaInteiro: true });
+  assert.equal(seg.conflito, false);
+});
+
+test("verificarConflitoCultoDomingo: 1º domingo do mês (Santa Ceia) bloqueia eventos de DIA TODO e eventos até as 13h", () => {
+  // 05/07/2026 é o 1º domingo de julho de 2026 (dia 5 <= 7)
+  const diaTodo = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 5, isDiaInteiro: true });
+  assert.equal(diaTodo.conflito, true);
+  assert.equal(diaTodo.subtipo, "ceia");
+  assert.match(diaTodo.mensagem, /Santa Ceia.*08h30.*13h/);
+
+  const manha = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 5, horarioInicio: "09:00", horarioFim: "11:00" });
+  assert.equal(manha.conflito, true);
+  assert.equal(manha.subtipo, "ceia");
+  assert.match(manha.mensagem, /Santa Ceia.*08h30.*13h/);
+
+  const cruzando13h = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 5, horarioInicio: "12:00", horarioFim: "14:00" });
+  assert.equal(cruzando13h.conflito, true);
+  assert.equal(cruzando13h.subtipo, "ceia");
+});
+
+test("verificarConflitoCultoDomingo: 1º domingo do mês permite eventos a partir das 13h", () => {
+  // 05/07/2026 das 13:00 às 15:00 ou 14:00 às 17:00
+  const tarde = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 5, horarioInicio: "13:00", horarioFim: "15:00" });
+  assert.equal(tarde.conflito, false);
+
+  const noite = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 5, horarioInicio: "15:00", horarioFim: "18:00" });
+  assert.equal(noite.conflito, false);
+});
+
+test("verificarConflitoCultoDomingo: demais domingos bloqueiam eventos de DIA TODO e eventos a partir das 16h", () => {
+  // 12/07/2026 é o 2º domingo de julho de 2026 (dia 12 > 7)
+  const diaTodo = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 12, isDiaInteiro: true });
+  assert.equal(diaTodo.conflito, true);
+  assert.equal(diaTodo.subtipo, "culto_domingo");
+  assert.match(diaTodo.mensagem, /Culto de Celebração.*18h.*16h/);
+
+  const noite = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 12, horarioInicio: "18:00", horarioFim: "20:00" });
+  assert.equal(noite.conflito, true);
+  assert.equal(noite.subtipo, "culto_domingo");
+
+  const fimApos16h = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 12, horarioInicio: "15:00", horarioFim: "17:00" });
+  assert.equal(fimApos16h.conflito, true);
+  assert.equal(fimApos16h.subtipo, "culto_domingo");
+});
+
+test("verificarConflitoCultoDomingo: demais domingos permitem eventos terminando até as 16h", () => {
+  // 12/07/2026 das 09:00 às 11:30 ou das 14:00 às 16:00
+  const manha = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 12, horarioInicio: "09:00", horarioFim: "11:30" });
+  assert.equal(manha.conflito, false);
+
+  const tardeAte16h = verificarConflitoCultoDomingo({ ano: 2026, mes: 7, dia: 12, horarioInicio: "14:00", horarioFim: "16:00" });
+  assert.equal(tardeAte16h.conflito, false);
+});
+
+test("calcularJanelasLivres: no 1º domingo a janela inicia às 13:00 e nos demais encerra às 16:00", () => {
+  // 1º domingo (05/07/2026)
+  const janelasCeia = calcularJanelasLivres({ eventosNoDia: [], ano: 2026, mes: 7, dia: 5 });
+  assert.deepEqual(janelasCeia, [{ inicio: "13:00", fim: "22:00" }]);
+
+  // 2º domingo (12/07/2026)
+  const janelasCulto = calcularJanelasLivres({ eventosNoDia: [], ano: 2026, mes: 7, dia: 12 });
+  assert.deepEqual(janelasCulto, [{ inicio: "07:00", fim: "16:00" }]);
+});
+
+test("verificarDataEspecifica: bloqueia cultos de domingo e retorna motivo culto_domingo", () => {
+  // 1º domingo antes das 13h
+  const resCeia = verificarDataEspecifica({
+    eventos: [],
+    evangelismoCalendarId: EVANGELISMO_ID,
+    ano: 2026,
+    mes: 7,
+    dia: 5,
+    horarioInicio: "10:00",
+    horarioFim: "12:00",
+    agora: AGORA_FIXO,
+  });
+  assert.equal(resCeia.disponivel, false);
+  assert.equal(resCeia.motivo, "culto_domingo");
+  assert.equal(resCeia.subtipo, "ceia");
+  assert.match(montarMensagemDataEspecificaBloqueada(resCeia), /Santa Ceia.*13h/);
+
+  // Demais domingos após as 16h
+  const resCulto = verificarDataEspecifica({
+    eventos: [],
+    evangelismoCalendarId: EVANGELISMO_ID,
+    ano: 2026,
+    mes: 7,
+    dia: 19,
+    horarioInicio: "17:00",
+    horarioFim: "19:00",
+    agora: AGORA_FIXO,
+  });
+  assert.equal(resCulto.disponivel, false);
+  assert.equal(resCulto.motivo, "culto_domingo");
+  assert.equal(resCulto.subtipo, "culto_domingo");
+  assert.match(montarMensagemDataEspecificaBloqueada(resCulto), /Culto de Celebração.*16h/);
+});
+

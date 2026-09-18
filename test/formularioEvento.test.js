@@ -437,7 +437,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   await enviarPrivado("7"); // departamento (Rede de Homens)
   await enviarPrivado("12"); // mês (Dezembro)
   await enviarPrivado("1"); // data específica
-  await enviarPrivado("20"); // dia 20
+  await enviarPrivado("22"); // dia 22
   await enviarPrivado("19:00"); // inicio
   const rFim = await enviarPrivado("22:00"); // fim
 
@@ -511,8 +511,8 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     nome_lider: "Pr. João Silva",
     departamento: "Rede de Homens",
     nome_evento: "Conferência Atos 2",
-    data: "20/12/2026",
-    data_solicitada: "20/12/2026",
+    data: "22/12/2026",
+    data_solicitada: "22/12/2026",
     horario_inicio: "19:00",
     horario_termino: "22:00",
     horario_inicio_termino: "19:00 às 22:00",

@@ -1,6 +1,16 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { REDES, montarListaRedes, obterRedePorNumero, mapearRedeParaAgendaIndex, AGENDAS_INTERNAS, isAgendaInterna } = require("../bot/redes");
+const {
+  REDES,
+  montarListaRedes,
+  montarListaRedesParaUsuario,
+  obterRedesParaUsuario,
+  obterRedeDaLista,
+  obterRedePorNumero,
+  mapearRedeParaAgendaIndex,
+  AGENDAS_INTERNAS,
+  isAgendaInterna,
+} = require("../bot/redes");
 
 test("REDES: tem exatamente 10 entradas com números únicos de 1 a 10", () => {
   assert.equal(REDES.length, 10);
@@ -66,4 +76,77 @@ test("AGENDAS_INTERNAS: contém Reuniões, Atendimento, Limpeza e Ensaios com se
   assert.equal(isAgendaInterna(AGENDAS_INTERNAS.ENSAIOS), true);
   assert.equal(isAgendaInterna("cal-evangelismo"), false);
   assert.equal(isAgendaInterna(null), false);
+});
+
+// ============================================================================
+// RESTRIÇÃO DE DEPARTAMENTOS POR USUÁRIO (Líder vs Pastor / Diretor)
+// ============================================================================
+
+test("obterRedesParaUsuario: Pastor e Diretor têm acesso a todos os 10 departamentos", () => {
+  const usuarioPastor = { nome: "Pastor Paulo", cargos: ["pastor"], departamentos: ["Rede Kids"] };
+  const redesPastor = obterRedesParaUsuario(usuarioPastor);
+  assert.equal(redesPastor.length, 10);
+
+  const usuarioDiretor = { nome: "Diretor Carlos", cargos: ["diretor"], departamentos: [] };
+  const redesDiretor = obterRedesParaUsuario(usuarioDiretor);
+  assert.equal(redesDiretor.length, 10);
+});
+
+test("obterRedesParaUsuario: Líder comum cadastrado vê apenas seus departamentos + Outros", () => {
+  const usuarioLiderKids = {
+    nome: "Líder Ana",
+    cargos: ["lider"],
+    departamentos: ["Rede Kids"],
+    registradoNoBanco: true,
+  };
+  const redes = obterRedesParaUsuario(usuarioLiderKids);
+
+  // Deve conter exatamente 2 opções: Rede Kids (1) e Outros (2)
+  assert.equal(redes.length, 2);
+  assert.equal(redes[0].nome, "Rede Kids");
+  assert.equal(redes[0].numeroExibicao, "1");
+  assert.equal(redes[1].nome, "Outros");
+  assert.equal(redes[1].numeroExibicao, "2");
+
+  const textoLista = montarListaRedesParaUsuario(redes);
+  assert.equal(textoLista, "1 - Rede Kids\n2 - Outros");
+});
+
+test("obterRedesParaUsuario: Líder comum de múltiplos departamentos vê todos os seus departamentos + Outros", () => {
+  const usuarioMultiLider = {
+    nome: "Líder Marcos",
+    cargos: ["lider"],
+    departamentos: ["Rede de Homens", "Rede Ruach"],
+    registradoNoBanco: true,
+  };
+  const redes = obterRedesParaUsuario(usuarioMultiLider);
+
+  assert.equal(redes.length, 3);
+  const nomes = redes.map((r) => r.nome);
+  assert.ok(nomes.includes("Rede de Homens"));
+  assert.ok(nomes.includes("Rede Ruach"));
+  assert.ok(nomes.includes("Outros"));
+});
+
+test("obterRedeDaLista: Líder só consegue selecionar os departamentos permitidos na sua lista", () => {
+  const usuarioLiderKids = {
+    nome: "Líder Ana",
+    cargos: ["lider"],
+    departamentos: ["Rede Kids"],
+    registradoNoBanco: true,
+  };
+  const redesPermitidas = obterRedesParaUsuario(usuarioLiderKids);
+
+  // Escolha pelo número de exibição 1 (Rede Kids) ou 2 (Outros)
+  assert.equal(obterRedeDaLista("1", redesPermitidas).nome, "Rede Kids");
+  assert.equal(obterRedeDaLista("2", redesPermitidas).nome, "Outros");
+
+  // Escolha pelo número original da rede (9 para Rede Kids)
+  assert.equal(obterRedeDaLista("9", redesPermitidas).nome, "Rede Kids");
+
+  // Tentativa de escolher departamento de outro líder (ex: 7 - Rede de Homens, 1 - Evangelismo): BLOQUEADO (retorna null)
+  assert.equal(obterRedeDaLista("7", redesPermitidas), null);
+  assert.equal(obterRedeDaLista("1", redesPermitidas).nome, "Rede Kids"); // 1 é o exibido para Rede Kids!
+  assert.equal(obterRedeDaLista("Evangelismo", redesPermitidas), null);
+  assert.equal(obterRedeDaLista("Rede de Homens", redesPermitidas), null);
 });

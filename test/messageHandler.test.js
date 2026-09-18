@@ -550,7 +550,7 @@ test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agen
   const agora = moment.tz("America/Sao_Paulo");
   const mesAlvo = agora.month() + 1;
   const anoAlvo = agora.year();
-  const diaAlvo = 20;
+  const diaAlvo = 22;
 
   const eventoExterno = {
     calendarId: AGENDAS[10], // Eventos Externos
@@ -1691,7 +1691,7 @@ test("área do líder: agendar reunião e secretaria recusa", async () => {
   await enviar(handleMessage, NUMERO_LIDER, "4");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Intercessão");
-  await enviar(handleMessage, NUMERO_LIDER, "20/12/2026");
+  await enviar(handleMessage, NUMERO_LIDER, "21/12/2026");
   await enviar(handleMessage, NUMERO_LIDER, "20:00");
   await enviar(handleMessage, NUMERO_LIDER, "21:00");
   await enviar(handleMessage, NUMERO_LIDER, "Na Igreja");

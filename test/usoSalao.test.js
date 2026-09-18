@@ -137,8 +137,13 @@ test("Uso do Salão: membro solicita uso do salão e termo de responsabilidade �
   const [rTerminoInvalido] = await harness.enviar(NUMERO_MEMBRO, "12:00");
   assert.match(rTerminoInvalido, /horário de término deve ser posterior/);
 
-  // 6. Informa término válido
-  const [rTerminoOk] = await harness.enviar(NUMERO_MEMBRO, "18:00");
+  // 5b. Tenta horário de término em domingo após as 16h (conflito de culto de celebração)
+  const [rConflitoDomingo] = await harness.enviar(NUMERO_MEMBRO, "18:00");
+  assert.match(rConflitoDomingo, /Culto de Celebração/);
+  assert.match(rConflitoDomingo, /16h/);
+
+  // 6. Informa término válido (terminando antes das 16h no domingo)
+  const [rTerminoOk] = await harness.enviar(NUMERO_MEMBRO, "15:30");
   assert.match(rTerminoOk, /Qual será a \*finalidade\* do uso do salão\?/);
 
   // 7. Informa finalidade
@@ -156,7 +161,7 @@ test("Uso do Salão: membro solicita uso do salão e termo de responsabilidade �
   const [rSucesso] = await harness.enviar(NUMERO_MEMBRO, "SIM");
   assert.match(rSucesso, /Solicitação de Uso do Salão Enviada!/);
   assert.match(rSucesso, /20\/12\/2026/);
-  assert.match(rSucesso, /14:00 às 18:00/);
+  assert.match(rSucesso, /14:00 às 15:30/);
 
   // Sessão do membro foi finalizada
   assert.equal(harness.etapas[`${NUMERO_MEMBRO}@c.us`], undefined);
@@ -166,7 +171,7 @@ test("Uso do Salão: membro solicita uso do salão e termo de responsabilidade �
   assert.ok(msgSecretaria, "deve notificar o grupo da secretaria");
   assert.match(msgSecretaria.texto, /Mariana Costa/);
   assert.match(msgSecretaria.texto, /20\/12\/2026/);
-  assert.match(msgSecretaria.texto, /14:00 às 18:00/);
+  assert.match(msgSecretaria.texto, /14:00 às 15:30/);
   assert.match(msgSecretaria.texto, /Aniversário de Família/);
   assert.match(msgSecretaria.texto, /Termo de Responsabilidade:\* Aceito pelo solicitante/);
   assert.match(msgSecretaria.texto, /aprovar salão/);

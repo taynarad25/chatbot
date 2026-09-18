@@ -3,6 +3,79 @@ const moment = require("moment-timezone");
 const DIAS_SEMANA_ABREV = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 /**
+ * Verifica se um agendamento colide com os cultos programados aos domingos:
+ * - 1º Domingo do Mês: Santa Ceia (08h30) -> bloqueia das 00:00 às 13:00 (livre após 13h)
+ * - Demais Domingos: Culto de Celebração (18h00) -> bloqueia das 16:00 às 23:59 (livre até as 16h)
+ * - Eventos de DIA TODO são bloqueados em qualquer domingo.
+ */
+function verificarConflitoCultoDomingo({ ano, mes, dia, dateObj, isDiaInteiro, horarioInicio, horarioFim }) {
+  let m;
+  if (dateObj) {
+    m = moment.tz(dateObj, "America/Sao_Paulo").startOf("day");
+  } else if (dia && mes && ano) {
+    m = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo").startOf("day");
+  } else {
+    return { conflito: false };
+  }
+
+  if (m.day() !== 0) {
+    return { conflito: false };
+  }
+
+  const ehPrimeiroDomingo = m.date() <= 7;
+  const dataFormatada = m.format("DD/MM");
+
+  if (isDiaInteiro) {
+    if (ehPrimeiroDomingo) {
+      return {
+        conflito: true,
+        subtipo: "ceia",
+        dataFormatada,
+        mensagem: `❌ Não é possível agendar eventos de *DIA TODO* no domingo (${dataFormatada}). No 1º domingo do mês celebramos a *Santa Ceia* às 08h30 e o templo fica reservado até as 13h. Por favor, escolha outro dia ou agende com horário a partir das 13h.`,
+      };
+    } else {
+      return {
+        conflito: true,
+        subtipo: "culto_domingo",
+        dataFormatada,
+        mensagem: `❌ Não é possível agendar eventos de *DIA TODO* no domingo (${dataFormatada}). Aos domingos realizamos o *Culto de Celebração* às 18h e o espaço da igreja fica reservado a partir das 16h. Por favor, escolha outro dia ou agende com horário até as 16h.`,
+      };
+    }
+  }
+
+  if (horarioInicio) {
+    const [hIni, mIni = 0] = horarioInicio.split(":").map(Number);
+    const [hFim, mFim = 0] = horarioFim ? horarioFim.split(":").map(Number) : [hIni + 1, mIni];
+    const minInicio = hIni * 60 + mIni;
+    const minFim = hFim * 60 + mFim;
+
+    if (ehPrimeiroDomingo) {
+      // Bloqueio das 00:00 às 13:00 (0 a 780 minutos)
+      if (minInicio < 780 && minFim > 0) {
+        return {
+          conflito: true,
+          subtipo: "ceia",
+          dataFormatada,
+          mensagem: `❌ No dia ${dataFormatada} (1º domingo do mês) celebramos a *Santa Ceia* às 08h30. O espaço da igreja fica reservado até as *13h*. Por favor, escolha outro horário a partir das 13h ou outra data.`,
+        };
+      }
+    } else {
+      // Bloqueio das 16:00 às 23:59 (960 a 1440 minutos)
+      if (minFim > 960 && minInicio < 1440) {
+        return {
+          conflito: true,
+          subtipo: "culto_domingo",
+          dataFormatada,
+          mensagem: `❌ Aos domingos realizamos o *Culto de Celebração* às 18h e o espaço da igreja fica reservado a partir das *16h*. Por favor, escolha um horário que termine até as 16h ou agende para outro dia.`,
+        };
+      }
+    }
+  }
+
+  return { conflito: false, ehDomingo: true, ehPrimeiroDomingo, dataFormatada };
+}
+
+/**
  * Calcula as datas disponíveis num mês para um novo evento de agendamento.
  * Não faz nenhuma chamada de rede — `eventos` já deve vir buscado via buscarEventos().
  *
@@ -59,6 +132,24 @@ function calcularDisponibilidade({
     if (sabadosLivresEvangelismo.includes(dTargetFormatted)) {
       if (!firstConflictDetails) {
         firstConflictDetails = { type: "sabado_livre", date: dTargetFormatted };
+      }
+      return false;
+    }
+
+    const conflitoDomingo = verificarConflitoCultoDomingo({
+      dateObj: dataMsg,
+      isDiaInteiro,
+      horarioInicio,
+      horarioFim,
+    });
+    if (conflitoDomingo.conflito) {
+      if (!firstConflictDetails) {
+        firstConflictDetails = {
+          type: "culto_domingo",
+          subtipo: conflitoDomingo.subtipo,
+          date: dTargetFormatted,
+          mensagem: conflitoDomingo.mensagem,
+        };
       }
       return false;
     }
@@ -136,6 +227,9 @@ function montarMensagemConflito(conflito) {
   if (!conflito) {
     return "❌ Não há datas disponíveis para essas condições neste mês.";
   }
+  if (conflito.type === "culto_domingo") {
+    return conflito.mensagem;
+  }
   if (conflito.type === "sabado_livre") {
     return `❌ Não há datas disponíveis para agendamento no dia ${moment(conflito.date).format("DD/MM")}. Este sábado está reservado como "Sábado LIVRE" do Evangelismo. Por favor, escolha outra data ou mês.`;
   }
@@ -184,6 +278,24 @@ function verificarDataEspecifica({ eventos, evangelismoCalendarId, ano, mes, dia
   );
   if (ehSabadoLivre) {
     return { disponivel: false, motivo: "sabado_livre", dataFormatada };
+  }
+
+  const conflitoDomingo = verificarConflitoCultoDomingo({
+    ano,
+    mes,
+    dia,
+    isDiaInteiro,
+    horarioInicio,
+    horarioFim,
+  });
+  if (conflitoDomingo.conflito) {
+    return {
+      disponivel: false,
+      motivo: "culto_domingo",
+      subtipo: conflitoDomingo.subtipo,
+      dataFormatada,
+      mensagem: conflitoDomingo.mensagem,
+    };
   }
 
   const eventosNoDia = eventos.filter((ev) => {
@@ -236,10 +348,26 @@ function verificarDataEspecifica({ eventos, evangelismoCalendarId, ano, mes, dia
 // Calcula as janelas de horário livres num dia específico, considerando 1h de
 // buffer antes/depois de cada evento já marcado, dentro de uma janela "comercial"
 // (7h-22h por padrão) — só pra dar uma sugestão útil, não é uma regra rígida.
-function calcularJanelasLivres({ eventosNoDia, ano, mes, dia, inicioDiaHH = 7, fimDiaHH = 22 }) {
+function calcularJanelasLivres({ eventosNoDia, ano, mes, dia, inicioDiaHH, fimDiaHH }) {
   const diaBase = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo").startOf("day");
-  const limiteInicio = diaBase.clone().set({ hour: inicioDiaHH, minute: 0 });
-  const limiteFim = diaBase.clone().set({ hour: fimDiaHH, minute: 0 });
+  const ehDomingo = diaBase.day() === 0;
+  const ehPrimeiroDomingo = ehDomingo && diaBase.date() <= 7;
+
+  let horaInicioPadrao = inicioDiaHH !== undefined ? inicioDiaHH : 7;
+  let horaFimPadrao = fimDiaHH !== undefined ? fimDiaHH : 22;
+
+  if (ehDomingo) {
+    if (ehPrimeiroDomingo) {
+      // 1º domingo do mês: Santa Ceia bloqueia até 13h
+      horaInicioPadrao = Math.max(horaInicioPadrao, 13);
+    } else {
+      // Demais domingos: Culto de Celebração bloqueia a partir das 16h
+      horaFimPadrao = Math.min(horaFimPadrao, 16);
+    }
+  }
+
+  const limiteInicio = diaBase.clone().set({ hour: horaInicioPadrao, minute: 0 });
+  const limiteFim = diaBase.clone().set({ hour: horaFimPadrao, minute: 0 });
   const buffer = moment.duration(60, "minutes");
 
   const ocupados = (eventosNoDia || [])
@@ -284,6 +412,9 @@ function calcularJanelasLivres({ eventosNoDia, ano, mes, dia, inicioDiaHH = 7, f
 function montarMensagemDataEspecificaBloqueada(resultado) {
   const { motivo, conflito, dataFormatada } = resultado;
 
+  if (motivo === "culto_domingo") {
+    return resultado.mensagem || `❌ O dia ${dataFormatada} está reservado para culto na igreja. Escolha outro dia ou horário, ou digite *menu* para recomeçar.`;
+  }
   if (motivo === "data_passada") {
     return `❌ O dia ${dataFormatada} já passou. Escolha uma data a partir de hoje, ou digite *menu* para recomeçar.`;
   }
@@ -400,11 +531,26 @@ function consultarDisponibilidadeMesDiaSemana({
       // 4. Sem eventos no dia: totalmente livre
       if (eventosNoDia.length === 0) {
         const isHoje = cursor.isSame(hojeSP, "day");
-        let inicioJanela = "07:00";
+        const ehDomingo = cursor.day() === 0;
+        const ehPrimeiroDomingo = ehDomingo && cursor.date() <= 7;
+
+        let horaInicio = 7;
+        let horaFim = 22;
+        if (ehDomingo) {
+          if (ehPrimeiroDomingo) {
+            horaInicio = 13;
+          } else {
+            horaFim = 16;
+          }
+        }
+
+        let inicioJanela = `${String(horaInicio).padStart(2, "0")}:00`;
+        let fimJanela = `${String(horaFim).padStart(2, "0")}:00`;
+
         if (isHoje) {
           const horaAgora = agora.hour();
           const minutoAgora = agora.minute();
-          if (horaAgora >= 22) {
+          if (horaAgora >= horaFim) {
             dias.push({
               dataFormatada,
               diaSemanaNome,
@@ -414,10 +560,10 @@ function consultarDisponibilidadeMesDiaSemana({
             cursor.add(1, "day");
             continue;
           }
-          if (horaAgora > 7 || (horaAgora === 7 && minutoAgora > 0)) {
+          if (horaAgora > horaInicio || (horaAgora === horaInicio && minutoAgora > 0)) {
             const proxMin = minutoAgora === 0 ? "00" : minutoAgora <= 30 ? "30" : "00";
             const proxH = minutoAgora > 30 ? horaAgora + 1 : horaAgora;
-            if (proxH >= 22) {
+            if (proxH >= horaFim) {
               dias.push({
                 dataFormatada,
                 diaSemanaNome,
@@ -435,7 +581,7 @@ function consultarDisponibilidadeMesDiaSemana({
           dataFormatada,
           diaSemanaNome,
           status: "livre",
-          janelasLivres: [{ inicio: inicioJanela, fim: "22:00" }],
+          janelasLivres: [{ inicio: inicioJanela, fim: fimJanela }],
         });
         cursor.add(1, "day");
         continue;
@@ -535,6 +681,7 @@ function formatarRelatorioDisponibilidade({ dias, mesNome, diaSemanaTexto }) {
 }
 
 module.exports = {
+  verificarConflitoCultoDomingo,
   calcularDisponibilidade,
   montarMensagemConflito,
   montarMensagemDatasDisponiveis,
