@@ -57,6 +57,25 @@ function seedFromEnvSeNecessario() {
   console.log(`[Lideres] Banco semeado a partir de WHATSAPP_LIDERES com ${numeros.length} número(s).`);
 }
 
+function normalizarDepartamentos(deptos) {
+  if (!deptos) return [];
+  let arr = [];
+  if (Array.isArray(deptos)) {
+    arr = deptos;
+  } else if (typeof deptos === "string") {
+    try {
+      const parsed = JSON.parse(deptos);
+      arr = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      arr = deptos.split(",").map((d) => d.trim());
+    }
+  }
+  const limpos = arr
+    .map((d) => String(d || "").trim())
+    .filter(Boolean);
+  return Array.from(new Set(limpos));
+}
+
 function loadLideres() {
   try {
     seedFromEnvSeNecessario();
@@ -64,11 +83,13 @@ function loadLideres() {
     const lideres = {};
     for (const row of rows) {
       const cargos = normalizarCargos(row.cargos);
+      const departamentos = normalizarDepartamentos(row.departamento);
       lideres[row.telefone] = {
         nome: row.nome,
         telefone: row.telefone,
         cargos,
-        departamento: row.departamento || "",
+        departamentos,
+        departamento: departamentos.join(", "),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
       };
@@ -98,11 +119,12 @@ function obterUsuarioPorTelefone(telefone) {
     nome: "",
     telefone: telefoneNormalizado,
     cargos: [],
+    departamentos: [],
     departamento: "",
   };
 }
 
-function addLider({ nome, telefone, cargos, departamento }) {
+function addLider({ nome, telefone, cargos, departamentos, departamento }) {
   const telefoneNormalizado = normalizarTelefone(telefone);
   if (!telefoneNormalizado) return { ok: false, message: "Telefone inválido." };
   if (!nome || !nome.trim()) return { ok: false, message: "Nome é obrigatório." };
@@ -111,16 +133,16 @@ function addLider({ nome, telefone, cargos, departamento }) {
   if (existente) return { ok: false, message: "Já existe um usuário com esse telefone." };
 
   const cargosNormalizados = normalizarCargos(cargos);
-  const depto = String(departamento || "").trim();
+  const deptosNormalizados = normalizarDepartamentos(departamentos !== undefined ? departamentos : departamento);
 
   db.prepare("INSERT INTO lideres (telefone, nome, cargos, departamento, createdAt) VALUES (?, ?, ?, ?, ?)")
-    .run(telefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), depto, new Date().toISOString());
+    .run(telefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), JSON.stringify(deptosNormalizados), new Date().toISOString());
   sincronizarTelefones();
-  console.log(`[Lideres] Usuário adicionado: ${nome.trim()} (${telefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Depto: ${depto || "Nenhum"}`);
+  console.log(`[Lideres] Usuário adicionado: ${nome.trim()} (${telefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Deptos: [${deptosNormalizados.join(", ") || "Nenhum"}]`);
   return { ok: true, message: "Usuário adicionado com sucesso." };
 }
 
-function updateLider(telefoneAtual, { nome, telefone, cargos, departamento }) {
+function updateLider(telefoneAtual, { nome, telefone, cargos, departamentos, departamento }) {
   const telefoneAtualNormalizado = normalizarTelefone(telefoneAtual);
   const novoTelefoneNormalizado = normalizarTelefone(telefone);
   if (!novoTelefoneNormalizado) return { ok: false, message: "Telefone inválido." };
@@ -135,13 +157,14 @@ function updateLider(telefoneAtual, { nome, telefone, cargos, departamento }) {
   }
 
   const cargosNormalizados = normalizarCargos(cargos !== undefined ? cargos : liderExistente.cargos);
-  const deptoFinal = departamento !== undefined ? String(departamento || "").trim() : (liderExistente.departamento || "");
+  const deptosFonte = departamentos !== undefined ? departamentos : (departamento !== undefined ? departamento : liderExistente.departamento);
+  const deptosNormalizados = normalizarDepartamentos(deptosFonte);
 
   db.prepare("DELETE FROM lideres WHERE telefone = ?").run(telefoneAtualNormalizado);
   db.prepare("INSERT INTO lideres (telefone, nome, cargos, departamento, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(novoTelefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), deptoFinal, liderExistente.createdAt, new Date().toISOString());
+    .run(novoTelefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), JSON.stringify(deptosNormalizados), liderExistente.createdAt, new Date().toISOString());
   sincronizarTelefones();
-  console.log(`[Lideres] Usuário editado: ${telefoneAtualNormalizado} -> ${nome.trim()} (${novoTelefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Depto: ${deptoFinal || "Nenhum"}`);
+  console.log(`[Lideres] Usuário editado: ${telefoneAtualNormalizado} -> ${nome.trim()} (${novoTelefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Deptos: [${deptosNormalizados.join(", ") || "Nenhum"}]`);
   return { ok: true, message: "Usuário atualizado com sucesso." };
 }
 
@@ -161,9 +184,12 @@ function obterLideresPorDepartamento(departamento) {
   const deptoNorm = String(departamento).trim().toLowerCase();
   const todos = listLideres();
   return todos.filter((l) => {
-    const d = (l.departamento || "").trim().toLowerCase();
-    if (!d) return false;
-    return d === deptoNorm || d.includes(deptoNorm) || deptoNorm.includes(d);
+    const deptos = Array.isArray(l.departamentos) ? l.departamentos : normalizarDepartamentos(l.departamento);
+    return deptos.some((d) => {
+      const dNorm = String(d || "").trim().toLowerCase();
+      if (!dNorm) return false;
+      return dNorm === deptoNorm || dNorm.includes(deptoNorm) || deptoNorm.includes(dNorm);
+    });
   });
 }
 
@@ -175,6 +201,7 @@ module.exports = {
   updateLider,
   removeLider,
   normalizarCargos,
+  normalizarDepartamentos,
   obterUsuarioPorTelefone,
   obterLideresPorDepartamento,
 };

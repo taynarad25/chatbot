@@ -199,6 +199,23 @@ test("POST e PUT /secretaria/api/admin/lideres salvam e atualizam departamento",
   const u2 = obterUsuarioPorTelefone("5511999998888");
   assert.equal(u2.nome, "Líder Débora Alterada");
   assert.equal(u2.departamento, "Intercessão");
+
+  const postMultiRes = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: adminCookie },
+    body: JSON.stringify({
+      nome: "Líder Multi",
+      telefone: "5511999997777",
+      cargos: ["lider"],
+      departamentos: ["Rede de Casais", "Rede Ruach"],
+    }),
+  });
+  const postMultiJson = await postMultiRes.json();
+  assert.equal(postMultiRes.status, 200);
+  assert.equal(postMultiJson.ok, true);
+
+  const uMulti = obterUsuarioPorTelefone("5511999997777");
+  assert.deepEqual(uMulti.departamentos, ["Rede de Casais", "Rede Ruach"]);
 });
 
 // ============================================================================

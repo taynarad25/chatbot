@@ -898,22 +898,21 @@ function renderIndexHtml() {
       <form id="addLiderForm">
         <input name="nome" placeholder="Nome completo" required />
         <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" autocomplete="off" required />
-        <div style="margin-bottom: 12px;">
-          <label style="display:block; font-size: 0.85rem; color: #a1a1aa; margin-bottom: 5px;">Departamento / Ministério:</label>
-          <select name="departamento" id="liderDepartamento" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #ffffff; font-size: 0.95rem;">
-            <option value="" style="background: #18181b; color: #ffffff;">Nenhum / Geral</option>
-            <option value="Evangelismo" style="background: #18181b; color: #ffffff;">Evangelismo</option>
-            <option value="Epifania" style="background: #18181b; color: #ffffff;">Epifania</option>
-            <option value="Intercessão" style="background: #18181b; color: #ffffff;">Intercessão</option>
-            <option value="Projeto Social Seeds" style="background: #18181b; color: #ffffff;">Projeto Social Seeds</option>
-            <option value="Rede Ruach" style="background: #18181b; color: #ffffff;">Rede Ruach</option>
-            <option value="Rede de Casais" style="background: #18181b; color: #ffffff;">Rede de Casais</option>
-            <option value="Rede de Homens" style="background: #18181b; color: #ffffff;">Rede de Homens</option>
-            <option value="Rede de Mulheres" style="background: #18181b; color: #ffffff;">Rede de Mulheres</option>
-            <option value="Rede Kids" style="background: #18181b; color: #ffffff;">Rede Kids</option>
-            <option value="Eventos Externos" style="background: #18181b; color: #ffffff;">Eventos Externos</option>
-            <option value="Outros" style="background: #18181b; color: #ffffff;">Outros</option>
-          </select>
+        <div class="deptos-container" style="margin-bottom: 14px;">
+          <span class="cargos-title" style="display:block; font-size: 0.85rem; color: #a1a1aa; margin-bottom: 6px;">Departamentos / Ministérios (marque todos os que se aplicam):</span>
+          <div class="deptos-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; max-height: 140px; overflow-y: auto; padding: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;">
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Evangelismo" /> Evangelismo</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Epifania" /> Epifania</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Intercessão" /> Intercessão</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Projeto Social Seeds" /> Projeto Social Seeds</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Ruach" /> Rede Ruach</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Casais" /> Rede de Casais</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Homens" /> Rede de Homens</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Mulheres" /> Rede de Mulheres</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Kids" /> Rede Kids</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Eventos Externos" /> Eventos Externos</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Outros" /> Outros</label>
+          </div>
         </div>
         <div class="cargos-container">
           <span class="cargos-title">Cargos / Permissões Ministeriais:</span>
@@ -1121,7 +1120,7 @@ function renderIndexHtml() {
 
       const filtrados = lideresCache.filter(l => {
         const cargosStr = Array.isArray(l.cargos) ? l.cargos.join(' ') : (l.cargos || '');
-        const deptoStr = l.departamento || '';
+        const deptoStr = Array.isArray(l.departamentos) ? l.departamentos.join(' ') : (l.departamento || '');
         const nomeOk = !filtroNome || normalizarBusca(l.nome).includes(filtroNome) || normalizarBusca(cargosStr).includes(filtroNome) || normalizarBusca(deptoStr).includes(filtroNome);
         const telefoneOk = !filtroTelefone || l.telefone.includes(filtroTelefone);
         return nomeOk && telefoneOk;
@@ -1151,12 +1150,16 @@ function renderIndexHtml() {
           span.appendChild(badge);
         });
 
-        if (l.departamento) {
+        const deptosList = Array.isArray(l.departamentos) && l.departamentos.length > 0
+          ? l.departamentos
+          : (l.departamento ? (typeof l.departamento === 'string' ? l.departamento.split(',').map(d => d.trim()).filter(Boolean) : [l.departamento]) : []);
+
+        deptosList.forEach(depto => {
           const badgeDepto = document.createElement('span');
           badgeDepto.className = 'badge badge-depto';
-          badgeDepto.textContent = l.departamento;
+          badgeDepto.textContent = depto;
           span.appendChild(badgeDepto);
-        }
+        });
 
         li.appendChild(span);
 
@@ -1209,7 +1212,13 @@ function renderIndexHtml() {
       const form = document.getElementById('addLiderForm');
       form.nome.value = lider.nome;
       form.telefone.value = formatarTelefone(lider.telefone);
-      form.departamento.value = lider.departamento || '';
+      
+      const deptos = Array.isArray(lider.departamentos)
+        ? lider.departamentos
+        : (lider.departamento ? String(lider.departamento).split(',').map(d => d.trim()).filter(Boolean) : []);
+      form.querySelectorAll('input[name="departamentos"]').forEach(cb => {
+        cb.checked = deptos.includes(cb.value);
+      });
       
       const cargos = Array.isArray(lider.cargos) ? lider.cargos : (lider.cargos ? [lider.cargos] : ['lider']);
       form.querySelectorAll('input[name="cargos"]').forEach(cb => {
@@ -1225,7 +1234,9 @@ function renderIndexHtml() {
       liderEmEdicao = null;
       const form = document.getElementById('addLiderForm');
       form.reset();
-      form.departamento.value = '';
+      form.querySelectorAll('input[name="departamentos"]').forEach(cb => {
+        cb.checked = false;
+      });
       form.querySelectorAll('input[name="cargos"]').forEach(cb => {
         cb.checked = (cb.value === 'lider');
       });
@@ -1279,6 +1290,9 @@ function renderIndexHtml() {
         return;
       }
       data.cargos = checkedBoxes;
+
+      const checkedDeptos = Array.from(form.querySelectorAll('input[name="departamentos"]:checked')).map(cb => cb.value);
+      data.departamentos = checkedDeptos;
 
       const editando = !!liderEmEdicao;
       const url = editando ? '/secretaria/api/admin/lideres/' + encodeURIComponent(liderEmEdicao) : '/secretaria/api/admin/lideres';

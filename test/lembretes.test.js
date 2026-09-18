@@ -19,7 +19,7 @@ const {
   processarLembretesEventos,
 } = require("../bot/lembretes");
 const { salvarFormularioEvento } = require("../bot/formularioEvento");
-const { addLider, listLideres, obterLideresPorDepartamento } = require("../web/lideres");
+const { addLider, listLideres, obterLideresPorDepartamento, obterUsuarioPorTelefone } = require("../web/lideres");
 const { createMessageHandler } = require("../bot/messageHandler");
 
 after(() => {
@@ -328,4 +328,55 @@ test("Diretor com cargo adicional 'lider' recebe lembretes, mas só vê opção 
   assert.match(respostas[0], /9️⃣ Área da Direção/);
   assert.doesNotMatch(respostas[0], /7️⃣ Área do Líder/, "Diretor com função líder não deve ver o menu líder");
   assert.doesNotMatch(respostas[0], /8️⃣ Área Pastoral/);
+});
+
+test("Líder de múltiplos departamentos recebe avisos de eventos de qualquer um de seus departamentos", async () => {
+  addLider({
+    nome: "Sara Multi-Ministério",
+    telefone: "5511922223333",
+    cargos: ["lider"],
+    departamentos: ["Epifania", "Rede Kids", "Intercessão"],
+  });
+
+  const usuario = obterUsuarioPorTelefone("5511922223333");
+  assert.deepEqual(usuario.departamentos, ["Epifania", "Rede Kids", "Intercessão"]);
+
+  // Deve ser encontrada ao buscar por qualquer um dos três departamentos
+  assert.ok(obterLideresPorDepartamento("Epifania").some((l) => l.telefone === "5511922223333"));
+  assert.ok(obterLideresPorDepartamento("Rede Kids").some((l) => l.telefone === "5511922223333"));
+  assert.ok(obterLideresPorDepartamento("Intercessão").some((l) => l.telefone === "5511922223333"));
+  // Não deve ser encontrada em departamento onde não atua
+  assert.ok(!obterLideresPorDepartamento("Rede de Homens").some((l) => l.telefone === "5511922223333"));
+
+  // Dispara lembrete para evento da Rede Kids
+  const dataBase = new Date("2026-09-18T10:00:00.000Z");
+  const eventosKids = [
+    {
+      id: "google-ev-kids-01",
+      summary: "Encontro Especial Rede Kids",
+      start: { dateTime: "2026-09-23T14:00:00-03:00" },
+      location: "Sala Kids",
+      calendarId: "cal-kids",
+    },
+  ];
+
+  const mensagens = [];
+  const fakeClient = {
+    sendMessage: async (to, txt) => {
+      mensagens.push({ to, txt });
+    },
+  };
+
+  await processarLembretesEventos({
+    client: fakeClient,
+    buscarEventos: async () => eventosKids,
+    agendasParaLer: [],
+    diasAntecedencia: 5,
+    dataBase,
+  });
+
+  assert.equal(mensagens.length, 1);
+  assert.equal(mensagens[0].to, "5511922223333@c.us");
+  assert.match(mensagens[0].txt, /Sara Multi-Ministério/);
+  assert.match(mensagens[0].txt, /Rede Kids/);
 });
