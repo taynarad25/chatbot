@@ -156,10 +156,10 @@ test("Área Pastoral: pastor adiciona atendimento pastoral diretamente no Google
 
   // 6. Informa horário
   const [r4] = await harness.enviar(NUMERO_PASTOR, "15:30");
-  assert.match(r4, /Onde será o atendimento\?/);
+  assert.match(r4, /Qual espaço da igreja será utilizado\?/);
 
-  // 7. Informa local
-  const [r5] = await harness.enviar(NUMERO_PASTOR, "Gabinete Pastoral");
+  // 7. Informa local / espaço (1 - Gabinete Pastoral)
+  const [r5] = await harness.enviar(NUMERO_PASTOR, "1");
   assert.match(r5, /Atendimento Pastoral Agendado com Sucesso!/);
   assert.match(r5, /Ana Paula Souza/);
   assert.match(r5, /20\/11\/2026/);
@@ -350,4 +350,103 @@ test("Área Pastoral: pastor acessa ferramentas de liderança (eventos e reuniõ
   const [rReunioes] = await harness.enviar(NUMERO_PASTOR, "6");
   assert.match(rReunioes, /Reuniões/);
   assert.match(rReunioes, /1 - Agendar reunião/);
+});
+
+test("Área Pastoral: atendimento em Gabinete Pastoral com atividade concorrente na igreja consulta pastor (confirmar)", async () => {
+  const NUMERO_PASTOR = "5511999991111";
+
+  const eventoConcorrente = {
+    id: "ensaio-louvor-1",
+    summary: "Ensaio Ministério de Louvor",
+    calendarId: AGENDAS_INTERNAS.ENSAIOS,
+    start: { dateTime: "2026-11-20T15:00:00-03:00" },
+    end: { dateTime: "2026-11-20T17:00:00-03:00" },
+  };
+
+  const harness = criarHarness({
+    usuarios: [{ nome: "Pr. Roberto", telefone: NUMERO_PASTOR, cargos: ["pastor"] }],
+    calendarEvents: [eventoConcorrente],
+  });
+
+  await harness.enviar(NUMERO_PASTOR, "8");
+  await harness.enviar(NUMERO_PASTOR, "2");
+  await harness.enviar(NUMERO_PASTOR, "1");
+  await harness.enviar(NUMERO_PASTOR, "Lucas Oliveira");
+  await harness.enviar(NUMERO_PASTOR, "20/11/2026");
+  await harness.enviar(NUMERO_PASTOR, "15:30");
+
+  // Escolhe Gabinete Pastoral (opção 1)
+  const [rConflito] = await harness.enviar(NUMERO_PASTOR, "1");
+  assert.match(rConflito, /Aviso de Atividade Concorrente/);
+  assert.match(rConflito, /Ensaio Ministério de Louvor/);
+  assert.match(rConflito, /o Salão permanece livre/);
+
+  // Pastor confirma (opção 1)
+  const [rConfirma] = await harness.enviar(NUMERO_PASTOR, "1");
+  assert.match(rConfirma, /Atendimento Pastoral Agendado com Sucesso!/);
+  assert.match(rConfirma, /Lucas Oliveira/);
+  assert.match(rConfirma, /Gabinete Pastoral/);
+  assert.equal(harness.eventosGravados.length, 1);
+});
+
+test("Área Pastoral: atendimento em Gabinete Pastoral com atividade concorrente na igreja consulta pastor (remarcar)", async () => {
+  const NUMERO_PASTOR = "5511999991111";
+
+  const eventoConcorrente = {
+    id: "culto-oracao-1",
+    summary: "Reunião de Oração",
+    calendarId: AGENDAS_INTERNAS.REUNIOES,
+    start: { dateTime: "2026-11-20T15:00:00-03:00" },
+    end: { dateTime: "2026-11-20T17:00:00-03:00" },
+  };
+
+  const harness = criarHarness({
+    usuarios: [{ nome: "Pr. Roberto", telefone: NUMERO_PASTOR, cargos: ["pastor"] }],
+    calendarEvents: [eventoConcorrente],
+  });
+
+  await harness.enviar(NUMERO_PASTOR, "8");
+  await harness.enviar(NUMERO_PASTOR, "2");
+  await harness.enviar(NUMERO_PASTOR, "1");
+  await harness.enviar(NUMERO_PASTOR, "Lucas Oliveira");
+  await harness.enviar(NUMERO_PASTOR, "20/11/2026");
+  await harness.enviar(NUMERO_PASTOR, "15:30");
+
+  // Escolhe Gabinete Pastoral
+  await harness.enviar(NUMERO_PASTOR, "1");
+
+  // Pastor prefere remarcar (opção 2)
+  const [rRemarcar] = await harness.enviar(NUMERO_PASTOR, "2");
+  assert.match(rRemarcar, /informe a nova \*data\* do atendimento/);
+  assert.equal(harness.eventosGravados.length, 0);
+});
+
+test("Área Pastoral: atendimento reservando todo o espaço da igreja bloqueia quando ocupado", async () => {
+  const NUMERO_PASTOR = "5511999991111";
+
+  const eventoCulto = {
+    id: "culto-celeb-1",
+    summary: "Culto Especial",
+    calendarId: "agenda-culto",
+    start: { dateTime: "2026-11-20T15:00:00-03:00" },
+    end: { dateTime: "2026-11-20T17:00:00-03:00" },
+  };
+
+  const harness = criarHarness({
+    usuarios: [{ nome: "Pr. Roberto", telefone: NUMERO_PASTOR, cargos: ["pastor"] }],
+    calendarEvents: [eventoCulto],
+  });
+
+  await harness.enviar(NUMERO_PASTOR, "8");
+  await harness.enviar(NUMERO_PASTOR, "2");
+  await harness.enviar(NUMERO_PASTOR, "1");
+  await harness.enviar(NUMERO_PASTOR, "Lucas Oliveira");
+  await harness.enviar(NUMERO_PASTOR, "20/11/2026");
+  await harness.enviar(NUMERO_PASTOR, "15:30");
+
+  // Escolhe Todo o espaço da igreja (opção 2)
+  const [rBloqueado] = await harness.enviar(NUMERO_PASTOR, "2");
+  assert.match(rBloqueado, /Espaço Indisponível/);
+  assert.match(rBloqueado, /Culto Especial/);
+  assert.equal(harness.eventosGravados.length, 0);
 });

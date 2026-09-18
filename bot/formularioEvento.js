@@ -1,4 +1,5 @@
 const db = require("../db");
+const moment = require("moment-timezone");
 const { notificarMultimidia: notificarMultimidiaDefault } = require("./secretaria");
 
 const WEBHOOK_GOOGLE_DOCS_URL =
@@ -107,10 +108,10 @@ const PERGUNTAS_DEFINICOES = [
     (d) => Boolean(d.horarioInicio && d.horarioFim),
   ],
 
-  // 5. Horário total (contando organização pré e pós-evento)
+  // 5. Uso do salão antes, depois ou no dia anterior
   [
     "horario_total",
-    "⏱️ *Horário total (organização pré e pós-evento):*\nQual é o horário total necessário no local, contando montagem/organização prévia e desmontagem/limpeza pós-evento? (Ex: Das 17h às 23h)",
+    "🏛️ *Uso do salão antes, depois ou no dia anterior:*\nVai precisar usar o salão antes do horário de início do evento (para montagem/organização), depois para desmontagem/limpeza, ou no dia anterior para decoração?\n\n👉 Se *SIM*, informe os horários necessários (ex: *Dia anterior das 18h às 21h para decoração, e no dia das 17h às 19h para montagem e 22h às 23h para limpeza*).\n👉 Se *NÃO*, responda apenas *NÃO*.",
   ],
 
   // 6. Local (Lembrar: Se for na Igreja, preenche automaticamente com o endereço fixo)
@@ -399,6 +400,8 @@ async function processarRespostaFormulario({
   notificarMultimidia = notificarMultimidiaDefault,
   etapas,
   enviarWebhook = enviarWebhookGoogleDocs,
+  calendar = null,
+  agendasParaLer = null,
 }) {
   const perguntaAtual = info.perguntas[info.indicePergunta];
   if (!perguntaAtual) {
@@ -446,11 +449,46 @@ async function processarRespostaFormulario({
       docUrl: linkDoc,
     });
 
+    // Se o líder informou horários extras de preparação/decoração/limpeza, grava na agenda do departamento do evento
+    const textoExtra = (payload.horario_total || "").trim();
+    const precisaExtra = textoExtra && !/^(não|nao|nenhum|nenhuma|nada|zero)$/i.test(textoExtra);
+    if (precisaExtra && calendar && calendar.events && typeof calendar.events.insert === "function" && agendasParaLer) {
+      try {
+        const { mapearRedeParaAgendaIndex } = require("./redes");
+        const agendaDepto = agendasParaLer[mapearRedeParaAgendaIndex(payload.departamento)];
+        if (agendaDepto) {
+          let dataMom = moment.tz(payload.data, "DD/MM/YYYY", "America/Sao_Paulo");
+          if (!dataMom.isValid()) {
+            dataMom = moment.tz("America/Sao_Paulo").add(1, "day");
+          }
+          if (/dia anterior|v[eé]spera/i.test(textoExtra)) {
+            dataMom = dataMom.clone().subtract(1, "day");
+          }
+          const dataIsoIni = dataMom.clone().set({ hour: 18, minute: 0, second: 0 }).format();
+          const dataIsoFim = dataMom.clone().set({ hour: 21, minute: 0, second: 0 }).format();
+
+          const resourceExtra = {
+            summary: `[Preparação/Decoração] ${payload.nome_evento}`,
+            description: `Uso do espaço para montagem, preparação, decoração ou limpeza.\nEvento Principal: ${payload.nome_evento}\nLíder Responsável: ${payload.nome_lider}\nDetalhes dos horários: ${textoExtra}`,
+            location: payload.local || "Igreja",
+            start: { dateTime: dataIsoIni, timeZone: "America/Sao_Paulo" },
+            end: { dateTime: dataIsoFim, timeZone: "America/Sao_Paulo" },
+          };
+          await calendar.events.insert({ calendarId: agendaDepto, resource: resourceExtra });
+          console.log(`[Formulário] Bloco de preparação/decoração inserido no calendário do departamento '${payload.departamento}': ${resourceExtra.summary}`);
+        }
+      } catch (errCalExtra) {
+        console.warn("[Formulário] Aviso ao agendar bloco extra de preparação:", errCalExtra.message);
+      }
+    }
+
     await responderLider(
       `✅ *Formulário do Evento Concluído com Sucesso!*\n\n` +
       `O documento oficial do evento foi gerado automaticamente no Google Docs:\n` +
       `🔗 *Acesse o documento gerado:*\n${linkDoc}\n\n` +
-      `A secretaria já foi notificada com o link do documento gerado. 🙏`
+      `A secretaria já foi notificada com o link do documento gerado. 🙏\n\n` +
+      `🧹 *Compromisso de Limpeza e Organização:*\n` +
+      `Lembramos que o salão e as dependências da igreja devem ser entregues após o evento exatamente da mesma forma como foram encontrados (organização das cadeiras, lixo recolhido e limpeza geral).`
     );
 
     const notificacaoGrupo =

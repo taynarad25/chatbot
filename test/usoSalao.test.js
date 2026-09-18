@@ -267,8 +267,8 @@ test("Regra de visibilidade: eventos de Uso do Salão NÃO aparecem na agenda de
     calendarEvents: [eventoPublico, eventoUsoSalao],
   });
 
-  // 1. Membro consulta a agenda oficial (opção 2 -> mês de Outubro/10)
-  await harness.enviar(NUMERO_MEMBRO, "2");
+  // 1. Membro consulta a agenda oficial (opção 3 -> mês de Outubro/10)
+  await harness.enviar(NUMERO_MEMBRO, "3");
   const [rMembro1, rMembro2] = await harness.enviar(NUMERO_MEMBRO, "10");
   const msgMembro = rMembro2 || rMembro1;
 

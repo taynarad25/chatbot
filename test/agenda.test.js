@@ -1,7 +1,8 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
-const { agruparEventosAgenda, montarMensagemAgenda, montarDetalheEvento, interpretarPeriodoPersonalizado, isEventoFuturo } = require("../bot/agenda");
+const { agruparEventosAgenda, montarMensagemAgenda, montarMensagemAgendaCompletaPorSecoes, montarDetalheEvento, interpretarPeriodoPersonalizado, isEventoFuturo } = require("../bot/agenda");
+const { AGENDAS_INTERNAS } = require("../bot/redes");
 
 function evento({ data, hora, horaFim, summary, location, description, diaTodo = false }) {
   if (diaTodo) {
@@ -277,3 +278,46 @@ test("isEventoFuturo: evento inválido ou nulo retorna false", () => {
   assert.equal(isEventoFuturo(null), false);
   assert.equal(isEventoFuturo({}), false);
 });
+
+test("Privacidade Pastoral: Direção (isPastor=false) vê apenas 'Atendimento Pastoral' sem nome do discípulo", () => {
+  const evAtendimento = {
+    calendarId: AGENDAS_INTERNAS.ATENDIMENTO,
+    summary: "Atendimento Pastoral - Discípulo João da Silva",
+    description: "Discípulo: João da Silva\nPastor: Roberto\nMotivo sensível",
+    location: "Gabinete Pastoral",
+    start: { dateTime: "2026-10-15T15:00:00-03:00" },
+    end: { dateTime: "2026-10-15T16:00:00-03:00" },
+  };
+
+  const itens = agruparEventosAgenda([evAtendimento]);
+  const msgAgenda = montarMensagemAgendaCompletaPorSecoes(itens, "Outubro", AGENDAS_INTERNAS, { isPastor: false });
+  assert.match(msgAgenda, /Atendimento Pastoral/);
+  assert.doesNotMatch(msgAgenda, /João da Silva/);
+
+  // No detalhe do evento para Direção, oculta detalhes e nome
+  const detalhe = montarDetalheEvento(itens[0], { isPastor: false, agendasInternas: AGENDAS_INTERNAS });
+  assert.match(detalhe, /Atendimento Pastoral reservado à equipe pastoral/);
+  assert.doesNotMatch(detalhe, /João da Silva/);
+  assert.doesNotMatch(detalhe, /Motivo sensível/);
+});
+
+test("Privacidade Pastoral: Pastores (isPastor=true) visualizam nome do discípulo e detalhes completos", () => {
+  const evAtendimento = {
+    calendarId: AGENDAS_INTERNAS.ATENDIMENTO,
+    summary: "Atendimento Pastoral - Discípulo João da Silva",
+    description: "Discípulo: João da Silva\nPastor: Roberto\nMotivo sensível",
+    location: "Gabinete Pastoral",
+    start: { dateTime: "2026-10-15T15:00:00-03:00" },
+    end: { dateTime: "2026-10-15T16:00:00-03:00" },
+  };
+
+  const itens = agruparEventosAgenda([evAtendimento]);
+  const msgAgenda = montarMensagemAgendaCompletaPorSecoes(itens, "Outubro", AGENDAS_INTERNAS, { isPastor: true });
+  assert.match(msgAgenda, /Atendimento Pastoral - Discípulo João da Silva/);
+
+  // No detalhe do evento para Pastor, exibe o discípulo e descrição
+  const detalhe = montarDetalheEvento(itens[0], { isPastor: true, agendasInternas: AGENDAS_INTERNAS });
+  assert.match(detalhe, /João da Silva/);
+  assert.match(detalhe, /Motivo sensível/);
+});
+

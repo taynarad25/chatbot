@@ -20,8 +20,17 @@ function isAgendaInterna(calendarId) {
   return IDS_AGENDAS_INTERNAS.includes(calendarId);
 }
 
+const ESPACOS_IGREJA = {
+  GABINETE_PASTORAL: "Gabinete Pastoral",
+  SALAO: "Salão",
+  SALA_INFANTIL: "Sala Infantil",
+  TODO_ESPACO: "Todo o espaço da igreja",
+};
+
 module.exports = {
   AGENDAS_INTERNAS,
   IDS_AGENDAS_INTERNAS,
   isAgendaInterna,
+  ESPACOS_IGREJA,
 };
+

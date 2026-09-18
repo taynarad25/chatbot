@@ -297,11 +297,12 @@ async function responderGrupoPastoral(handleMessage, { body, quotedBody }) {
 // Menu principal
 // ---------------------------------------------------------------------------
 
-test("saudação: usuário comum recebe o menu sem as opções de líder (6 e 7)", async () => {
+test("saudação: usuário comum recebe o menu sem as opções de líder (7, 8 e 9)", async () => {
   const { handleMessage } = criarContexto();
   const respostas = await enviar(handleMessage, NUMERO_COMUM, "oi");
   assert.equal(respostas.length, 1);
-  assert.match(respostas[0], /1️⃣ Horário dos cultos/);
+  assert.match(respostas[0], /1️⃣ Quem somos/);
+  assert.match(respostas[0], /2️⃣ Horário dos cultos/);
   assert.doesNotMatch(respostas[0], /Agendar ou alterar evento/);
 });
 
@@ -359,21 +360,32 @@ test("mensagens ignoradas: status@broadcast e mensagens do próprio bot não ger
 });
 
 // ---------------------------------------------------------------------------
-// Opção 1 — Horário dos cultos
+// Opção 1 — Quem somos
 // ---------------------------------------------------------------------------
 
-test("opção 1: retorna a mensagem estática de horário dos cultos", async () => {
+test("opção 1: retorna informações de quem somos com link do site", async () => {
   const { handleMessage } = criarContexto();
   const respostas = await enviar(handleMessage, NUMERO_COMUM, "1");
+  assert.match(respostas[0], /quem somos/i);
+  assert.match(respostas[0], /comunidadecristacurados\.com\.br\/home/);
+});
+
+// ---------------------------------------------------------------------------
+// Opção 2 — Horário dos cultos
+// ---------------------------------------------------------------------------
+
+test("opção 2: retorna a mensagem estática de horário dos cultos", async () => {
+  const { handleMessage } = criarContexto();
+  const respostas = await enviar(handleMessage, NUMERO_COMUM, "2");
   assert.match(respostas[0], /Culto de Celebração/);
   assert.match(respostas[0], /Santa Ceia/);
 });
 
 // ---------------------------------------------------------------------------
-// Opção 2 — Ver agenda
+// Opção 3 — Ver agenda
 // ---------------------------------------------------------------------------
 
-test("opção 2: fluxo completo por mês, incluindo o detalhe do evento", async () => {
+test("opção 3: fluxo completo por mês, incluindo o detalhe do evento", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const dataEvento = agora.clone().add(2, "days");
   const mesAtual = dataEvento.month() + 1;
@@ -387,7 +399,7 @@ test("opção 2: fluxo completo por mês, incluindo o detalhe do evento", async 
   };
   const { handleMessage, setEventos } = criarContexto({ eventos: [evento] });
 
-  const menuResp = await enviar(handleMessage, NUMERO_COMUM, "2");
+  const menuResp = await enviar(handleMessage, NUMERO_COMUM, "3");
   assert.match(menuResp[0], /Para qual mês/);
 
   setEventos([evento]);
@@ -400,18 +412,18 @@ test("opção 2: fluxo completo por mês, incluindo o detalhe do evento", async 
   assert.match(detalheResp[0], /Traga seu cônjuge!/);
 });
 
-test("opção 2: mês sem eventos avisa e encerra o fluxo (não trava esperando um número de item)", async () => {
+test("opção 3: mês sem eventos avisa e encerra o fluxo (não trava esperando um número de item)", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const mesAtual = agora.month() + 1;
   const { handleMessage, etapas } = criarContexto({ eventos: [] });
 
-  await enviar(handleMessage, NUMERO_COMUM, "2");
+  await enviar(handleMessage, NUMERO_COMUM, "3");
   const respostas = await enviar(handleMessage, NUMERO_COMUM, String(mesAtual));
   assert.match(respostas[1], /Não há eventos programados/);
   assert.equal(etapas[NUMERO_COMUM], undefined, "o fluxo deveria ter sido encerrado");
 });
 
-test("opção 2: período personalizado (DD/MM a DD/MM) busca e entrega a agenda", async () => {
+test("opção 3: período personalizado (DD/MM a DD/MM) busca e entrega a agenda", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const inicio = agora.clone().add(2, "days");
   const fim = agora.clone().add(5, "days");
@@ -423,7 +435,7 @@ test("opção 2: período personalizado (DD/MM a DD/MM) busca e entrega a agenda
   };
   const { handleMessage } = criarContexto({ eventos: [evento] });
 
-  await enviar(handleMessage, NUMERO_COMUM, "2");
+  await enviar(handleMessage, NUMERO_COMUM, "3");
   const escolhaZero = await enviar(handleMessage, NUMERO_COMUM, "0");
   assert.match(escolhaZero[0], /Digite as datas de início e fim/);
 
@@ -432,16 +444,16 @@ test("opção 2: período personalizado (DD/MM a DD/MM) busca e entrega a agenda
   assert.match(resposta[1], /Mutirão de Evangelismo/);
 });
 
-test("opção 2: período personalizado em formato inválido pede para tentar de novo, sem encerrar o fluxo", async () => {
+test("opção 3: período personalizado em formato inválido pede para tentar de novo, sem encerrar o fluxo", async () => {
   const { handleMessage, etapas } = criarContexto();
-  await enviar(handleMessage, NUMERO_COMUM, "2");
+  await enviar(handleMessage, NUMERO_COMUM, "3");
   await enviar(handleMessage, NUMERO_COMUM, "0");
   const resposta = await enviar(handleMessage, NUMERO_COMUM, "não sei quando");
   assert.match(resposta[0], /Não consegui entender as datas/);
   assert.equal(etapas[NUMERO_COMUM].etapa, "periodo_personalizado");
 });
 
-test("opção 2: eventos da agenda 'Eventos Externos' ficam ocultos na consulta da agenda da igreja", async () => {
+test("opção 3: eventos da agenda 'Eventos Externos' ficam ocultos na consulta da agenda da igreja", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const dataEvento = agora.clone().add(2, "days");
   const mesAtual = dataEvento.month() + 1;
@@ -456,19 +468,19 @@ test("opção 2: eventos da agenda 'Eventos Externos' ficam ocultos na consulta 
 
   // 1. Quando há evento da igreja e evento externo, apenas o evento da igreja aparece
   const ctx1 = criarContexto({ eventos: [eventoIgreja, eventoExterno] });
-  await enviar(ctx1.handleMessage, NUMERO_COMUM, "2");
+  await enviar(ctx1.handleMessage, NUMERO_COMUM, "3");
   const res1 = await enviar(ctx1.handleMessage, NUMERO_COMUM, String(mesAtual));
   assert.match(res1[1], /Culto de Casais/);
   assert.doesNotMatch(res1[1], /Congresso Regional Externo/);
 
   // 2. Quando há apenas evento externo no mês, a agenda informa que não há eventos programados
   const ctx2 = criarContexto({ eventos: [eventoExterno] });
-  await enviar(ctx2.handleMessage, NUMERO_COMUM, "2");
+  await enviar(ctx2.handleMessage, NUMERO_COMUM, "3");
   const res2 = await enviar(ctx2.handleMessage, NUMERO_COMUM, String(mesAtual));
   assert.match(res2[1], /Não há eventos programados/);
 });
 
-test("opção 2: eventos das agendas internas (Reuniões, Atendimento, Limpeza, Ensaios) ficam ocultos na consulta da agenda da igreja", async () => {
+test("opção 3: eventos das agendas internas (Reuniões, Atendimento, Limpeza, Ensaios) ficam ocultos na consulta da agenda da igreja", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const dataEvento = agora.clone().add(2, "days");
   const mesAtual = dataEvento.month() + 1;
@@ -499,7 +511,7 @@ test("opção 2: eventos das agendas internas (Reuniões, Atendimento, Limpeza, 
   };
 
   const ctx = criarContexto({ eventos: [eventoIgreja, eventoReuniao, eventoAtendimento, eventoLimpeza, eventoEnsaio] });
-  await enviar(ctx.handleMessage, NUMERO_COMUM, "2");
+  await enviar(ctx.handleMessage, NUMERO_COMUM, "3");
   const res = await enviar(ctx.handleMessage, NUMERO_COMUM, String(mesAtual));
   assert.match(res[1], /Culto de Casais/);
   assert.doesNotMatch(res[1], /Reunião de Líderes/);
@@ -679,9 +691,9 @@ test("Eventos Externos: líder agenda evento externo em 7 passos, secretaria apr
   assert.ok(eventoExternoGravado);
   assert.match(eventoExternoGravado.resource.summary, /Evento Externo - Conferência Regional de Avivamento/);
 
-  const preparacaoSalaoGravada = eventosGravados.find((e) => e.calendarId === AGENDAS[15]);
+  const preparacaoSalaoGravada = eventosGravados.find((e) => e.calendarId === AGENDAS[10] && e.resource.summary.includes("Preparação"));
   assert.ok(preparacaoSalaoGravada);
-  assert.match(preparacaoSalaoGravada.resource.summary, /Preparação Salão/);
+  assert.match(preparacaoSalaoGravada.resource.summary, /Preparação/);
 
   // Valida que o webhook POST foi chamado com os dados exatos
   assert.ok(webhookPayloadRecebido);
@@ -749,13 +761,13 @@ test("Eventos Externos: secretaria recusa solicitação no grupo e notifica soli
 });
 
 // ---------------------------------------------------------------------------
-// Opção 3 — Atendimento pastoral
+// Opção 4 — Atendimento pastoral
 // ---------------------------------------------------------------------------
 
-test("opção 3: coleta nome e disponibilidade, notifica o grupo de atendimento pastoral e encerra o fluxo", async () => {
+test("opção 4: coleta nome e disponibilidade, notifica o grupo de atendimento pastoral e encerra o fluxo", async () => {
   const { handleMessage, etapas, gruposEnviados } = criarContexto();
 
-  const r1 = await enviar(handleMessage, NUMERO_COMUM, "3");
+  const r1 = await enviar(handleMessage, NUMERO_COMUM, "4");
   assert.match(r1[0], /Qual é o seu \*nome\*/);
 
   const r2 = await enviar(handleMessage, NUMERO_COMUM, "Maria");
@@ -773,22 +785,22 @@ test("opção 3: coleta nome e disponibilidade, notifica o grupo de atendimento 
 });
 
 // ---------------------------------------------------------------------------
-// Opção 4 — Aulas de música
+// Opção 5 — Aulas de música
 // ---------------------------------------------------------------------------
 
-test("opção 4: retorna a mensagem estática sobre aulas de música", async () => {
+test("opção 5: retorna a mensagem estática sobre aulas de música", async () => {
   const { handleMessage } = criarContexto();
-  const respostas = await enviar(handleMessage, NUMERO_COMUM, "4");
+  const respostas = await enviar(handleMessage, NUMERO_COMUM, "5");
   assert.match(respostas[0], /Aulas de Música/);
 });
 
 // ---------------------------------------------------------------------------
-// Opção 5 — Falar com a secretaria
+// Opção 6 — Falar com a secretaria
 // ---------------------------------------------------------------------------
 
-test("opção 5: notifica o grupo da secretaria com o nome do contato", async () => {
+test("opção 6: notifica o grupo da secretaria com o nome do contato", async () => {
   const { handleMessage, gruposEnviados } = criarContexto();
-  const msg = criarMsgPrivada(NUMERO_COMUM, "5", { pushname: "João" });
+  const msg = criarMsgPrivada(NUMERO_COMUM, "6", { pushname: "João" });
   await handleMessage(msg);
 
   assert.match(msg.respostas[0], /Um atendente responderá em breve/);
@@ -798,12 +810,12 @@ test("opção 5: notifica o grupo da secretaria com o nome do contato", async ()
 });
 
 // ---------------------------------------------------------------------------
-// Opção 6 — Agendar ou alterar evento (só líderes)
+// Opções 7, 8, 9 — Restritas para líderes, pastores e direção
 // ---------------------------------------------------------------------------
 
-test("opção 6: usuário comum não tem acesso (cai no fallback genérico, sem revelar a opção de líder)", async () => {
+test("opção 7: usuário comum não tem acesso (cai no fallback genérico, sem revelar a opção de líder)", async () => {
   const { handleMessage, etapas } = criarContexto();
-  const respostas = await enviar(handleMessage, NUMERO_COMUM, "6");
+  const respostas = await enviar(handleMessage, NUMERO_COMUM, "7");
   assert.match(respostas[0], /Não entendi sua mensagem/);
   assert.equal(etapas[NUMERO_COMUM], undefined);
 });
@@ -1398,7 +1410,7 @@ test("grupo: 'marcar evento' respondendo a uma mensagem do bot sem código embut
 
 test("digitar 'menu' no meio de qualquer fluxo reseta a conversa e mostra o menu principal", async () => {
   const { handleMessage, etapas } = criarContexto();
-  await enviar(handleMessage, NUMERO_COMUM, "3"); // entra no fluxo pastoral
+  await enviar(handleMessage, NUMERO_COMUM, "4"); // entra no fluxo pastoral
   assert.equal(etapas[NUMERO_COMUM].fluxo, "pastoral");
 
   const respostas = await enviar(handleMessage, NUMERO_COMUM, "menu");
@@ -1407,14 +1419,14 @@ test("digitar 'menu' no meio de qualquer fluxo reseta a conversa e mostra o menu
 });
 
 // ---------------------------------------------------------------------------
-// Fluxo Pastoral (Opção 3) e aprovação pelo grupo "Atendimento Pastoral"
+// Fluxo Pastoral (Opção 4) e aprovação pelo grupo "Atendimento Pastoral"
 // ---------------------------------------------------------------------------
 
-test("opção 3: fluxo de atendimento pastoral completo - solicitação + confirmação pela pastoral", async () => {
+test("opção 4: fluxo de atendimento pastoral completo - solicitação + confirmação pela pastoral", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas } = criarContexto();
 
   // 1. Discípulo inicia o fluxo pastoral
-  const r1 = await enviar(handleMessage, NUMERO_COMUM, "3");
+  const r1 = await enviar(handleMessage, NUMERO_COMUM, "4");
   assert.match(r1[0], /Qual é o seu \*nome\*/);
 
   // 2. Discípulo informa o nome
@@ -1457,11 +1469,11 @@ test("opção 3: fluxo de atendimento pastoral completo - solicitação + confir
   assert.equal(buscarPendente(codigo), null);
 });
 
-test("opção 3: fluxo de atendimento pastoral completo - solicitação + recusa pela pastoral", async () => {
+test("opção 4: fluxo de atendimento pastoral completo - solicitação + recusa pela pastoral", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas } = criarContexto();
 
   // 1. Discípulo inicia o fluxo pastoral
-  await enviar(handleMessage, NUMERO_COMUM, "3");
+  await enviar(handleMessage, NUMERO_COMUM, "4");
   await enviar(handleMessage, NUMERO_COMUM, "Gabriel");
   await enviar(handleMessage, NUMERO_COMUM, "Segunda à noite");
 
@@ -1487,10 +1499,10 @@ test("opção 3: fluxo de atendimento pastoral completo - solicitação + recusa
   assert.equal(buscarPendente(codigo), null);
 });
 
-test("opção 3: fluxo pastoral - comando inválido do pastor avisa no grupo", async () => {
+test("opção 4: fluxo pastoral - comando inválido do pastor avisa no grupo", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas } = criarContexto();
 
-  await enviar(handleMessage, NUMERO_COMUM, "3");
+  await enviar(handleMessage, NUMERO_COMUM, "4");
   await enviar(handleMessage, NUMERO_COMUM, "Gabriel");
   await enviar(handleMessage, NUMERO_COMUM, "Segunda");
 
@@ -1873,5 +1885,68 @@ test("área do líder: opção 5 fluxo de consulta de disponibilidade por mês e
   assert.match(r4[1], /Dia totalmente livre|Horários disponíveis|Sem horários disponíveis/);
   assert.equal(etapas[NUMERO_LIDER], undefined);
 });
+
+test("Menu de Eventos: opção 6 permite ao líder informar uso antes/montagem no departamento e orienta sobre limpeza", async () => {
+  const eventoGlow = {
+    id: "glow-1",
+    summary: "Conferência Glow",
+    calendarId: AGENDAS[7], // Rede de Homens
+    start: { dateTime: moment().add(5, "days").hour(19).minute(0).toISOString() },
+    end: { dateTime: moment().add(5, "days").hour(21).minute(0).toISOString() },
+  };
+
+  const { handleMessage, gruposEnviados, eventosGravados, etapas } = criarContexto({
+    lideresCadastrados: [{ nome: "Líder João", telefone: NUMERO_LIDER, departamento: "Rede de Homens" }],
+    eventos: [eventoGlow],
+  });
+
+  // 1. Entra na Área do Líder -> Menu de Eventos
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  const [rMenuEventos] = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(rMenuEventos, /6 - Informar uso do salão antes ou no dia anterior/);
+
+  // 2. Escolhe opção 6 (pede departamento)
+  const [rDepto] = await enviar(handleMessage, NUMERO_LIDER, "6");
+  assert.match(rDepto, /De qual departamento é o evento/);
+
+  // 2b. Escolhe departamento 7 (Rede de Homens) -> lista eventos
+  const resLista = await enviar(handleMessage, NUMERO_LIDER, "7");
+  assert.match(resLista.join("\n"), /Conferência Glow/);
+
+  // 2c. Escolhe evento 1 -> pede horários
+  const [rPergunta] = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(rPergunta, /Uso do salão antes, depois ou no dia anterior/);
+
+  // 3. Informa detalhes
+  const [rConfirmacao] = await enviar(handleMessage, NUMERO_LIDER, "dia anterior das 18h às 21h para montagem");
+  assert.match(rConfirmacao, /Horários de Preparação\/Decoração Registrados com Sucesso!/);
+  assert.match(rConfirmacao, /Compromisso de Limpeza e Organização/);
+
+  // Gravado na agenda do departamento (não em USO_SALAO)
+  assert.equal(eventosGravados.length, 1);
+  assert.notEqual(eventosGravados[0].calendarId, AGENDAS[15]);
+  assert.match(eventosGravados[0].resource.summary, /\[Preparação\/Decoração\]/);
+  assert.match(eventosGravados[0].resource.description, /Salão deve ser entregue limpo e organizado/);
+
+  // Secretaria notificada
+  const msgSec = gruposEnviados.find(g => g.includes("HORÁRIOS DE MONTAGEM/DECORAÇÃO INFORMADOS"));
+  assert.ok(msgSec);
+  assert.match(msgSec, /Conferência Glow/);
+  assert.match(msgSec, /Aviso de Limpeza/);
+
+  assert.equal(etapas[NUMERO_LIDER], undefined);
+});
+
+test("Atalho Líder: digitar 'preparação' ou 'decoração' aciona registro de uso prévio com aviso de limpeza", async () => {
+  const { handleMessage, etapas } = criarContexto({
+    lideresCadastrados: [{ nome: "Líder João", telefone: NUMERO_LIDER, departamento: "Rede de Jovens" }],
+  });
+
+  const [rAtalho] = await enviar(handleMessage, NUMERO_LIDER, "preparação");
+  assert.match(rAtalho, /Uso do Salão Antes \/ Montagem \/ Decoração/);
+  assert.equal(etapas[NUMERO_LIDER].fluxo, "agendamento");
+  assert.equal(etapas[NUMERO_LIDER].etapa, "preparacao_informar_horarios");
+});
+
 
 

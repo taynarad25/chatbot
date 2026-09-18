@@ -104,8 +104,15 @@ function classificarSecaoEvento(item, agendasInternas = {}) {
   return "IGREJA";
 }
 
-function montarMensagemAgendaCompletaPorSecoes(itens, tituloPeriodo, agendasInternas = {}) {
+function montarMensagemAgendaCompletaPorSecoes(itens, tituloPeriodo, agendasInternas = {}, opcoes = {}) {
   let msgAgenda = `📋 *Agenda Completa — ${tituloPeriodo}*\n`;
+  let agInternas = agendasInternas;
+  let opts = opcoes;
+  if (agendasInternas && (agendasInternas.isPastor !== undefined || agendasInternas.agendasInternas !== undefined)) {
+    opts = agendasInternas;
+    agInternas = agendasInternas.agendasInternas || {};
+  }
+  const isPastor = Boolean(opts && opts.isPastor);
 
   const itensPorSecao = {};
   SECOES_AGENDA.forEach(s => {
@@ -118,20 +125,25 @@ function montarMensagemAgendaCompletaPorSecoes(itens, tituloPeriodo, agendasInte
     if (!itensPorSecao[secaoKey]) {
       itensPorSecao[secaoKey] = [];
     }
-    itensPorSecao[secaoKey].push({ item, numero });
+    itensPorSecao[secaoKey].push({ item, numero, secaoKey });
   });
 
   SECOES_AGENDA.forEach(secao => {
     const lista = itensPorSecao[secao.key];
     if (lista && lista.length > 0) {
       msgAgenda += `\n${secao.titulo}\n`;
-      lista.forEach(({ item, numero }) => {
+      lista.forEach(({ item, numero, secaoKey }) => {
         const horaStr = item.horaFmt ? ` às ${item.horaFmt}` : "";
+        let tituloExibicao = item.summary;
+        if (secaoKey === "ATENDIMENTOS" && !isPastor) {
+          tituloExibicao = "Atendimento Pastoral";
+        }
+
         if (item.tipo === "recorrente") {
           const prefixo = (item.weekday === 0 || item.weekday === 6) ? "Todos os" : "Todas as";
-          msgAgenda += `${numero} - 🗓️ *${prefixo} ${DIAS_SEMANA_PLURAL[item.weekday]}*${horaStr} | ${item.summary}\n`;
+          msgAgenda += `${numero} - 🗓️ *${prefixo} ${DIAS_SEMANA_PLURAL[item.weekday]}*${horaStr} | ${tituloExibicao}\n`;
         } else {
-          msgAgenda += `${numero} - 📌 *${item.dataFmt}*${horaStr} | ${item.summary}\n`;
+          msgAgenda += `${numero} - 📌 *${item.dataFmt}*${horaStr} | ${tituloExibicao}\n`;
         }
       });
     }
@@ -143,7 +155,7 @@ function montarMensagemAgendaCompletaPorSecoes(itens, tituloPeriodo, agendasInte
 
 // Monta o detalhe de um item da agenda. Para itens recorrentes, mostra a
 // próxima ocorrência a partir de hoje (ou a última, se todas já passaram).
-function montarDetalheEvento(item) {
+function montarDetalheEvento(item, opcoes = {}) {
   let evento;
   if (item.tipo === "unico") {
     evento = item.eventos[0];
@@ -166,7 +178,17 @@ function montarDetalheEvento(item) {
     horarioFmt = "Dia todo";
   }
 
-  let detalhe = `📌 *${item.summary}*\n\n`;
+  const isPastor = Boolean(opcoes && opcoes.isPastor);
+  const secaoKey = classificarSecaoEvento(item, opcoes.agendasInternas || {});
+  const isPastoral = secaoKey === "ATENDIMENTOS" || /atendimento pastoral/i.test(item.summary || "");
+  const esconderNome = isPastoral && !isPastor;
+
+  let tituloExibicao = item.summary;
+  if (esconderNome) {
+    tituloExibicao = "Atendimento Pastoral";
+  }
+
+  let detalhe = `📌 *${tituloExibicao}*\n\n`;
   detalhe += `📆 *Data:* ${dataFmt}\n`;
   detalhe += `⏰ *Horário:* ${horarioFmt}\n`;
   if (evento.location) {
@@ -174,7 +196,11 @@ function montarDetalheEvento(item) {
   }
   if (evento.description) {
     let desc = evento.description.trim();
-    if (desc.length > 500) desc = desc.slice(0, 500).trim() + "…";
+    if (esconderNome) {
+      desc = "Atendimento Pastoral reservado à equipe pastoral.";
+    } else if (desc.length > 500) {
+      desc = desc.slice(0, 500).trim() + "…";
+    }
     detalhe += `📝 *Descrição:* ${desc}\n`;
   }
   detalhe += `\nDigite outro número para ver mais detalhes, ou *menu* para voltar.`;
