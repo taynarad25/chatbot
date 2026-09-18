@@ -179,7 +179,7 @@ test("Uso do Salão: secretaria aprova no grupo, grava na agenda de Uso do Salã
   });
 
   // Realiza a solicitação completa
-  await harness.enviar(NUMERO_MEMBRO, "9");
+  await harness.enviar(NUMERO_MEMBRO, "5");
   await harness.enviar(NUMERO_MEMBRO, "25/12/2026");
   await harness.enviar(NUMERO_MEMBRO, "15:00");
   await harness.enviar(NUMERO_MEMBRO, "20:00");
@@ -278,7 +278,7 @@ test("Regra de visibilidade: eventos de Uso do Salão NÃO aparecem na agenda de
   assert.doesNotMatch(msgMembro, /Uso do Salão/);
 
   // 2. Pastor consulta a agenda completa/total (Área Pastoral -> opção 1 -> mês 10)
-  await harness.enviar(NUMERO_PASTOR, "7");
+  await harness.enviar(NUMERO_PASTOR, "8");
   await harness.enviar(NUMERO_PASTOR, "1");
   const [rPastor1, rPastor2] = await harness.enviar(NUMERO_PASTOR, "10");
   const msgPastor = rPastor2 || rPastor1;

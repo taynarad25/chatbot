@@ -236,22 +236,17 @@ test("Simulação Bot: usuário com múltiplos cargos ('lider', 'pastor') recebe
 
   // 1. Saudação / Menu: Pastor tem Área Pastoral com todas as opções de liderança integradas (sem menus separados duplicados)
   const [menu] = await bot.enviarMsg(NUMERO, "Olá");
-  assert.match(menu, /7️⃣ Área Pastoral/, "Deveria exibir Área Pastoral para quem tem cargo pastor");
-  assert.doesNotMatch(menu, /6️⃣ Área do Líder/, "Não deve exibir Área do Líder duplicada para quem já é pastor");
+  assert.match(menu, /8️⃣ Área Pastoral/, "Deveria exibir Área Pastoral para quem tem cargo pastor");
+  assert.doesNotMatch(menu, /7️⃣ Área do Líder/, "Não deve exibir Área do Líder duplicada para quem já é pastor");
 
-  // 2. Acesso à Área Pastoral (comando 7) contém todas as opções de liderança
-  const [respPastoral] = await bot.enviarMsg(NUMERO, "7");
+  // 2. Acesso à Área Pastoral (comando 8) contém todas as opções de liderança
+  const [respPastoral] = await bot.enviarMsg(NUMERO, "8");
   assert.match(respPastoral, /⛪ \*Área Pastoral\*/, "Usuário com cargo pastor deve conseguir acessar a Área Pastoral");
   assert.match(respPastoral, /Agendar, alterar ou cancelar evento/);
   assert.match(respPastoral, /Agendar, alterar ou desmarcar reunião/);
-
-  // 3. Pastor também consegue acessar atalho direto de líder caso digite 6
-  await bot.enviarMsg(NUMERO, "menu");
-  const [respLider] = await bot.enviarMsg(NUMERO, "6");
-  assert.match(respLider, /👑 \*Área do Líder\*/);
 });
 
-test("Simulação Bot: usuário com apenas 'lider' acessa opção 6 mas não opção 7", async () => {
+test("Simulação Bot: usuário com apenas 'lider' acessa opção 7 mas não opção 8", async () => {
   const bot = criarBotHarness([
     {
       nome: "Líder Amanda",
@@ -264,19 +259,19 @@ test("Simulação Bot: usuário com apenas 'lider' acessa opção 6 mas não op�
 
   // Menu: exibe apenas Área do Líder
   const [menu] = await bot.enviarMsg(NUMERO, "oi");
-  assert.match(menu, /6️⃣ Área do Líder/);
-  assert.doesNotMatch(menu, /7️⃣ Área Pastoral/);
+  assert.match(menu, /7️⃣ Área do Líder/);
+  assert.doesNotMatch(menu, /8️⃣ Área Pastoral/);
 
-  // Acessa opção 6 com sucesso
-  const [resp6] = await bot.enviarMsg(NUMERO, "6");
-  assert.match(resp6, /👑 \*Área do Líder\*/);
+  // Acessa opção 7 com sucesso
+  const [resp7] = await bot.enviarMsg(NUMERO, "7");
+  assert.match(resp7, /👑 \*Área do Líder\*/);
 
   // Volta ao menu
   await bot.enviarMsg(NUMERO, "menu");
 
-  // Tenta acessar opção 7 (não autorizada para quem não é pastor)
-  const [resp7] = await bot.enviarMsg(NUMERO, "7");
-  assert.match(resp7, /Não entendi sua mensagem/);
+  // Tenta acessar opção 8 (não autorizada para quem não é pastor)
+  const [resp8] = await bot.enviarMsg(NUMERO, "8");
+  assert.match(resp8, /Não entendi sua mensagem/);
 });
 
 test("Simulação Bot: usuário com apenas 'membro' visualiza uso do salão no 5 e secretaria no 6", async () => {
@@ -295,21 +290,21 @@ test("Simulação Bot: usuário com apenas 'membro' visualiza uso do salão no 5
   assert.match(menu, /5️⃣ Solicitar uso do salão/);
   assert.match(menu, /6️⃣ Falar com a secretaria/);
   assert.doesNotMatch(menu, /Área do Líder/);
-  assert.doesNotMatch(menu, /7️⃣ Área Pastoral/);
-  assert.doesNotMatch(menu, /8️⃣ Área da Direção/);
+  assert.doesNotMatch(menu, /8️⃣ Área Pastoral/);
+  assert.doesNotMatch(menu, /9️⃣ Área da Direção/);
 
   // Opção 6 para membro é Falar com a Secretaria (não acessa Área do Líder)
   const [resp6] = await bot.enviarMsg(NUMERO, "6");
   assert.match(resp6, /📞 \*Secretaria\*/);
   assert.doesNotMatch(resp6, /Área do Líder/);
 
-  // Opção 7 não é reconhecida (não acessa Área Pastoral)
+  // Opção 8 não é reconhecida (não acessa Área Pastoral)
   await bot.enviarMsg(NUMERO, "menu");
-  const [resp7] = await bot.enviarMsg(NUMERO, "7");
-  assert.match(resp7, /Não entendi sua mensagem/);
+  const [resp8] = await bot.enviarMsg(NUMERO, "8");
+  assert.match(resp8, /Não entendi sua mensagem/);
 });
 
-test("Simulação Bot: usuário com cargo 'diretor' recebe e acessa Área da Direção (8)", async () => {
+test("Simulação Bot: usuário com cargo 'diretor' recebe e acessa Área da Direção (9)", async () => {
   const bot = criarBotHarness([
     {
       nome: "Diretora Fabiana",
@@ -321,11 +316,11 @@ test("Simulação Bot: usuário com cargo 'diretor' recebe e acessa Área da Dir
   const NUMERO = "5511977770004@c.us";
 
   const [menu] = await bot.enviarMsg(NUMERO, "olá");
-  assert.match(menu, /8️⃣ Área da Direção/);
+  assert.match(menu, /9️⃣ Área da Direção/);
 
-  const [resp8] = await bot.enviarMsg(NUMERO, "8");
-  assert.match(resp8, /📋 \*Área da Direção\*/);
-  assert.match(resp8, /1️⃣ Ver todos os eventos da igreja/);
+  const [resp9] = await bot.enviarMsg(NUMERO, "9");
+  assert.match(resp9, /📋 \*Área da Direção\*/);
+  assert.match(resp9, /1️⃣ Ver todos os eventos da igreja/);
 });
 
 test("Simulação Bot: diretor consulta 'Ver todos os eventos da igreja' e visualiza agendas internas", async () => {
@@ -360,8 +355,8 @@ test("Simulação Bot: diretor consulta 'Ver todos os eventos da igreja' e visua
   const NUMERO = "5511977770004@c.us";
 
   // 1. Entra na Área da Direção
-  const [resp8] = await bot.enviarMsg(NUMERO, "8");
-  assert.match(resp8, /1️⃣ Ver todos os eventos da igreja/);
+  const [resp9] = await bot.enviarMsg(NUMERO, "9");
+  assert.match(resp9, /1️⃣ Ver todos os eventos da igreja/);
 
   // 2. Escolhe opção 1 (Ver todos os eventos)
   const [r1] = await bot.enviarMsg(NUMERO, "1");

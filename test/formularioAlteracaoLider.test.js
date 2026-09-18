@@ -70,7 +70,7 @@ test("Menu Líder: opção 1 exibe submenu de eventos com opção 4 (Alterar for
     usuarios: [{ nome: "Líder João", telefone: NUMERO_LIDER, cargos: ["lider"] }],
   });
 
-  await harness.enviar(NUMERO_LIDER, "6"); // Área do Líder
+  await harness.enviar(NUMERO_LIDER, "7"); // Área do Líder
   const [menuEventos] = await harness.enviar(NUMERO_LIDER, "1"); // Menu de Eventos
 
   assert.match(menuEventos, /📅 \*Menu de Eventos\*/);
@@ -96,7 +96,7 @@ test("Menu Líder: fluxo completo de alteração de campo do formulário com sol
   });
 
   // 1. Entra no menu de eventos
-  await harness.enviar(NUMERO_LIDER, "6");
+  await harness.enviar(NUMERO_LIDER, "7");
   await harness.enviar(NUMERO_LIDER, "1");
 
   // 2. Escolhe opção 4 (Alterar formulário)
@@ -157,7 +157,7 @@ test("Menu Líder: opção 14 permite reiniciar e preencher novamente o formulá
     calendarEvents: [eventoLuau],
   });
 
-  await harness.enviar(NUMERO_LIDER, "6");
+  await harness.enviar(NUMERO_LIDER, "7");
   await harness.enviar(NUMERO_LIDER, "1");
   await harness.enviar(NUMERO_LIDER, "4"); // Atualizar formulário
   await harness.enviar(NUMERO_LIDER, "5"); // Rede Ruach
@@ -224,7 +224,7 @@ test("Menu Líder: alteração de informação do formulário (identidade visual
   });
 
   // 1. Acessa área do líder -> Menu de Eventos -> Alterar formulário
-  await harness.enviar(NUMERO_LIDER, "6");
+  await harness.enviar(NUMERO_LIDER, "7");
   await harness.enviar(NUMERO_LIDER, "1");
   await harness.enviar(NUMERO_LIDER, "4");
 

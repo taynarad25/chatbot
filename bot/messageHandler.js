@@ -31,6 +31,14 @@ const {
   salvarFormularioEvento,
   obterFormularioEvento,
 } = require("./formularioEvento");
+const {
+  WEBHOOK_EVENTOS_EXTERNOS_URL,
+  AGENDA_INDEX_EVENTOS_EXTERNOS,
+  AGENDA_INDEX_USO_SALAO,
+  TERMO_RESPONSABILIDADE_EVENTO_EXTERNO,
+  montarPayloadEventoExterno,
+  enviarWebhookGoogleDocsExternos,
+} = require("./eventosExternos");
 
 // Cada "átomo" é uma saudação isolada reconhecida. A mensagem inteira precisa ser só
 // uma sequência desses átomos (separados por vírgula/ponto/"e"/espaço) pra contar como
@@ -238,6 +246,186 @@ async function comRetry(fn, { tentativas = 2, esperaMs = 1500 } = {}) {
   throw ultimoErro;
 }
 
+async function processarRespostaEventoExterno({
+  msg,
+  numero,
+  info,
+  client,
+  notificarSecretaria,
+  etapas,
+  usuario,
+  contato,
+}) {
+  const texto = (msg.body || "").trim();
+
+  if (info.etapa === "evento_externo_nome") {
+    if (!texto) {
+      return msg.reply("❌ Por favor, digite o *nome do evento*:");
+    }
+    info.nomeEvento = texto;
+    info.etapa = "evento_externo_data_horario";
+    return msg.reply(
+      "📅 2️⃣ Qual é a *data e horário* do evento?\n\n" +
+      "(Ex: 25/10 das 19:00 às 22:00, ou 25/10/2026 às 19h)"
+    );
+  }
+
+  if (info.etapa === "evento_externo_data_horario") {
+    if (!texto) {
+      return msg.reply("❌ Por favor, informe a *data e horário* do evento:");
+    }
+    info.dataHorarioTexto = texto;
+
+    const matchData = texto.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+    if (matchData) {
+      const dia = parseInt(matchData[1], 10);
+      const mes = parseInt(matchData[2], 10);
+      const ano = matchData[3]
+        ? (matchData[3].length === 2 ? 2000 + parseInt(matchData[3], 10) : parseInt(matchData[3], 10))
+        : moment.tz("America/Sao_Paulo").year();
+      info.dia = dia;
+      info.mes = mes;
+      info.ano = ano;
+      info.dataFormatada = `${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}/${ano}`;
+    }
+
+    info.etapa = "evento_externo_local";
+    return msg.reply(
+      "📍 3️⃣ Qual é o *local* do evento?\n\n" +
+      "(Digite o endereço completo ou informe se será na igreja/templo)"
+    );
+  }
+
+  if (info.etapa === "evento_externo_local") {
+    if (!texto) {
+      return msg.reply("❌ Por favor, informe o *local* do evento:");
+    }
+    info.local = resolverLocalEvento(texto);
+    info.etapa = "evento_externo_valores";
+    return msg.reply(
+      "💰 4️⃣ *Haverá entrada de valores ou repasse para o ministério?*\n\n" +
+      "(Informe se haverá cobrança de inscrição, taxa, venda ou repasse, e qual o valor/descrição. Se não houver, responda *Não*)"
+    );
+  }
+
+  if (info.etapa === "evento_externo_valores") {
+    if (!texto) {
+      return msg.reply("❌ Por favor, informe sobre a entrada de valores/repasse ou responda *Não*:");
+    }
+    info.valores = texto;
+    info.etapa = "evento_externo_precisa_salao";
+    return msg.reply(
+      "🏛️ 5️⃣ *Vai precisar do salão antes do evento?*\n" +
+      "(Ex: no dia anterior ou horas antes para montagem/decoração)\n\n" +
+      "Digite *Sim* ou *Não*:"
+    );
+  }
+
+  if (info.etapa === "evento_externo_precisa_salao") {
+    const r = texto.toLowerCase();
+    if (/^(sim|s|precisa|com certeza|positivo|vamos)/i.test(r)) {
+      info.precisaSalaoAntes = true;
+      info.etapa = "evento_externo_salao_detalhes";
+      return msg.reply(
+        "⏰ Em qual data e horário vai precisar do salão antes do evento para montagem/decoração?\n\n" +
+        "(Ex: 24/10 das 14:00 às 18:00, ou no mesmo dia das 15h às 18h)"
+      );
+    }
+    if (/^(n[aã]o|n|nenhum|nao precisa)/i.test(r)) {
+      info.precisaSalaoAntes = false;
+      info.salaoDetalhes = "Não";
+      info.etapa = "evento_externo_termo";
+      return msg.reply(TERMO_RESPONSABILIDADE_EVENTO_EXTERNO);
+    }
+    return msg.reply("❌ Por favor, responda *Sim* ou *Não*: vai precisar do salão antes do evento?");
+  }
+
+  if (info.etapa === "evento_externo_salao_detalhes") {
+    if (!texto) {
+      return msg.reply("❌ Por favor, informe quando precisará do salão antes do evento:");
+    }
+    info.salaoDetalhes = texto;
+    info.etapa = "evento_externo_termo";
+    return msg.reply(TERMO_RESPONSABILIDADE_EVENTO_EXTERNO);
+  }
+
+  if (info.etapa === "evento_externo_termo") {
+    const concorda = /^(sim|s|concordo|aceito|afirmativo)$/i.test(texto);
+    if (!concorda) {
+      return msg.reply(
+        "❌ Para solicitar o agendamento de um evento externo, é necessário aceitar o termo de responsabilidade.\n\n" +
+        "Digite *SIM* para concordar e continuar, ou *menu* para cancelar."
+      );
+    }
+    info.termoAceito = true;
+    info.etapa = "evento_externo_observacoes";
+    return msg.reply("📝 7️⃣ *Observações adicionais:*\n\nAlguma observação, detalhe extra ou necessidade técnica? (Ou responda *Nenhuma*)");
+  }
+
+  if (info.etapa === "evento_externo_observacoes") {
+    info.observacoes = texto || "Nenhuma";
+
+    const nomeSol = usuario?.nome || (contato ? nomeContato(contato, numero) : "Responsável");
+    const dadosEventoExterno = {
+      tipo: "evento_externo",
+      solicitanteId: numero,
+      nomeSolicitante: nomeSol,
+      nomeEvento: info.nomeEvento,
+      dataHorarioTexto: info.dataHorarioTexto,
+      dia: info.dia,
+      mes: info.mes,
+      ano: info.ano,
+      dataFormatada: info.dataFormatada || info.dataHorarioTexto,
+      local: info.local,
+      valores: info.valores,
+      precisaSalaoAntes: Boolean(info.precisaSalaoAntes),
+      salaoDetalhes: info.salaoDetalhes || "Não",
+      termoAceito: true,
+      observacoes: info.observacoes,
+    };
+
+    try {
+      const codigo = salvarPendente(dadosEventoExterno);
+      const resumoGrupo =
+        `🌐 *NOVA SOLICITAÇÃO DE EVENTO EXTERNO*\n\n` +
+        `👤 *Responsável:* ${nomeSol} (${numero})\n` +
+        `📅 *Evento:* ${dadosEventoExterno.nomeEvento}\n` +
+        `📆 *Data e Horário:* ${dadosEventoExterno.dataHorarioTexto}\n` +
+        `📍 *Local:* ${dadosEventoExterno.local}\n` +
+        `💰 *Valores / Repasse:* ${dadosEventoExterno.valores}\n` +
+        `🏛️ *Salão antes do evento:* ${dadosEventoExterno.precisaSalaoAntes ? dadosEventoExterno.salaoDetalhes : "Não"}\n` +
+        `📜 *Termo de Responsabilidade:* Aceito\n` +
+        `📝 *Observações:* ${dadosEventoExterno.observacoes}\n\n` +
+        `_Responda a este resumo com "aprovar evento externo" ou "recusar evento externo" para confirmar._\n\n` +
+        `_Código: ${codigo}_`;
+
+      await notificarSecretaria(client, resumoGrupo);
+
+      const resumoLider =
+        `✅ *Solicitação de Evento Externo Registrada!*\n\n` +
+        `• *Evento:* ${dadosEventoExterno.nomeEvento}\n` +
+        `• *Data e Horário:* ${dadosEventoExterno.dataHorarioTexto}\n` +
+        `• *Local:* ${dadosEventoExterno.local}\n` +
+        `• *Valores / Repasse:* ${dadosEventoExterno.valores}\n` +
+        `• *Salão antes:* ${dadosEventoExterno.precisaSalaoAntes ? dadosEventoExterno.salaoDetalhes : "Não"}\n` +
+        `• *Termo:* Aceito\n` +
+        `• *Observações:* ${dadosEventoExterno.observacoes}\n\n` +
+        `Sua solicitação foi enviada para a secretaria para análise e confirmação. Assim que confirmada, o documento oficial será gerado e o link enviado aqui para você! 🙏\n\n` +
+        `Digite *menu* para voltar ao menu principal.`;
+
+      delete etapas[numero];
+      return msg.reply(resumoLider);
+    } catch (errSalvar) {
+      console.error("[Evento Externo] Erro ao registrar pendente:", errSalvar);
+      delete etapas[numero];
+      return msg.reply("⚠️ Ocorreu um erro ao registrar sua solicitação. Tente novamente em instantes.");
+    }
+  }
+
+  delete etapas[numero];
+  return msg.reply("❌ Etapa desconhecida. Digite *menu* para reiniciar.");
+}
+
 /**
  * Monta o handler de mensagens do bot (menu principal + fluxos de conversa).
  * Todas as dependências que envolvem I/O real (WhatsApp, Google Calendar) são
@@ -253,8 +441,20 @@ async function comRetry(fn, { tentativas = 2, esperaMs = 1500 } = {}) {
  * @param {(inicio: string, fim: string, agendaId?: string) => Promise<object[]>} deps.buscarEventos
  * @param {() => object[]} [deps.listLideres] - retorna os líderes cadastrados no painel ({ nome, telefone, cargos }),
  *   usado para identificar o solicitante nos resumos de evento pelo nome cadastrado (não o nome do contato salvo no celular)
+ * @param {(payload: object) => Promise<object>} [deps.enviarWebhook]
+ * @param {(payload: object) => Promise<object>} [deps.enviarWebhookExterno]
  */
-function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapas, buscarEventos, listLideres = () => [], enviarWebhook = enviarWebhookGoogleDocs }) {
+function createMessageHandler({
+  client,
+  calendar,
+  agendasParaLer,
+  lideres,
+  etapas,
+  buscarEventos,
+  listLideres = () => [],
+  enviarWebhook = enviarWebhookGoogleDocs,
+  enviarWebhookExterno = enviarWebhookGoogleDocsExternos,
+}) {
   function resolverUsuario(numeroComDdi) {
     const numeroDigitos = String(numeroComDdi || "").replace(/\D/g, "");
     const cadastrados = (typeof listLideres === "function" ? listLideres() : []) || [];
@@ -413,6 +613,8 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
           "confirmar salão", "confirmar salao",
           "recusar salão", "recusar salao",
           "não aprovar salão", "nao aprovar salao",
+          "aprovar evento externo", "aprovar evento", "confirmar evento externo", "confirmar evento", "marcar evento externo",
+          "recusar evento externo", "recusar evento", "não aprovar evento externo", "nao aprovar evento externo",
           "alterar evento", "não alterar", "nao alterar",
           "alterar reuniao", "alterar reunião",
           "cancelar evento", "manter evento",
@@ -520,7 +722,12 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             textoMsg === "marcar salão" ||
             textoMsg === "marcar salao" ||
             textoMsg === "confirmar salão" ||
-            textoMsg === "confirmar salao";
+            textoMsg === "confirmar salao" ||
+            textoMsg === "aprovar evento externo" ||
+            textoMsg === "aprovar evento" ||
+            textoMsg === "confirmar evento externo" ||
+            textoMsg === "confirmar evento" ||
+            textoMsg === "marcar evento externo";
           const isRecusarMarcar =
             textoMsg === "não marcar" ||
             textoMsg === "nao marcar" ||
@@ -530,7 +737,11 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
             textoMsg === "recusar salão" ||
             textoMsg === "recusar salao" ||
             textoMsg === "não aprovar salão" ||
-            textoMsg === "nao aprovar salao";
+            textoMsg === "nao aprovar salao" ||
+            textoMsg === "recusar evento externo" ||
+            textoMsg === "recusar evento" ||
+            textoMsg === "não aprovar evento externo" ||
+            textoMsg === "nao aprovar evento externo";
 
           const isAlterar =
             textoMsg === "alterar evento" ||
@@ -557,6 +768,121 @@ function createMessageHandler({ client, calendar, agendasParaLer, lideres, etapa
               const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
+              }
+
+              if (dados.tipo === "evento_externo") {
+                const { solicitanteId } = dados;
+                if (isMarcar) {
+                  try {
+                    const calendarIdExternos = agendasParaLer[AGENDA_INDEX_EVENTOS_EXTERNOS] || agendasParaLer[10];
+                    const ano = dados.ano || moment().tz("America/Sao_Paulo").year();
+                    const mes = dados.mes || (moment().tz("America/Sao_Paulo").month() + 1);
+                    const dia = dados.dia || moment().tz("America/Sao_Paulo").date();
+
+                    const dataIsoInicio = moment.tz(
+                      `${dia}/${mes}/${ano} 19:00`,
+                      "D/M/YYYY HH:mm",
+                      "America/Sao_Paulo"
+                    ).format();
+                    const dataIsoFim = moment.tz(
+                      `${dia}/${mes}/${ano} 22:00`,
+                      "D/M/YYYY HH:mm",
+                      "America/Sao_Paulo"
+                    ).format();
+
+                    const resourceExterno = {
+                      summary: `Evento Externo - ${dados.nomeEvento}`,
+                      description:
+                        `Evento Externo agendado via Bot.\n` +
+                        `👤 Responsável: ${dados.nomeSolicitante}\n` +
+                        `📞 Contato: ${dados.solicitanteId}\n` +
+                        `📆 Data/Horário Solicitado: ${dados.dataHorarioTexto}\n` +
+                        `📍 Local: ${dados.local}\n` +
+                        `💰 Valores / Repasse: ${dados.valores}\n` +
+                        `🏛️ Salão antes do evento: ${dados.precisaSalaoAntes ? dados.salaoDetalhes : "Não"}\n` +
+                        `📝 Observações: ${dados.observacoes}\n` +
+                        `📜 Termo de responsabilidade aceito.`,
+                      location: dados.local,
+                      start: { dateTime: dataIsoInicio, timeZone: "America/Sao_Paulo" },
+                      end: { dateTime: dataIsoFim, timeZone: "America/Sao_Paulo" },
+                    };
+
+                    if (calendar && calendar.events && typeof calendar.events.insert === "function") {
+                      await calendar.events.insert({ calendarId: calendarIdExternos, resource: resourceExterno });
+                    }
+
+                    if (dados.precisaSalaoAntes) {
+                      const calendarIdSalao = agendasParaLer[AGENDA_INDEX_USO_SALAO] || agendasParaLer[15] || AGENDAS_INTERNAS.USO_SALAO;
+                      const resourceSalao = {
+                        summary: `Preparação Salão (Evento Externo) - ${dados.nomeEvento}`,
+                        description:
+                          `Uso do Salão antes de Evento Externo (${dados.nomeEvento}).\n` +
+                          `👤 Responsável: ${dados.nomeSolicitante} (${dados.solicitanteId})\n` +
+                          `⏰ Período: ${dados.salaoDetalhes}`,
+                        location: ENDERECO_IGREJA,
+                        start: { dateTime: dataIsoInicio, timeZone: "America/Sao_Paulo" },
+                        end: { dateTime: dataIsoFim, timeZone: "America/Sao_Paulo" },
+                      };
+                      if (calendar && calendar.events && typeof calendar.events.insert === "function") {
+                        await calendar.events.insert({ calendarId: calendarIdSalao, resource: resourceSalao });
+                      }
+                    }
+
+                    const payloadExterno = montarPayloadEventoExterno(dados);
+                    let linkDoc = "";
+                    try {
+                      const resultado = await enviarWebhookExterno(payloadExterno);
+                      linkDoc = resultado?.url || "";
+                    } catch (errWebhook) {
+                      console.error("[Evento Externo] Erro no webhook Google Apps Script:", errWebhook);
+                    }
+
+                    removerPendente(codigo);
+
+                    const feedbackUsuario =
+                      `✅ *Solicitação de Evento Externo Aprovada!*\n\n` +
+                      `Sua solicitação para o evento "*${dados.nomeEvento}*" foi aprovada pela secretaria e confirmada na agenda oficial! 🙏\n\n` +
+                      (linkDoc
+                        ? `📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}\n\n`
+                        : "") +
+                      `Digite *menu* para voltar ao menu principal.`;
+
+                    try {
+                      await client.sendMessage(solicitanteId, feedbackUsuario);
+                      console.log(`[Secretaria] Confirmação de evento externo enviada para ${mascararTelefone(solicitanteId)}`);
+                    } catch (sendErr) {
+                      console.error(`[ALERTA:whatsapp] Erro ao enviar confirmação de evento externo para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                    }
+
+                    const confirmacaoGrupo =
+                      `✅ *Evento Externo Aprovado e Documento Criado com Sucesso!*\n\n` +
+                      `• *Evento:* ${dados.nomeEvento}\n` +
+                      `• *Responsável:* ${dados.nomeSolicitante}\n` +
+                      `• *Data/Horário:* ${dados.dataHorarioTexto}\n` +
+                      `• *Local:* ${dados.local}\n` +
+                      (linkDoc ? `📄 *Link do Documento Gerado:*\n${linkDoc}` : `⚠️ Documento gerado sem URL de retorno.`);
+
+                    return msg.reply(confirmacaoGrupo);
+                  } catch (err) {
+                    console.error("[ALERTA:evento-externo] Erro ao aprovar evento externo:", err);
+                    return msg.reply("❌ Erro ao salvar o evento externo na agenda do Google. Responda de novo a esta mensagem após corrigir.");
+                  }
+                } else {
+                  removerPendente(codigo);
+                  const feedbackRecusa =
+                    `❌ *Solicitação de Evento Externo*\n\n` +
+                    `Infelizmente não pudemos aprovar sua solicitação para o evento "*${dados.nomeEvento}*".\n` +
+                    `Por favor, entre em contato diretamente com a secretaria para mais informações.\n\n` +
+                    `Digite *menu* para voltar ao menu principal.`;
+
+                  try {
+                    await client.sendMessage(solicitanteId, feedbackRecusa);
+                    console.log(`[Secretaria] Recusa de evento externo enviada para ${mascararTelefone(solicitanteId)}`);
+                  } catch (sendErr) {
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar recusa de evento externo para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Solicitante notificado sobre a recusa do evento externo.`);
+                }
               }
 
               if (dados.tipo === "uso_salao") {
@@ -952,14 +1278,12 @@ Escolha uma opção:
           menu += `\n5️⃣ Falar com a secretaria`;
         }
 
-        if (isLider && !isPastor && !isDiretor) {
-          menu += `\n${isMembro ? "7️⃣" : "6️⃣"} Área do Líder`;
-        }
         if (isPastor) {
-          menu += `\n7️⃣ Área Pastoral`;
-        }
-        if (isDiretor) {
-          menu += `\n8️⃣ Área da Direção`;
+          menu += `\n8️⃣ Área Pastoral`;
+        } else if (isDiretor) {
+          menu += `\n9️⃣ Área da Direção`;
+        } else if (isLider) {
+          menu += `\n7️⃣ Área do Líder`;
         }
 
         menu += `\n\nDigite *menu* a qualquer momento para voltar ao menu principal.`;
@@ -969,6 +1293,19 @@ Escolha uma opção:
       if (etapas[numero]) {
         const info = etapas[numero];
         console.log(`[Fluxo Ativo] ${identificarUsuario(contato, numero, isLider, usuario)} | Fluxo: ${info.fluxo} | Etapa: ${info.etapa}`);
+
+        if (info.fluxo === "evento_externo") {
+          return await processarRespostaEventoExterno({
+            msg,
+            numero,
+            info,
+            client,
+            notificarSecretaria,
+            etapas,
+            usuario,
+            contato,
+          });
+        }
 
         if (info.fluxo === "formulario_evento") {
           return await processarRespostaFormulario({
@@ -1005,8 +1342,12 @@ Escolha uma opção:
               info.etapa = "form_alterar_departamento";
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou alteração de formulário de evento.`);
               return msg.reply(`📝 *Atualizar Formulário de Evento*\n\n🏢 De qual departamento é o evento que você deseja alterar o formulário?\n\n${montarListaRedes()}`);
+            } else if (msg.body === "5") {
+              info.fluxo = "evento_externo";
+              info.etapa = "evento_externo_nome";
+              return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
             } else {
-              return msg.reply("❌ Opção inválida. Digite 1 para Agendar, 2 para Alterar, 3 para Cancelar ou 4 para Atualizar Formulário.");
+              return msg.reply("❌ Opção inválida. Digite 1 para Agendar, 2 para Alterar, 3 para Cancelar, 4 para Atualizar Formulário ou 5 para Evento Externo.");
             }
           }
 
@@ -1940,7 +2281,8 @@ Escolha uma opção:
                 "1 - Agendar novo evento\n" +
                 "2 - Alterar evento existente\n" +
                 "3 - Cancelar evento existente\n" +
-                "4 - Alterar ou atualizar dados do formulário do evento\n\n" +
+                "4 - Alterar ou atualizar dados do formulário do evento\n" +
+                "5 - Agendar evento externo\n\n" +
                 "Digite *menu* para voltar ao menu principal."
               );
             } else if (escolha === "2") {
@@ -1966,8 +2308,12 @@ Escolha uma opção:
                 listaMeses += `${i + 1} - ${MESES[i]}\n`;
               }
               return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
+            } else if (escolha === "6") {
+              info.fluxo = "evento_externo";
+              info.etapa = "evento_externo_nome";
+              return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
             } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, ou digite *menu* para voltar.");
+              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 6, ou digite *menu* para voltar.");
             }
           }
         } else if (info.fluxo === "area_pastoral") {
@@ -2004,7 +2350,8 @@ Escolha uma opção:
                 "1 - Agendar novo evento\n" +
                 "2 - Alterar evento existente\n" +
                 "3 - Cancelar evento existente\n" +
-                "4 - Alterar ou atualizar dados do formulário do evento\n\n" +
+                "4 - Alterar ou atualizar dados do formulário do evento\n" +
+                "5 - Agendar evento externo\n\n" +
                 "Digite *menu* para voltar ao menu principal."
               );
             } else if (escolha === "4") {
@@ -2032,8 +2379,12 @@ Escolha uma opção:
               return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
             } else if (escolha === "8") {
               return msg.reply("📋 *Atendimentos Pastorais*\n\nOs pedidos de atendimento pastoral são enviados diretamente ao grupo oficial de pastores para alinhamento e confirmação.\n\nDigite *menu* para voltar ao menu principal.");
+            } else if (escolha === "9") {
+              info.fluxo = "evento_externo";
+              info.etapa = "evento_externo_nome";
+              return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
             } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 8, ou digite *menu* para voltar.");
+              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 9, ou digite *menu* para voltar.");
             }
           }
 
@@ -2371,7 +2722,8 @@ Escolha uma opção:
                 "1 - Agendar novo evento\n" +
                 "2 - Alterar evento existente\n" +
                 "3 - Cancelar evento existente\n" +
-                "4 - Alterar ou atualizar dados do formulário do evento\n\n" +
+                "4 - Alterar ou atualizar dados do formulário do evento\n" +
+                "5 - Agendar evento externo\n\n" +
                 "Digite *menu* para voltar ao menu principal."
               );
             } else if (escolha === "3") {
@@ -2401,8 +2753,12 @@ Escolha uma opção:
               const avisoSecretaria = `📞 *PEDIDO DA DIREÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO diretor solicitou contato da secretaria.`;
               await notificarSecretaria(client, avisoSecretaria);
               return msg.reply("📞 *Secretaria Notificada!*\n\nA equipe da secretaria entrará em contato em breve.\n\nDigite *menu* para voltar ao menu principal.");
+            } else if (escolha === "8") {
+              info.fluxo = "evento_externo";
+              info.etapa = "evento_externo_nome";
+              return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
             } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 7, ou digite *menu* para voltar.");
+              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 8, ou digite *menu* para voltar.");
             }
           }
         } else if (info.fluxo === "artes_flyers") {
@@ -3023,36 +3379,35 @@ Digite *menu* para voltar ao menu principal.`;
         return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
       }
 
-      if (texto === "6") {
-        if (isLider) {
-          console.log(`Opção 6 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área do Líder`);
-          etapas[numero] = { fluxo: "area_lider", etapa: "menu_lider" };
-          const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n4️⃣ Agendar, alterar ou desmarcar reunião\n5️⃣ Consultar disponibilidade de dias e horários\n\nDigite *menu* para voltar ao menu principal.`;
-          return msg.reply(msgSubmenu);
-        }
-        if (isMembro) {
-          console.log(`Opção 6 (Secretaria) selecionada por membro ${identificarUsuario(contato, numero, isLider, usuario)}`);
-          const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO usuário solicitou falar com a secretaria.`;
-          await notificarSecretaria(client, avisoSecretaria);
-          return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
-        }
+      if (texto === "6" && isMembro) {
+        console.log(`Opção 6 (Secretaria) selecionada por membro ${identificarUsuario(contato, numero, isLider, usuario)}`);
+        const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO usuário solicitou falar com a secretaria.`;
+        await notificarSecretaria(client, avisoSecretaria);
+        return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
       }
 
-      if (texto === "7" && isPastor) {
-        console.log(`Opção 7 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área Pastoral`);
+      if (texto === "7" && isLider && !isPastor && !isDiretor) {
+        console.log(`Opção 7 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área do Líder`);
+        etapas[numero] = { fluxo: "area_lider", etapa: "menu_lider" };
+        const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n4️⃣ Agendar, alterar ou desmarcar reunião\n5️⃣ Consultar disponibilidade de dias e horários\n6️⃣ Agendar evento externo\n\nDigite *menu* para voltar ao menu principal.`;
+        return msg.reply(msgSubmenu);
+      }
+
+      if (texto === "8" && isPastor) {
+        console.log(`Opção 8 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área Pastoral`);
         etapas[numero] = { fluxo: "area_pastoral", etapa: "menu_pastoral" };
-        const msgSubmenu = `⛪ *Área Pastoral*\n\nGraça e Paz, Pastor(a)! Escolha uma opção:\n\n1️⃣ Ver agenda completa da igreja\n2️⃣ Atendimento pastoral (agendar, alterar ou desmarcar)\n3️⃣ Agendar, alterar ou cancelar evento\n4️⃣ Solicitar aviso / comunicado no culto\n5️⃣ Solicitar artes e flyers\n6️⃣ Agendar, alterar ou desmarcar reunião\n7️⃣ Consultar disponibilidade de dias e horários\n8️⃣ Consultar orientações de atendimento pastoral\n\nDigite *menu* para voltar ao menu principal.`;
+        const msgSubmenu = `⛪ *Área Pastoral*\n\nGraça e Paz, Pastor(a)! Escolha uma opção:\n\n1️⃣ Ver agenda completa da igreja\n2️⃣ Atendimento pastoral (agendar, alterar ou desmarcar)\n3️⃣ Agendar, alterar ou cancelar evento\n4️⃣ Solicitar aviso / comunicado no culto\n5️⃣ Solicitar artes e flyers\n6️⃣ Agendar, alterar ou desmarcar reunião\n7️⃣ Consultar disponibilidade de dias e horários\n8️⃣ Consultar orientações de atendimento pastoral\n9️⃣ Agendar evento externo\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
       }
 
-      if (texto === "8" && isDiretor) {
-        console.log(`Opção 8 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área da Direção`);
+      if (texto === "9" && isDiretor && !isPastor) {
+        console.log(`Opção 9 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área da Direção`);
         etapas[numero] = { fluxo: "area_diretor", etapa: "menu_diretor" };
-        const msgSubmenu = `📋 *Área da Direção*\n\nEscolha o que deseja fazer:\n\n1️⃣ Ver todos os eventos da igreja (agenda completa)\n2️⃣ Agendar, alterar ou cancelar evento\n3️⃣ Solicitar aviso / comunicado no culto\n4️⃣ Solicitar artes e flyers\n5️⃣ Agendar, alterar ou desmarcar reunião\n6️⃣ Consultar disponibilidade de dias e horários\n7️⃣ Falar com a secretaria\n\nDigite *menu* para voltar ao menu principal.`;
+        const msgSubmenu = `📋 *Área da Direção*\n\nEscolha o que deseja fazer:\n\n1️⃣ Ver todos os eventos da igreja (agenda completa)\n2️⃣ Agendar, alterar ou cancelar evento\n3️⃣ Solicitar aviso / comunicado no culto\n4️⃣ Solicitar artes e flyers\n5️⃣ Agendar, alterar ou desmarcar reunião\n6️⃣ Consultar disponibilidade de dias e horários\n7️⃣ Falar com a secretaria\n8️⃣ Agendar evento externo\n\nDigite *menu* para voltar ao menu principal.`;
         return msg.reply(msgSubmenu);
       }
 
-      if (((texto === "9" || texto === "opção 9" || texto === "opcao 9") && isMembro) || /^(?:solicitar\s+)?(?:uso\s+do\s+)?sal[aã]o$/i.test(texto.trim())) {
+      if (isMembro && /^(?:solicitar\s+)?(?:uso\s+do\s+)?sal[aã]o$/i.test(texto.trim())) {
         console.log(`[Uso do Salão] Iniciado por ${identificarUsuario(contato, numero, isLider, usuario)}`);
         etapas[numero] = { fluxo: "uso_salao", etapa: "uso_salao_data" };
         return msg.reply(
@@ -3095,4 +3450,5 @@ module.exports = {
   resolverOpcaoLocalReuniao,
   temPermissao,
   identificarUsuario,
+  processarRespostaEventoExterno,
 };

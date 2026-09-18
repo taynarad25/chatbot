@@ -429,7 +429,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   }
 
   // 1. Líder solicita agendamento de evento
-  await enviarPrivado("6");
+  await enviarPrivado("7");
   await enviarPrivado("1");
   await enviarPrivado("1"); // novo agendamento
   await enviarPrivado("Conferência Atos 2"); // nome

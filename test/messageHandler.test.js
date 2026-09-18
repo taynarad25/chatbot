@@ -39,6 +39,7 @@ const AGENDAS = [
   "cal-seeds", "cal-ruach", "cal-casais", "cal-homens", "cal-mulheres", "cal-kids",
   "cal-externos",
   "cal-reunioes", "cal-atendimento", "cal-limpeza", "cal-ensaios",
+  "cal-uso-salao",
 ];
 const LIDERES = ["5511999999999"];
 const NUMERO_LIDER = "5511999999999@c.us";
@@ -57,7 +58,7 @@ const JID_GRUPO_MULTIMIDIA = "333333333333333@g.us";
 
 // Monta um novo "servidor" de teste: handler + espiões de tudo que ele chamaria
 // de verdade (mensagens de grupo, mensagens diretas, gravação na Google Agenda).
-function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
+function criarContexto({ eventos = [], lideresCadastrados = [], enviarWebhookExterno } = {}) {
   const etapas = {};
   const gruposEnviados = []; // mensagens que o bot mandou para os grupos
   const multimidiaEnviados = []; // mensagens que o bot mandou para MULTIMÍDIAS
@@ -131,6 +132,7 @@ function criarContexto({ eventos = [], lideresCadastrados = [] } = {}) {
   const handleMessage = createMessageHandler({
     client, calendar, agendasParaLer: AGENDAS, lideres: LIDERES, etapas, buscarEventos,
     listLideres: () => lideresCadastrados,
+    enviarWebhookExterno,
   });
 
   return {
@@ -161,7 +163,7 @@ function criarMsgPrivada(numero, body, { pushname } = {}) {
 }
 
 // Mensagem em grupo, respondendo (reply/quote) a uma mensagem anterior do próprio bot.
-function criarMsgGrupo({ nomeGrupo, body, quotedBody, quotedFromMe = true }) {
+function criarMsgGrupo({ nomeGrupo = "Mensagens Secretaria", body, quotedBody, quotedFromMe = true }) {
   const respostas = [];
   const msg = {
     from: nomeGrupo === "Atendimento Pastoral" ? JID_GRUPO_PASTORAL : JID_GRUPO_SECRETARIA,
@@ -201,7 +203,7 @@ async function iniciarAgendamentoDataEspecifica(handleMessage, {
   dia,
   extraOpts,
 } = {}) {
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, titulo);
@@ -224,7 +226,7 @@ async function solicitarAgendamentoSemana(handleMessage, {
   escolhaItem = "1",
   extraOpts,
 } = {}) {
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, titulo);
@@ -246,7 +248,7 @@ function criarEventoExistente({ id, summary, diasAFrente = 10, hora = 19, minuto
 }
 
 async function iniciarAlteracaoEvento(handleMessage, { rede = "7", item = "1", setEventos, evento } = {}) {
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2");
   if (setEventos && evento) setEventos([evento]);
@@ -256,7 +258,7 @@ async function iniciarAlteracaoEvento(handleMessage, { rede = "7", item = "1", s
 }
 
 async function iniciarCancelamentoEvento(handleMessage, { rede = "1", item = "1", setEventos, evento } = {}) {
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "3");
   if (setEventos && evento) setEventos([evento]);
@@ -327,11 +329,12 @@ test("saudação: mensagem com texto além da saudação NÃO ativa o menu (pode
   }
 });
 
-test("saudação: líder recebe o menu com a opção 6 da Área do Líder", async () => {
+test("saudação: líder recebe o menu com a opção 7 da Área do Líder", async () => {
   const { handleMessage } = criarContexto();
   const respostas = await enviar(handleMessage, NUMERO_LIDER, "oi");
-  assert.match(respostas[0], /6️⃣ Área do Líder/);
-  assert.doesNotMatch(respostas[0], /7️⃣/);
+  assert.match(respostas[0], /7️⃣ Área do Líder/);
+  assert.doesNotMatch(respostas[0], /8️⃣ Área Pastoral/);
+  assert.doesNotMatch(respostas[0], /9️⃣ Área da Direção/);
 });
 
 test("texto livre sem fluxo ativo: bot fica em silêncio (pode ser conversa com a secretaria fora do menu)", async () => {
@@ -560,7 +563,7 @@ test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agen
   assert.match(respFim[0], /Evento Externo Bloqueador/);
 });
 
-test("opção 6: líder pode agendar evento escolhendo departamento 'Eventos Externos' (opção 10)", async () => {
+test("opção 6: líder pode agendar evento escolhendo departamento 'Outros' (opção 10)", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const mesAlvo = agora.month() + 1;
   const diaAlvo = 22;
@@ -568,7 +571,7 @@ test("opção 6: líder pode agendar evento escolhendo departamento 'Eventos Ext
   const { handleMessage, gruposEnviados, eventosGravados } = criarContexto();
 
   const { respRede } = await iniciarAgendamentoDataEspecifica(handleMessage, {
-    titulo: "Encontro Regional",
+    titulo: "Encontro Geral",
     local: "Parque da Cidade",
     rede: "10",
     mes: mesAlvo,
@@ -580,7 +583,7 @@ test("opção 6: líder pode agendar evento escolhendo departamento 'Eventos Ext
   const respFinalizar = await enviar(handleMessage, NUMERO_LIDER, "17:00");
 
   assert.match(respFinalizar[0], /Solicitação de Agendamento/);
-  assert.match(respFinalizar[0], /Departamento:\* Eventos Externos/);
+  assert.match(respFinalizar[0], /Departamento:\* Outros/);
 
   // Secretaria aprova no grupo
   const codigo = extrairCodigo(gruposEnviados[0]);
@@ -593,8 +596,156 @@ test("opção 6: líder pode agendar evento escolhendo departamento 'Eventos Ext
   await handleMessage(msgSecretaria);
 
   assert.equal(eventosGravados.length, 1);
-  assert.equal(eventosGravados[0].calendarId, AGENDAS[10]); // Salvo na agenda de Eventos Externos
-  assert.match(eventosGravados[0].resource.summary, /Encontro Regional/);
+  assert.equal(eventosGravados[0].calendarId, AGENDAS[3]); // Salvo na agenda de Outros (agendaIndex 3)
+  assert.match(eventosGravados[0].resource.summary, /Encontro Geral/);
+});
+
+test("Eventos Externos: líder agenda evento externo em 7 passos, secretaria aprova, grava agenda e envia link do Google Docs", async () => {
+  let webhookPayloadRecebido = null;
+  const mockWebhookExterno = async (payload) => {
+    webhookPayloadRecebido = payload;
+    return { url: "https://docs.google.com/document/d/evento-externo-aprovado/edit" };
+  };
+
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto({
+    enviarWebhookExterno: mockWebhookExterno,
+  });
+
+  // 1. Líder abre Área do Líder (opção 7)
+  const [respMenuLider] = await enviar(handleMessage, NUMERO_LIDER, "7");
+  assert.match(respMenuLider, /👑 \*Área do Líder\*/);
+  assert.match(respMenuLider, /6️⃣ Agendar evento externo/);
+
+  // 2. Escolhe opção 6 (Agendar evento externo) -> Passo 1: Nome do evento
+  const [p1] = await enviar(handleMessage, NUMERO_LIDER, "6");
+  assert.match(p1, /Qual é o \*nome do evento\*\?/);
+
+  // 3. Responde nome do evento -> Passo 2: Data e horário
+  const [p2] = await enviar(handleMessage, NUMERO_LIDER, "Conferência Regional de Avivamento");
+  assert.match(p2, /Qual é a \*data e horário\* do evento\?/);
+
+  // 4. Responde data e horário -> Passo 3: Local
+  const [p3] = await enviar(handleMessage, NUMERO_LIDER, "28/11/2026 das 19:00 às 22:00");
+  assert.match(p3, /Qual é o \*local\* do evento\?/);
+
+  // 5. Responde local -> Passo 4: Valores e repasse
+  const [p4] = await enviar(handleMessage, NUMERO_LIDER, "igreja");
+  assert.match(p4, /Haverá entrada de valores ou repasse/);
+
+  // 6. Responde valores -> Passo 5: Precisa do salão antes?
+  const [p5] = await enviar(handleMessage, NUMERO_LIDER, "Entrada 1kg de alimento, sem repasse em dinheiro");
+  assert.match(p5, /Vai precisar do salão antes do evento\?/);
+
+  // 7. Responde Sim -> Passo 5b: Detalhes do salão antes
+  const [p5b] = await enviar(handleMessage, NUMERO_LIDER, "Sim");
+  assert.match(p5b, /Em qual data e horário vai precisar do salão antes do evento/);
+
+  // 8. Responde detalhes do salão -> Passo 6: Termo de Responsabilidade
+  const [p6] = await enviar(handleMessage, NUMERO_LIDER, "27/11 das 14h às 18h para decoração");
+  assert.match(p6, /Termo de Responsabilidade/);
+  assert.match(p6, /Digite \*SIM\* para aceitar/);
+
+  // 9. Aceita com SIM -> Passo 7: Observações adicionais
+  const [p7] = await enviar(handleMessage, NUMERO_LIDER, "SIM");
+  assert.match(p7, /Observações adicionais/);
+
+  // 10. Responde observações -> Finaliza solicitação
+  const [resumoFinal] = await enviar(handleMessage, NUMERO_LIDER, "Precisaremos de 3 microfones e iluminação cênica");
+  assert.match(resumoFinal, /Solicitação de Evento Externo Registrada!/);
+  assert.match(resumoFinal, /Conferência Regional de Avivamento/);
+  assert.match(resumoFinal, /enviada para a secretaria para análise/);
+
+  // Verifica notificação no grupo da secretaria
+  const msgSecretaria = gruposEnviados.find((g) => g.includes("NOVA SOLICITAÇÃO DE EVENTO EXTERNO"));
+  assert.ok(msgSecretaria);
+  assert.match(msgSecretaria, /Conferência Regional de Avivamento/);
+  assert.match(msgSecretaria, /27\/11 das 14h às 18h/);
+  const codigo = extrairCodigo(msgSecretaria);
+  assert.ok(codigo);
+
+  // 11. Secretaria aprova no grupo respondendo "aprovar evento externo" citando a mensagem
+  const msgAprovacao = criarMsgGrupo({
+    body: "aprovar evento externo",
+    quotedBody: msgSecretaria,
+  });
+  await handleMessage(msgAprovacao);
+  const respGrupo = msgAprovacao.respostas[0];
+  assert.match(respGrupo, /Evento Externo Aprovado e Documento Criado com Sucesso!/);
+  assert.match(respGrupo, /https:\/\/docs\.google\.com\/document\/d\/evento-externo-aprovado\/edit/);
+
+  // Verifica gravação no Google Calendar (tanto o evento externo quanto a preparação do salão)
+  assert.equal(eventosGravados.length, 2);
+  const eventoExternoGravado = eventosGravados.find((e) => e.calendarId === AGENDAS[10]);
+  assert.ok(eventoExternoGravado);
+  assert.match(eventoExternoGravado.resource.summary, /Evento Externo - Conferência Regional de Avivamento/);
+
+  const preparacaoSalaoGravada = eventosGravados.find((e) => e.calendarId === AGENDAS[15]);
+  assert.ok(preparacaoSalaoGravada);
+  assert.match(preparacaoSalaoGravada.resource.summary, /Preparação Salão/);
+
+  // Valida que o webhook POST foi chamado com os dados exatos
+  assert.ok(webhookPayloadRecebido);
+  assert.equal(webhookPayloadRecebido.nome_evento, "Conferência Regional de Avivamento");
+  assert.equal(webhookPayloadRecebido.precisa_salao_antes, "27/11 das 14h às 18h para decoração");
+  assert.equal(webhookPayloadRecebido.termo_responsabilidade, "Aceito");
+
+  // Valida que o líder recebeu a confirmação direta no WhatsApp com o link do documento
+  const msgDiretaLider = diretasEnviadas.find((d) => d.to === NUMERO_LIDER);
+  assert.ok(msgDiretaLider);
+  assert.match(msgDiretaLider.texto, /Solicitação de Evento Externo Aprovada!/);
+  assert.match(msgDiretaLider.texto, /https:\/\/docs\.google\.com\/document\/d\/evento-externo-aprovado\/edit/);
+});
+
+test("Eventos Externos: exige concordância expressa com o termo de responsabilidade", async () => {
+  const { handleMessage } = criarContexto();
+
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "Vigília Regional");
+  await enviar(handleMessage, NUMERO_LIDER, "12/12 das 23h às 05h");
+  await enviar(handleMessage, NUMERO_LIDER, "Templo");
+  await enviar(handleMessage, NUMERO_LIDER, "Não");
+  await enviar(handleMessage, NUMERO_LIDER, "Não"); // Sem salão antes -> cai direto no Termo
+
+  // Resposta diferente de SIM
+  const [respNaoAceitou] = await enviar(handleMessage, NUMERO_LIDER, "Não concordo com isso");
+  assert.match(respNaoAceitou, /necessário aceitar o termo de responsabilidade/);
+
+  // Agora envia SIM
+  const [respAceitou] = await enviar(handleMessage, NUMERO_LIDER, "SIM");
+  assert.match(respAceitou, /Observações adicionais/);
+});
+
+test("Eventos Externos: secretaria recusa solicitação no grupo e notifica solicitante", async () => {
+  const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto();
+
+  await enviar(handleMessage, NUMERO_LIDER, "7");
+  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "Encontro Cancelável");
+  await enviar(handleMessage, NUMERO_LIDER, "10/10 20:00");
+  await enviar(handleMessage, NUMERO_LIDER, "Salão");
+  await enviar(handleMessage, NUMERO_LIDER, "Não");
+  await enviar(handleMessage, NUMERO_LIDER, "Não");
+  await enviar(handleMessage, NUMERO_LIDER, "SIM");
+  await enviar(handleMessage, NUMERO_LIDER, "Nenhuma");
+
+  const msgSecretaria = gruposEnviados.find((g) => g.includes("NOVA SOLICITAÇÃO DE EVENTO EXTERNO"));
+  assert.ok(msgSecretaria);
+
+  // Secretaria recusa
+  const msgRecusa = criarMsgGrupo({
+    body: "recusar evento externo",
+    quotedBody: msgSecretaria,
+  });
+  await handleMessage(msgRecusa);
+  const respGrupo = msgRecusa.respostas[0];
+  assert.match(respGrupo, /Solicitante notificado sobre a recusa do evento externo/);
+
+  assert.equal(eventosGravados.length, 0);
+
+  const msgDiretaLider = diretasEnviadas.find((d) => d.to === NUMERO_LIDER);
+  assert.ok(msgDiretaLider);
+  assert.match(msgDiretaLider.texto, /Infelizmente não pudemos aprovar sua solicitação para o evento/);
 });
 
 // ---------------------------------------------------------------------------
@@ -771,10 +922,10 @@ test("opção 6 (líder): endereço customizado (evento fora da igreja) é usado
   assert.doesNotMatch(escolha[0], /Rua Benedicto de Abreu Júnior/);
 });
 
-test("opção 6 (líder): evento de DIA TODO pula a pergunta de horário de término", async () => {
+test("opção 7 (líder): evento de DIA TODO pula a pergunta de horário de término", async () => {
   const { handleMessage } = criarContexto({ eventos: [] });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Retiro Espiritual");
@@ -1037,9 +1188,9 @@ test("opção 6 (líder): cancelar evento — secretaria nega ('manter evento')"
   assert.match(negativa.respostas[0], /evento foi mantido/);
 });
 
-test("opção 6 (líder): departamento sem eventos futuros encerra o fluxo de alteração", async () => {
+test("opção 7 (líder): departamento sem eventos futuros encerra o fluxo de alteração", async () => {
   const { handleMessage, etapas } = criarContexto({ eventos: [] });
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2");
   const resp = await enviar(handleMessage, NUMERO_LIDER, "9");
@@ -1047,7 +1198,7 @@ test("opção 6 (líder): departamento sem eventos futuros encerra o fluxo de al
   assert.equal(etapas[NUMERO_LIDER], undefined);
 });
 
-test("opção 6 (líder): evento que já passou não aparece na lista pra alterar/cancelar (precisa ser um agendamento novo)", async () => {
+test("opção 7 (líder): evento que já passou não aparece na lista pra alterar/cancelar (precisa ser um agendamento novo)", async () => {
   const etapas = {};
   const client = {
     sendMessage: async () => {},
@@ -1082,7 +1233,7 @@ test("opção 6 (líder): evento que já passou não aparece na lista pra altera
     buscarEventos: buscarEventosPorPeriodo,
   });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2"); // Alterar evento existente
   const listaResp = await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
@@ -1105,7 +1256,7 @@ test("opção 7: usuário comum não tem acesso (fallback genérico)", async () 
 test("opção 7 (líder): encaminha o comunicado em texto livre para a secretaria", async () => {
   const { handleMessage, gruposEnviados, etapas } = criarContexto();
 
-  const r1 = await enviar(handleMessage, NUMERO_LIDER, "6");
+  const r1 = await enviar(handleMessage, NUMERO_LIDER, "7");
   assert.match(r1[0], /Área do Líder/);
 
   const r2 = await enviar(handleMessage, NUMERO_LIDER, "2");
@@ -1125,7 +1276,7 @@ test("opção 7 (líder): resumo do comunicado também usa o nome cadastrado no 
     lideresCadastrados: [{ nome: "Pastor Marcos", telefone: "5511999999999" }],
   });
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "2");
   await enviar(handleMessage, NUMERO_LIDER, "Não haverá culto no dia 20.", { pushname: "celular do Pastor" });
 
@@ -1361,7 +1512,7 @@ test("fluxo artes_flyers: solicita com sucesso sem imagem anexa", async () => {
   const { handleMessage, gruposEnviados, etapas } = criarContexto();
 
   // 1. Inicia Área do Líder -> Artes e Flyers
-  const r1 = await enviar(handleMessage, NUMERO_LIDER, "6");
+  const r1 = await enviar(handleMessage, NUMERO_LIDER, "7");
   const r2 = await enviar(handleMessage, NUMERO_LIDER, "3");
   assert.match(r2[0], /De qual departamento é a solicitação/);
 
@@ -1408,7 +1559,7 @@ test("fluxo artes_flyers: solicita com sucesso anexando imagem/mídia", async ()
   const { handleMessage, gruposEnviados, multimidiaEnviados, etapas } = criarContexto();
 
   // Inicia e avança até a etapa da foto
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "3");
   await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
@@ -1455,7 +1606,7 @@ test("atalho líder: digitando 'pedir midia' inicia diretamente o fluxo de artes
 test("área do líder: agendar reunião coleta dados rapidamente, secretaria aprova e líder recebe ata em anexo", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados, etapas } = criarContexto();
 
-  const rMenu = await enviar(handleMessage, NUMERO_LIDER, "6");
+  const rMenu = await enviar(handleMessage, NUMERO_LIDER, "7");
   assert.match(rMenu[0], /4️⃣ Agendar, alterar ou desmarcar reunião/);
 
   const rSub = await enviar(handleMessage, NUMERO_LIDER, "4");
@@ -1523,7 +1674,7 @@ test("área do líder: agendar reunião coleta dados rapidamente, secretaria apr
 test("área do líder: agendar reunião e secretaria recusa", async () => {
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosGravados } = criarContexto();
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "4");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Intercessão");
@@ -1558,7 +1709,7 @@ test("área do líder: alterar reunião existente na agenda de reuniões", async
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosAlterados, setEventos } = criarContexto();
   setEventos(reunioesExistentes);
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "4");
   const rLista = await enviar(handleMessage, NUMERO_LIDER, "2");
   assert.match(rLista[1], /Reuniões Agendadas/);
@@ -1605,7 +1756,7 @@ test("área do líder: desmarcar reunião existente na agenda de reuniões", asy
   const { handleMessage, gruposEnviados, diretasEnviadas, eventosCancelados, setEventos } = criarContexto();
   setEventos(reunioesExistentes);
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "4");
   const rLista = await enviar(handleMessage, NUMERO_LIDER, "3");
   assert.match(rLista[1], /Reuniões Agendadas/);
@@ -1635,7 +1786,7 @@ test("área do líder: desmarcar reunião existente na agenda de reuniões", asy
 test("área do líder: validações de data, horários e local no fluxo de reunião", async () => {
   const { handleMessage, etapas } = criarContexto();
 
-  await enviar(handleMessage, NUMERO_LIDER, "6");
+  await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "4");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Depto Teste");
@@ -1700,7 +1851,7 @@ test("área do líder: opção 5 fluxo de consulta de disponibilidade por mês e
   const { handleMessage, etapas } = criarContexto({ eventos: [] });
 
   // 1. Inicia Área do Líder
-  const r1 = await enviar(handleMessage, NUMERO_LIDER, "6");
+  const r1 = await enviar(handleMessage, NUMERO_LIDER, "7");
   assert.match(r1[0], /5️⃣ Consultar disponibilidade de dias e horários/);
 
   // 2. Escolhe opção 5
