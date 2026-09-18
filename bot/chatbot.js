@@ -256,6 +256,20 @@ function criarClient() {
     } catch (err) {
       console.error('Erro na rotina de resolução de grupos:', err);
     }
+
+    // Inicia agendador automático de lembretes para os líderes (5 dias antes)
+    try {
+      const { iniciarAgendadorLembretes } = require("./lembretes");
+      iniciarAgendadorLembretes({
+        client,
+        buscarEventos,
+        agendasParaLer,
+        horaExecucao: 9,
+      });
+      console.log("[Lembretes] Agendador de lembretes de eventos iniciado.");
+    } catch (errLembrete) {
+      console.error("[Lembretes] Erro ao iniciar agendador de lembretes:", errLembrete.message);
+    }
   });
 
   client.on("authenticated", () => {

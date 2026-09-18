@@ -837,6 +837,15 @@ function createMessageHandler({
                       console.error("[Evento Externo] Erro no webhook Google Apps Script:", errWebhook);
                     }
 
+                    salvarFormularioEvento({
+                      evento: dados.nomeEvento,
+                      departamento: "Eventos Externos",
+                      data: dados.dataHora,
+                      solicitanteId: dados.solicitanteId,
+                      payload: payloadExterno,
+                      docUrl: linkDoc,
+                    });
+
                     removerPendente(codigo);
 
                     const feedbackUsuario =

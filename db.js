@@ -62,12 +62,26 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_formularios_evento ON formularios_eventos(evento);
+
+  CREATE TABLE IF NOT EXISTS lembretes_enviados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    eventoId TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    destinatario TEXT NOT NULL,
+    enviadoEm TEXT NOT NULL,
+    UNIQUE(eventoId, tipo)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_lembretes_evento ON lembretes_enviados(eventoId, tipo);
 `);
 
 try {
   const cols = db.prepare("PRAGMA table_info(lideres)").all();
   if (!cols.some((c) => c.name === "cargos")) {
     db.exec("ALTER TABLE lideres ADD COLUMN cargos TEXT NOT NULL DEFAULT '[\"lider\"]'");
+  }
+  if (!cols.some((c) => c.name === "departamento")) {
+    db.exec("ALTER TABLE lideres ADD COLUMN departamento TEXT NOT NULL DEFAULT ''");
   }
 } catch {
   // Tabela ainda sendo criada ou erro ignorável

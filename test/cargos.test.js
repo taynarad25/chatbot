@@ -164,6 +164,43 @@ test("Rota alias /secretaria/api/admin/usuarios funciona de forma idêntica", as
   assert.ok(Array.isArray(json.usuarios));
 });
 
+test("POST e PUT /secretaria/api/admin/lideres salvam e atualizam departamento", async () => {
+  const postRes = await fetch(`${baseUrl}/secretaria/api/admin/lideres`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: adminCookie },
+    body: JSON.stringify({
+      nome: "Líder Débora",
+      telefone: "5511999998888",
+      cargos: ["lider"],
+      departamento: "Rede de Mulheres",
+    }),
+  });
+  const postJson = await postRes.json();
+  assert.equal(postRes.status, 200);
+  assert.equal(postJson.ok, true);
+
+  const u1 = obterUsuarioPorTelefone("5511999998888");
+  assert.equal(u1.departamento, "Rede de Mulheres");
+
+  const putRes = await fetch(`${baseUrl}/secretaria/api/admin/lideres/5511999998888`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: adminCookie },
+    body: JSON.stringify({
+      nome: "Líder Débora Alterada",
+      telefone: "5511999998888",
+      cargos: ["lider", "pastor"],
+      departamento: "Intercessão",
+    }),
+  });
+  const putJson = await putRes.json();
+  assert.equal(putRes.status, 200);
+  assert.equal(putJson.ok, true);
+
+  const u2 = obterUsuarioPorTelefone("5511999998888");
+  assert.equal(u2.nome, "Líder Débora Alterada");
+  assert.equal(u2.departamento, "Intercessão");
+});
+
 // ============================================================================
 // 3. LÓGICA DO BOT & VALIDAÇÃO DE MÚLTIPLAS PERMISSÕES
 // ============================================================================

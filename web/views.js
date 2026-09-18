@@ -831,6 +831,7 @@ function renderIndexHtml() {
     .badge-pastor { background: rgba(255, 125, 0, 0.15); color: #ff7d00; border: 1px solid rgba(255, 125, 0, 0.35); }
     .badge-diretor { background: rgba(123, 44, 191, 0.18); color: #c084fc; border: 1px solid rgba(123, 44, 191, 0.35); }
     .badge-membro { background: rgba(255, 255, 255, 0.08); color: #9ca3af; border: 1px solid rgba(255, 255, 255, 0.15); }
+    .badge-depto { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
     @media (max-width: 600px) {
       .header-painel { flex-direction: column; align-items: flex-start; gap: 14px; }
       .filtros-lideres { flex-direction: column; gap: 0; }
@@ -887,7 +888,7 @@ function renderIndexHtml() {
     <div id="tab-lideres" class="tab-content">
       <h3 class="section-title-tab">Gestão de Usuários & Cargos</h3>
       <div class="filtros-lideres">
-        <input id="filtroLiderNome" placeholder="🔍 Buscar por nome ou cargo" />
+        <input id="filtroLiderNome" placeholder="🔍 Buscar por nome, cargo ou departamento" />
         <input id="filtroLiderTelefone" placeholder="📱 Buscar por telefone" inputmode="numeric" autocomplete="off" />
       </div>
       <ul id="liderList"></ul>
@@ -897,6 +898,23 @@ function renderIndexHtml() {
       <form id="addLiderForm">
         <input name="nome" placeholder="Nome completo" required />
         <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" autocomplete="off" required />
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; font-size: 0.85rem; color: #a1a1aa; margin-bottom: 5px;">Departamento / Ministério:</label>
+          <select name="departamento" id="liderDepartamento" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #ffffff; font-size: 0.95rem;">
+            <option value="" style="background: #18181b; color: #ffffff;">Nenhum / Geral</option>
+            <option value="Evangelismo" style="background: #18181b; color: #ffffff;">Evangelismo</option>
+            <option value="Epifania" style="background: #18181b; color: #ffffff;">Epifania</option>
+            <option value="Intercessão" style="background: #18181b; color: #ffffff;">Intercessão</option>
+            <option value="Projeto Social Seeds" style="background: #18181b; color: #ffffff;">Projeto Social Seeds</option>
+            <option value="Rede Ruach" style="background: #18181b; color: #ffffff;">Rede Ruach</option>
+            <option value="Rede de Casais" style="background: #18181b; color: #ffffff;">Rede de Casais</option>
+            <option value="Rede de Homens" style="background: #18181b; color: #ffffff;">Rede de Homens</option>
+            <option value="Rede de Mulheres" style="background: #18181b; color: #ffffff;">Rede de Mulheres</option>
+            <option value="Rede Kids" style="background: #18181b; color: #ffffff;">Rede Kids</option>
+            <option value="Eventos Externos" style="background: #18181b; color: #ffffff;">Eventos Externos</option>
+            <option value="Outros" style="background: #18181b; color: #ffffff;">Outros</option>
+          </select>
+        </div>
         <div class="cargos-container">
           <span class="cargos-title">Cargos / Permissões Ministeriais:</span>
           <div class="cargos-checkboxes">
@@ -1103,7 +1121,8 @@ function renderIndexHtml() {
 
       const filtrados = lideresCache.filter(l => {
         const cargosStr = Array.isArray(l.cargos) ? l.cargos.join(' ') : (l.cargos || '');
-        const nomeOk = !filtroNome || normalizarBusca(l.nome).includes(filtroNome) || normalizarBusca(cargosStr).includes(filtroNome);
+        const deptoStr = l.departamento || '';
+        const nomeOk = !filtroNome || normalizarBusca(l.nome).includes(filtroNome) || normalizarBusca(cargosStr).includes(filtroNome) || normalizarBusca(deptoStr).includes(filtroNome);
         const telefoneOk = !filtroTelefone || l.telefone.includes(filtroTelefone);
         return nomeOk && telefoneOk;
       });
@@ -1131,6 +1150,13 @@ function renderIndexHtml() {
           badge.textContent = nomeCargo === 'Lider' ? 'Líder' : nomeCargo;
           span.appendChild(badge);
         });
+
+        if (l.departamento) {
+          const badgeDepto = document.createElement('span');
+          badgeDepto.className = 'badge badge-depto';
+          badgeDepto.textContent = l.departamento;
+          span.appendChild(badgeDepto);
+        }
 
         li.appendChild(span);
 
@@ -1183,6 +1209,7 @@ function renderIndexHtml() {
       const form = document.getElementById('addLiderForm');
       form.nome.value = lider.nome;
       form.telefone.value = formatarTelefone(lider.telefone);
+      form.departamento.value = lider.departamento || '';
       
       const cargos = Array.isArray(lider.cargos) ? lider.cargos : (lider.cargos ? [lider.cargos] : ['lider']);
       form.querySelectorAll('input[name="cargos"]').forEach(cb => {
@@ -1198,6 +1225,7 @@ function renderIndexHtml() {
       liderEmEdicao = null;
       const form = document.getElementById('addLiderForm');
       form.reset();
+      form.departamento.value = '';
       form.querySelectorAll('input[name="cargos"]').forEach(cb => {
         cb.checked = (cb.value === 'lider');
       });

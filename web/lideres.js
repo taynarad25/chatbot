@@ -68,6 +68,7 @@ function loadLideres() {
         nome: row.nome,
         telefone: row.telefone,
         cargos,
+        departamento: row.departamento || "",
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
       };
@@ -97,10 +98,11 @@ function obterUsuarioPorTelefone(telefone) {
     nome: "",
     telefone: telefoneNormalizado,
     cargos: [],
+    departamento: "",
   };
 }
 
-function addLider({ nome, telefone, cargos }) {
+function addLider({ nome, telefone, cargos, departamento }) {
   const telefoneNormalizado = normalizarTelefone(telefone);
   if (!telefoneNormalizado) return { ok: false, message: "Telefone inválido." };
   if (!nome || !nome.trim()) return { ok: false, message: "Nome é obrigatório." };
@@ -109,15 +111,16 @@ function addLider({ nome, telefone, cargos }) {
   if (existente) return { ok: false, message: "Já existe um usuário com esse telefone." };
 
   const cargosNormalizados = normalizarCargos(cargos);
+  const depto = String(departamento || "").trim();
 
-  db.prepare("INSERT INTO lideres (telefone, nome, cargos, createdAt) VALUES (?, ?, ?, ?)")
-    .run(telefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), new Date().toISOString());
+  db.prepare("INSERT INTO lideres (telefone, nome, cargos, departamento, createdAt) VALUES (?, ?, ?, ?, ?)")
+    .run(telefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), depto, new Date().toISOString());
   sincronizarTelefones();
-  console.log(`[Lideres] Usuário adicionado: ${nome.trim()} (${telefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}]`);
+  console.log(`[Lideres] Usuário adicionado: ${nome.trim()} (${telefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Depto: ${depto || "Nenhum"}`);
   return { ok: true, message: "Usuário adicionado com sucesso." };
 }
 
-function updateLider(telefoneAtual, { nome, telefone, cargos }) {
+function updateLider(telefoneAtual, { nome, telefone, cargos, departamento }) {
   const telefoneAtualNormalizado = normalizarTelefone(telefoneAtual);
   const novoTelefoneNormalizado = normalizarTelefone(telefone);
   if (!novoTelefoneNormalizado) return { ok: false, message: "Telefone inválido." };
@@ -132,12 +135,13 @@ function updateLider(telefoneAtual, { nome, telefone, cargos }) {
   }
 
   const cargosNormalizados = normalizarCargos(cargos !== undefined ? cargos : liderExistente.cargos);
+  const deptoFinal = departamento !== undefined ? String(departamento || "").trim() : (liderExistente.departamento || "");
 
   db.prepare("DELETE FROM lideres WHERE telefone = ?").run(telefoneAtualNormalizado);
-  db.prepare("INSERT INTO lideres (telefone, nome, cargos, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)")
-    .run(novoTelefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), liderExistente.createdAt, new Date().toISOString());
+  db.prepare("INSERT INTO lideres (telefone, nome, cargos, departamento, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(novoTelefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), deptoFinal, liderExistente.createdAt, new Date().toISOString());
   sincronizarTelefones();
-  console.log(`[Lideres] Usuário editado: ${telefoneAtualNormalizado} -> ${nome.trim()} (${novoTelefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}]`);
+  console.log(`[Lideres] Usuário editado: ${telefoneAtualNormalizado} -> ${nome.trim()} (${novoTelefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Depto: ${deptoFinal || "Nenhum"}`);
   return { ok: true, message: "Usuário atualizado com sucesso." };
 }
 
@@ -152,6 +156,17 @@ function removeLider(telefone) {
   return { ok: true, message: "Usuário removido com sucesso." };
 }
 
+function obterLideresPorDepartamento(departamento) {
+  if (!departamento || !String(departamento).trim()) return [];
+  const deptoNorm = String(departamento).trim().toLowerCase();
+  const todos = listLideres();
+  return todos.filter((l) => {
+    const d = (l.departamento || "").trim().toLowerCase();
+    if (!d) return false;
+    return d === deptoNorm || d.includes(deptoNorm) || deptoNorm.includes(d);
+  });
+}
+
 module.exports = {
   telefonesLideres,
   loadLideres,
@@ -161,4 +176,5 @@ module.exports = {
   removeLider,
   normalizarCargos,
   obterUsuarioPorTelefone,
+  obterLideresPorDepartamento,
 };
