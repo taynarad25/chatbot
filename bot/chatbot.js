@@ -227,6 +227,7 @@ function criarClient() {
     try {
       const inviteSec = "KsHKE5q5BiI81KvJ1ARdUp";
       const invitePas = "I2AxSM7v9CI211RGWJBX2Y";
+      const inviteMul = "D7exjarQTrcGSAjzCvM5QV";
       
       console.log('=============== RESOLVENDO GRUPOS POR CONVITE ===============');
       try {
@@ -251,6 +252,18 @@ function criarClient() {
         }
       } catch (err) {
         console.error("Erro ao resolver convite Pastoral:", err.message);
+      }
+
+      try {
+        const info = await client.getInviteInfo(inviteMul);
+        const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
+        console.log(`NOME: "MULTIMÍDIAS"  --->  JID RESOLVIDO: "${jid}"`);
+        if (jid) {
+          const { atualizarCacheGrupo } = require("./secretaria");
+          atualizarCacheGrupo("MULTIMÍDIAS", jid);
+        }
+      } catch (err) {
+        console.error("Erro ao resolver convite MULTIMÍDIAS:", err.message);
       }
       console.log('=============================================================');
     } catch (err) {

@@ -591,6 +591,11 @@ function createMessageHandler({
 
   return async function handleMessage(msg) {
     try {
+      if (!msg) return;
+      if (msg.body === undefined || msg.body === null) {
+        msg.body = "";
+      }
+
       // Ignora mensagens de status e mensagens enviadas pelo próprio bot
       if (msg.from === 'status@broadcast' || msg.fromMe) {
         return;
@@ -1257,7 +1262,7 @@ function createMessageHandler({
 
       const contato = await msg.getContact();
       const numero = contato.id._serialized;
-      const texto = msg.body.toLowerCase().trim();
+      const texto = (msg.body || "").toLowerCase().trim();
       const usuario = resolverUsuario(numero);
       const isLider = temPermissao(usuario, "lider") || lideres.some((l) => numero.includes(l));
       const isPastor = temPermissao(usuario, "pastor");
@@ -2802,22 +2807,30 @@ Escolha uma opção:
           }
 
           if (info.etapa === "artes_foto") {
-            if (msg.hasMedia) {
+            const temMidia = Boolean(msg.hasMedia || msg.type === "image" || msg.type === "document");
+            if (temMidia) {
               try {
-                const media = await comRetry(() => msg.downloadMedia(), { tentativas: 4, esperaMs: 3000 });
+                const media = await comRetry(async () => {
+                  const m = await msg.downloadMedia();
+                  if (!m || !m.data) {
+                    throw new Error("Dados da mídia ainda não carregados ou vazios");
+                  }
+                  return m;
+                }, { tentativas: 5, esperaMs: 2500 });
                 info.midiaAnexa = media;
+                info.etapa = "artes_prazo";
+                return msg.reply("📷 ✅ *Imagem recebida com sucesso!*\n\n⏳ Para qual *data máxima* você precisa desse material pronto? (Ex: 22/08)");
               } catch (errMedia) {
                 console.error("[Artes] Erro ao baixar mídia:", errMedia);
-                return msg.reply("❌ Ocorreu um erro ao baixar a imagem. Por favor, envie a imagem novamente ou responda com *NÃO* para continuar sem imagem.");
+                return msg.reply("❌ Não foi possível carregar a imagem enviada. Por favor, tente enviar a imagem novamente ou responda com *NÃO* para continuar sem imagem.");
               }
-            } else if (msg.body.trim().toLowerCase() === "não" || msg.body.trim().toLowerCase() === "nao") {
+            } else if ((msg.body || "").trim().toLowerCase() === "não" || (msg.body || "").trim().toLowerCase() === "nao") {
               info.midiaAnexa = null;
+              info.etapa = "artes_prazo";
+              return msg.reply("⏳ Para qual *data máxima* você precisa desse material pronto? (Ex: 22/08)");
             } else {
-              return msg.reply("❌ Por favor, envie uma imagem ou responda com *NÃO*.");
+              return msg.reply("❌ Por favor, envie uma *foto/imagem* pelo WhatsApp ou responda com *NÃO* se não tiver imagem.");
             }
-
-            info.etapa = "artes_prazo";
-            return msg.reply("⏳ Para qual *data máxima* você precisa desse material pronto? (Ex: 22/08)");
           }
 
           if (info.etapa === "artes_prazo") {

@@ -1565,18 +1565,19 @@ test("fluxo artes_flyers: solicita com sucesso anexando imagem/mídia", async ()
   await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "Detalhes da arte");
 
-  // Simula o envio de imagem (hasMedia=true)
+  // Simula o envio de imagem (hasMedia=true) sem legenda (body undefined no whatsapp-web.js)
   const respostas = [];
   const msgComMidia = {
     from: NUMERO_LIDER,
     fromMe: false,
-    body: "",
+    body: undefined,
     hasMedia: true,
     downloadMedia: async () => ({ data: "fake_base64_data", mimetype: "image/png" }),
     reply: async (texto) => { respostas.push(texto); return texto; },
     getContact: async () => ({ id: { _serialized: NUMERO_LIDER }, pushname: "Pastor", name: undefined }),
   };
   await handleMessage(msgComMidia);
+  assert.match(respostas[0], /Imagem recebida com sucesso/);
   assert.match(respostas[0], /Para qual \*data máxima\*/);
 
   // Finaliza informando o prazo

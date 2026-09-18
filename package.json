@@ -11,7 +11,9 @@
   "description": "",
   "main": "bot/chatbot.js",
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "simular": "node simular.js",
+    "start": "node web.js"
   },
   "repository": {
     "type": "git",

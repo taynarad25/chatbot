@@ -1,4 +1,10 @@
 const db = require("../db");
+let MessageMedia;
+try {
+  MessageMedia = require("whatsapp-web.js").MessageMedia;
+} catch (_) {
+  MessageMedia = null;
+}
 
 const NOME_GRUPO_SECRETARIA = "Mensagens Secretaria";
 const NOME_GRUPO_PASTORAL = "Atendimento Pastoral";
@@ -236,11 +242,20 @@ async function notificarMultimidia(client, mensagem, midiaAnexa = null) {
       }
     }
 
+    let mediaParaEnviar = midiaAnexa;
+    if (midiaAnexa && MessageMedia && !(midiaAnexa instanceof MessageMedia) && midiaAnexa.data && midiaAnexa.mimetype) {
+      try {
+        mediaParaEnviar = new MessageMedia(midiaAnexa.mimetype, midiaAnexa.data, midiaAnexa.filename);
+      } catch (wrapErr) {
+        console.warn("[Multimídia] Aviso ao instanciar MessageMedia:", wrapErr.message);
+      }
+    }
+
     if (cachedJid && cachedJid.includes("@")) {
       try {
-        if (midiaAnexa) {
+        if (mediaParaEnviar) {
           try {
-            await client.sendMessage(cachedJid, midiaAnexa, { caption: mensagem });
+            await client.sendMessage(cachedJid, mediaParaEnviar, { caption: mensagem });
           } catch (mErr) {
             console.warn(`[Multimídia] Falha ao enviar mídia anexa pelo JID ${cachedJid}, enviando texto:`, mErr.message);
             await client.sendMessage(cachedJid, mensagem + "\n\n⚠️ _Nota: Não foi possível anexar o arquivo de mídia diretamente._");
@@ -260,9 +275,9 @@ async function notificarMultimidia(client, mensagem, midiaAnexa = null) {
       const chats = await client.getChats();
       const grupo = encontrarGrupoMultimidia(chats);
       if (grupo && grupo.id && grupo.id._serialized) {
-        if (midiaAnexa) {
+        if (mediaParaEnviar) {
           try {
-            await client.sendMessage(grupo.id._serialized, midiaAnexa, { caption: mensagem });
+            await client.sendMessage(grupo.id._serialized, mediaParaEnviar, { caption: mensagem });
           } catch (mErr) {
             console.warn(`[Multimídia] Falha ao enviar mídia anexa via busca, enviando texto:`, mErr.message);
             await client.sendMessage(grupo.id._serialized, mensagem + "\n\n⚠️ _Nota: Não foi possível anexar o arquivo de mídia diretamente._");
