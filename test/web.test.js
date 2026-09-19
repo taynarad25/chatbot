@@ -115,7 +115,7 @@ test("GET / e GET /home: servem a página inicial institucional com seções de 
   }
 });
 
-test("GET /ministerios e /ministérios: serve a página dedicada aos ministérios com 200 e todos os 9 ministérios", async () => {
+test("GET /ministerios e /ministérios: serve a página dedicada aos ministérios com 200 e ministérios completos", async () => {
   for (const url of [`${baseUrl}/ministerios`, `${baseUrl}/ministerios/`, `${baseUrl}/minist%C3%A9rios`]) {
     const res = await fetch(url);
     assert.equal(res.status, 200, `deve retornar 200 para ${url}`);
@@ -128,12 +128,15 @@ test("GET /ministerios e /ministérios: serve a página dedicada aos ministério
     assert.match(html, /Rede de Homens/);
     assert.match(html, /Rede de Mulheres/);
     assert.match(html, /Epifania/);
+    assert.match(html, /Departamento de Artes/);
     assert.match(html, /Evangelismo/);
     assert.match(html, /Intercessão/);
     assert.match(html, /Social Seeds/);
+    assert.match(html, /Quero Participar da Integração/);
     assert.doesNotMatch(html, /href="\/secretaria"/, "link da secretaria não deve estar exposto na página de ministérios");
   }
 });
+
 
 
 test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404 e com Cache-Control no-cache", async () => {

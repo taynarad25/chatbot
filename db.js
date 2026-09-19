@@ -13,6 +13,8 @@ const { DatabaseSync } = require("node:sqlite");
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, "dados.db");
 
 const db = new DatabaseSync(DB_PATH);
+db.exec("PRAGMA journal_mode = WAL;");
+db.exec("PRAGMA busy_timeout = 5000;");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (

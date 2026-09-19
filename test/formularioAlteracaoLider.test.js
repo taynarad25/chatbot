@@ -178,7 +178,7 @@ test("Menu Líder: alteração de informação do formulário (identidade visual
   const NUMERO_LIDER = "5511999994444";
   const eventoCulto = {
     id: "evento-culto-1",
-    summary: "Culto de Celebração e Avivamento",
+    summary: "Culto de Celebração com Mídia",
     start: { dateTime: "2026-11-28T19:00:00-03:00" },
     end: { dateTime: "2026-11-28T21:30:00-03:00" },
     location: "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi",
@@ -186,7 +186,7 @@ test("Menu Líder: alteração de informação do formulário (identidade visual
 
   const { salvarFormularioEvento } = require("../bot/formularioEvento");
   salvarFormularioEvento({
-    evento: "Culto de Celebração e Avivamento",
+    evento: "Culto de Celebração com Mídia",
     departamento: "Rede da Família",
     data: "28/11/2026",
     solicitanteId: NUMERO_LIDER,
@@ -194,7 +194,7 @@ test("Menu Líder: alteração de informação do formulário (identidade visual
     payload: {
       nome_lider: "Líder Marcos",
       departamento: "Rede da Família",
-      nome_evento: "Culto de Celebração e Avivamento",
+      nome_evento: "Culto de Celebração com Mídia",
       data: "28/11/2026",
       horario_inicio: "19:00",
       horario_termino: "21:30",
@@ -218,7 +218,7 @@ test("Menu Líder: alteração de informação do formulário (identidade visual
   };
 
   const harness = criarHarness({
-    usuarios: [{ nome: "Líder Marcos", telefone: NUMERO_LIDER, cargos: ["lider"] }],
+    usuarios: [{ nome: "Líder Marcos", telefone: NUMERO_LIDER, cargos: ["lider"], departamentos: ["Rede da Família"] }],
     calendarEvents: [eventoCulto],
     enviarWebhook: mockWebhook,
   });
@@ -228,8 +228,8 @@ test("Menu Líder: alteração de informação do formulário (identidade visual
   await harness.enviar(NUMERO_LIDER, "1");
   await harness.enviar(NUMERO_LIDER, "4");
 
-  // 2. Escolhe departamento 9 (Rede da Família)
-  await harness.enviar(NUMERO_LIDER, "9");
+  // 2. Escolhe departamento cadastrado do líder (1 - Rede da Família)
+  await harness.enviar(NUMERO_LIDER, "1");
 
   // 3. Seleciona o evento 1
   await harness.enviar(NUMERO_LIDER, "1");
@@ -257,7 +257,8 @@ test("Menu Líder: alteração de informação do formulário (identidade visual
   assert.match(msgSec.texto, /https:\/\/docs\.google\.com\/document\/d\/doc-novo-atualizado-789\/edit/);
 
   // Validação dos dados obrigatórios de mídia / divulgação enviados para o grupo da secretaria:
-  assert.match(msgSec.texto, /Culto de Celebração e Avivamento/, "deve conter nome do evento");
+  assert.match(msgSec.texto, /Culto de Celebração com Mídia/, "deve conter nome do evento");
+
   assert.match(msgSec.texto, /19:00 às 21:30/, "deve conter horário");
   assert.match(msgSec.texto, /Rua Benedicto de Abreu Júnior, 40/, "deve conter endereço");
   assert.match(msgSec.texto, /Habacuque 3:2/, "deve conter versículo base");
