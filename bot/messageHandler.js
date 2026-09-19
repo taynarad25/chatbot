@@ -30,6 +30,7 @@ const {
   AGENDAS_INTERNAS,
 } = require("./redes");
 const { notificarSecretaria, notificarPastoral, notificarMultimidia, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
+const { executarBroadcast, BROADCAST_CONFIG } = require("./broadcast");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
 const { registrarAgendamentoPastoral } = require("./lembretes");
@@ -752,12 +753,9 @@ function createMessageHandler({
         return;
       }
 
-      // Lógica para mensagens em grupo (Confirmação da Secretaria). A imensa maioria
-      // das mensagens em qualquer grupo não tem nada a ver com o bot (conversa normal
-      // do grupo) — pra não gerar log nem chamar getChat() (a parte cara/frágil que já
-      // causou erro por causa de JIDs sintéticos) à toa, só investiga mais a fundo
-      // quando a mensagem é uma resposta (reply) a algo E o texto é uma das palavras-
-      // chave de aprovação conhecidas.
+      // Lógica para mensagens em grupo:
+      // 1. Confirmação / Aprovação da Secretaria ou Pastoral (requer citação + palavra-chave)
+      // 2. Transmissão (Broadcast) do grupo 'Mensagens Secretaria' (captura imagem/texto e transmite)
       if (msg.from.endsWith("@g.us")) {
         const textoMsg = (msg.body || "").toLowerCase().trim();
         const PALAVRAS_CHAVE_APROVACAO = [
@@ -796,24 +794,77 @@ function createMessageHandler({
             bodyTrimmedLower.startsWith("nao pode ");
         }
 
-        if (!ehPalavraChave) {
-          return; // Mensagem comum do grupo, sem relação com o bot — ignora em silêncio
-        }
-
-        if (!msg.hasQuotedMsg) {
-          // Provável esquecimento: a secretaria ou pastor digitou a palavra-chave certa, mas sem
-          // usar "Responder" na mensagem do bot — não dá pra saber a qual pedido se
-          // refere. Não precisa de getChat() pra registrar esse diagnóstico.
-          console.log(`[Grupo] Palavra-chave "${textoMsg}" digitada sem usar "Responder" (de: ${mascararTelefone(msg.from)}) — ignorada.`); // NOSONAR
-          return;
-        }
-
         const cachedSecretaria = obterJidCached(NOME_GRUPO_SECRETARIA);
+        let ehGrupoSecretaria = Boolean(cachedSecretaria && msg.from === cachedSecretaria);
+
+        // Se o cache do grupo Secretaria ainda não foi populado, tenta resolver via getChat() apenas se necessário
+        if (!ehGrupoSecretaria && !cachedSecretaria) {
+          try {
+            const chatTemp = await comRetry(() => msg.getChat());
+            const nomeChatNormalizado = chatTemp?.name ? chatTemp.name.trim().toLowerCase() : "";
+            if (nomeChatNormalizado.includes(NOME_GRUPO_SECRETARIA.trim().toLowerCase())) {
+              ehGrupoSecretaria = true;
+              atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
+            }
+          } catch (_) {}
+        }
+
+        // Se for resposta citada com palavra-chave de aprovação, segue o fluxo de aprovação
+        const ehRespostaAprovacao = ehPalavraChave && Boolean(msg.hasQuotedMsg);
+
+        if (!ehRespostaAprovacao) {
+          // Se veio do grupo "Mensagens Secretaria" e NÃO é resposta a aprovação
+          if (ehGrupoSecretaria) {
+            // Se for apenas uma palavra-chave de aprovação isolada sem mídia (ex: "marcar evento" ou "recusar"),
+            // é provável esquecimento de usar "Responder" no pedido do bot
+            if (!msg.hasMedia && PALAVRAS_CHAVE_APROVACAO.includes(textoMsg)) {
+              console.log(`[Grupo] Palavra-chave "${textoMsg}" digitada sem usar "Responder" (de: ${mascararTelefone(msg.from)}) — ignorada.`); // NOSONAR
+              return;
+            }
+
+            // Captura de mídia (imagem/foto) se houver
+            let media = null;
+            if (msg.hasMedia && typeof msg.downloadMedia === "function") {
+              try {
+                media = await comRetry(() => msg.downloadMedia());
+              } catch (errMedia) {
+                console.error(`[Broadcast] Falha ao baixar mídia da mensagem:`, errMedia.message);
+              }
+            }
+
+            const textoBroadcast = (msg.caption || msg.body || "").trim();
+            if (!media && !textoBroadcast) {
+              return;
+            }
+
+            console.log(`[Broadcast] Mensagem capturada no grupo '${NOME_GRUPO_SECRETARIA}' (mídia: ${Boolean(media)}, texto: "${textoBroadcast.slice(0, 60)}")`);
+            const resBroadcast = await executarBroadcast({
+              client,
+              media,
+              texto: textoBroadcast,
+              listLideres,
+            });
+
+            if (typeof msg.react === "function") {
+              msg.react("📢").catch(() => {});
+            }
+
+            return resBroadcast;
+          }
+
+          // Para outros grupos:
+          if (ehPalavraChave && !msg.hasQuotedMsg) {
+            console.log(`[Grupo] Palavra-chave "${textoMsg}" digitada sem usar "Responder" (de: ${mascararTelefone(msg.from)}) — ignorada.`); // NOSONAR
+          }
+          return; // Mensagem comum de outros grupos — ignora em silêncio
+        }
+
+        // Daqui para baixo: ehRespostaAprovacao === true (fluxo de aprovação existente)
         const cachedPastoral = obterJidCached(NOME_GRUPO_PASTORAL);
         const cachedMultimidia = obterJidCached(NOME_GRUPO_MULTIMIDIA);
 
         let grupoPertence = null;
-        if (msg.from === cachedSecretaria) {
+        if (ehGrupoSecretaria) {
           grupoPertence = NOME_GRUPO_SECRETARIA;
         } else if (msg.from === cachedPastoral) {
           grupoPertence = NOME_GRUPO_PASTORAL;
