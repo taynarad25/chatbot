@@ -42,7 +42,14 @@ function resetDeduplicacao() {
 
 async function notificarAlerta(client, categoria, mensagem, { agora, janelaMs } = {}) {
   if (!podeEnviar(categoria, agora, janelaMs)) return false;
-  if (!client || typeof client.getChats !== "function" || !client.pupBrowser || !client.pupPage) return false;
+  if (!client || typeof client.getChats !== "function") return false;
+  if (client.pupBrowser === null || client.pupPage === null) return false;
+  if (client.pupBrowser && typeof client.pupBrowser.isConnected === "function" && !client.pupBrowser.isConnected()) {
+    return false;
+  }
+  if (client.pupPage && typeof client.pupPage.isClosed === "function" && client.pupPage.isClosed()) {
+    return false;
+  }
 
   try {
     const chats = await client.getChats();

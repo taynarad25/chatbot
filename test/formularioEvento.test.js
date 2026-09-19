@@ -429,9 +429,10 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   }
 
   // 1. Líder solicita agendamento de evento
-  await enviarPrivado("7");
-  await enviarPrivado("1");
-  await enviarPrivado("1"); // novo agendamento
+  await enviarPrivado("7"); // Área do Líder
+  await enviarPrivado("1"); // Agenda, Eventos e Reuniões
+  await enviarPrivado("1"); // Eventos da Igreja
+  await enviarPrivado("1"); // Agendar novo evento
   await enviarPrivado("Conferência Atos 2"); // nome
   await enviarPrivado("igreja"); // local
   await enviarPrivado("7"); // departamento (Rede de Homens)

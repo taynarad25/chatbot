@@ -72,8 +72,9 @@ async function enviar(handleMessage, numero, body) {
 test("tabela de pendentes indisponível: líder recebe um aviso claro, não fica sem resposta nem vê 'erro na agenda'", async () => {
   const { handleMessage } = criarContexto();
 
-  await enviar(handleMessage, NUMERO_LIDER, "7");
-  await enviar(handleMessage, NUMERO_LIDER, "1");
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Área do Líder
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agenda, Eventos e Reuniões
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Eventos da Igreja
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar novo evento
   await enviar(handleMessage, NUMERO_LIDER, "Culto de Jovens");
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
