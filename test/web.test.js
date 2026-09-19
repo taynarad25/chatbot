@@ -107,10 +107,34 @@ test("GET / e GET /home: servem a página inicial institucional com seções de 
 
     assert.match(html, /secretaria\.curados@gmail\.com/);
 
+    // Link para a página dedicada de ministérios
+    assert.match(html, /href="\/ministerios"/, "deve conter link para a página dedicada aos ministérios");
+
     // O link para a secretaria é confidencial e não deve estar visível na home pública
     assert.doesNotMatch(html, /href="\/secretaria"/, "link da secretaria não deve estar exposto na home");
   }
 });
+
+test("GET /ministerios e /ministérios: serve a página dedicada aos ministérios com 200 e todos os 9 ministérios", async () => {
+  for (const url of [`${baseUrl}/ministerios`, `${baseUrl}/ministerios/`, `${baseUrl}/minist%C3%A9rios`]) {
+    const res = await fetch(url);
+    assert.equal(res.status, 200, `deve retornar 200 para ${url}`);
+    assert.match(res.headers.get("content-type"), /text\/html/);
+    const html = await res.text();
+    assert.match(html, /Nossos Ministérios/i);
+    assert.match(html, /Rede Kids/);
+    assert.match(html, /Rede Ruach/);
+    assert.match(html, /Rede de Casais/);
+    assert.match(html, /Rede de Homens/);
+    assert.match(html, /Rede de Mulheres/);
+    assert.match(html, /Epifania/);
+    assert.match(html, /Evangelismo/);
+    assert.match(html, /Intercessão/);
+    assert.match(html, /Social Seeds/);
+    assert.doesNotMatch(html, /href="\/secretaria"/, "link da secretaria não deve estar exposto na página de ministérios");
+  }
+});
+
 
 test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404 e com Cache-Control no-cache", async () => {
   const res = await fetch(`${baseUrl}/favicon.ico`);

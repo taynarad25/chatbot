@@ -22,6 +22,9 @@ const logoBuffer = fs.existsSync(LOGO_FILE) ? fs.readFileSync(LOGO_FILE) : null;
 const HOME_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "home.html"))
   ? path.join(__dirname, "public", "home.html")
   : path.join(__dirname, "web", "public", "home.html");
+const MINISTERIOS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "ministerios.html"))
+  ? path.join(__dirname, "public", "ministerios.html")
+  : path.join(__dirname, "web", "public", "ministerios.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -136,6 +139,12 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         return res.end('Bad Request: Invalid URL');
       }
       const pathname = url.pathname;
+      let decodedPathname = pathname;
+      try {
+        decodedPathname = decodeURIComponent(pathname);
+      } catch {
+        decodedPathname = pathname;
+      }
 
       // Navegadores pedem isso sozinhos em toda navegação; sem essa rota, cai no
       // fallback de "404 Not Found" e loga um aviso a cada login/troca de página.
@@ -193,6 +202,24 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       if (req.method === 'GET' && (pathname === '/' || pathname === '/home' || pathname === '/home/' || pathname === '/home.html')) {
         if (fs.existsSync(HOME_HTML_FILE)) {
           const content = fs.readFileSync(HOME_HTML_FILE, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // Rota /ministerios (e variações como /ministérios): Página dedicada aos Ministérios da Comunidade Cristã Curados
+      if (req.method === 'GET' && (
+        pathname === '/ministerios' || pathname === '/ministerios/' || pathname === '/ministerios.html' ||
+        decodedPathname === '/ministerios' || decodedPathname === '/ministerios/' || decodedPathname === '/ministerios.html' ||
+        decodedPathname === '/ministérios' || decodedPathname === '/ministérios/' || decodedPathname === '/ministérios.html'
+      )) {
+        if (fs.existsSync(MINISTERIOS_HTML_FILE)) {
+          const content = fs.readFileSync(MINISTERIOS_HTML_FILE, 'utf8');
           res.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
             'X-Content-Type-Options': 'nosniff',
