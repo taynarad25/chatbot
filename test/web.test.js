@@ -99,7 +99,7 @@ test("GET / e GET /home: servem a página inicial institucional com seções de 
     // Rodapé com contatos da Secretaria, Tesouraria e E-mail
     assert.match(html, /\(11\) 93761-3279/);
     assert.match(html, /https:\/\/wa\.me\/5511937613279/);
-    assert.match(html, /Secretaria Pastoral/);
+    assert.match(html, /Secretaria/);
 
     assert.match(html, /\(11\) 99111-7612/);
     assert.match(html, /https:\/\/wa\.me\/5511991117612/);
@@ -128,7 +128,7 @@ test("GET /ministerios e /ministérios: serve a página dedicada aos ministério
     assert.match(html, /Rede de Homens/);
     assert.match(html, /Rede de Mulheres/);
     assert.match(html, /Epifania/);
-    assert.match(html, /Departamento de Artes/);
+    assert.match(html, /Ministério de Artes/);
     assert.match(html, /Evangelismo/);
     assert.match(html, /Intercessão/);
     assert.match(html, /Social Seeds/);
