@@ -1,6 +1,7 @@
 node_modules
 .wwebjs_auth
 .wwebjs_cache
+temp
 .git
 *.log
 credenciais-google.json

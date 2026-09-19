@@ -1,4 +1,6 @@
+const fs = require("fs");
 const db = require("../db");
+const { carregarMidiaDeDisco } = require("./mediaStorage");
 let MessageMedia;
 try {
   MessageMedia = require("whatsapp-web.js").MessageMedia;
@@ -172,20 +174,45 @@ async function executarBroadcast({
       continue;
     }
 
+    let enviadoComSucesso = false;
     try {
       if (mediaObj && client && typeof client.sendMessage === "function") {
         const options = texto ? { caption: texto } : {};
+        console.log(`[Broadcast] (${i + 1}/${total}) Enviando mídia (${mediaObj.mimetype || "sem mimetype"}) para ${dest.nome} (${mascararTelefone(dest.telefone)})...`);
         await client.sendMessage(jid, mediaObj, options);
       } else if (texto && client && typeof client.sendMessage === "function") {
+        console.log(`[Broadcast] (${i + 1}/${total}) Enviando texto para ${dest.nome} (${mascararTelefone(dest.telefone)})...`);
         await client.sendMessage(jid, texto);
       }
 
       enviados++;
+      enviadoComSucesso = true;
       destinatariosEnviados.push(dest);
-      console.log(`[Broadcast] (${i + 1}/${total}) Enviado com sucesso para ${dest.nome} (${mascararTelefone(dest.telefone)})`);
+      console.log(`[Broadcast] (${i + 1}/${total}) ✅ Enviado com sucesso para ${dest.nome} (${mascararTelefone(dest.telefone)})`);
     } catch (sendErr) {
-      falhas++;
-      console.error(`[Broadcast] Falha ao enviar para ${dest.nome} (${mascararTelefone(dest.telefone)}):`, sendErr.message);
+      console.error(`[Broadcast] ❌ Falha ao enviar para ${dest.nome} (${mascararTelefone(dest.telefone)}):`, sendErr.message);
+      if (sendErr.stack) {
+        console.error(`[Broadcast] Detalhes do erro:`, sendErr.stack);
+      }
+
+      // Tentativa de fallback: se falhou o envio com objeto em memória e temos arquivo salvo em disco
+      if (mediaObj && media?.caminhoArquivo && fs.existsSync(media.caminhoArquivo) && client && typeof client.sendMessage === "function") {
+        try {
+          console.log(`[Broadcast] Tentando fallback enviando mídia do arquivo em disco: ${media.caminhoArquivo}...`);
+          const mediaDoDisco = carregarMidiaDeDisco(media.caminhoArquivo);
+          await client.sendMessage(jid, mediaDoDisco, texto ? { caption: texto } : {});
+          enviados++;
+          enviadoComSucesso = true;
+          destinatariosEnviados.push(dest);
+          console.log(`[Broadcast] ✅ Sucesso no envio via fallback de disco para ${dest.nome}!`);
+        } catch (fallbackErr) {
+          console.error(`[Broadcast] ❌ Fallback via disco também falhou para ${dest.nome}:`, fallbackErr.message);
+        }
+      }
+
+      if (!enviadoComSucesso) {
+        falhas++;
+      }
     }
 
     // Intervalo de segurança (delay) entre envios para evitar bloqueios do WhatsApp

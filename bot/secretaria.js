@@ -1,4 +1,6 @@
+const fs = require("fs");
 const db = require("../db");
+const { carregarMidiaDeDisco } = require("./mediaStorage");
 let MessageMedia;
 try {
   MessageMedia = require("whatsapp-web.js").MessageMedia;
@@ -257,8 +259,22 @@ async function notificarMultimidia(client, mensagem, midiaAnexa = null) {
           try {
             await client.sendMessage(cachedJid, mediaParaEnviar, { caption: mensagem });
           } catch (mErr) {
-            console.warn(`[Multimídia] Falha ao enviar mídia anexa pelo JID ${cachedJid}, enviando texto:`, mErr.message);
-            await client.sendMessage(cachedJid, mensagem + "\n\n⚠️ _Nota: Não foi possível anexar o arquivo de mídia diretamente._");
+            console.warn(`[Multimídia] Falha ao enviar mídia anexa pelo JID ${cachedJid}:`, mErr.message);
+            let enviouDisco = false;
+            if (midiaAnexa?.caminhoArquivo && fs.existsSync(midiaAnexa.caminhoArquivo)) {
+              try {
+                console.log(`[Multimídia] Tentando envio de mídia direto do disco: ${midiaAnexa.caminhoArquivo}`);
+                const mediaDisco = carregarMidiaDeDisco(midiaAnexa.caminhoArquivo);
+                await client.sendMessage(cachedJid, mediaDisco, { caption: mensagem });
+                enviouDisco = true;
+                console.log(`[Multimídia] ✅ Mídia enviada com sucesso via fallback de disco.`);
+              } catch (dErr) {
+                console.warn(`[Multimídia] Falha também no envio via disco:`, dErr.message);
+              }
+            }
+            if (!enviouDisco) {
+              await client.sendMessage(cachedJid, mensagem + "\n\n⚠️ _Nota: Não foi possível anexar o arquivo de mídia diretamente._");
+            }
           }
         } else {
           await client.sendMessage(cachedJid, mensagem);

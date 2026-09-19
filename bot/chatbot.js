@@ -15,6 +15,7 @@ const { google } = require("googleapis");
 const { createMessageHandler } = require("./messageHandler");
 const { telefonesLideres, loadLideres, listLideres } = require("../web/lideres");
 const { notificarAlerta, extrairAlerta } = require("./alertas");
+const { garantirDiretorioTemp, limparMidiasAntigas } = require("./mediaStorage");
 const db = require("../db");
 
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
@@ -184,6 +185,10 @@ let isGeneratingQr = false;
 let isCanceling = false;
 
 function criarClient() {
+  // Garante que a pasta temporária de mídias existe e tem permissão de escrita
+  garantirDiretorioTemp();
+  limparMidiasAntigas();
+
   const puppeteerOpts = {
     headless: true,
     timeout: 60000, // Aumenta o tempo limite para abrir o Chrome na VM
@@ -201,11 +206,29 @@ function criarClient() {
     puppeteerOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   }
 
-  client = new Client({
+  const clientOptions = {
     authStrategy: new LocalAuth({ clientId, dataPath: path.join(ROOT_DIR, ".wwebjs_auth") }),
     authTimeoutMs: 60000, // Aumenta tempo de espera da autenticação
     puppeteer: puppeteerOpts
-  });
+  };
+
+  // Suporte a cache de versão do WhatsApp Web para estabilidade de downloadMedia
+  if (process.env.WWEB_VERSION_REMOTE_PATH) {
+    clientOptions.webVersionCache = {
+      type: 'remote',
+      remotePath: process.env.WWEB_VERSION_REMOTE_PATH,
+      strict: true,
+    };
+    console.log(`[Config] webVersionCache remoto configurado: ${process.env.WWEB_VERSION_REMOTE_PATH}`);
+  } else if (process.env.WWEB_CACHE_TYPE === 'local' || process.env.WWEB_VERSION) {
+    clientOptions.webVersionCache = {
+      type: 'local',
+      path: path.join(ROOT_DIR, '.wwebjs_cache'),
+    };
+    console.log(`[Config] webVersionCache local configurado em .wwebjs_cache`);
+  }
+
+  client = new Client(clientOptions);
 
   client.on("qr", async (qr) => {
     console.log("✅ QR Code gerado com sucesso.");
@@ -224,6 +247,13 @@ function criarClient() {
     isGeneratingQr = false;
     saveBotState(true); // Salva como ativo apenas quando a conexão é confirmada
     console.log("✅ Bot conectado!");
+
+    try {
+      const waVersion = await client.getWWebVersion();
+      console.log(`[WhatsApp] Versão do WhatsApp Web ativa no navegador: ${waVersion}`);
+    } catch (errVer) {
+      console.warn(`[WhatsApp] Não foi possível consultar a versão do WhatsApp Web: ${errVer.message}`);
+    }
 
     try {
       const inviteSec = "KsHKE5q5BiI81KvJ1ARdUp";

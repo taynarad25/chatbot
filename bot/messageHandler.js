@@ -31,6 +31,7 @@ const {
 } = require("./redes");
 const { notificarSecretaria, notificarPastoral, notificarMultimidia, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { executarBroadcast, BROADCAST_CONFIG } = require("./broadcast");
+const { baixarMidiaComRetry } = require("./mediaStorage");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
 const { registrarAgendamentoPastoral } = require("./lembretes");
@@ -822,14 +823,17 @@ function createMessageHandler({
               return;
             }
 
-            // Captura de mídia (imagem/foto) se houver
+            // Captura de mídia (imagem/foto/documento) com retries inteligentes e persistência em disco
             let media = null;
-            if (msg.hasMedia && typeof msg.downloadMedia === "function") {
-              try {
-                media = await comRetry(() => msg.downloadMedia());
-              } catch (errMedia) {
-                console.error(`[Broadcast] Falha ao baixar mídia da mensagem:`, errMedia.message);
-              }
+            const temMidia = Boolean(msg.hasMedia || msg.type === "image" || msg.type === "document" || msg.type === "video");
+            if (temMidia || typeof msg.downloadMedia === "function") {
+              media = await baixarMidiaComRetry(msg, {
+                client,
+                contexto: "Broadcast",
+                tentativas: 5,
+                esperaMs: 2000,
+                salvarEmDisco: true,
+              });
             }
 
             const textoBroadcast = (msg.caption || msg.body || "").trim();
@@ -3291,19 +3295,18 @@ Escolha uma opção:
           if (info.etapa === "artes_foto") {
             const temMidia = Boolean(msg.hasMedia || msg.type === "image" || msg.type === "document");
             if (temMidia) {
-              try {
-                const media = await comRetry(async () => {
-                  const m = await msg.downloadMedia();
-                  if (!m || !m.data) {
-                    throw new Error("Dados da mídia ainda não carregados ou vazios");
-                  }
-                  return m;
-                }, { tentativas: 5, esperaMs: 2500 });
+              const media = await baixarMidiaComRetry(msg, {
+                client,
+                contexto: "Artes",
+                tentativas: 5,
+                esperaMs: 2000,
+                salvarEmDisco: true,
+              });
+              if (media && media.data) {
                 info.midiaAnexa = media;
                 info.etapa = "artes_prazo";
                 return msg.reply("📷 ✅ *Imagem recebida com sucesso!*\n\n⏳ Para qual *data máxima* você precisa desse material pronto? (Ex: 22/08)");
-              } catch (errMedia) {
-                console.error("[Artes] Erro ao baixar mídia:", errMedia);
+              } else {
                 return msg.reply("❌ Não foi possível carregar a imagem enviada. Por favor, tente enviar a imagem novamente ou responda com *NÃO* para continuar sem imagem.");
               }
             } else if ((msg.body || "").trim().toLowerCase() === "não" || (msg.body || "").trim().toLowerCase() === "nao") {
