@@ -97,26 +97,20 @@ test("Área Pastoral: somente usuário com cargo 'pastor' visualiza menu pastora
     ],
   });
 
-  // Pastor recebe Área Pastoral no menu
+  // Pastor recebe Área Pastoral no menu (agora 7️⃣ unificado)
   const [menuPastor] = await harness.enviar(NUMERO_PASTOR, "Olá");
-  assert.match(menuPastor, /8️⃣ Área Pastoral/);
+  assert.match(menuPastor, /7️⃣ Área Pastoral/);
 
   // Líder comum NÃO recebe Área Pastoral no menu
   const [menuLider] = await harness.enviar(NUMERO_LIDER_COMUM, "Olá");
-  assert.doesNotMatch(menuLider, /8️⃣ Área Pastoral/);
+  assert.doesNotMatch(menuLider, /Área Pastoral/);
 
-  // Pastor acessa opção 8 com sucesso
-  const [resp8Pastor] = await harness.enviar(NUMERO_PASTOR, "8");
+  // Pastor acessa opção 7 com sucesso
+  const [resp8Pastor] = await harness.enviar(NUMERO_PASTOR, "7");
   assert.match(resp8Pastor, /Graça e Paz, Pastor\(a\)!/);
-  assert.match(resp8Pastor, /1️⃣ Ver agenda completa da igreja/);
-  assert.match(resp8Pastor, /2️⃣ Atendimento pastoral \(agendar, alterar ou desmarcar\)/);
-  assert.match(resp8Pastor, /3️⃣ Agendar, alterar ou cancelar evento/);
-  assert.match(resp8Pastor, /4️⃣ Solicitar aviso \/ comunicado no culto/);
-  assert.match(resp8Pastor, /5️⃣ Solicitar artes e flyers/);
-  assert.match(resp8Pastor, /6️⃣ Agendar, alterar ou desmarcar reunião/);
-  assert.match(resp8Pastor, /7️⃣ Consultar disponibilidade de dias e horários/);
-  assert.match(resp8Pastor, /8️⃣ Consultar orientações de atendimento pastoral/);
-  assert.match(resp8Pastor, /9️⃣ Agendar evento externo/);
+  assert.match(resp8Pastor, /1️⃣ 📅 \*Agenda, Eventos e Reuniões\*/);
+  assert.match(resp8Pastor, /2️⃣ 🤝 \*Atendimento Pastoral\*/);
+  assert.match(resp8Pastor, /3️⃣ 📢 \*Comunicação e Mídia\*/);
 
   // Líder comum tenta opção 8 e não acessa
   const [resp8Lider] = await harness.enviar(NUMERO_LIDER_COMUM, "8");
@@ -138,9 +132,9 @@ test("Área Pastoral: pastor adiciona atendimento pastoral diretamente no Google
   // 2. Escolhe opção 2 (Atendimento pastoral -> abre submenu)
   const [rSubmenu] = await harness.enviar(NUMERO_PASTOR, "2");
   assert.match(rSubmenu, /Atendimento Pastoral/);
-  assert.match(rSubmenu, /1 - Agendar novo atendimento/);
-  assert.match(rSubmenu, /2 - Alterar atendimento existente/);
-  assert.match(rSubmenu, /3 - Desmarcar atendimento existente/);
+  assert.match(rSubmenu, /1️⃣ Agendar novo atendimento pastoral/);
+  assert.match(rSubmenu, /2️⃣ Alterar atendimento existente/);
+  assert.match(rSubmenu, /3️⃣ Desmarcar atendimento existente/);
 
   // 3. Escolhe 1 (Agendar novo atendimento)
   const [r1] = await harness.enviar(NUMERO_PASTOR, "1");
@@ -207,7 +201,8 @@ test("Área Pastoral: pastor consulta agenda completa da igreja incluindo agenda
   // 1. Entra na área pastoral
   await harness.enviar(NUMERO_PASTOR, "8");
 
-  // 2. Escolhe opção 1 (Ver agenda completa)
+  // 2. Escolhe submenu 1 (Agenda, Eventos e Reuniões) e opção 1 (Ver agenda completa)
+  await harness.enviar(NUMERO_PASTOR, "1");
   const [r1] = await harness.enviar(NUMERO_PASTOR, "1");
   assert.match(r1, /Ver Agenda Completa/);
 
@@ -336,18 +331,20 @@ test("Área Pastoral: pastor acessa ferramentas de liderança (eventos e reuniõ
     ],
   });
 
-  // 1. Acessa menu de eventos diretamente da Área Pastoral (opção 3)
+  // 1. Acessa menu de eventos a partir da Área Pastoral
   await harness.enviar(NUMERO_PASTOR, "8");
-  const [rEventos] = await harness.enviar(NUMERO_PASTOR, "3");
-  assert.match(rEventos, /Menu de Eventos/);
+  await harness.enviar(NUMERO_PASTOR, "1");
+  const [rEventos] = await harness.enviar(NUMERO_PASTOR, "2");
+  assert.match(rEventos, /Eventos da Igreja|Menu de Eventos/);
   assert.match(rEventos, /1 - Agendar novo evento/);
 
   // Volta ao menu principal
   await harness.enviar(NUMERO_PASTOR, "menu");
 
-  // 2. Acessa menu de reuniões diretamente da Área Pastoral (opção 6)
+  // 2. Acessa menu de reuniões a partir da Área Pastoral
   await harness.enviar(NUMERO_PASTOR, "8");
-  const [rReunioes] = await harness.enviar(NUMERO_PASTOR, "6");
+  await harness.enviar(NUMERO_PASTOR, "1");
+  const [rReunioes] = await harness.enviar(NUMERO_PASTOR, "3");
   assert.match(rReunioes, /Reuniões/);
   assert.match(rReunioes, /1 - Agendar reunião/);
 });

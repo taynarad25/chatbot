@@ -292,7 +292,7 @@ test("Pastor com cargo adicional 'lider' recebe lembretes ministeriais, mas não
   });
 
   assert.equal(respostas.length, 1);
-  assert.match(respostas[0], /8️⃣ Área Pastoral/);
+  assert.match(respostas[0], /7️⃣ Área Pastoral/);
   assert.doesNotMatch(respostas[0], /7️⃣ Área do Líder/, "Pastor com função líder não deve ver o menu líder");
 });
 
@@ -330,9 +330,9 @@ test("Diretor com cargo adicional 'lider' recebe lembretes, mas só vê opção 
   });
 
   assert.equal(respostas.length, 1);
-  assert.match(respostas[0], /9️⃣ Área da Direção/);
+  assert.match(respostas[0], /7️⃣ Área da Direção/);
   assert.doesNotMatch(respostas[0], /7️⃣ Área do Líder/, "Diretor com função líder não deve ver o menu líder");
-  assert.doesNotMatch(respostas[0], /8️⃣ Área Pastoral/);
+  assert.doesNotMatch(respostas[0], /7️⃣ Área Pastoral/);
 });
 
 test("Líder de múltiplos departamentos recebe avisos de eventos de qualquer um de seus departamentos", async () => {

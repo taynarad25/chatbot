@@ -42,7 +42,7 @@ function resetDeduplicacao() {
 
 async function notificarAlerta(client, categoria, mensagem, { agora, janelaMs } = {}) {
   if (!podeEnviar(categoria, agora, janelaMs)) return false;
-  if (!client) return false;
+  if (!client || typeof client.getChats !== "function" || !client.pupBrowser || !client.pupPage) return false;
 
   try {
     const chats = await client.getChats();

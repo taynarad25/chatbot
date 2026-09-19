@@ -282,8 +282,9 @@ test("Regra de visibilidade: eventos de Uso do Salão NÃO aparecem na agenda de
   // Uso do Salão NÃO PODE aparecer na agenda oficial para membros!
   assert.doesNotMatch(msgMembro, /Uso do Salão/);
 
-  // 2. Pastor consulta a agenda completa/total (Área Pastoral -> opção 1 -> mês 10)
+  // 2. Pastor consulta a agenda completa/total (Área Pastoral -> Subgrupo 1 Agenda -> Opção 1 Ver Eventos -> mês 10)
   await harness.enviar(NUMERO_PASTOR, "8");
+  await harness.enviar(NUMERO_PASTOR, "1");
   await harness.enviar(NUMERO_PASTOR, "1");
   const [rPastor1, rPastor2] = await harness.enviar(NUMERO_PASTOR, "10");
   const msgPastor = rPastor2 || rPastor1;

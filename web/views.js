@@ -866,6 +866,7 @@ function renderIndexHtml() {
         <button class="primary" id="requestQr" style="display:none">Solicitar QR Code</button>
         <button id="cancelQr" style="display:none">Cancelar QR Code</button>
         <button class="danger" id="disconnect" style="display:none">Desconectar WhatsApp</button>
+        <button id="resetSession" style="display:none; background: rgba(234, 88, 12, 0.25); color: #fdba74; border: 1px solid rgba(234, 88, 12, 0.5);">Resetar Conexão / Limpar Cache</button>
       </div>
     </div>
 
@@ -993,6 +994,8 @@ function renderIndexHtml() {
       document.getElementById('disconnect').style.display = json.connected ? 'inline-block' : 'none';
       document.getElementById('cancelQr').style.display = isWorking && !json.connected ? 'inline-block' : 'none';
       document.getElementById('requestQr').style.display = !json.connected && !isWorking ? 'inline-block' : 'none';
+      const resetBtn = document.getElementById('resetSession');
+      if (resetBtn) resetBtn.style.display = !json.connected && !isWorking ? 'inline-block' : 'none';
 
       if (isAdmin) {
         fetch('/secretaria/api/logs')
@@ -1338,6 +1341,15 @@ function renderIndexHtml() {
         fetch('/secretaria/disconnect', {method:'POST'}).then(refresh);
       }
     };
+    const resetBtnEl = document.getElementById('resetSession');
+    if (resetBtnEl) {
+      resetBtnEl.onclick = () => {
+        if(confirm('Deseja limpar todos os dados da sessão antiga e gerar um QR Code 100% limpo?')) {
+          console.log('Botão: Resetar Conexão');
+          fetch('/secretaria/reset-session', {method:'POST'}).then(refresh);
+        }
+      };
+    }
     document.getElementById('logout').onclick = () => {
       console.log('Encerrando sessão...');
       fetch('/secretaria/logout', {method:'POST'}).then(() => window.location.href='/secretaria/login');

@@ -84,6 +84,20 @@ console.warn = (...args) => logger(originalWarn, ...args);
 
 // Captura de erros que fariam o processo morrer sem logar
 process.on('unhandledRejection', (reason, promise) => {
+  const isTargetClose =
+    reason?.name === 'TargetCloseError' ||
+    (typeof reason?.message === 'string' && (
+      reason.message.includes('Target closed') ||
+      reason.message.includes('Session closed') ||
+      reason.message.includes('Protocol error') ||
+      reason.message.includes('Execution context was destroyed')
+    ));
+
+  if (isTargetClose) {
+    console.warn('[Puppeteer] Sessão do navegador finalizada durante operação assíncrona.');
+    return;
+  }
+
   console.error('[ALERTA:fatal] Rejeição de promessa não tratada em:', promise, 'motivo:', reason);
 });
 
@@ -184,6 +198,41 @@ let clientId = "bot";
 let isGeneratingQr = false;
 let isCanceling = false;
 
+function limparTravasChromium(id = clientId) {
+  const sessionDir = path.join(ROOT_DIR, ".wwebjs_auth", `session-${id}`);
+  const profileDir = path.join(sessionDir, "Default");
+  const locks = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
+
+  [sessionDir, profileDir].forEach(dir => {
+    try {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir);
+      files.forEach(file => {
+        if (locks.some(lock => file.includes(lock))) {
+          const lockPath = path.join(dir, file);
+          try {
+            fs.unlinkSync(lockPath);
+            console.log(`[Browser] 🔓 Trava residual removida: ${lockPath}`);
+          } catch (e) {}
+        }
+      });
+    } catch (err) {}
+  });
+}
+
+function limparSessaoResidual(id = clientId) {
+  const sessionDir = path.join(ROOT_DIR, ".wwebjs_auth", `session-${id}`);
+  try {
+    if (fs.existsSync(sessionDir)) {
+      console.log(`[Browser] 🧹 Limpando dados da sessão residual em ${sessionDir}...`);
+      fs.rmSync(sessionDir, { recursive: true, force: true, maxRetries: 5 });
+      console.log(`[Browser] ✨ Sessão residual limpa com sucesso.`);
+    }
+  } catch (err) {
+    console.warn(`[Browser] Aviso ao limpar sessão residual: ${err.message}`);
+  }
+}
+
 function criarClient() {
   // Garante que a pasta temporária de mídias existe e tem permissão de escrita
   garantirDiretorioTemp();
@@ -204,12 +253,15 @@ function criarClient() {
 
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     puppeteerOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  } else if (fs.existsSync('/usr/bin/chromium')) {
+    puppeteerOpts.executablePath = '/usr/bin/chromium';
   }
 
   const clientOptions = {
     authStrategy: new LocalAuth({ clientId, dataPath: path.join(ROOT_DIR, ".wwebjs_auth") }),
     authTimeoutMs: 60000, // Aumenta tempo de espera da autenticação
-    puppeteer: puppeteerOpts
+    puppeteer: puppeteerOpts,
+    userAgent: process.env.WHATSAPP_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   };
 
   // Suporte a cache de versão do WhatsApp Web para estabilidade de downloadMedia
@@ -329,13 +381,25 @@ function criarClient() {
     saveBotState(false); // Se a sessão no cache falhou, paramos o bot para evitar loops
   });
 
-  client.on("disconnected", (reason) => {
+  client.on("disconnected", async (reason) => {
     clientReady = false;
     pendingQr = null;
     isGeneratingQr = false;
     isInitializing = false;
     saveBotState(false); // Salva como inativo ao desconectar
     console.warn(`[WhatsApp] Cliente desconectado. Motivo: ${reason}`);
+
+    const oldClient = client;
+    client = null;
+    if (oldClient) {
+      try {
+        await oldClient.destroy();
+      } catch (errDestroy) {}
+    }
+
+    if (reason === "LOGOUT") {
+      limparSessaoResidual(clientId);
+    }
   });
 
   const handleMessage = createMessageHandler({
@@ -375,10 +439,19 @@ const loadBotState = () => {
   }
 };
 
-async function startClient() {
+async function startClient(options = {}) {
   if (clientReady || isInitializing) return;
   console.log("🚀 Iniciando processo de inicialização do cliente...");
   console.time("client_init");
+
+  // Se já havia uma referência ativa de client desconectada ou quebrada, destrói antes
+  if (client) {
+    try {
+      console.log("[Browser] Encerrando cliente anterior antes de reiniciar...");
+      await client.destroy();
+    } catch (e) {}
+    client = null;
+  }
 
   // Força o encerramento de processos zumbis do Chromium antes de iniciar.
   // Caminho absoluto (não "pkill" solto) para não depender da resolução via
@@ -393,32 +466,11 @@ async function startClient() {
 
   // Remove o arquivo SingletonLock do Chromium se ele existir. 
   // Isso previne o erro "Code 21" (Profile in use) comum em ambientes Docker/PM2.
-  const sessionDir = path.join(ROOT_DIR, ".wwebjs_auth", `session-${clientId}`);
-  const profileDir = path.join(sessionDir, "Default");
-  const locks = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
+  limparTravasChromium(clientId);
 
-  [sessionDir, profileDir].forEach(dir => {
-    try {
-      if (!fs.existsSync(dir)) return;
-      const files = fs.readdirSync(dir);
-      files.forEach(file => {
-        // Verifica se o arquivo contém as palavras-chave de trava do Chromium
-        if (locks.some(lock => file.includes(lock))) {
-          const lockPath = path.join(dir, file);
-          try {
-            // No Linux, SingletonLock é um link simbólico. fs.existsSync falha se o link estiver "quebrado".
-            // Tentamos a remoção direta para garantir que limpe mesmo links órfãos de sessões anteriores.
-            fs.unlinkSync(lockPath);
-            console.log(`[Browser] 🔓 Trava residual removida com sucesso: ${lockPath}`);
-          } catch (e) {
-            // Ignora se o arquivo sumiu entre o readdir e o unlink
-          }
-        }
-      });
-    } catch (err) {
-      // Falha silenciosa se não conseguir ler o diretório (ex: pasta Default ainda não criada)
-    }
-  });
+  if (options.forceClean) {
+    limparSessaoResidual(clientId);
+  }
 
   isInitializing = true;
   isGeneratingQr = true;
@@ -481,36 +533,53 @@ async function disconnectClient(shouldLogout = true) {
   const action = shouldLogout ? "logout (desparear)" : "fechamento (manter sessão)";
   console.log(`🔌 Iniciando processo de desconexão: ${action}...`);
 
-  if (!client) {
+  const currentClient = client;
+  client = null;
+  clientReady = false;
+  isInitializing = false;
+  isGeneratingQr = false;
+  pendingQr = null;
+
+  if (shouldLogout) {
+    saveBotState(false);
+  }
+
+  if (!currentClient) {
     console.warn("⚠️ Tentativa de desconexão ignorada: Nenhum cliente ativo.");
-    // Garante que o status seja resetado mesmo se o objeto client não existir
-    clientReady = false;
-    isInitializing = false;
-    isGeneratingQr = false;
-    pendingQr = null;
-    return { ok: false, message: "Não há cliente ativo para desconectar." };
+    if (shouldLogout) {
+      limparSessaoResidual(clientId);
+    }
+    return { ok: true, message: "Nenhum cliente ativo estava rodando. Sessão limpa com sucesso." };
   }
 
   try {
-    if (shouldLogout && typeof client.logout === "function") {
-      await client.logout();
-    } else if (typeof client.destroy === "function") {
-      await client.destroy();
+    if (shouldLogout && typeof currentClient.logout === "function") {
+      try {
+        await currentClient.logout();
+      } catch (errLogout) {
+        console.warn("⚠️ Erro ao executar logout do cliente:", errLogout.message);
+      }
+    }
+    if (typeof currentClient.destroy === "function") {
+      try {
+        await currentClient.destroy();
+      } catch (errDestroy) {
+        console.warn("⚠️ Erro ao destruir cliente:", errDestroy.message);
+      }
+    }
+    if (shouldLogout) {
+      limparSessaoResidual(clientId);
     }
     console.log(`✅ WhatsApp desconectado via ${action}.`);
     return { ok: true, message: "WhatsApp desconectado com sucesso." };
   } catch (err) {
     console.error("❌ Erro ao desconectar WhatsApp:", err);
+    if (shouldLogout) {
+      limparSessaoResidual(clientId);
+    }
     return { ok: true, message: "WhatsApp desconectado (com aviso de erro no processo)." };
   } finally {
     client = null;
-    // Só marca o bot como "deve ficar parado" em logout de verdade (ação explícita do
-    // admin). No fechamento gracioso (shouldLogout=false, usado no SIGTERM/SIGINT) a
-    // sessão do WhatsApp continua válida, então o estado persistido é preservado para
-    // que o próximo boot reconecte sozinho sem exigir um novo QR Code.
-    if (shouldLogout) {
-      saveBotState(false);
-    }
     clientReady = false;
     isInitializing = false;
     isGeneratingQr = false;

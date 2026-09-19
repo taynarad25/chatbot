@@ -290,14 +290,14 @@ test("Simulação Bot: usuário com múltiplos cargos ('lider', 'pastor') recebe
 
   // 1. Saudação / Menu: Pastor tem Área Pastoral com todas as opções de liderança integradas (sem menus separados duplicados)
   const [menu] = await bot.enviarMsg(NUMERO, "Olá");
-  assert.match(menu, /8️⃣ Área Pastoral/, "Deveria exibir Área Pastoral para quem tem cargo pastor");
+  assert.match(menu, /7️⃣ Área Pastoral/, "Deveria exibir Área Pastoral para quem tem cargo pastor");
   assert.doesNotMatch(menu, /7️⃣ Área do Líder/, "Não deve exibir Área do Líder duplicada para quem já é pastor");
 
-  // 2. Acesso à Área Pastoral (comando 8) contém todas as opções de liderança
+  // 2. Acesso à Área Pastoral (comando 8 ou 7) contém os subgrupos integrados
   const [respPastoral] = await bot.enviarMsg(NUMERO, "8");
   assert.match(respPastoral, /⛪ \*Área Pastoral\*/, "Usuário com cargo pastor deve conseguir acessar a Área Pastoral");
-  assert.match(respPastoral, /Agendar, alterar ou cancelar evento/);
-  assert.match(respPastoral, /Agendar, alterar ou desmarcar reunião/);
+  assert.match(respPastoral, /Agenda, Eventos e Reuniões/);
+  assert.match(respPastoral, /Atendimento Pastoral/);
 });
 
 test("Simulação Bot: usuário com apenas 'lider' acessa opção 7 mas não opção 8", async () => {
@@ -370,11 +370,11 @@ test("Simulação Bot: usuário com cargo 'diretor' recebe e acessa Área da Dir
   const NUMERO = "5511977770004@c.us";
 
   const [menu] = await bot.enviarMsg(NUMERO, "olá");
-  assert.match(menu, /9️⃣ Área da Direção/);
+  assert.match(menu, /7️⃣ Área da Direção/);
 
   const [resp9] = await bot.enviarMsg(NUMERO, "9");
   assert.match(resp9, /📋 \*Área da Direção\*/);
-  assert.match(resp9, /1️⃣ Ver todos os eventos da igreja/);
+  assert.match(resp9, /Agenda, Eventos e Reuniões/);
 });
 
 test("Simulação Bot: diretor consulta 'Ver todos os eventos da igreja' e visualiza agendas internas", async () => {
@@ -410,9 +410,11 @@ test("Simulação Bot: diretor consulta 'Ver todos os eventos da igreja' e visua
 
   // 1. Entra na Área da Direção
   const [resp9] = await bot.enviarMsg(NUMERO, "9");
-  assert.match(resp9, /1️⃣ Ver todos os eventos da igreja/);
+  assert.match(resp9, /Agenda, Eventos e Reuniões/);
 
-  // 2. Escolhe opção 1 (Ver todos os eventos)
+  // 2. Escolhe subgrupo 1 (Agenda) e depois opção 1 (Ver todos os eventos)
+  const [subAgenda] = await bot.enviarMsg(NUMERO, "1");
+  assert.match(subAgenda, /Ver Todos os Eventos da Igreja/i);
   const [r1] = await bot.enviarMsg(NUMERO, "1");
   assert.match(r1, /Ver Todos os Eventos da Igreja/);
 

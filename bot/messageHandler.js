@@ -440,6 +440,139 @@ async function processarRespostaEventoExterno({
   return msg.reply("❌ Etapa desconhecida. Digite *menu* para reiniciar.");
 }
 
+function montarMenuLider() {
+  return (
+    "👑 *Área do Líder*\n\n" +
+    "Escolha um subgrupo:\n\n" +
+    "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
+    "2️⃣ 📢 *Comunicação e Mídia*\n\n" +
+    "Digite *menu* para voltar ao menu principal."
+  );
+}
+
+function montarSubmenuLiderAgenda() {
+  return (
+    "📅 *Agenda, Eventos e Reuniões*\n\n" +
+    "Escolha o que deseja fazer:\n\n" +
+    "1️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
+    "2️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar reunião)\n" +
+    "3️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
+    "4️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n\n" +
+    "Digite o número da opção desejada.\n" +
+    "Digite *voltar* para o menu anterior ou *menu* para o início."
+  );
+}
+
+function montarSubmenuLiderComunicacao() {
+  return (
+    "📢 *Comunicação e Mídia*\n\n" +
+    "Escolha o que deseja fazer:\n\n" +
+    "1️⃣ 📢 *Aviso / Comunicado no Culto*\n" +
+    "2️⃣ 🎨 *Artes e Flyers*\n\n" +
+    "Digite o número da opção desejada.\n" +
+    "Digite *voltar* para o menu anterior ou *menu* para o início."
+  );
+}
+
+function montarMenuPastoral() {
+  return (
+    "⛪ *Área Pastoral*\n" +
+    "Graça e Paz, Pastor(a)!\n\n" +
+    "Escolha um subgrupo:\n\n" +
+    "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
+    "2️⃣ 🤝 *Atendimento Pastoral*\n" +
+    "3️⃣ 📢 *Comunicação e Mídia*\n\n" +
+    "Digite *menu* para voltar ao menu principal."
+  );
+}
+
+function montarSubmenuPastoralAgenda() {
+  return (
+    "📅 *Agenda, Eventos e Reuniões (Pastoral)*\n\n" +
+    "Escolha o que deseja fazer:\n\n" +
+    "1️⃣ 📖 *Ver Agenda Completa da Igreja*\n" +
+    "2️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
+    "3️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar)\n" +
+    "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
+    "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n\n" +
+    "Digite o número da opção desejada.\n" +
+    "Digite *voltar* para o menu pastoral ou *menu* para o início."
+  );
+}
+
+function montarSubmenuPastoralAtendimento() {
+  return (
+    "🤝 *Atendimento Pastoral*\n\n" +
+    "Escolha o que deseja fazer:\n\n" +
+    "1️⃣ Agendar novo atendimento pastoral\n" +
+    "2️⃣ Alterar atendimento existente\n" +
+    "3️⃣ Desmarcar atendimento existente\n" +
+    "4️⃣ Consultar orientações pastorais\n\n" +
+    "Digite o número da opção desejada.\n" +
+    "Digite *voltar* para o menu pastoral ou *menu* para o início."
+  );
+}
+
+function montarSubmenuPastoralComunicacao() {
+  return (
+    "📢 *Comunicação e Mídia*\n\n" +
+    "Escolha o que deseja fazer:\n\n" +
+    "1️⃣ 📢 *Aviso / Comunicado no Culto*\n" +
+    "2️⃣ 🎨 *Artes e Flyers*\n\n" +
+    "Digite o número da opção desejada.\n" +
+    "Digite *voltar* para o menu pastoral ou *menu* para o início."
+  );
+}
+
+function montarMenuDiretor() {
+  return (
+    "📋 *Área da Direção*\n\n" +
+    "Escolha um subgrupo:\n\n" +
+    "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
+    "2️⃣ 📢 *Comunicação e Mídia*\n\n" +
+    "Digite *menu* para voltar ao menu principal."
+  );
+}
+
+function montarSubmenuDiretorAgenda() {
+  return (
+    "📅 *Agenda, Eventos e Reuniões (Direção)*\n\n" +
+    "Escolha o que deseja fazer:\n\n" +
+    "1️⃣ 📖 *Ver Todos os Eventos da Igreja* (Agenda completa)\n" +
+    "2️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
+    "3️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar)\n" +
+    "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
+    "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n\n" +
+    "Digite o número da opção desejada.\n" +
+    "Digite *voltar* para o menu da direção ou *menu* para o início."
+  );
+}
+
+function montarSubmenuDiretorComunicacao() {
+  return (
+    "📢 *Comunicação e Mídia*\n\n" +
+    "Escolha o que deseja fazer:\n\n" +
+    "1️⃣ 📢 *Aviso / Comunicado no Culto*\n" +
+    "2️⃣ 🎨 *Artes e Flyers*\n\n" +
+    "Digite o número da opção desejada.\n" +
+    "Digite *voltar* para o menu da direção ou *menu* para o início."
+  );
+}
+
+function montarMenuEventos() {
+  return (
+    "📅 *Menu de Eventos*\n\n" +
+    "Escolha o que deseja fazer:\n\n" +
+    "1 - Agendar novo evento\n" +
+    "2 - Alterar evento existente\n" +
+    "3 - Cancelar evento existente\n" +
+    "4 - Alterar ou atualizar dados do formulário do evento\n" +
+    "5 - Agendar evento externo\n" +
+    "6 - Informar uso do salão antes ou no dia anterior (montagem/decoração)\n\n" +
+    "Digite *voltar* para o menu anterior ou *menu* para o início."
+  );
+}
+
 /**
  * Monta o handler de mensagens do bot (menu principal + fluxos de conversa).
  * Todas as dependências que envolvem I/O real (WhatsApp, Google Calendar) são
@@ -1533,14 +1666,13 @@ Escolha uma opção:
           menu += `\n5️⃣ Solicitar uso do salão`;
           menu += `\n6️⃣ Falar com a secretaria`;
         } else {
-          menu += `\n5️⃣ Aulas de música`;
-          menu += `\n6️⃣ Falar com a secretaria`;
+          menu += `\n5️⃣ Falar com a secretaria`;
         }
 
         if (isPastor) {
-          menu += `\n8️⃣ Área Pastoral`;
+          menu += `\n7️⃣ Área Pastoral`;
         } else if (isDiretor) {
-          menu += `\n9️⃣ Área da Direção`;
+          menu += `\n7️⃣ Área da Direção`;
         } else if (isLider) {
           menu += `\n7️⃣ Área do Líder`;
         }
@@ -1584,6 +1716,22 @@ Escolha uma opção:
         if (info.fluxo === "agendamento") {
           // Lógica de agendamento (Opção 6)
           if (info.etapa === "evento_acao") {
+            const entradaAcao = msg.body.trim().toLowerCase();
+            if (entradaAcao === "voltar") {
+              if (isPastor) {
+                info.fluxo = "area_pastoral";
+                info.etapa = "pastoral_sub_agenda";
+                return msg.reply(montarSubmenuPastoralAgenda());
+              } else if (isDiretor) {
+                info.fluxo = "area_diretor";
+                info.etapa = "diretor_sub_agenda";
+                return msg.reply(montarSubmenuDiretorAgenda());
+              } else {
+                info.fluxo = "area_lider";
+                info.etapa = "lider_sub_agenda";
+                return msg.reply(montarSubmenuLiderAgenda());
+              }
+            }
             if (msg.body === "1") {
               info.etapa = "evento_nome";
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou novo agendamento.`);
@@ -1621,7 +1769,7 @@ Escolha uma opção:
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou informe de preparação/decoração de evento.`);
               return msg.reply(`🏢 De qual departamento é o evento que você precisa de horários para montagem/decoração?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else {
-              return msg.reply("❌ Opção inválida. Digite 1 para Agendar, 2 para Alterar, 3 para Cancelar, 4 para Atualizar Formulário, 5 para Evento Externo ou 6 para Informar montagem/decoração.");
+              return msg.reply("❌ Opção inválida. Digite 1 para Agendar, 2 para Alterar, 3 para Cancelar, 4 para Atualizar Formulário, 5 para Evento Externo, 6 para Informar montagem/decoração ou *voltar*.");
             }
           }
 
@@ -2615,59 +2763,181 @@ Escolha uma opção:
             }));
           }
         } else if (info.fluxo === "area_lider") {
+          const escolha = msg.body.trim().toLowerCase();
+
           if (info.etapa === "menu_lider") {
-            const escolha = msg.body.trim();
-            if (escolha === "1") {
-              info.fluxo = "agendamento";
-              info.etapa = "evento_acao";
-              return msg.reply(
-                "📅 *Menu de Eventos*\n\n" +
-                "Escolha o que deseja fazer:\n\n" +
-                "1 - Agendar novo evento\n" +
-                "2 - Alterar evento existente\n" +
-                "3 - Cancelar evento existente\n" +
-                "4 - Alterar ou atualizar dados do formulário do evento\n" +
-                "5 - Agendar evento externo\n" +
-                "6 - Informar uso do salão antes ou no dia anterior (montagem/decoração)\n\n" +
-                "Digite *menu* para voltar ao menu principal."
-              );
-            } else if (escolha === "2") {
-              info.fluxo = "comunicados";
-              info.etapa = "texto_comunicado";
-              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
-            } else if (escolha === "3") {
+            if (escolha === "voltar") {
+              return msg.reply("Você já está na Área do Líder. Digite *menu* para voltar ao menu principal.");
+            }
+            if (escolha === "1" || /agenda|evento/i.test(escolha)) {
+              info.etapa = "lider_sub_agenda";
+              return msg.reply(montarSubmenuLiderAgenda());
+            }
+            if (escolha === "2" || /comunica|m[ií]dia/i.test(escolha)) {
+              info.etapa = "lider_sub_comunicacao";
+              return msg.reply(montarSubmenuLiderComunicacao());
+            }
+
+            // Atalhos diretos preservados
+            if (escolha === "3" || /artes|flyers/i.test(escolha)) {
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
               info.redesDisponiveis = redesUsuario;
               return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
-            } else if (escolha === "4") {
+            }
+            if (escolha === "4" || /reuni[aã]o|reunioes/i.test(escolha)) {
               info.fluxo = "reunioes";
               info.etapa = "menu_reuniao";
-              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *menu* para voltar.");
-            } else if (escolha === "5") {
+              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *voltar* para o menu anterior ou *menu* para voltar ao início.");
+            }
+            if (escolha === "5" || /disponib/i.test(escolha)) {
               info.fluxo = "consulta_disponibilidade_lider";
               info.etapa = "escolha_mes";
               const agora = moment.tz("America/Sao_Paulo");
-              const mesAtual = agora.month(); // 0-indexed
-
+              const mesAtual = agora.month();
               let listaMeses = "📅 *Consulta de Disponibilidade*\n\nPara qual mês você deseja consultar?\n\n";
               for (let i = mesAtual; i < 12; i++) {
                 listaMeses += `${i + 1} - ${MESES[i]}\n`;
               }
               return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
-            } else if (escolha === "6") {
+            }
+            if (escolha === "6" || /evento\s+externo/i.test(escolha)) {
               info.fluxo = "evento_externo";
               info.etapa = "evento_externo_nome";
               return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
-            } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 6, ou digite *menu* para voltar.");
             }
+
+            return msg.reply("❌ Opção inválida. Escolha 1 para Agenda e Eventos ou 2 para Comunicação e Mídia (ou digite *menu* para voltar).");
+          }
+
+          if (info.etapa === "lider_sub_agenda") {
+            if (escolha === "voltar") {
+              info.etapa = "menu_lider";
+              return msg.reply(montarMenuLider());
+            }
+            if (escolha === "1" || /evento/i.test(escolha)) {
+              info.fluxo = "agendamento";
+              info.etapa = "evento_acao";
+              return msg.reply(montarMenuEventos());
+            }
+            if (escolha === "2" || /reuni/i.test(escolha)) {
+              info.fluxo = "reunioes";
+              info.etapa = "menu_reuniao";
+              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *voltar* para o menu anterior ou *menu* para voltar ao início.");
+            }
+            if (escolha === "3" || /disponib/i.test(escolha)) {
+              info.fluxo = "consulta_disponibilidade_lider";
+              info.etapa = "escolha_mes";
+              const agora = moment.tz("America/Sao_Paulo");
+              const mesAtual = agora.month();
+              let listaMeses = "📅 *Consulta de Disponibilidade*\n\nPara qual mês você deseja consultar?\n\n";
+              for (let i = mesAtual; i < 12; i++) {
+                listaMeses += `${i + 1} - ${MESES[i]}\n`;
+              }
+              return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
+            }
+            if (escolha === "4" || /montagem|decora/i.test(escolha)) {
+              info.fluxo = "agendamento";
+              info.etapa = "preparacao_informar_horarios";
+              info.departamento = usuario?.departamento || "Evento";
+              return msg.reply(
+                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
+                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
+                "• *Nome do evento e departamento*\n" +
+                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
+                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
+              );
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 4, digite *voltar* para o menu anterior ou *menu* para o início.");
+          }
+
+          if (info.etapa === "lider_sub_comunicacao") {
+            if (escolha === "voltar") {
+              info.etapa = "menu_lider";
+              return msg.reply(montarMenuLider());
+            }
+            if (escolha === "1" || /aviso|comunicado/i.test(escolha)) {
+              info.fluxo = "comunicados";
+              info.etapa = "texto_comunicado";
+              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
+            }
+            if (escolha === "2" || /arte|flyer/i.test(escolha)) {
+              info.fluxo = "artes_flyers";
+              info.etapa = "artes_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
+            }
+            return msg.reply("❌ Opção inválida. Escolha 1 para Aviso/Comunicado ou 2 para Artes e Flyers (ou digite *voltar*).");
           }
         } else if (info.fluxo === "area_pastoral") {
+          const escolha = msg.body.trim().toLowerCase();
+
           if (info.etapa === "menu_pastoral") {
-            const escolha = msg.body.trim();
-            if (escolha === "1") {
+            if (escolha === "voltar") {
+              return msg.reply("Você já está na Área Pastoral. Digite *menu* para voltar ao menu principal.");
+            }
+            if (escolha === "1" || /agenda|evento/i.test(escolha)) {
+              info.etapa = "pastoral_sub_agenda";
+              return msg.reply(montarSubmenuPastoralAgenda());
+            }
+            if (escolha === "2" || /atendimento|pastoral/i.test(escolha)) {
+              info.etapa = "pastoral_menu_atendimento";
+              return msg.reply(montarSubmenuPastoralAtendimento());
+            }
+            if (escolha === "3" || /comunica|m[ií]dia/i.test(escolha)) {
+              info.etapa = "pastoral_sub_comunicacao";
+              return msg.reply(montarSubmenuPastoralComunicacao());
+            }
+
+            // Atalhos diretos preservados
+            if (escolha === "4" || /aviso|comunicado/i.test(escolha)) {
+              info.fluxo = "comunicados";
+              info.etapa = "texto_comunicado";
+              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
+            }
+            if (escolha === "5" || /artes|flyers/i.test(escolha)) {
+              info.fluxo = "artes_flyers";
+              info.etapa = "artes_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
+            }
+            if (escolha === "6" || /reuni[aã]o|reunioes/i.test(escolha)) {
+              info.fluxo = "reunioes";
+              info.etapa = "menu_reuniao";
+              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *voltar* para o menu anterior ou *menu* para voltar ao início.");
+            }
+            if (escolha === "7" || /disponib/i.test(escolha)) {
+              info.fluxo = "consulta_disponibilidade_lider";
+              info.etapa = "escolha_mes";
+              const agora = moment.tz("America/Sao_Paulo");
+              const mesAtual = agora.month();
+              let listaMeses = "📅 *Consulta de Disponibilidade*\n\nPara qual mês você deseja consultar?\n\n";
+              for (let i = mesAtual; i < 12; i++) {
+                listaMeses += `${i + 1} - ${MESES[i]}\n`;
+              }
+              return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
+            }
+            if (escolha === "8" || /orienta/i.test(escolha)) {
+              return msg.reply("📋 *Atendimentos Pastorais*\n\nOs pedidos de atendimento pastoral são enviados diretamente ao grupo oficial de pastores para alinhamento e confirmação.\n\nDigite *voltar* para o menu anterior ou *menu* para o início.");
+            }
+            if (escolha === "9" || /evento\s+externo/i.test(escolha)) {
+              info.fluxo = "evento_externo";
+              info.etapa = "evento_externo_nome";
+              return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
+            }
+
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 3 (ou digite *menu* para voltar).");
+          }
+
+          if (info.etapa === "pastoral_sub_agenda") {
+            if (escolha === "voltar") {
+              info.etapa = "menu_pastoral";
+              return msg.reply(montarMenuPastoral());
+            }
+            if (escolha === "1" || /agenda\s+completa|todos/i.test(escolha)) {
               info.fluxo = "ver_agenda";
               info.agendaCompleta = true;
               info.isPastor = true;
@@ -2680,68 +2950,72 @@ Escolha uma opção:
               }
               listaMeses += "\n0 - Escolher um período específico";
               return msg.reply(listaMeses + "\n\nDigite o número do mês desejado, ou 0 para outro período:");
-            } else if (escolha === "2") {
-              info.etapa = "pastoral_menu_atendimento";
-              return msg.reply(
-                "🤝 *Atendimento Pastoral*\n\n" +
-                "O que você deseja fazer?\n\n" +
-                "1 - Agendar novo atendimento\n" +
-                "2 - Alterar atendimento existente\n" +
-                "3 - Desmarcar atendimento existente\n\n" +
-                "Digite *menu* para voltar."
-              );
-            } else if (escolha === "3") {
+            }
+            if (escolha === "2" || /evento/i.test(escolha)) {
               info.fluxo = "agendamento";
               info.etapa = "evento_acao";
-              return msg.reply(
-                "📅 *Menu de Eventos*\n\n" +
-                "Escolha o que deseja fazer:\n\n" +
-                "1 - Agendar novo evento\n" +
-                "2 - Alterar evento existente\n" +
-                "3 - Cancelar evento existente\n" +
-                "4 - Alterar ou atualizar dados do formulário do evento\n" +
-                "5 - Agendar evento externo\n" +
-                "6 - Informar uso do salão antes ou no dia anterior (montagem/decoração)\n\n" +
-                "Digite *menu* para voltar ao menu principal."
-              );
-            } else if (escolha === "4") {
-              info.fluxo = "comunicados";
-              info.etapa = "texto_comunicado";
-              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
-            } else if (escolha === "5") {
-              info.fluxo = "artes_flyers";
-              info.etapa = "artes_departamento";
-              const redesUsuario = obterRedesParaUsuario(usuario);
-              info.redesDisponiveis = redesUsuario;
-              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
-            } else if (escolha === "6") {
+              return msg.reply(montarMenuEventos());
+            }
+            if (escolha === "3" || /reuni/i.test(escolha)) {
               info.fluxo = "reunioes";
               info.etapa = "menu_reuniao";
-              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *menu* para voltar.");
-            } else if (escolha === "7") {
+              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *voltar* para o menu anterior ou *menu* para voltar ao início.");
+            }
+            if (escolha === "4" || /disponib/i.test(escolha)) {
               info.fluxo = "consulta_disponibilidade_lider";
               info.etapa = "escolha_mes";
               const agora = moment.tz("America/Sao_Paulo");
-              const mesAtual = agora.month(); // 0-indexed
-
+              const mesAtual = agora.month();
               let listaMeses = "📅 *Consulta de Disponibilidade*\n\nPara qual mês você deseja consultar?\n\n";
               for (let i = mesAtual; i < 12; i++) {
                 listaMeses += `${i + 1} - ${MESES[i]}\n`;
               }
               return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
-            } else if (escolha === "8") {
-              return msg.reply("📋 *Atendimentos Pastorais*\n\nOs pedidos de atendimento pastoral são enviados diretamente ao grupo oficial de pastores para alinhamento e confirmação.\n\nDigite *menu* para voltar ao menu principal.");
-            } else if (escolha === "9") {
-              info.fluxo = "evento_externo";
-              info.etapa = "evento_externo_nome";
-              return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
-            } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 9, ou digite *menu* para voltar.");
             }
+            if (escolha === "5" || /montagem|decora/i.test(escolha)) {
+              info.fluxo = "agendamento";
+              info.etapa = "preparacao_informar_horarios";
+              info.departamento = usuario?.departamento || "Evento";
+              return msg.reply(
+                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
+                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
+                "• *Nome do evento e departamento*\n" +
+                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
+                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
+              );
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, digite *voltar* para o menu anterior ou *menu* para o início.");
+          }
+
+          if (info.etapa === "pastoral_sub_comunicacao") {
+            if (escolha === "voltar") {
+              info.etapa = "menu_pastoral";
+              return msg.reply(montarMenuPastoral());
+            }
+            if (escolha === "1" || /aviso|comunicado/i.test(escolha)) {
+              info.fluxo = "comunicados";
+              info.etapa = "texto_comunicado";
+              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
+            }
+            if (escolha === "2" || /arte|flyer/i.test(escolha)) {
+              info.fluxo = "artes_flyers";
+              info.etapa = "artes_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
+            }
+            return msg.reply("❌ Opção inválida. Escolha 1 para Aviso/Comunicado ou 2 para Artes e Flyers (ou digite *voltar*).");
           }
 
           if (info.etapa === "pastoral_menu_atendimento") {
-            const opc = msg.body.trim();
+            const opc = msg.body.trim().toLowerCase();
+            if (opc === "voltar") {
+              info.etapa = "menu_pastoral";
+              return msg.reply(montarMenuPastoral());
+            }
+            if (opc === "4" || /orienta/i.test(opc)) {
+              return msg.reply("📋 *Atendimentos Pastorais*\n\nOs pedidos de atendimento pastoral são enviados diretamente ao grupo oficial de pastores para alinhamento e confirmação.\n\nDigite *voltar* para o menu anterior ou *menu* para o início.");
+            }
             if (opc === "1") {
               info.etapa = "pastoral_add_nome";
               return msg.reply("🤝 *Adicionar Atendimento Pastoral*\n\nQual é o nome da pessoa / discípulo a ser atendido(a)?");
@@ -3194,9 +3468,65 @@ Escolha uma opção:
             return await executarSalvarAtendimentoPastoral();
           }
         } else if (info.fluxo === "area_diretor") {
+          const escolha = msg.body.trim().toLowerCase();
+
           if (info.etapa === "menu_diretor") {
-            const escolha = msg.body.trim();
-            if (escolha === "1") {
+            if (escolha === "voltar") {
+              return msg.reply("Você já está na Área da Direção. Digite *menu* para voltar ao menu principal.");
+            }
+            if (escolha === "1" || /agenda|evento/i.test(escolha)) {
+              info.etapa = "diretor_sub_agenda";
+              return msg.reply(montarSubmenuDiretorAgenda());
+            }
+            if (escolha === "2" || /comunica|m[ií]dia/i.test(escolha)) {
+              info.etapa = "diretor_sub_comunicacao";
+              return msg.reply(montarSubmenuDiretorComunicacao());
+            }
+
+            // Atalhos diretos preservados
+            if (escolha === "3" || /aviso|comunicado/i.test(escolha)) {
+              info.fluxo = "comunicados";
+              info.etapa = "texto_comunicado";
+              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
+            }
+            if (escolha === "4" || /artes|flyers/i.test(escolha)) {
+              info.fluxo = "artes_flyers";
+              info.etapa = "artes_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
+            }
+            if (escolha === "5" || /reuni[aã]o|reunioes/i.test(escolha)) {
+              info.fluxo = "reunioes";
+              info.etapa = "menu_reuniao";
+              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *voltar* para o menu anterior ou *menu* para voltar ao início.");
+            }
+            if (escolha === "6" || /disponib/i.test(escolha)) {
+              info.fluxo = "consulta_disponibilidade_lider";
+              info.etapa = "escolha_mes";
+              const agora = moment.tz("America/Sao_Paulo");
+              const mesAtual = agora.month();
+              let listaMeses = "📅 *Consulta de Disponibilidade*\n\nPara qual mês você deseja consultar?\n\n";
+              for (let i = mesAtual; i < 12; i++) {
+                listaMeses += `${i + 1} - ${MESES[i]}\n`;
+              }
+              return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
+            }
+            if (escolha === "8" || /evento\s+externo/i.test(escolha)) {
+              info.fluxo = "evento_externo";
+              info.etapa = "evento_externo_nome";
+              return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
+            }
+
+            return msg.reply("❌ Opção inválida. Escolha 1 para Agenda e Eventos ou 2 para Comunicação e Mídia (ou digite *menu* para voltar).");
+          }
+
+          if (info.etapa === "diretor_sub_agenda") {
+            if (escolha === "voltar") {
+              info.etapa = "menu_diretor";
+              return msg.reply(montarMenuDiretor());
+            }
+            if (escolha === "1" || /todos|completa/i.test(escolha)) {
               info.fluxo = "ver_agenda";
               info.agendaCompleta = true;
               info.isPastor = isPastor;
@@ -3209,56 +3539,61 @@ Escolha uma opção:
               }
               listaMeses += "\n0 - Escolher um período específico";
               return msg.reply(listaMeses + "\n\nDigite o número do mês desejado, ou 0 para outro período:");
-            } else if (escolha === "2") {
+            }
+            if (escolha === "2" || /evento/i.test(escolha)) {
               info.fluxo = "agendamento";
               info.etapa = "evento_acao";
-              return msg.reply(
-                "📅 *Menu de Eventos*\n\n" +
-                "Escolha o que deseja fazer:\n\n" +
-                "1 - Agendar novo evento\n" +
-                "2 - Alterar evento existente\n" +
-                "3 - Cancelar evento existente\n" +
-                "4 - Alterar ou atualizar dados do formulário do evento\n" +
-                "5 - Agendar evento externo\n" +
-                "6 - Informar uso do salão antes ou no dia anterior (montagem/decoração)\n\n" +
-                "Digite *menu* para voltar ao menu principal."
-              );
-            } else if (escolha === "3") {
-              info.fluxo = "comunicados";
-              info.etapa = "texto_comunicado";
-              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
-            } else if (escolha === "4") {
-              info.fluxo = "artes_flyers";
-              info.etapa = "artes_departamento";
-              const redesUsuario = obterRedesParaUsuario(usuario);
-              info.redesDisponiveis = redesUsuario;
-              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
-            } else if (escolha === "5") {
+              return msg.reply(montarMenuEventos());
+            }
+            if (escolha === "3" || /reuni/i.test(escolha)) {
               info.fluxo = "reunioes";
               info.etapa = "menu_reuniao";
-              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *menu* para voltar.");
-            } else if (escolha === "6") {
+              return msg.reply("🤝 *Reuniões*\n\nO que você deseja fazer?\n\n1 - Agendar reunião\n2 - Alterar reunião existente\n3 - Desmarcar reunião existente\n\nDigite *voltar* para o menu anterior ou *menu* para o início.");
+            }
+            if (escolha === "4" || /disponib/i.test(escolha)) {
               info.fluxo = "consulta_disponibilidade_lider";
               info.etapa = "escolha_mes";
               const agora = moment.tz("America/Sao_Paulo");
-              const mesAtual = agora.month(); // 0-indexed
-
+              const mesAtual = agora.month();
               let listaMeses = "📅 *Consulta de Disponibilidade*\n\nPara qual mês você deseja consultar?\n\n";
               for (let i = mesAtual; i < 12; i++) {
                 listaMeses += `${i + 1} - ${MESES[i]}\n`;
               }
               return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
-            } else if (escolha === "7") {
-              const avisoSecretaria = `📞 *PEDIDO DA DIREÇÃO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO diretor solicitou contato da secretaria.`;
-              await notificarSecretaria(client, avisoSecretaria);
-              return msg.reply("📞 *Secretaria Notificada!*\n\nA equipe da secretaria entrará em contato em breve.\n\nDigite *menu* para voltar ao menu principal.");
-            } else if (escolha === "8") {
-              info.fluxo = "evento_externo";
-              info.etapa = "evento_externo_nome";
-              return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
-            } else {
-              return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 8, ou digite *menu* para voltar.");
             }
+            if (escolha === "5" || /montagem|decora/i.test(escolha)) {
+              info.fluxo = "agendamento";
+              info.etapa = "preparacao_informar_horarios";
+              info.departamento = usuario?.departamento || "Evento";
+              return msg.reply(
+                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
+                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
+                "• *Nome do evento e departamento*\n" +
+                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
+                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
+              );
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, digite *voltar* para o menu anterior ou *menu* para o início.");
+          }
+
+          if (info.etapa === "diretor_sub_comunicacao") {
+            if (escolha === "voltar") {
+              info.etapa = "menu_diretor";
+              return msg.reply(montarMenuDiretor());
+            }
+            if (escolha === "1" || /aviso|comunicado/i.test(escolha)) {
+              info.fluxo = "comunicados";
+              info.etapa = "texto_comunicado";
+              return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
+            }
+            if (escolha === "2" || /arte|flyer/i.test(escolha)) {
+              info.fluxo = "artes_flyers";
+              info.etapa = "artes_departamento";
+              const redesUsuario = obterRedesParaUsuario(usuario);
+              info.redesDisponiveis = redesUsuario;
+              return msg.reply(`🎨 *Solicitar artes e flyers*\n\n🏢 De qual departamento é a solicitação?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
+            }
+            return msg.reply("❌ Opção inválida. Escolha 1 para Aviso/Comunicado ou 2 para Artes e Flyers (ou digite *voltar*).");
           }
         } else if (info.fluxo === "artes_flyers") {
           if (info.etapa === "artes_departamento") {
@@ -3343,6 +3678,21 @@ Escolha uma opção:
         } else if (info.fluxo === "reunioes") {
           if (info.etapa === "menu_reuniao") {
             const escolha = msg.body.trim();
+            if (escolha.toLowerCase() === "voltar") {
+              if (isPastor) {
+                info.fluxo = "area_pastoral";
+                info.etapa = "pastoral_sub_agenda";
+                return msg.reply(montarSubmenuPastoralAgenda());
+              } else if (isDiretor) {
+                info.fluxo = "area_diretor";
+                info.etapa = "diretor_sub_agenda";
+                return msg.reply(montarSubmenuDiretorAgenda());
+              } else {
+                info.fluxo = "area_lider";
+                info.etapa = "lider_sub_agenda";
+                return msg.reply(montarSubmenuLiderAgenda());
+              }
+            }
             if (escolha === "1") {
               info.etapa = "reuniao_departamento";
               return msg.reply("🤝 *Agendar Reunião*\n\n1️⃣ Qual é o *departamento* da reunião? (Ex: Jovens, Mulheres, Diáconos, etc.)");
@@ -3973,8 +4323,10 @@ Digite *menu* para voltar ao menu principal.`;
             `Digite *menu* a qualquer momento para cancelar.`
           );
         }
-        console.log(`Opção 5 (Aulas de Música) selecionada por ${identificarUsuario(contato, numero, isLider)}`);
-        return msg.reply(`🎵 *Aulas de Música*\n\nPor enquanto, as aulas de música estão suspensas. Assim que retornarmos, avisaremos!\n\nAgradecemos a compreensão. 🙏\n\nDigite *menu* para voltar ao menu principal.`);
+        console.log(`Opção 5 (Secretaria) selecionada por visitante ${identificarUsuario(contato, numero, isLider, usuario)}`);
+        const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO usuário solicitou falar com a secretaria.`;
+        await notificarSecretaria(client, avisoSecretaria);
+        return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
       }
 
       if (texto === "6") {
@@ -3984,25 +4336,22 @@ Digite *menu* para voltar ao menu principal.`;
         return msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
       }
 
+      if ((texto === "7" || texto === "8") && isPastor) {
+        console.log(`Opção Pastoral selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área Pastoral`);
+        etapas[numero] = { fluxo: "area_pastoral", etapa: "menu_pastoral" };
+        return msg.reply(montarMenuPastoral());
+      }
+
+      if ((texto === "7" || texto === "9") && isDiretor && !isPastor) {
+        console.log(`Opção Direção selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área da Direção`);
+        etapas[numero] = { fluxo: "area_diretor", etapa: "menu_diretor" };
+        return msg.reply(montarMenuDiretor());
+      }
+
       if (texto === "7" && isLider && !isPastor && !isDiretor) {
         console.log(`Opção 7 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área do Líder`);
         etapas[numero] = { fluxo: "area_lider", etapa: "menu_lider" };
-        const msgSubmenu = `👑 *Área do Líder*\n\nEscolha o que deseja fazer:\n\n1️⃣ Agendar, alterar ou cancelar evento\n2️⃣ Solicitar aviso / comunicado no culto\n3️⃣ Solicitar artes e flyers\n4️⃣ Agendar, alterar ou desmarcar reunião\n5️⃣ Consultar disponibilidade de dias e horários\n6️⃣ Agendar evento externo\n\nDigite *menu* para voltar ao menu principal.`;
-        return msg.reply(msgSubmenu);
-      }
-
-      if (texto === "8" && isPastor) {
-        console.log(`Opção 8 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área Pastoral`);
-        etapas[numero] = { fluxo: "area_pastoral", etapa: "menu_pastoral" };
-        const msgSubmenu = `⛪ *Área Pastoral*\n\nGraça e Paz, Pastor(a)! Escolha uma opção:\n\n1️⃣ Ver agenda completa da igreja\n2️⃣ Atendimento pastoral (agendar, alterar ou desmarcar)\n3️⃣ Agendar, alterar ou cancelar evento\n4️⃣ Solicitar aviso / comunicado no culto\n5️⃣ Solicitar artes e flyers\n6️⃣ Agendar, alterar ou desmarcar reunião\n7️⃣ Consultar disponibilidade de dias e horários\n8️⃣ Consultar orientações de atendimento pastoral\n9️⃣ Agendar evento externo\n\nDigite *menu* para voltar ao menu principal.`;
-        return msg.reply(msgSubmenu);
-      }
-
-      if (texto === "9" && isDiretor && !isPastor) {
-        console.log(`Opção 9 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área da Direção`);
-        etapas[numero] = { fluxo: "area_diretor", etapa: "menu_diretor" };
-        const msgSubmenu = `📋 *Área da Direção*\n\nEscolha o que deseja fazer:\n\n1️⃣ Ver todos os eventos da igreja (agenda completa)\n2️⃣ Agendar, alterar ou cancelar evento\n3️⃣ Solicitar aviso / comunicado no culto\n4️⃣ Solicitar artes e flyers\n5️⃣ Agendar, alterar ou desmarcar reunião\n6️⃣ Consultar disponibilidade de dias e horários\n7️⃣ Falar com a secretaria\n8️⃣ Agendar evento externo\n\nDigite *menu* para voltar ao menu principal.`;
-        return msg.reply(msgSubmenu);
+        return msg.reply(montarMenuLider());
       }
 
       if (isMembro && /^(?:solicitar\s+)?(?:uso\s+do\s+)?sal[aã]o$/i.test(texto.trim())) {
@@ -4061,4 +4410,15 @@ module.exports = {
   temPermissao,
   identificarUsuario,
   processarRespostaEventoExterno,
+  montarMenuLider,
+  montarSubmenuLiderAgenda,
+  montarSubmenuLiderComunicacao,
+  montarMenuPastoral,
+  montarSubmenuPastoralAgenda,
+  montarSubmenuPastoralAtendimento,
+  montarSubmenuPastoralComunicacao,
+  montarMenuDiretor,
+  montarSubmenuDiretorAgenda,
+  montarSubmenuDiretorComunicacao,
+  montarMenuEventos,
 };

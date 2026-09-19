@@ -429,8 +429,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         return sendJson(res, 200, { ok: true });
       }
       if (req.method === 'POST' && pathname === '/secretaria/disconnect') {
-        const result = await disconnectClient();
+        const result = await disconnectClient(true);
         return sendJson(res, result.ok ? 200 : 500, result);
+      }
+      if (req.method === 'POST' && pathname === '/secretaria/reset-session') {
+        await disconnectClient(true);
+        await startClient({ forceClean: true });
+        return sendJson(res, 200, { ok: true, message: 'Sessão reiniciada do zero.' });
       }
       if (req.method === 'POST' && pathname === '/secretaria/logout') {
         const sessionId = getSessionId(req);
