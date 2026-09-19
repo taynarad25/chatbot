@@ -75,6 +75,19 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_lembretes_evento ON lembretes_enviados(eventoId, tipo);
+
+  CREATE TABLE IF NOT EXISTS agendamentos_pastorais (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    eventoId TEXT,
+    pastorTelefone TEXT NOT NULL,
+    pastorNome TEXT,
+    discipulo TEXT,
+    dataHora TEXT,
+    criadoEm TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_agendamentos_pastorais_ev ON agendamentos_pastorais(eventoId);
+  CREATE INDEX IF NOT EXISTS idx_agendamentos_pastorais_disc ON agendamentos_pastorais(discipulo);
 `);
 
 try {

@@ -40,6 +40,7 @@ const AGENDAS = [
   "cal-externos",
   "cal-reunioes", "cal-atendimento", "cal-limpeza", "cal-ensaios",
   "cal-uso-salao",
+  "cal-artes",
 ];
 const LIDERES = ["5511999999999"];
 const NUMERO_LIDER = "5511999999999@c.us";
@@ -575,7 +576,7 @@ test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agen
   assert.match(respFim[0], /Evento Externo Bloqueador/);
 });
 
-test("opção 6: líder pode agendar evento escolhendo departamento 'Outros' (opção 10)", async () => {
+test("opção 6: líder pode agendar evento escolhendo departamento 'Outros' (opção 13)", async () => {
   const agora = moment.tz("America/Sao_Paulo");
   const mesAlvo = agora.month() + 1;
   const diaAlvo = 22;
@@ -585,7 +586,7 @@ test("opção 6: líder pode agendar evento escolhendo departamento 'Outros' (op
   const { respRede } = await iniciarAgendamentoDataEspecifica(handleMessage, {
     titulo: "Encontro Geral",
     local: "Parque da Cidade",
-    rede: "10",
+    rede: "13",
     mes: mesAlvo,
     dia: diaAlvo,
   });

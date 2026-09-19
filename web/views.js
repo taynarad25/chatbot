@@ -910,6 +910,9 @@ function renderIndexHtml() {
             <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Homens" /> Rede de Homens</label>
             <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Mulheres" /> Rede de Mulheres</label>
             <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Kids" /> Rede Kids</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Departamento de Artes" /> Departamento de Artes</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Diaconia" /> Diaconia</label>
+            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Relacionamentos" /> Relacionamentos</label>
             <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Eventos Externos" /> Eventos Externos</label>
             <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Outros" /> Outros</label>
           </div>

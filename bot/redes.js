@@ -12,7 +12,10 @@ const REDES = [
   { numero: "7", nome: "Rede de Homens", agendaIndex: 7, palavrasChave: ["homens"] },
   { numero: "8", nome: "Rede de Mulheres", agendaIndex: 8, palavrasChave: ["mulheres"] },
   { numero: "9", nome: "Rede Kids", agendaIndex: 9, palavrasChave: ["kids"] },
-  { numero: "10", nome: "Outros", agendaIndex: 3, palavrasChave: [] },
+  { numero: "10", nome: "Departamento de Artes", agendaIndex: 16, palavrasChave: ["artes", "teatro", "dança", "danca", "coral", "pintura"] },
+  { numero: "11", nome: "Diaconia", agendaIndex: 3, palavrasChave: ["diaconia", "diáconos", "diaconos"] },
+  { numero: "12", nome: "Relacionamentos", agendaIndex: 3, palavrasChave: ["relacionamentos", "relacionamento"] },
+  { numero: "13", nome: "Outros", agendaIndex: 3, palavrasChave: [] },
 ];
 
 const REDE_PADRAO = REDES.find((r) => r.nome === "Outros") || REDES[REDES.length - 1]; // "Outros", usada como fallback

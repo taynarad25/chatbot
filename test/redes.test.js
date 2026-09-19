@@ -12,23 +12,26 @@ const {
   isAgendaInterna,
 } = require("../bot/redes");
 
-test("REDES: tem exatamente 10 entradas com números únicos de 1 a 10", () => {
-  assert.equal(REDES.length, 10);
+test("REDES: tem exatamente 13 entradas com números únicos de 1 a 13", () => {
+  assert.equal(REDES.length, 13);
   const numeros = REDES.map((r) => r.numero).sort((a, b) => Number(a) - Number(b));
-  assert.deepEqual(numeros, ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]);
+  assert.deepEqual(numeros, ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"]);
 });
 
 test("montarListaRedes: gera a lista numerada na ordem esperada", () => {
   const lista = montarListaRedes();
   assert.equal(
     lista,
-    "1 - Evangelismo\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Outros"
+    "1 - Evangelismo\n2 - Epifania\n3 - Intercessão\n4 - Projeto Social Seeds\n5 - Rede Ruach\n6 - Rede de Casais\n7 - Rede de Homens\n8 - Rede de Mulheres\n9 - Rede Kids\n10 - Departamento de Artes\n11 - Diaconia\n12 - Relacionamentos\n13 - Outros"
   );
 });
 
 test("obterRedePorNumero: retorna a rede correta pelo número do menu", () => {
   assert.equal(obterRedePorNumero("6").nome, "Rede de Casais");
-  assert.equal(obterRedePorNumero("10").nome, "Outros");
+  assert.equal(obterRedePorNumero("10").nome, "Departamento de Artes");
+  assert.equal(obterRedePorNumero("11").nome, "Diaconia");
+  assert.equal(obterRedePorNumero("12").nome, "Relacionamentos");
+  assert.equal(obterRedePorNumero("13").nome, "Outros");
 });
 
 test("obterRedePorNumero: aceita número com espaços em volta (ex: msg.body com \\n)", () => {
@@ -36,8 +39,8 @@ test("obterRedePorNumero: aceita número com espaços em volta (ex: msg.body com
 });
 
 test("obterRedePorNumero: retorna null para número fora da lista", () => {
-  assert.equal(obterRedePorNumero("11"), null);
-  assert.equal(obterRedePorNumero("12"), null);
+  assert.equal(obterRedePorNumero("14"), null);
+  assert.equal(obterRedePorNumero("15"), null);
   assert.equal(obterRedePorNumero("0"), null);
   assert.equal(obterRedePorNumero("abc"), null);
 });
@@ -82,14 +85,14 @@ test("AGENDAS_INTERNAS: contém Reuniões, Atendimento, Limpeza e Ensaios com se
 // RESTRIÇÃO DE DEPARTAMENTOS POR USUÁRIO (Líder vs Pastor / Diretor)
 // ============================================================================
 
-test("obterRedesParaUsuario: Pastor e Diretor têm acesso a todos os 10 departamentos", () => {
+test("obterRedesParaUsuario: Pastor e Diretor têm acesso a todos os 13 departamentos", () => {
   const usuarioPastor = { nome: "Pastor Paulo", cargos: ["pastor"], departamentos: ["Rede Kids"] };
   const redesPastor = obterRedesParaUsuario(usuarioPastor);
-  assert.equal(redesPastor.length, 10);
+  assert.equal(redesPastor.length, 13);
 
   const usuarioDiretor = { nome: "Diretor Carlos", cargos: ["diretor"], departamentos: [] };
   const redesDiretor = obterRedesParaUsuario(usuarioDiretor);
-  assert.equal(redesDiretor.length, 10);
+  assert.equal(redesDiretor.length, 13);
 });
 
 test("obterRedesParaUsuario: Líder comum cadastrado vê apenas seus departamentos + Outros", () => {

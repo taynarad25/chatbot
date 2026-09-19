@@ -113,6 +113,7 @@ const agendasParaLer = [
   "7975950de545f60f585bc041682c6564ce4c29d0ef7e06cdeffa21ffc0ffd572@group.calendar.google.com", // Limpeza
   "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com", // Ensaios
   "49b999ac91607d07310d7e36a26fe088ddc3cd2b34ff741a0e139b43a18bdabc@group.calendar.google.com", // Uso do Salão
+  "ca137e32f53409b1bd297929b9a2afd663eaf7df370e4c0aea6442c6a68a7946@group.calendar.google.com", // Departamento de Artes
 ];
 
 console.log(`[Config] ${agendasParaLer.length} agenda(s) configurada(s) para leitura.`);

@@ -31,6 +31,85 @@ function formatarJidWhatsApp(telefone) {
   return limpo.endsWith("@c.us") ? limpo : `${limpo}@c.us`;
 }
 
+const ID_AGENDA_ENSAIOS = "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com";
+const ID_AGENDA_REUNIOES = "b8f01bfd149139d388080ec63176c2556e6e1aedce184b84d37671c3d082d238@group.calendar.google.com";
+const ID_AGENDA_ATENDIMENTO = "0a55126694643f39944faf173fe3acd127b2a52074c6ecc9e9ed4dc23edf8b57@group.calendar.google.com";
+
+function ehEnsaio(ev) {
+  if (!ev) return false;
+  if (ev.calendarId === ID_AGENDA_ENSAIOS) return true;
+  const titulo = (ev.summary || "").toLowerCase();
+  return titulo.includes("ensaio");
+}
+
+function ehReuniao(ev) {
+  if (!ev) return false;
+  if (ev.calendarId === ID_AGENDA_REUNIOES) return true;
+  const titulo = (ev.summary || "").toLowerCase();
+  return /reuni[aã]o/i.test(titulo);
+}
+
+function ehAtendimentoPastoral(ev) {
+  if (!ev) return false;
+  if (ev.calendarId === ID_AGENDA_ATENDIMENTO) return true;
+  const titulo = (ev.summary || "").toLowerCase();
+  return titulo.includes("atendimento pastoral") || titulo.includes("atendimento");
+}
+
+function montarMensagemConfirmacaoAtendimento({ nome = "", horario = "", data = "", discipulo = "" } = {}) {
+  const saudacao = nome ? `Olá, *${nome}*! Tudo bem?` : "Olá, Pastor! Tudo bem?";
+  const dataFormatada = formatarDataBrasil(data);
+  const infoHorario = horario ? ` às *${horario}*` : "";
+  const infoData = dataFormatada ? `amanhã (${dataFormatada}${infoHorario})` : "amanhã";
+  const infoDiscipulo = discipulo ? ` com *${discipulo}*` : "";
+  return `${saudacao}\n\nPassando para saber: o atendimento pastoral${infoDiscipulo} agendado para ${infoData} está confirmado?`;
+}
+
+function registrarAgendamentoPastoral({ eventoId = "", pastorTelefone = "", pastorNome = "", discipulo = "", dataHora = "" } = {}) {
+  if (!pastorTelefone) return false;
+  try {
+    const agora = new Date().toISOString();
+    const telLimpo = String(pastorTelefone).replace(/\D/g, "");
+    db.prepare(`
+      INSERT INTO agendamentos_pastorais (eventoId, pastorTelefone, pastorNome, discipulo, dataHora, criadoEm)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(eventoId || "", telLimpo, pastorNome || "", discipulo || "", dataHora || "", agora);
+    return true;
+  } catch (err) {
+    console.error("[Lembretes] Erro ao registrar agendamento pastoral:", err.message);
+    return false;
+  }
+}
+
+function buscarPastorAgendamento(eventoId, discipulo) {
+  try {
+    if (eventoId) {
+      const row = db.prepare("SELECT * FROM agendamentos_pastorais WHERE eventoId = ? AND eventoId != '' ORDER BY id DESC LIMIT 1").get(eventoId);
+      if (row) return row;
+    }
+    if (discipulo) {
+      const termo = String(discipulo).trim().toLowerCase();
+      if (termo.length >= 3) {
+        const row = db.prepare("SELECT * FROM agendamentos_pastorais WHERE LOWER(discipulo) LIKE '%' || ? || '%' ORDER BY id DESC LIMIT 1").get(termo);
+        if (row) return row;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error("[Lembretes] Erro ao buscar pastor do agendamento:", err.message);
+    return null;
+  }
+}
+
+function montarMensagemConfirmacaoReuniao({ nome = "", reuniao = "", horario = "", data = "" } = {}) {
+  const saudacao = nome ? `Olá, *${nome}*! Tudo bem?` : "Olá! Tudo bem?";
+  const dataFormatada = formatarDataBrasil(data);
+  const infoHorario = horario ? ` às *${horario}*` : "";
+  const infoData = dataFormatada ? `amanhã (${dataFormatada}${infoHorario})` : "amanhã";
+  const nomeReuniao = reuniao ? ` "*${reuniao}*"` : "";
+  return `${saudacao}\n\nPassando para saber: a sua reunião${nomeReuniao} agendada para ${infoData} está confirmada?`;
+}
+
 function montarMensagemLembrete({
   nomeLider = "",
   evento = "",
@@ -141,6 +220,24 @@ async function processarLembretesEventos({
   const tipoLembrete = `${diasAntecedencia}_dias_antes`;
 
   for (const ev of eventos) {
+    const isEnsaio = ehEnsaio(ev);
+    if (isEnsaio) {
+      // Ensaios não devem receber mensagens de confirmação
+      continue;
+    }
+
+    const isReuniao = ehReuniao(ev);
+    const isPastoral = ehAtendimentoPastoral(ev);
+
+    // Reunião e Atendimento Pastoral: mande 1 dia antes (diasAntecedencia === 1).
+    // Eventos no geral: mande com a antecedência configurada (padrão 5 dias).
+    if (diasAntecedencia !== 1 && (isReuniao || isPastoral)) {
+      continue;
+    }
+    if (diasAntecedencia === 1 && !isReuniao && !isPastoral) {
+      continue;
+    }
+
     const eventoId = ev.id || `${ev.summary}_${dataAlvoStr}`;
     const jaEnviado = buscarLembreteEnviado(eventoId, tipoLembrete);
     if (jaEnviado) {
@@ -167,7 +264,89 @@ async function processarLembretesEventos({
       });
     }
 
-    // 2. Se não encontrou formulário ou solicitante, tenta descobrir pelos departamentos cadastrados
+    let discipulo = "";
+    if (isPastoral) {
+      const matchDiscDesc = (ev.description || "").match(/Disc[ií]pulo\s*:\s*([^\n\r]+)/i);
+      if (matchDiscDesc) {
+        discipulo = matchDiscDesc[1].trim();
+      } else {
+        discipulo = titulo
+          .replace(/atendimento pastoral\s*[-–:]*\s*/i, "")
+          .replace(/atendimento\s*[-–:]*\s*/i, "")
+          .replace(/\(pr\.?[^)]*\)/i, "")
+          .replace(/\(pastor[^)]*\)/i, "")
+          .trim();
+      }
+    }
+
+    // 2. Se for Atendimento Pastoral: a confirmação DEVE ser mandada pro pastor que o marcou e NUNCA no grupo
+    if (destinatarios.length === 0 && isPastoral) {
+      const desc = ev.description || "";
+
+      // a) Busca no banco agendamentos_pastorais pelo ID do evento ou nome do discípulo
+      const agendamento = buscarPastorAgendamento(ev.id, discipulo);
+      if (agendamento && agendamento.pastorTelefone) {
+        destinatarios.push({
+          telefone: agendamento.pastorTelefone,
+          nome: agendamento.pastorNome || "",
+          docUrl: "",
+          departamento: "Atendimento Pastoral",
+        });
+      }
+
+      // b) Tenta extrair telefone do pastor na descrição do evento (ex: "Telefone Pastor: 5511...", "Pastor: Gabriel (5511...)")
+      if (destinatarios.length === 0) {
+        const matchTelPastor = desc.match(/(?:Telefone\s*Pastor|Pastor(?:\s*Respons[aá]vel)?)[^0-9]*((?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?9\d{4}[-\s]?\d{4})/i)
+          || desc.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?9\d{4}[-\s]?\d{4}/);
+        if (matchTelPastor) {
+          destinatarios.push({
+            telefone: matchTelPastor[1] || matchTelPastor[0],
+            nome: "",
+            docUrl: "",
+            departamento: "Atendimento Pastoral",
+          });
+        }
+      }
+
+      // c) Tenta extrair nome do pastor na descrição ou no título e buscar em líderes/usuários
+      if (destinatarios.length === 0) {
+        const matchNomePastor = desc.match(/(?:Pastor|Pr\.?)\s*:\s*([^\n\r,]+)/i)
+          || titulo.match(/(?:Pastor|Pr\.?)\s*([^\n\r,\)\-]+)/i);
+        if (matchNomePastor) {
+          const nomePastor = matchNomePastor[1].trim();
+          try {
+            const pastorRow = db.prepare("SELECT * FROM lideres WHERE LOWER(nome) LIKE '%' || LOWER(?) || '%'").get(nomePastor);
+            if (pastorRow && pastorRow.telefone) {
+              destinatarios.push({
+                telefone: pastorRow.telefone,
+                nome: pastorRow.nome,
+                docUrl: "",
+                departamento: "Atendimento Pastoral",
+              });
+            }
+          } catch (e) {}
+        }
+      }
+
+      // d) Se ainda assim não encontrou o pastor que marcou, envia para os pastores cadastrados no sistema (direto no privado, NUNCA no grupo!)
+      if (destinatarios.length === 0) {
+        try {
+          const pastores = db.prepare("SELECT * FROM lideres WHERE LOWER(cargos) LIKE '%pastor%'").all();
+          for (const p of pastores) {
+            if (p.telefone) {
+              destinatarios.push({
+                telefone: p.telefone,
+                nome: p.nome,
+                docUrl: "",
+                departamento: "Atendimento Pastoral",
+              });
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 3. Se não encontrou formulário ou solicitante, tenta descobrir pelos departamentos cadastrados
     if (destinatarios.length === 0) {
       let depto = "";
       if (ev.calendarId && agendasParaLer.length > 0) {
@@ -205,16 +384,40 @@ async function processarLembretesEventos({
     }
 
     for (const dest of destinatarios) {
-      const msg = montarMensagemLembrete({
-        nomeLider: dest.nome,
-        evento: titulo,
-        data: dataEv,
-        horario,
-        local,
-        departamento: dest.departamento,
-        docUrl: dest.docUrl,
-        diasRestantes: diasAntecedencia,
-      });
+      // Bloqueio explícito: confirmação de atendimento pastoral NUNCA deve ser enviada para grupos
+      const telDest = String(dest.telefone || "");
+      if (isPastoral && telDest.includes("@g.us")) {
+        console.warn(`[Lembretes] Bloqueado envio de confirmação de atendimento pastoral para grupo (${telDest}). Deve ser apenas para o pastor no privado.`);
+        continue;
+      }
+
+      let msg = "";
+      if (isPastoral) {
+        msg = montarMensagemConfirmacaoAtendimento({
+          nome: dest.nome,
+          horario,
+          data: dataEv,
+          discipulo,
+        });
+      } else if (isReuniao) {
+        msg = montarMensagemConfirmacaoReuniao({
+          nome: dest.nome,
+          reuniao: titulo,
+          horario,
+          data: dataEv,
+        });
+      } else {
+        msg = montarMensagemLembrete({
+          nomeLider: dest.nome,
+          evento: titulo,
+          data: dataEv,
+          horario,
+          local,
+          departamento: dest.departamento,
+          docUrl: dest.docUrl,
+          diasRestantes: diasAntecedencia,
+        });
+      }
 
       const jid = formatarJidWhatsApp(dest.telefone);
       if (client && typeof client.sendMessage === "function") {
@@ -247,11 +450,20 @@ function iniciarAgendadorLembretes({
     if (executando) return;
     executando = true;
     try {
+      // 1. Lembretes de eventos gerais (5 dias de antecedência)
       await processarLembretesEventos({
         client,
         buscarEventos,
         agendasParaLer,
         diasAntecedencia: 5,
+      });
+
+      // 2. Lembretes de reuniões e atendimentos pastorais (1 dia antes)
+      await processarLembretesEventos({
+        client,
+        buscarEventos,
+        agendasParaLer,
+        diasAntecedencia: 1,
       });
     } catch (err) {
       console.error("[Agendador Lembretes] Erro no processamento:", err);
@@ -284,8 +496,15 @@ module.exports = {
   formatarHoraBrasil,
   formatarJidWhatsApp,
   montarMensagemLembrete,
+  montarMensagemConfirmacaoAtendimento,
+  montarMensagemConfirmacaoReuniao,
+  ehEnsaio,
+  ehReuniao,
+  ehAtendimentoPastoral,
   buscarLembreteEnviado,
   registrarLembreteEnviado,
+  registrarAgendamentoPastoral,
+  buscarPastorAgendamento,
   processarLembretesEventos,
   iniciarAgendadorLembretes,
 };
