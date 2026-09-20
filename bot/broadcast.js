@@ -7,6 +7,7 @@ try {
 } catch (_) {
   MessageMedia = null;
 }
+const { enviarMensagemResiliente } = require("./senderResiliente");
 
 const BROADCAST_CONFIG = {
   // Quando true, envia EXCLUSIVAMENTE para Gabriela Diniz (fase de testes).
@@ -179,10 +180,10 @@ async function executarBroadcast({
       if (mediaObj && client && typeof client.sendMessage === "function") {
         const options = texto ? { caption: texto } : {};
         console.log(`[Broadcast] (${i + 1}/${total}) Enviando mídia (${mediaObj.mimetype || "sem mimetype"}) para ${dest.nome} (${mascararTelefone(dest.telefone)})...`);
-        await client.sendMessage(jid, mediaObj, options);
+        await enviarMensagemResiliente(client, jid, mediaObj, options, { jid });
       } else if (texto && client && typeof client.sendMessage === "function") {
         console.log(`[Broadcast] (${i + 1}/${total}) Enviando texto para ${dest.nome} (${mascararTelefone(dest.telefone)})...`);
-        await client.sendMessage(jid, texto);
+        await enviarMensagemResiliente(client, jid, texto, {}, { jid });
       }
 
       enviados++;
@@ -200,7 +201,7 @@ async function executarBroadcast({
         try {
           console.log(`[Broadcast] Tentando fallback enviando mídia do arquivo em disco: ${media.caminhoArquivo}...`);
           const mediaDoDisco = carregarMidiaDeDisco(media.caminhoArquivo);
-          await client.sendMessage(jid, mediaDoDisco, texto ? { caption: texto } : {});
+          await enviarMensagemResiliente(client, jid, mediaDoDisco, texto ? { caption: texto } : {}, { jid });
           enviados++;
           enviadoComSucesso = true;
           destinatariosEnviados.push(dest);

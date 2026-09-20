@@ -16,6 +16,7 @@ const { createMessageHandler } = require("./messageHandler");
 const { telefonesLideres, loadLideres, listLideres } = require("../web/lideres");
 const { notificarAlerta, extrairAlerta } = require("./alertas");
 const { garantirDiretorioTemp, limparMidiasAntigas } = require("./mediaStorage");
+const { aplicarResilienciaClient } = require("./senderResiliente");
 const db = require("../db");
 
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
@@ -256,6 +257,9 @@ function criarClient() {
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
+      '--disable-ipc-flooding-protection',
+      '--memory-pressure-off',
+      '--disable-features=CalculateNativeWinOcclusion,InterestFeedContentSuggestions,BlinkLifecycleScriptForbidden',
     ]
   };
 
@@ -302,6 +306,7 @@ function criarClient() {
   }
 
   client = new Client(clientOptions);
+  aplicarResilienciaClient(client);
 
   client.on("qr", async (qr) => {
     console.log("✅ QR Code gerado com sucesso.");
@@ -409,6 +414,17 @@ function criarClient() {
       console.error("[Lembretes] Erro ao iniciar agendador de lembretes:", errLembrete.message);
     }
   });
+
+  // Heartbeat periódico unref'd para manter o contexto do Puppeteer ativo contra idle discard do navegador
+  setInterval(async () => {
+    if (client && clientReady && client.pupPage) {
+      try {
+        if (typeof client.pupPage.isClosed !== "function" || !client.pupPage.isClosed()) {
+          await client.pupPage.evaluate(() => typeof window !== "undefined" && Boolean(window.WWebJS));
+        }
+      } catch (_) {}
+    }
+  }, 3 * 60 * 1000).unref();
 
   client.on("auth_failure", (msg) => {
     console.error("Falha na autenticação:", msg);
