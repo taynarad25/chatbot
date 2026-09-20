@@ -14,6 +14,7 @@ const {
   montarMensagemLembreteMultimidia,
   montarMensagemConfirmacaoAtendimento,
   montarMensagemConfirmacaoReuniao,
+  montarMensagemAgendaQuinzenalSecretarias,
   ehEnsaio,
   ehReuniao,
   ehAtendimentoPastoral,
@@ -24,6 +25,7 @@ const {
   registrarLembreteEnviado,
   processarLembretesEventos,
   processarLembretesDivulgacaoMultimidia,
+  processarEnvioAgendaSecretarias,
 } = require("../bot/lembretes");
 const { salvarFormularioEvento } = require("../bot/formularioEvento");
 const { addLider, listLideres, obterLideresPorDepartamento, obterUsuarioPorTelefone } = require("../web/lideres");
@@ -747,4 +749,229 @@ test("processarLembretesEventos: envia lembrete de confirmação de evento ao l�
   assert.equal(mensagensLider[0].to, `${NUMERO_LIDER_3DIAS}@c.us`);
   assert.match(mensagensLider[0].txt, /Faltam \*3 dias\* para a realização do seu evento:/);
   assert.match(mensagensLider[0].txt, /Café com Deus Homens/);
+});
+
+test("processarLembretesEventos: faltando 5 dias inclui docUrl e envia cópia à secretaria; faltando 3 dias não inclui docUrl e envia cópia à secretaria", async () => {
+  const NUMERO_LIDER_COMPARACAO = "5511977770099";
+  addLider({
+    nome: "Lucas Lider",
+    telefone: NUMERO_LIDER_COMPARACAO,
+    cargos: ["lider"],
+    departamento: "Rede de Jovens",
+  });
+
+  salvarFormularioEvento({
+    evento: "Luau da Juventude",
+    departamento: "Rede de Jovens",
+    data: "25/09/2026",
+    solicitanteId: NUMERO_LIDER_COMPARACAO,
+    docUrl: "https://docs.google.com/document/d/luau-doc-123/edit",
+    payload: {
+      nome_lider: "Lucas Lider",
+      departamento: "Rede de Jovens",
+    },
+  });
+
+  const eventosAgenda = [
+    {
+      id: "ev-luau-5dias",
+      summary: "Luau da Juventude",
+      start: { dateTime: "2026-09-25T19:00:00-03:00" },
+      calendarId: "agenda-jovens",
+    },
+  ];
+
+  const enviadasLider5d = [];
+  const avisosSecretaria5d = [];
+  const fakeClient5d = {
+    sendMessage: async (to, txt) => {
+      enviadasLider5d.push({ to, txt });
+    },
+  };
+  const fakeNotificarSecretaria5d = async (c, txt) => {
+    avisosSecretaria5d.push(txt);
+  };
+
+  // Teste 1: Faltando 5 dias (dataBase: 2026-09-20 -> evento: 2026-09-25)
+  await processarLembretesEventos({
+    client: fakeClient5d,
+    buscarEventos: async () => eventosAgenda,
+    agendasParaLer: [],
+    diasAntecedencia: 5,
+    dataBase: new Date("2026-09-20T10:00:00.000Z"),
+    notificarSecretariaFn: fakeNotificarSecretaria5d,
+  });
+
+  assert.equal(enviadasLider5d.length, 1);
+  assert.match(enviadasLider5d[0].txt, /Faltam \*5 dias\*/);
+  assert.match(enviadasLider5d[0].txt, /Formulário de Agendamento Preenchido/);
+  assert.match(enviadasLider5d[0].txt, /https:\/\/docs\.google\.com\/document\/d\/luau-doc-123\/edit/);
+  assert.equal(avisosSecretaria5d.length, 1);
+  assert.match(avisosSecretaria5d[0], /Aviso à Secretaria - Lembrete de Evento/);
+  assert.match(avisosSecretaria5d[0], /Formulário Anexado:/);
+
+  // Teste 2: Faltando 3 dias (dataBase: 2026-09-22 -> evento: 2026-09-25)
+  const enviadasLider3d = [];
+  const avisosSecretaria3d = [];
+  const fakeClient3d = {
+    sendMessage: async (to, txt) => {
+      enviadasLider3d.push({ to, txt });
+    },
+  };
+  const fakeNotificarSecretaria3d = async (c, txt) => {
+    avisosSecretaria3d.push(txt);
+  };
+
+  await processarLembretesEventos({
+    client: fakeClient3d,
+    buscarEventos: async () => eventosAgenda,
+    agendasParaLer: [],
+    diasAntecedencia: 3,
+    dataBase: new Date("2026-09-22T10:00:00.000Z"),
+    notificarSecretariaFn: fakeNotificarSecretaria3d,
+  });
+
+  assert.equal(enviadasLider3d.length, 1);
+  assert.match(enviadasLider3d[0].txt, /Faltam \*3 dias\*/);
+  assert.doesNotMatch(enviadasLider3d[0].txt, /Formulário de Agendamento Preenchido/);
+  assert.doesNotMatch(enviadasLider3d[0].txt, /https:\/\/docs\.google\.com\/document\/d\/luau-doc-123\/edit/);
+  assert.equal(avisosSecretaria3d.length, 1);
+  assert.match(avisosSecretaria3d[0], /Aviso à Secretaria - Lembrete de Evento/);
+  assert.doesNotMatch(avisosSecretaria3d[0], /Formulário Anexado:/);
+});
+
+test("processarLembretesEventos: reuniões enviam cópia à secretaria, mas atendimento pastoral NUNCA envia à secretaria", async () => {
+  const eventosMistos = [
+    {
+      id: "ev-reuniao-depto-sec",
+      summary: "Reunião de Alinhamento - Rede de Homens",
+      start: { dateTime: "2026-09-21T20:00:00-03:00" },
+      calendarId: "agenda-reunioes",
+    },
+    {
+      id: "ev-atendimento-confidencial-sec",
+      summary: "Atendimento Pastoral - Roberto Teste",
+      start: { dateTime: "2026-09-21T15:00:00-03:00" },
+      calendarId: "agenda-atendimentos",
+    },
+  ];
+
+  addLider({
+    nome: "Pastor Silvano",
+    telefone: "5511999997788",
+    cargos: ["pastor"],
+    departamento: "Geral",
+  });
+
+  const avisosSecretaria = [];
+  const fakeClient = {
+    sendMessage: async () => {},
+  };
+  const fakeNotificarSecretaria = async (c, txt) => {
+    avisosSecretaria.push(txt);
+  };
+
+  await processarLembretesEventos({
+    client: fakeClient,
+    buscarEventos: async () => eventosMistos,
+    agendasParaLer: [],
+    diasAntecedencia: 1,
+    dataBase: new Date("2026-09-20T10:00:00.000Z"),
+    notificarSecretariaFn: fakeNotificarSecretaria,
+  });
+
+  // Apenas a reunião deve gerar aviso na secretaria
+  assert.ok(avisosSecretaria.length >= 1);
+  assert.ok(avisosSecretaria.some((msg) => msg.includes("Reunião de Alinhamento - Rede de Homens")));
+  // Atendimento pastoral nunca pode estar na secretaria
+  assert.ok(!avisosSecretaria.some((msg) => msg.includes("Atendimento Pastoral") || msg.includes("Roberto Teste")));
+});
+
+test("montarMensagemAgendaQuinzenalSecretarias: unifica horários de preparação/limpeza e agrupa por dia", () => {
+  const eventos = [
+    {
+      summary: "Conferência Águas Profundas",
+      start: { dateTime: "2026-09-22T19:00:00-03:00" },
+      location: "Templo Sede",
+    },
+    {
+      summary: "[Preparação/Decoração] Conferência Águas Profundas",
+      start: { dateTime: "2026-09-22T17:00:00-03:00" },
+    },
+    {
+      summary: "[Limpeza] Conferência Águas Profundas",
+      start: { dateTime: "2026-09-22T22:00:00-03:00" },
+    },
+  ];
+
+  const msg = montarMensagemAgendaQuinzenalSecretarias(eventos, "2026-09-21", "2026-10-05");
+
+  assert.match(msg, /AGENDA QUINZENAL DAS SECRETÁRIAS/);
+  assert.match(msg, /21\/09\/2026\* a \*05\/10\/2026/);
+  assert.match(msg, /Conferência Águas Profundas/);
+  assert.match(msg, /17:00/);
+  assert.match(msg, /horário para preparação e limpeza/);
+  // Não deve aparecer itens avulsos repetidos
+  assert.doesNotMatch(msg, /• \*\[Preparação\/Decoração\]/);
+});
+
+test("processarEnvioAgendaSecretarias: envia na segunda-feira para Isabelly e Gabriela e previne reenvio", async () => {
+  addLider({
+    nome: "Isabelly Lacerda",
+    telefone: "5511988880001",
+    cargos: ["secretaria", "lider"],
+    departamento: "Secretaria",
+  });
+  addLider({
+    nome: "Gabriela Diniz",
+    telefone: "5511988880002",
+    cargos: ["secretaria", "lider"],
+    departamento: "Secretaria",
+  });
+
+  const eventosMock = [
+    {
+      summary: "Culto de Domingo",
+      start: { dateTime: "2026-09-27T18:00:00-03:00" },
+      location: "Templo",
+    },
+  ];
+
+  const mensagensEnviadas = [];
+  const fakeClient = {
+    sendMessage: async (to, txt) => {
+      mensagensEnviadas.push({ to, txt });
+    },
+  };
+
+  // 1. Em dia que NÃO é segunda-feira (ex: domingo 2026-09-20), não deve enviar
+  const resDomingo = await processarEnvioAgendaSecretarias({
+    client: fakeClient,
+    buscarEventos: async () => eventosMock,
+    dataBase: new Date("2026-09-20T10:00:00.000Z"), // Domingo
+  });
+  assert.equal(resDomingo.pulado, true);
+  assert.equal(mensagensEnviadas.length, 0);
+
+  // 2. Em uma segunda-feira (2026-09-21), deve enviar para Isabelly e Gabriela
+  const resSegunda = await processarEnvioAgendaSecretarias({
+    client: fakeClient,
+    buscarEventos: async () => eventosMock,
+    dataBase: new Date("2026-09-21T10:00:00.000Z"), // Segunda-feira
+  });
+  assert.equal(resSegunda.enviados, 2);
+  assert.equal(mensagensEnviadas.length, 2);
+  assert.ok(mensagensEnviadas.some((m) => m.to === "5511988880001@c.us"));
+  assert.ok(mensagensEnviadas.some((m) => m.to === "5511988880002@c.us"));
+  assert.match(mensagensEnviadas[0].txt, /AGENDA QUINZENAL DAS SECRETÁRIAS/);
+  assert.match(mensagensEnviadas[0].txt, /Culto de Domingo/);
+
+  // 3. Reexecução no mesmo dia não deve duplicar (idempotência)
+  const resSegundaNovamente = await processarEnvioAgendaSecretarias({
+    client: fakeClient,
+    buscarEventos: async () => eventosMock,
+    dataBase: new Date("2026-09-21T14:00:00.000Z"), // Mesma segunda-feira
+  });
+  assert.equal(resSegundaNovamente.pulado, true);
+  assert.equal(mensagensEnviadas.length, 2); // Não aumentou
 });

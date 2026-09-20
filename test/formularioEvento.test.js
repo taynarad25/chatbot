@@ -63,25 +63,24 @@ async function simularPreenchimentoFormulario({
   const totalPerguntas = perguntasIniciais.length;
   let ultimaMsg;
 
-  for (let i = 0; i < totalPerguntas; i++) {
-    const pergunta = etapas[solicitanteId].perguntas[etapas[solicitanteId].indicePergunta];
-    const resposta = obterResposta(pergunta, i);
+  let loopCount = 0;
+  while (etapas[solicitanteId] && loopCount < 50) {
+    const info = etapas[solicitanteId];
+    const pergunta = info.perguntas[info.indicePergunta];
+    if (!pergunta) break;
+    const resposta = obterResposta(pergunta, loopCount++);
     ultimaMsg = criarMsgFalsa(resposta);
 
     await processarRespostaFormulario({
       msg: ultimaMsg,
       numero: solicitanteId,
-      info: etapas[solicitanteId],
+      info,
       client,
       notificarSecretaria,
       notificarMultimidia,
       etapas,
       enviarWebhook,
     });
-
-    if (i < totalPerguntas - 1) {
-      assert.ok(etapas[solicitanteId], "deve manter o estado até a última pergunta");
-    }
   }
 
   return { etapas, client, solicitanteId, gruposNotificados, multimidiasNotificados, ultimaMsg, perguntasIniciais };
@@ -155,13 +154,14 @@ test("iniciarFormularioEvento: evento com dados anteriores pula campos repetidos
   assert.ok(idsPerguntas.includes("horario_total"), "deve conter horario_total");
   assert.ok(idsPerguntas.includes("valor_inscricao"), "deve conter valor_inscricao");
   assert.ok(idsPerguntas.includes("precisa_valor_ministerio"), "deve conter precisa_valor_ministerio");
+  assert.ok(idsPerguntas.includes("midia_ja_feita"), "deve conter midia_ja_feita");
   assert.ok(idsPerguntas.includes("prazo_imagem"), "deve conter prazo_imagem");
   assert.ok(idsPerguntas.includes("data_maxima_divulgacao"), "deve conter data_maxima_divulgacao");
   assert.ok(idsPerguntas.includes("objetivo_espiritual"), "deve conter objetivo_espiritual");
   assert.ok(!idsPerguntas.includes("resultado_esperado"), "resultado_esperado foi unificado no objetivo_espiritual");
 
-  // Total de perguntas filtradas: 25 - 4 = 21 perguntas
-  assert.equal(etapas[solicitanteId].perguntas.length, 21);
+  // Total de perguntas filtradas: 26 - 4 = 22 perguntas
+  assert.equal(etapas[solicitanteId].perguntas.length, 22);
 
   // Mensagem inicial destaca os dados já salvos
   assert.equal(client.mensagensEnviadas.length, 1);
@@ -171,7 +171,54 @@ test("iniciarFormularioEvento: evento com dados anteriores pula campos repetidos
   assert.match(msgIntro, /16:00 às 19:00/);
   assert.match(msgIntro, /Salão Nobre/);
   assert.match(msgIntro, /Chá de Mulheres/);
-  assert.match(msgIntro, /1\/21/);
+  assert.match(msgIntro, /1\/22/);
+});
+
+test("processarRespostaFormulario: quando midia_ja_feita for SIM pula paleta, estilo, prazo_imagem e data_maxima_divulgacao", async () => {
+  let payloadRecebido = null;
+  const mockEnviarWebhook = async (payload) => {
+    payloadRecebido = payload;
+    return {
+      status: "success",
+      url: "https://docs.google.com/document/d/teste-midia-pulada/edit",
+    };
+  };
+
+  const respostasPerguntas = [];
+  const { etapas, client, solicitanteId } = await simularPreenchimentoFormulario({
+    dadosIniciais: {
+      rede: "Rede de Homens",
+      evento: "Café dos Homens",
+      local: "Templo",
+      dataFormatada: "10/11/2026",
+      horarioInicio: "08:00",
+      horarioFim: "11:00",
+    },
+    obterResposta: (pergunta) => {
+      respostasPerguntas.push(pergunta.id);
+      if (pergunta.id === "midia_ja_feita") {
+        return "Sim, já fizemos a arte com a equipe";
+      }
+      return `Valor para ${pergunta.id}`;
+    },
+    enviarWebhook: mockEnviarWebhook,
+  });
+
+  assert.equal(etapas[solicitanteId], undefined, "deve concluir o formulário normalmente");
+  // Verifica se as perguntas puladas NÃO foram feitas
+  assert.ok(respostasPerguntas.includes("midia_ja_feita"), "deve perguntar midia_ja_feita");
+  assert.ok(!respostasPerguntas.includes("paleta"), "NÃO deve perguntar paleta");
+  assert.ok(!respostasPerguntas.includes("estilo"), "NÃO deve perguntar estilo");
+  assert.ok(!respostasPerguntas.includes("prazo_imagem"), "NÃO deve perguntar prazo_imagem");
+  assert.ok(!respostasPerguntas.includes("data_maxima_divulgacao"), "NÃO deve perguntar data_maxima_divulgacao");
+  assert.ok(respostasPerguntas.includes("responsavel_geral"), "deve pular direto para responsavel_geral");
+
+  // Verifica se o payload preencheu os campos pulados com os valores padrão adequados
+  assert.equal(payloadRecebido.midia_ja_feita, "Sim, já fizemos a arte com a equipe");
+  assert.equal(payloadRecebido.paleta, "Já realizada previamente com a equipe de multimídia");
+  assert.equal(payloadRecebido.estilo, "Já realizada previamente com a equipe de multimídia");
+  assert.equal(payloadRecebido.prazo_imagem, "Arte já concluída");
+  assert.equal(payloadRecebido.data_maxima_divulgacao, "");
 });
 
 test("iniciarFormularioEvento: se dadosIniciais for de reunião, NUNCA inicia o formulário", async () => {
@@ -469,7 +516,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   assert.match(diretasEnviadas[0].texto, /Agendamento Confirmado e Gravado/);
   assert.match(diretasEnviadas[1].texto, /FORMULÁRIO INTERNO DO EVENTO/);
   assert.match(diretasEnviadas[1].texto, /Conferência Atos 2/);
-  assert.match(diretasEnviadas[1].texto, /1\/21/); // 25 perguntas menos as 4 puladas (nome, data, horario, local) = 21
+  assert.match(diretasEnviadas[1].texto, /1\/22/); // 26 perguntas menos as 4 puladas (nome, data, horario, local) = 22
 
   // 3. Líder responde o formulário conversacional
   assert.ok(etapas[NUMERO_LIDER]);
@@ -483,6 +530,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     "Sim, precisaremos de recursos", // precisa_valor_ministerio
     "A Família no Altar", // tema
     "Josué 24:15", // versiculo
+    "Não", // midia_ja_feita
     "Bordeaux e Dourado", // paleta
     "Elegante", // estilo
     "Diácono Carlos", // responsavel_geral
@@ -502,7 +550,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   for (let i = 0; i < respostasParaEnviar.length; i++) {
     const resp = await enviarPrivado(respostasParaEnviar[i]);
     if (i < respostasParaEnviar.length - 1) {
-      assert.match(resp[0], new RegExp(`\\[${i + 2}\\/21\\]`));
+      assert.match(resp[0], new RegExp(`\\[${i + 2}\\/22\\]`));
     } else {
       // Última resposta
       assert.match(resp[0], /Gerando o documento oficial no Google Docs/);
@@ -535,6 +583,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     publico: "Casais e Famílias",
     tema: "A Família no Altar",
     versiculo: "Josué 24:15",
+    midia_ja_feita: "Não",
     paleta: "Bordeaux e Dourado",
     estilo: "Elegante",
     responsavel_geral: "Diácono Carlos",

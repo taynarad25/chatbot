@@ -3,10 +3,163 @@ const moment = require("moment-timezone");
 const DIAS_SEMANA_PLURAL = ["Domingos", "Segundas-feiras", "Terças-feiras", "Quartas-feiras", "Quintas-feiras", "Sextas-feiras", "Sábados"];
 const DIAS_SEMANA = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
+function normalizarTextoComparacao(str = "") {
+  return String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extrairFaixaHorarioTexto(texto = "") {
+  if (!texto) return null;
+  const match = texto.match(/(?:das?\s*)?(\d{1,2})(?::(\d{2})|h(?:(\d{2}))?)?\s*(?:às?|as?|ate|até|-)\s*(\d{1,2})(?::(\d{2})|h(?:(\d{2}))?)?/i);
+  if (match) {
+    const hIni = String(match[1]).padStart(2, "0");
+    const mIni = String(match[2] || match[3] || "00").padStart(2, "0");
+    const hFim = String(match[4]).padStart(2, "0");
+    const mFim = String(match[5] || match[6] || "00").padStart(2, "0");
+    return { inicio: `${hIni}:${mIni}`, fim: `${hFim}:${mFim}` };
+  }
+  const matchInicio = texto.match(/(?:a partir das?|às?|as?)\s*(\d{1,2})(?::(\d{2})|h(?:(\d{2}))?)/i);
+  if (matchInicio) {
+    const hIni = String(matchInicio[1]).padStart(2, "0");
+    const mIni = String(matchInicio[2] || matchInicio[3] || "00").padStart(2, "0");
+    return { inicio: `${hIni}:${mIni}`, fim: null };
+  }
+  return null;
+}
+
+function identificarInfoPreparacaoLimpeza(ev = {}) {
+  const summary = (ev.summary || "").trim();
+  const description = (ev.description || "").trim();
+
+  const matchPrefixo =
+    summary.match(/^\[(?:preparaç[aã]o(?:\/decoraç[aã]o)?|decoraç[aã]o|limpeza|montagem)\]\s*(.*)$/i) ||
+    summary.match(/^(?:preparaç[aã]o(?:\/decoraç[aã]o)?|decoraç[aã]o|limpeza|montagem)\s*[-:]\s*(.*)$/i);
+
+  let nomePrincipal = matchPrefixo ? matchPrefixo[1].trim() : "";
+
+  const matchDesc = description.match(/Evento Principal:\s*([^\n\r]+)/i);
+  if (matchDesc && matchDesc[1]) {
+    nomePrincipal = matchDesc[1].trim();
+  }
+
+  const isPrep = Boolean(
+    matchPrefixo ||
+    matchDesc ||
+    /\[preparação\]|\[preparacao\]|\[decoração\]|\[decoracao\]|\[limpeza\]|\[montagem\]/i.test(summary) ||
+    /montagem, preparação, decoração ou limpeza/i.test(description)
+  );
+
+  return { isPrep, nomePrincipal };
+}
+
+function formatarLinhaPreparacaoLimpeza(faixa, isVespera = false) {
+  if (!faixa) return "";
+  const prefixoVespera = isVespera ? "Véspera " : "";
+  if (faixa.inicio && faixa.fim) {
+    return `${prefixoVespera}${faixa.inicio} às ${faixa.fim} — horário para preparação e limpeza`;
+  }
+  if (faixa.inicio) {
+    return `${prefixoVespera}A partir das ${faixa.inicio} — horário para preparação e limpeza`;
+  }
+  return "";
+}
+
+function unificarEventosPreparacaoLimpeza(eventos = []) {
+  if (!Array.isArray(eventos) || eventos.length === 0) return eventos;
+
+  const preps = [];
+  const principais = [];
+
+  eventos.forEach(ev => {
+    const info = identificarInfoPreparacaoLimpeza(ev);
+    if (info.isPrep) {
+      preps.push({ ev, nomePrincipal: info.nomePrincipal });
+    } else {
+      principais.push(ev);
+    }
+  });
+
+  if (preps.length === 0) {
+    principais.forEach(ev => {
+      if (!ev.horarioPreparacaoLimpeza && ev.description) {
+        const faixa = extrairFaixaHorarioTexto(ev.description);
+        if (faixa && /montagem|preparaç|decoraç|limpeza|horário total/i.test(ev.description)) {
+          ev.horarioPreparacaoLimpeza = formatarLinhaPreparacaoLimpeza(faixa);
+        }
+      }
+    });
+    return eventos;
+  }
+
+  const prepsNaoVinculados = [];
+
+  preps.forEach(({ ev: evPrep, nomePrincipal }) => {
+    const normNome = normalizarTextoComparacao(nomePrincipal);
+    const datePrep = moment.tz(evPrep.start?.dateTime || evPrep.start?.date, "America/Sao_Paulo");
+
+    let alvo = principais.find(p => {
+      const normP = normalizarTextoComparacao(p.summary);
+      const matchNome = (normNome && (normP === normNome || normP.includes(normNome) || normNome.includes(normP)));
+      if (!matchNome) return false;
+      const dateP = moment.tz(p.start?.dateTime || p.start?.date, "America/Sao_Paulo");
+      const diffDias = Math.abs(dateP.diff(datePrep, "days", true));
+      return diffDias <= 1.5;
+    });
+
+    if (alvo) {
+      const dateP = moment.tz(alvo.start?.dateTime || alvo.start?.date, "America/Sao_Paulo");
+      const isVespera = datePrep.isBefore(dateP, "day");
+
+      let faixa = extrairFaixaHorarioTexto(evPrep.description);
+      if (!faixa && evPrep.start?.dateTime) {
+        const hIni = datePrep.format("HH:mm");
+        const hFim = evPrep.end?.dateTime ? moment.tz(evPrep.end.dateTime, "America/Sao_Paulo").format("HH:mm") : null;
+        faixa = { inicio: hIni, fim: hFim };
+      }
+
+      if (faixa) {
+        if (!alvo._faixasPrep) alvo._faixasPrep = [];
+        alvo._faixasPrep.push({ faixa, isVespera });
+      }
+    } else {
+      prepsNaoVinculados.push(evPrep);
+    }
+  });
+
+  principais.forEach(p => {
+    if (p._faixasPrep && p._faixasPrep.length > 0) {
+      const faixasMesmoDia = p._faixasPrep.filter(f => !f.isVespera);
+      if (faixasMesmoDia.length > 0) {
+        const inis = faixasMesmoDia.map(f => f.faixa.inicio).filter(Boolean).sort();
+        const fims = faixasMesmoDia.map(f => f.faixa.fim).filter(Boolean).sort();
+        const menorIni = inis[0];
+        const maiorFim = fims[fims.length - 1];
+        p.horarioPreparacaoLimpeza = formatarLinhaPreparacaoLimpeza({ inicio: menorIni, fim: maiorFim }, false);
+      } else {
+        const fVesp = p._faixasPrep[0];
+        p.horarioPreparacaoLimpeza = formatarLinhaPreparacaoLimpeza(fVesp.faixa, fVesp.isVespera);
+      }
+    } else if (!p.horarioPreparacaoLimpeza && p.description) {
+      const faixa = extrairFaixaHorarioTexto(p.description);
+      if (faixa && /montagem|preparaç|decoraç|limpeza|horário total/i.test(p.description)) {
+        p.horarioPreparacaoLimpeza = formatarLinhaPreparacaoLimpeza(faixa);
+      }
+    }
+  });
+
+  return [...principais, ...prepsNaoVinculados];
+}
+
 // Agrupa eventos em itens numerados para exibição: 3+ ocorrências do mesmo
 // nome/horário/dia da semana viram um único item "recorrente" (ex: "Todas as Quintas");
 // o restante vira um item "único" por evento, preservando o comportamento já existente.
-function agruparEventosAgenda(eventos) {
+function agruparEventosAgenda(eventosRaw = []) {
+  const eventos = unificarEventosPreparacaoLimpeza(eventosRaw);
   const porChave = {};
   eventos.forEach(ev => {
     const startStr = ev.start.dateTime || ev.start.date;
@@ -22,6 +175,8 @@ function agruparEventosAgenda(eventos) {
   const itens = [];
   Object.values(porChave).forEach(grupo => {
     grupo.eventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
+    const prepLimpeza = grupo.eventos.find(e => e.horarioPreparacaoLimpeza)?.horarioPreparacaoLimpeza || null;
+
     if (grupo.eventos.length >= 3) {
       itens.push({
         tipo: "recorrente",
@@ -30,6 +185,7 @@ function agruparEventosAgenda(eventos) {
         weekday: grupo.weekday,
         eventos: grupo.eventos,
         primeiraData: new Date(grupo.eventos[0].start.dateTime || grupo.eventos[0].start.date),
+        horarioPreparacaoLimpeza: prepLimpeza,
       });
     } else {
       grupo.eventos.forEach(ev => {
@@ -41,6 +197,7 @@ function agruparEventosAgenda(eventos) {
           dataFmt: d.format("DD/MM"),
           eventos: [ev],
           primeiraData: d.toDate(),
+          horarioPreparacaoLimpeza: ev.horarioPreparacaoLimpeza || prepLimpeza,
         });
       });
     }
@@ -104,7 +261,65 @@ function classificarSecaoEvento(item, agendasInternas = {}) {
   return "IGREJA";
 }
 
-function montarMensagemAgendaCompletaPorSecoes(itens, tituloPeriodo, agendasInternas = {}, opcoes = {}) {
+function unificarItensAgendaPreparacao(itens = []) {
+  if (!Array.isArray(itens) || itens.length === 0) return itens;
+  const preps = [];
+  const principais = [];
+
+  itens.forEach(it => {
+    const sum = it.summary || "";
+    const ev = it.eventos && it.eventos[0];
+    const desc = ev?.description || "";
+    const info = identificarInfoPreparacaoLimpeza({ summary: sum, description: desc });
+    if (info.isPrep) {
+      preps.push({ item: it, nomePrincipal: info.nomePrincipal });
+    } else {
+      principais.push(it);
+    }
+  });
+
+  if (preps.length === 0) return itens;
+
+  const prepsNaoVinculados = [];
+
+  preps.forEach(({ item: itPrep, nomePrincipal }) => {
+    const normNome = normalizarTextoComparacao(nomePrincipal);
+    const evPrep = itPrep.eventos && itPrep.eventos[0];
+    const datePrep = itPrep.primeiraData ? moment.tz(itPrep.primeiraData, "America/Sao_Paulo") : null;
+
+    let alvo = principais.find(p => {
+      const normP = normalizarTextoComparacao(p.summary);
+      const matchNome = (normNome && (normP === normNome || normP.includes(normNome) || normNome.includes(normP)));
+      if (!matchNome) return false;
+      if (!datePrep) return true;
+      const dateP = p.primeiraData ? moment.tz(p.primeiraData, "America/Sao_Paulo") : null;
+      if (!dateP) return true;
+      return Math.abs(dateP.diff(datePrep, "days", true)) <= 1.5;
+    });
+
+    if (alvo) {
+      if (!alvo.horarioPreparacaoLimpeza) {
+        let faixa = extrairFaixaHorarioTexto(evPrep?.description);
+        if (!faixa && evPrep?.start?.dateTime) {
+          const hIni = moment.tz(evPrep.start.dateTime, "America/Sao_Paulo").format("HH:mm");
+          const hFim = evPrep.end?.dateTime ? moment.tz(evPrep.end.dateTime, "America/Sao_Paulo").format("HH:mm") : null;
+          faixa = { inicio: hIni, fim: hFim };
+        } else if (!faixa && itPrep.horaFmt) {
+          faixa = { inicio: itPrep.horaFmt, fim: null };
+        }
+        if (faixa) {
+          alvo.horarioPreparacaoLimpeza = formatarLinhaPreparacaoLimpeza(faixa);
+        }
+      }
+    } else {
+      prepsNaoVinculados.push(itPrep);
+    }
+  });
+
+  return [...principais, ...prepsNaoVinculados];
+}
+
+function montarMensagemAgendaCompletaPorSecoes(itensRaw, tituloPeriodo, agendasInternas = {}, opcoes = {}) {
   let msgAgenda = `📋 *Agenda Completa — ${tituloPeriodo}*\n`;
   let agInternas = agendasInternas;
   let opts = opcoes;
@@ -119,9 +334,11 @@ function montarMensagemAgendaCompletaPorSecoes(itens, tituloPeriodo, agendasInte
     itensPorSecao[s.key] = [];
   });
 
+  const itens = unificarItensAgendaPreparacao(itensRaw);
+
   itens.forEach((item, i) => {
     const numero = i + 1;
-    const secaoKey = classificarSecaoEvento(item, agendasInternas);
+    const secaoKey = classificarSecaoEvento(item, agInternas);
     if (!itensPorSecao[secaoKey]) {
       itensPorSecao[secaoKey] = [];
     }
@@ -144,6 +361,9 @@ function montarMensagemAgendaCompletaPorSecoes(itens, tituloPeriodo, agendasInte
           msgAgenda += `${numero} - 🗓️ *${prefixo} ${DIAS_SEMANA_PLURAL[item.weekday]}*${horaStr} | ${tituloExibicao}\n`;
         } else {
           msgAgenda += `${numero} - 📌 *${item.dataFmt}*${horaStr} | ${tituloExibicao}\n`;
+        }
+        if (item.horarioPreparacaoLimpeza) {
+          msgAgenda += `   ⏰ ${item.horarioPreparacaoLimpeza}\n`;
         }
       });
     }
@@ -191,6 +411,9 @@ function montarDetalheEvento(item, opcoes = {}) {
   let detalhe = `📌 *${tituloExibicao}*\n\n`;
   detalhe += `📆 *Data:* ${dataFmt}\n`;
   detalhe += `⏰ *Horário:* ${horarioFmt}\n`;
+  if (item.horarioPreparacaoLimpeza) {
+    detalhe += `🧹 *Preparação e Limpeza:* ${item.horarioPreparacaoLimpeza}\n`;
+  }
   if (evento.location) {
     detalhe += `📍 *Local:* ${evento.location}\n`;
   }
@@ -297,4 +520,9 @@ module.exports = {
   montarDetalheEvento,
   interpretarPeriodoPersonalizado,
   isEventoFuturo,
+  extrairFaixaHorarioTexto,
+  identificarInfoPreparacaoLimpeza,
+  unificarEventosPreparacaoLimpeza,
+  unificarItensAgendaPreparacao,
 };
+

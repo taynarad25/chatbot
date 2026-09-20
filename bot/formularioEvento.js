@@ -134,6 +134,19 @@ async function notificarTesouraria(client, mensagem, { jidTesouraria } = {}) {
   }
 }
 
+function isMidiaJaFeita(dados = {}) {
+  const resp = dados.midia_ja_feita || "";
+  if (!resp) return false;
+  const s = String(resp).trim().toLowerCase();
+  if (/^(n|não|nao|negativo)\b/i.test(s) || /\b(não|nao)\b/i.test(s)) {
+    return false;
+  }
+  return (
+    /^(s|sim|ja|já|feita|feito|pronta|pronto)\b/i.test(s) ||
+    /\b(sim|já|feita|feito|pronta|pronto)\b/i.test(s)
+  );
+}
+
 const PERGUNTAS_DEFINICOES = [
   // 1. Nome do líder responsável
   ["nome_lider", "👤 *Nome do líder responsável:*\nQual é o nome do líder responsável pelo evento?"],
@@ -178,58 +191,71 @@ const PERGUNTAS_DEFINICOES = [
   // 11. Versículo Base (se houver)
   ["versiculo", "📖 *Versículo Base (se houver):*\nQual é o versículo base do evento? (Ou responda *Nenhum* / *Não*)"],
 
-  // 12. Cores da Identidade Visual (Paleta de Cores)
+  // 12. Mídia/Arte já foi feita previamente com a equipe de multimídia?
+  [
+    "midia_ja_feita",
+    "🎨 *Mídia e Artes de Divulgação:*\nA arte/mídia deste evento já foi feita previamente com a equipe de multimídia? (Responda *Sim* ou *Não*)",
+  ],
+
+  // 13. Cores da Identidade Visual (Paleta de Cores)
   [
     "paleta",
     "🎨 *Paleta de Cores (Identidade Visual):*\nQuais são as cores da identidade visual do evento? (Ex: Azul, branco e dourado / ou *A definir*)",
+    (d) => isMidiaJaFeita(d),
   ],
 
-  // 13. Mídias e Estilo Visual
+  // 14. Mídias e Estilo Visual (com instruções para materiais impressos)
   [
     "estilo",
-    "📱 *Mídias e Estilo Visual:*\nQuais mídias serão necessárias e qual o estilo visual desejado? (Ex: Flyer feed/stories, telão, vídeo teaser; jovem, elegante, minimalista / ou *Padrão*)",
+    "📱 *Mídias e Estilo Visual:*\nQuais mídias e artes serão necessárias e qual o estilo visual desejado? (Ex: Flyer feed/stories, telão, vídeo teaser; jovem, elegante, minimalista).\n\n🖨️ *Atenção para Materiais Impressos:*\nSe houver materiais impressos (banners, adesivos, panfletos, faixas), favor informar:\n• *Medida / dimensões exatas* (ex: 1x1m, 2x1m, A4)\n• *Formato* (ex: quadrado, círculo, retangular)\n• *Formato de envio* (ex: PDF para impressão ou imagem em alta resolução)\n(Ou responda *Padrão* / *Apenas digital*)",
+    (d) => isMidiaJaFeita(d),
   ],
 
-  // 14. Responsável Geral
+  // 15. Responsável Geral
   ["responsavel_geral", "👔 *Responsável Geral:*\nQuem será o responsável geral pela coordenação no dia do evento?"],
 
-  // 15. Haverá convidado (banda, pregador)?
+  // 16. Haverá convidado (banda, pregador)?
   ["convidado", "🎤 *Haverá convidado (banda, pregador)?*\nHaverá algum convidado especial (banda, pregador, cantor)? Se sim, quem? (Ou responda *Não*)"],
 
-  // 16. Louvor definido?
+  // 17. Louvor definido?
   ["louvor", "🎵 *Louvor definido?*\nO louvor já está definido (equipe/repertório)? (Ex: Sim / Não / A definir)"],
 
-  // 17. Decoração
+  // 18. Decoração
   ["decoracao", "🎈 *Decoração:*\nComo será a decoração ou quem ficará responsável? (Ou responda *Nenhuma* / *Simples*)"],
 
-  // 18. Alimentação
+  // 19. Alimentação
   ["alimentacao", "☕ *Alimentação:*\nHaverá alimentação (lanche, coffee break, almoço, jantar)? Se sim, descreva brevemente (ou responda *Não*)"],
 
-  // 19. Equipe (pré, durante e pós-evento)
+  // 20. Equipe (pré, durante e pós-evento)
   ["equipe", "👥 *Equipe (pré, durante e pós-evento):*\nComo está dividida a equipe de apoio (montagem pré-evento, durante e limpeza pós-evento)?"],
 
-  // 20. Materiais necessários
-  ["materiais", "📦 *Materiais necessários:*\nQuais materiais e equipamentos serão necessários? (Ex: Som, projetor, microfones, mesas / ou responda *Nenhum*)"],
-
-  // 21. Divulgação e Prazo da Imagem
+  // 21. Materiais necessários
   [
-    "prazo_imagem",
-    "📢 *Divulgação e Prazo:*\nAté quando você precisa da imagem/arte de divulgação pronta para a mídia e quais os canais? (Informe a data limite ou prazo desejado)",
+    "materiais",
+    "📦 *Materiais necessários:*\nQuais materiais e equipamentos serão necessários? (Ex: Som, microfones, projetor, mesas).\n\n🖨️ *Obs. para materiais impressos:* Se precisar de impressão pela igreja, informe as medidas, formato (círculo, quadrado) e formato de arquivo (PDF para impressão ou imagem), ou responda *Nenhum*.",
   ],
 
-  // 22. Data Máxima para Início da Divulgação
+  // 22. Divulgação e Prazo da Imagem
+  [
+    "prazo_imagem",
+    "📢 *Divulgação e Prazo:*\nAté quando você precisa das imagens e materiais prontos para divulgação e impressão? (Informe a data limite ou prazo desejado)",
+    (d) => isMidiaJaFeita(d),
+  ],
+
+  // 23. Data Máxima para Início da Divulgação
   [
     "data_maxima_divulgacao",
     "🗓️ *Data Máxima para Início da Divulgação:*\nQual é a data máxima para começar a divulgação deste evento? (Ex: DD/MM/AAAA - informe a data limite para iniciar as postagens ou responda *Não haverá* se não houver divulgação)",
+    (d) => isMidiaJaFeita(d),
   ],
 
-  // 23. Cronograma do evento
+  // 24. Cronograma do evento
   ["cronograma", "⏱️ *Cronograma do evento:*\nQual é o cronograma previsto do evento? (Ex: 19h Abertura, 19h30 Louvor, 20h Palavra, 21h Término)"],
 
-  // 24. Observações
+  // 25. Observações
   ["observacoes", "📝 *Observações:*\nAlguma observação, detalhe extra ou necessidade especial? (Ou responda *Nenhuma*)"],
 
-  // 25. Objetivo espiritual do evento (pergunta única unificada)
+  // 26. Objetivo espiritual do evento (pergunta única unificada)
   [
     "objetivo_espiritual",
     "🙏 *Objetivo espiritual do evento:*\nQual é o objetivo espiritual e o resultado esperado deste evento? (Descreva o propósito principal e o impacto esperado em vidas)",
@@ -332,17 +358,22 @@ function formatarResumoEventoGrupo(payload, { incluirTesouraria = true } = {}) {
   }
 
   // Informações de Divulgação, Mídias e Cores
-  if (cores) {
-    resumo += `\n🎨 *Cores:* ${cores}`;
-  }
-  if (midias) {
-    resumo += `\n📱 *Mídias:* ${midias}`;
-  }
-  if (divulgacao) {
-    resumo += `\n📢 *Divulgação:* ${divulgacao}`;
-  }
-  if (temConteudoRelevante(payload.data_maxima_divulgacao)) {
-    resumo += `\n🗓️ *Início da Divulgação:* ${payload.data_maxima_divulgacao}`;
+  // Informações de Divulgação, Mídias e Cores
+  if (isMidiaJaFeita(payload)) {
+    resumo += `\n🎨 *Mídia e Artes:* Já realizada previamente com a equipe de multimídia`;
+  } else {
+    if (cores) {
+      resumo += `\n🎨 *Cores:* ${cores}`;
+    }
+    if (midias) {
+      resumo += `\n📱 *Mídias:* ${midias}`;
+    }
+    if (divulgacao) {
+      resumo += `\n📢 *Divulgação:* ${divulgacao}`;
+    }
+    if (temConteudoRelevante(payload.data_maxima_divulgacao)) {
+      resumo += `\n🗓️ *Início da Divulgação:* ${payload.data_maxima_divulgacao}`;
+    }
   }
 
   if (incluirTesouraria && precisaDeValorDoMinisterio(payload.precisa_valor_ministerio)) {
@@ -353,7 +384,7 @@ function formatarResumoEventoGrupo(payload, { incluirTesouraria = true } = {}) {
 }
 
 const CAMPOS_RESPOSTAS_LIVRES = [
-  "publico", "tema", "versiculo", "paleta", "estilo",
+  "publico", "tema", "versiculo", "midia_ja_feita", "paleta", "estilo",
   "responsavel_geral", "convidado", "louvor", "decoracao",
   "alimentacao", "equipe", "materiais", "prazo_imagem",
   "data_maxima_divulgacao",
@@ -367,8 +398,13 @@ function montarPayloadFormulario(dadosIniciais = {}, respostas = {}) {
   const hFaixa = respostas.horario_inicio_termino || (hInicio && hFim ? `${hInicio} às ${hFim}` : "");
   const taxa = respostas.valor_inscricao || respostas.valor || "";
   const querTesouraria = precisaDeValorDoMinisterio(respostas.precisa_valor_ministerio);
-  const dataMaxDiv = respostas.data_maxima_divulgacao || respostas.dataMaximaDivulgacao || "";
-  const dataMaxDivIso = extrairDataIso(dataMaxDiv);
+  const jaFeita = isMidiaJaFeita(respostas);
+  const midiaJaFeitaVal = respostas.midia_ja_feita || (jaFeita ? "Sim" : "");
+  const paletaVal = respostas.paleta || (jaFeita ? "Já realizada previamente com a equipe de multimídia" : "");
+  const estiloVal = respostas.estilo || (jaFeita ? "Já realizada previamente com a equipe de multimídia" : "");
+  const prazoImagemVal = respostas.prazo_imagem || (jaFeita ? "Arte já concluída" : "");
+  const dataMaxDiv = jaFeita ? "" : (respostas.data_maxima_divulgacao || respostas.dataMaximaDivulgacao || "");
+  const dataMaxDivIso = jaFeita ? null : extrairDataIso(dataMaxDiv);
 
   const payload = {
     nome_lider: respostas.nome_lider || "",
@@ -387,12 +423,18 @@ function montarPayloadFormulario(dadosIniciais = {}, respostas = {}) {
     contato_tesouraria: querTesouraria ? CONTATO_TESOURARIA : "",
     aviso_tesouraria: querTesouraria ? `Entrar em contato com a tesouraria: ${CONTATO_TESOURARIA}` : "",
     resultado_esperado: respostas.objetivo_espiritual || "",
+    midia_ja_feita: midiaJaFeitaVal,
+    paleta: paletaVal,
+    estilo: estiloVal,
+    prazo_imagem: prazoImagemVal,
     data_maxima_divulgacao: dataMaxDiv,
-    dataMaximaDivulgacao: dataMaxDivIso || dataMaxDiv,
+    dataMaximaDivulgacao: dataMaxDivIso || dataMaxDiv || null,
   };
 
   for (const c of CAMPOS_RESPOSTAS_LIVRES) {
-    payload[c] = respostas[c] || "";
+    if (!payload[c]) {
+      payload[c] = respostas[c] || "";
+    }
   }
 
   if (respostas.cores && !payload.paleta) payload.paleta = respostas.cores;
@@ -474,6 +516,24 @@ async function processarRespostaFormulario({
   info.respostas[perguntaAtual.id] = respostaTexto;
   info.indicePergunta++;
 
+  // Pula dinamicamente perguntas subsequentes caso devePular seja satisfeito pelas respostas atuais
+  while (info.indicePergunta < info.perguntas.length) {
+    const proximaCandidata = info.perguntas[info.indicePergunta];
+    const contextoAtual = { ...info.dadosIniciais, ...info.respostas };
+    if (proximaCandidata.devePular && proximaCandidata.devePular(contextoAtual)) {
+      if (proximaCandidata.id === "paleta" || proximaCandidata.id === "estilo") {
+        info.respostas[proximaCandidata.id] = "Já realizada previamente com a equipe de multimídia";
+      } else if (proximaCandidata.id === "prazo_imagem") {
+        info.respostas[proximaCandidata.id] = "Arte já concluída";
+      } else if (proximaCandidata.id === "data_maxima_divulgacao") {
+        info.respostas[proximaCandidata.id] = "";
+      }
+      info.indicePergunta++;
+    } else {
+      break;
+    }
+  }
+
   if (info.indicePergunta < info.perguntas.length) {
     const proxima = info.perguntas[info.indicePergunta];
     const progresso = `📋 *[${info.indicePergunta + 1}/${info.perguntas.length}]*`;
@@ -513,6 +573,7 @@ async function processarRespostaFormulario({
     if (precisaExtra && calendar && calendar.events && typeof calendar.events.insert === "function" && agendasParaLer) {
       try {
         const { mapearRedeParaAgendaIndex } = require("./redes");
+        const { extrairFaixaHorarioTexto } = require("./agenda");
         const agendaDepto = agendasParaLer[mapearRedeParaAgendaIndex(payload.departamento)];
         if (agendaDepto) {
           let dataMom = moment.tz(payload.data, "DD/MM/YYYY", "America/Sao_Paulo");
@@ -522,8 +583,23 @@ async function processarRespostaFormulario({
           if (/dia anterior|v[eé]spera/i.test(textoExtra)) {
             dataMom = dataMom.clone().subtract(1, "day");
           }
-          const dataIsoIni = dataMom.clone().set({ hour: 18, minute: 0, second: 0 }).format();
-          const dataIsoFim = dataMom.clone().set({ hour: 21, minute: 0, second: 0 }).format();
+
+          const faixaExtra = extrairFaixaHorarioTexto(textoExtra);
+          let dataIsoIni;
+          let dataIsoFim;
+          if (faixaExtra && faixaExtra.inicio) {
+            const [hIni, mIni] = faixaExtra.inicio.split(":").map(Number);
+            dataIsoIni = dataMom.clone().set({ hour: hIni, minute: mIni, second: 0 }).format();
+            if (faixaExtra.fim) {
+              const [hFim, mFim] = faixaExtra.fim.split(":").map(Number);
+              dataIsoFim = dataMom.clone().set({ hour: hFim, minute: mFim, second: 0 }).format();
+            } else {
+              dataIsoFim = dataMom.clone().set({ hour: hIni + 2, minute: mIni, second: 0 }).format();
+            }
+          } else {
+            dataIsoIni = dataMom.clone().set({ hour: 18, minute: 0, second: 0 }).format();
+            dataIsoFim = dataMom.clone().set({ hour: 21, minute: 0, second: 0 }).format();
+          }
 
           const resourceExtra = {
             summary: `[Preparação/Decoração] ${payload.nome_evento}`,
@@ -560,7 +636,9 @@ async function processarRespostaFormulario({
     const temDivulgacao = temConteudoRelevante(payload.divulgacao || payload.prazo_imagem);
     const temCores = temConteudoRelevante(payload.cores || payload.paleta);
     const temDataDivulgacao = temConteudoRelevante(payload.data_maxima_divulgacao);
-    if (temMidia || temDivulgacao || temCores || temDataDivulgacao) {
+    const jaTemMidia = isMidiaJaFeita(payload);
+
+    if (temMidia || temDivulgacao || temCores || temDataDivulgacao || jaTemMidia) {
       const horario =
         payload.horario_inicio_termino ||
         (payload.horario_inicio && payload.horario_termino
@@ -577,10 +655,14 @@ async function processarRespostaFormulario({
 
       if (temConteudoRelevante(payload.tema)) resumoMultimidia += `\n✨ *Tema:* ${payload.tema}`;
       if (temConteudoRelevante(payload.versiculo)) resumoMultimidia += `\n📖 *Versículo Base:* ${payload.versiculo}`;
-      if (temCores) resumoMultimidia += `\n🎨 *Cores/Estilo:* ${payload.cores || payload.paleta}`;
-      if (temMidia) resumoMultimidia += `\n📱 *Mídias Solicitadas:* ${payload.midias || payload.estilo}`;
-      if (temDivulgacao) resumoMultimidia += `\n📢 *Divulgação / Prazo:* ${payload.divulgacao || payload.prazo_imagem}`;
-      if (temDataDivulgacao) resumoMultimidia += `\n🗓️ *Data Máxima para Início da Divulgação:* ${payload.data_maxima_divulgacao}`;
+      if (jaTemMidia) {
+        resumoMultimidia += `\n🎨 *Status da Arte:* Já realizada previamente com a equipe de multimídia`;
+      } else {
+        if (temCores) resumoMultimidia += `\n🎨 *Cores/Estilo:* ${payload.cores || payload.paleta}`;
+        if (temMidia) resumoMultimidia += `\n📱 *Mídias Solicitadas:* ${payload.midias || payload.estilo}`;
+        if (temDivulgacao) resumoMultimidia += `\n📢 *Divulgação / Prazo:* ${payload.divulgacao || payload.prazo_imagem}`;
+        if (temDataDivulgacao) resumoMultimidia += `\n🗓️ *Data Máxima para Início da Divulgação:* ${payload.data_maxima_divulgacao}`;
+      }
       if (linkDoc) resumoMultimidia += `\n\n📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}`;
 
       try {
@@ -664,4 +746,5 @@ module.exports = {
   obterFormularioEvento,
   extrairDataIso,
   temConteudoRelevante,
+  isMidiaJaFeita,
 };

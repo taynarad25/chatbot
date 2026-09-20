@@ -321,3 +321,66 @@ test("Privacidade Pastoral: Pastores (isPastor=true) visualizam nome do discípu
   assert.match(detalhe, /Motivo sensível/);
 });
 
+test("Unificação Agenda Completa: horários de preparação/limpeza aparecem unificados sob o evento principal", () => {
+  const evPrincipal = evento({
+    data: "2026-09-20",
+    hora: "18:00",
+    horaFim: "21:00",
+    summary: "Conferência Atos 2",
+    location: "Salão Nobre",
+  });
+  const evPrepLimpeza = {
+    summary: "[Preparação/Decoração] Conferência Atos 2",
+    description: "Horários informados: 16:00 as 22:00\nEvento Principal: Conferência Atos 2",
+    start: { dateTime: "2026-09-20T16:00:00-03:00" },
+    end: { dateTime: "2026-09-20T22:00:00-03:00" },
+  };
+
+  const itens = agruparEventosAgenda([evPrincipal, evPrepLimpeza]);
+
+  // Deve haver apenas 1 item (o evento de preparação foi unificado ao principal)
+  assert.equal(itens.length, 1);
+  assert.equal(itens[0].summary, "Conferência Atos 2");
+  assert.match(itens[0].horarioPreparacaoLimpeza, /16:00 às 22:00 — horário para preparação e limpeza/);
+
+  // Na agenda completa por seções, o horário de preparação aparece unificado com início e término
+  const msgCompleta = montarMensagemAgendaCompletaPorSecoes(itens, "Setembro", AGENDAS_INTERNAS, { isPastor: false });
+  assert.match(msgCompleta, /📌 \*20\/09\* às 18:00 \| Conferência Atos 2/);
+  assert.match(msgCompleta, /⏰ 16:00 às 22:00 — horário para preparação e limpeza/);
+  assert.doesNotMatch(msgCompleta, /\[Preparação\/Decoração\]/);
+
+  // No detalhe do evento, a linha de preparação também está presente
+  const detalhe = montarDetalheEvento(itens[0]);
+  assert.match(detalhe, /🧹 \*Preparação e Limpeza:\* 16:00 às 22:00 — horário para preparação e limpeza/);
+});
+
+test("Unificação Agenda Completa: eventos múltiplos de pré-montagem e pós-limpeza unem início e término", () => {
+  const evPrincipal = evento({
+    data: "2026-10-10",
+    hora: "19:00",
+    horaFim: "21:30",
+    summary: "Culto Especial de Celebração",
+  });
+  const evPre = {
+    summary: "[Preparação] Culto Especial de Celebração",
+    start: { dateTime: "2026-10-10T16:30:00-03:00" },
+    end: { dateTime: "2026-10-10T19:00:00-03:00" },
+  };
+  const evPos = {
+    summary: "[Limpeza] Culto Especial de Celebração",
+    start: { dateTime: "2026-10-10T21:30:00-03:00" },
+    end: { dateTime: "2026-10-10T23:00:00-03:00" },
+  };
+
+  const itens = agruparEventosAgenda([evPrincipal, evPre, evPos]);
+  assert.equal(itens.length, 1);
+  assert.equal(itens[0].summary, "Culto Especial de Celebração");
+  assert.match(itens[0].horarioPreparacaoLimpeza, /16:30 às 23:00 — horário para preparação e limpeza/);
+
+  const msgCompleta = montarMensagemAgendaCompletaPorSecoes(itens, "Outubro", AGENDAS_INTERNAS);
+  assert.match(msgCompleta, /⏰ 16:30 às 23:00 — horário para preparação e limpeza/);
+  assert.doesNotMatch(msgCompleta, /\[Preparação\]/);
+  assert.doesNotMatch(msgCompleta, /\[Limpeza\]/);
+});
+
+

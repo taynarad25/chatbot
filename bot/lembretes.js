@@ -1,7 +1,8 @@
 const db = require("../db");
 const { REDES } = require("./redes");
 const { obterFormularioEvento } = require("./formularioEvento");
-const { notificarMultimidia } = require("./secretaria");
+const { notificarMultimidia, notificarSecretaria } = require("./secretaria");
+const { unificarEventosPreparacaoLimpeza } = require("./agenda");
 const { obterUsuarioPorTelefone, obterLideresPorDepartamento } = require("../web/lideres");
 
 function formatarDataBrasil(isoOrDateStr) {
@@ -242,6 +243,7 @@ async function processarLembretesEventos({
   agendasParaLer = [],
   diasAntecedencia = 5,
   dataBase = new Date(),
+  notificarSecretariaFn = notificarSecretaria,
 } = {}) {
   if (!buscarEventos || typeof buscarEventos !== "function") {
     console.log("[Lembretes] buscarEventos não fornecido.");
@@ -473,7 +475,7 @@ async function processarLembretesEventos({
           horario,
           local,
           departamento: dest.departamento,
-          docUrl: dest.docUrl,
+          docUrl: diasAntecedencia === 5 ? dest.docUrl : "",
           diasRestantes: diasAntecedencia,
         });
       }
@@ -489,8 +491,23 @@ async function processarLembretesEventos({
         }
       } else {
         console.log(`[Lembretes] [Simulação] Mensagem para ${dest.telefone} sobre "${titulo}":\n${msg}`);
+        totalEnviados++;
       }
       registrarLembreteEnviado(eventoId, tipoLembrete, dest.telefone);
+
+      // Notifica secretaria sobre lembretes enviados aos líderes (eventos e reuniões - pastoral NUNCA vai para grupo)
+      if (!isPastoral && notificarSecretariaFn && typeof notificarSecretariaFn === "function") {
+        const tipoDesc = isReuniao ? "Reunião" : "Evento";
+        const formAviso = (diasAntecedencia === 5 && dest.docUrl) ? `\n📄 *Formulário Anexado:* ${dest.docUrl}` : "";
+        const msgSecretaria =
+          `📋 *Aviso à Secretaria - Lembrete de ${tipoDesc}*\n` +
+          `Lembrete de *${diasAntecedencia} dias* enviado ao líder *${dest.nome || "Líder"}* (${dest.telefone}) sobre *${titulo}*:${formAviso}\n\n${msg}`;
+        try {
+          await notificarSecretariaFn(client, msgSecretaria);
+        } catch (errSec) {
+          console.error(`[Lembretes] Falha ao enviar cópia do lembrete para secretaria:`, errSec.message);
+        }
+      }
     }
   }
 
@@ -588,6 +605,183 @@ async function processarLembretesDivulgacaoMultimidia({
   return { processados: rows.length, enviados: totalEnviados };
 }
 
+/**
+ * Monta o texto resumido da agenda das próximas 2 semanas para as secretárias.
+ */
+function montarMensagemAgendaQuinzenalSecretarias(eventos = [], dataInicio = "", dataFim = "") {
+  const inicioBr = formatarDataBrasil(dataInicio);
+  const fimBr = formatarDataBrasil(dataFim);
+
+  let cabecalho =
+    `🗓️ *AGENDA QUINZENAL DAS SECRETÁRIAS*\n` +
+    `Período: *${inicioBr}* a *${fimBr}*\n` +
+    `Acompanhamento dos eventos e programações das próximas 2 semanas.\n\n`;
+
+  if (!Array.isArray(eventos) || eventos.length === 0) {
+    return cabecalho + `_Nenhum evento agendado para as próximas duas semanas._ 🙏`;
+  }
+
+  // Unifica blocos de limpeza e preparação para não poluir a agenda com itens duplicados
+  const eventosTratados = typeof unificarEventosPreparacaoLimpeza === "function"
+    ? unificarEventosPreparacaoLimpeza(eventos)
+    : eventos;
+
+  // Ordena cronologicamente
+  const ordenados = [...eventosTratados].sort((a, b) => {
+    const timeA = new Date(a.start?.dateTime || a.start?.date || 0).getTime();
+    const timeB = new Date(b.start?.dateTime || b.start?.date || 0).getTime();
+    return timeA - timeB;
+  });
+
+  // Agrupa por data
+  const porData = {};
+  for (const ev of ordenados) {
+    const rawData = ev.start?.dateTime ? ev.start.dateTime.split("T")[0] : (ev.start?.date || "A definir");
+    if (!porData[rawData]) porData[rawData] = [];
+    porData[rawData].push(ev);
+  }
+
+  const DIAS_SEMANA = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+
+  let corpo = "";
+  for (const [dataIso, evs] of Object.entries(porData)) {
+    let tituloData = formatarDataBrasil(dataIso);
+    try {
+      const [ano, mes, dia] = dataIso.split("-").map(Number);
+      const dt = new Date(ano, mes - 1, dia);
+      const diaSemana = DIAS_SEMANA[dt.getDay()];
+      tituloData = `📅 *${tituloData} (${diaSemana})*`;
+    } catch {
+      tituloData = `📅 *${tituloData}*`;
+    }
+
+    corpo += `${tituloData}\n`;
+    for (const ev of evs) {
+      const hora = formatarHoraBrasil(ev.start?.dateTime);
+      const horaStr = hora ? ` às *${hora}*` : "";
+      const localStr = ev.location ? ` | 📍 ${ev.location}` : "";
+      corpo += `• *${ev.summary || "Evento"}*${horaStr}${localStr}\n`;
+      if (ev.horarioPreparacaoLimpeza) {
+        corpo += `  🧹 _${ev.horarioPreparacaoLimpeza}_\n`;
+      }
+    }
+    corpo += `\n`;
+  }
+
+  corpo += `_Que tenham uma excelente e abençoada quinzena de trabalho ministerial!_ ✨🙏`;
+  return cabecalho + corpo;
+}
+
+/**
+ * Toda segunda-feira de manhã envia a agenda das próximas duas semanas (14 dias)
+ * para Isabelly Lacerda e Gabriela Diniz (secretárias).
+ */
+async function processarEnvioAgendaSecretarias({
+  client,
+  buscarEventos,
+  agendasParaLer = [],
+  dataBase = new Date(),
+  destinatarios = null,
+  forcar = false,
+} = {}) {
+  const diaSemana = dataBase.getDay(); // 0 = Domingo, 1 = Segunda
+  if (!forcar && diaSemana !== 1) {
+    console.log("[Lembretes:Secretaria] Hoje não é segunda-feira. Envio da agenda quinzenal ignorado.");
+    return { processados: 0, enviados: 0, pulado: true, motivo: "Nao e segunda-feira" };
+  }
+
+  const ano = dataBase.getFullYear();
+  const mes = String(dataBase.getMonth() + 1).padStart(2, "0");
+  const dia = String(dataBase.getDate()).padStart(2, "0");
+  const dataBaseStr = `${ano}-${mes}-${dia}`;
+  const chaveEnvio = `agenda_quinzenal_secretarias_${dataBaseStr}`;
+
+  if (!forcar) {
+    const jaEnviado = buscarLembreteEnviado(chaveEnvio, "agenda_quinzenal_secretarias");
+    if (jaEnviado) {
+      console.log(`[Lembretes:Secretaria] Agenda quinzenal de ${dataBaseStr} já enviada anteriormente.`);
+      return { processados: 0, enviados: 0, pulado: true, motivo: "Ja enviado hoje" };
+    }
+  }
+
+  if (!buscarEventos || typeof buscarEventos !== "function") {
+    console.log("[Lembretes:Secretaria] buscarEventos não fornecido.");
+    return { processados: 0, enviados: 0 };
+  }
+
+  const inicioJanela = new Date(ano, dataBase.getMonth(), dataBase.getDate(), 0, 0, 0);
+  const fimJanela = new Date(inicioJanela);
+  fimJanela.setDate(fimJanela.getDate() + 14);
+  fimJanela.setHours(23, 59, 59, 999);
+
+  let eventos = [];
+  try {
+    eventos = await buscarEventos(inicioJanela.toISOString(), fimJanela.toISOString());
+  } catch (err) {
+    console.error("[Lembretes:Secretaria] Erro ao buscar eventos para agenda quinzenal:", err.message);
+    return { processados: 0, enviados: 0, erro: err.message };
+  }
+
+  // Resolve as secretárias destinatárias (Isabelly Lacerda e Gabriela Diniz)
+  let listaDest = destinatarios;
+  if (!listaDest || listaDest.length === 0) {
+    listaDest = [];
+    try {
+      const rows = db.prepare(`
+        SELECT telefone, nome FROM lideres 
+        WHERE LOWER(nome) LIKE '%isabelly%' 
+           OR LOWER(nome) LIKE '%gabriela diniz%' 
+           OR LOWER(nome) LIKE '%gabriela%' 
+           OR LOWER(cargos) LIKE '%secretaria%'
+      `).all();
+      for (const r of rows) {
+        if (r.telefone && !listaDest.some((d) => d.telefone === r.telefone)) {
+          listaDest.push({ telefone: r.telefone, nome: r.nome });
+        }
+      }
+    } catch (e) {
+      console.error("[Lembretes:Secretaria] Erro ao consultar secretárias no banco:", e.message);
+    }
+
+    if (process.env.SECRETARIA_TELEFONES) {
+      const telsEnv = process.env.SECRETARIA_TELEFONES.split(",").map((t) => t.trim()).filter(Boolean);
+      for (const t of telsEnv) {
+        if (!listaDest.some((d) => d.telefone === t)) {
+          listaDest.push({ telefone: t, nome: "Secretária" });
+        }
+      }
+    }
+  }
+
+  if (listaDest.length === 0) {
+    console.warn("[Lembretes:Secretaria] Nenhuma secretária (Isabelly / Gabriela) encontrada para envio.");
+    return { processados: eventos.length, enviados: 0, aviso: "Nenhuma secretaria encontrada" };
+  }
+
+  const dataFimStr = `${fimJanela.getFullYear()}-${String(fimJanela.getMonth() + 1).padStart(2, "0")}-${String(fimJanela.getDate()).padStart(2, "0")}`;
+  const mensagem = montarMensagemAgendaQuinzenalSecretarias(eventos, dataBaseStr, dataFimStr);
+
+  let totalEnviados = 0;
+  for (const dest of listaDest) {
+    const jid = formatarJidWhatsApp(dest.telefone);
+    if (client && typeof client.sendMessage === "function") {
+      try {
+        await client.sendMessage(jid, mensagem);
+        console.log(`[Lembretes:Secretaria] Agenda quinzenal enviada com sucesso para ${dest.nome} (${dest.telefone})`);
+        totalEnviados++;
+      } catch (errSend) {
+        console.error(`[Lembretes:Secretaria] Falha ao enviar agenda para ${dest.telefone}:`, errSend.message);
+      }
+    } else {
+      console.log(`[Lembretes:Secretaria] [Simulação] Envio para ${dest.telefone}:\n${mensagem}`);
+      totalEnviados++;
+    }
+    registrarLembreteEnviado(chaveEnvio, "agenda_quinzenal_secretarias", dest.telefone);
+  }
+
+  return { processados: eventos.length, enviados: totalEnviados };
+}
+
 function iniciarAgendadorLembretes({
   client,
   buscarEventos,
@@ -635,6 +829,13 @@ function iniciarAgendadorLembretes({
         client,
         diasAntecedencia: 3,
       });
+
+      // 6. Agenda quinzenal para secretárias (toda segunda-feira)
+      await processarEnvioAgendaSecretarias({
+        client,
+        buscarEventos,
+        agendasParaLer,
+      });
     } catch (err) {
       console.error("[Agendador Lembretes] Erro no processamento:", err);
     } finally {
@@ -669,6 +870,7 @@ module.exports = {
   montarMensagemLembreteMultimidia,
   montarMensagemConfirmacaoAtendimento,
   montarMensagemConfirmacaoReuniao,
+  montarMensagemAgendaQuinzenalSecretarias,
   ehEnsaio,
   ehReuniao,
   ehAtendimentoPastoral,
@@ -678,5 +880,6 @@ module.exports = {
   buscarPastorAgendamento,
   processarLembretesEventos,
   processarLembretesDivulgacaoMultimidia,
+  processarEnvioAgendaSecretarias,
   iniciarAgendadorLembretes,
 };

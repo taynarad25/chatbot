@@ -168,7 +168,17 @@ async function executarBroadcast({
 
   for (let i = 0; i < listaAlvo.length; i++) {
     const dest = listaAlvo[i];
-    const jid = formatarJidWhatsApp(dest.telefone);
+    let jid = formatarJidWhatsApp(dest.telefone);
+    if (client && typeof client.getNumberId === "function") {
+      try {
+        const contactId = await client.getNumberId(dest.telefone);
+        if (contactId && contactId._serialized) {
+          jid = contactId._serialized;
+        }
+      } catch (errId) {
+        console.warn(`[Broadcast] Falha ao resolver numberId para ${dest.telefone}:`, errId.message);
+      }
+    }
 
     if (!jid || jid.includes("@g.us")) {
       console.warn(`[Broadcast] Destinatário ignorado (JID inválido ou grupo): ${dest.telefone}`);
@@ -177,13 +187,18 @@ async function executarBroadcast({
 
     let enviadoComSucesso = false;
     try {
+      let resEnvio = null;
       if (mediaObj && client && typeof client.sendMessage === "function") {
         const options = texto ? { caption: texto } : {};
         console.log(`[Broadcast] (${i + 1}/${total}) Enviando mídia (${mediaObj.mimetype || "sem mimetype"}) para ${dest.nome} (${mascararTelefone(dest.telefone)})...`);
-        await enviarMensagemResiliente(client, jid, mediaObj, options, { jid });
+        resEnvio = await enviarMensagemResiliente(client, jid, mediaObj, options, { jid });
       } else if (texto && client && typeof client.sendMessage === "function") {
         console.log(`[Broadcast] (${i + 1}/${total}) Enviando texto para ${dest.nome} (${mascararTelefone(dest.telefone)})...`);
-        await enviarMensagemResiliente(client, jid, texto, {}, { jid });
+        resEnvio = await enviarMensagemResiliente(client, jid, texto, {}, { jid });
+      }
+
+      if (resEnvio === null || (typeof resEnvio === "object" && resEnvio !== null && resEnvio.id && Object.keys(resEnvio.id).length === 0 && !resEnvio.ack && !resEnvio._serialized)) {
+        throw new Error("Envio não confirmado pelo cliente WhatsApp");
       }
 
       enviados++;
@@ -201,7 +216,10 @@ async function executarBroadcast({
         try {
           console.log(`[Broadcast] Tentando fallback enviando mídia do arquivo em disco: ${media.caminhoArquivo}...`);
           const mediaDoDisco = carregarMidiaDeDisco(media.caminhoArquivo);
-          await enviarMensagemResiliente(client, jid, mediaDoDisco, texto ? { caption: texto } : {}, { jid });
+          const resFallback = await enviarMensagemResiliente(client, jid, mediaDoDisco, texto ? { caption: texto } : {}, { jid });
+          if (resFallback === null || (typeof resFallback === "object" && resFallback !== null && resFallback.id && Object.keys(resFallback.id).length === 0 && !resFallback.ack && !resFallback._serialized)) {
+            throw new Error("Envio via fallback de disco não confirmado");
+          }
           enviados++;
           enviadoComSucesso = true;
           destinatariosEnviados.push(dest);

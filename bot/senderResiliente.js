@@ -107,13 +107,15 @@ async function injetarPatchesCompatibilidade(pupPage) {
                 if (chat && chat.msgs) {
                   if (typeof chat.msgs.last === "function") {
                     const last = chat.msgs.last();
-                    if (last) return last;
+                    if (last && last.id && (last.id._serialized || last.id.id)) return last;
                   }
                   if (Array.isArray(chat.msgs._models) && chat.msgs._models.length > 0) {
-                    return chat.msgs._models[chat.msgs._models.length - 1];
+                    const last = chat.msgs._models[chat.msgs._models.length - 1];
+                    if (last && last.id && (last.id._serialized || last.id.id)) return last;
                   }
                 }
-                return { id: message?.id || {}, ack: 1, body: message?.body || "" };
+                // Se a mensagem não consta no chat, relança o erro para ativar retry ou fallback
+                throw err;
               }
               throw err;
             }
