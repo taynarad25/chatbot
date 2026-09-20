@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /usr/src/app
 
 # Garante que a pasta de trabalho e diretórios temporários pertencem ao usuário node
-RUN mkdir -p /usr/src/app/temp/media && chown -R node:node /usr/src/app
+RUN mkdir -p /usr/src/app/temp/media /usr/src/app/.wwebjs_auth /usr/src/app/.wwebjs_cache && chown -R node:node /usr/src/app
 
 # Roda como usuário node por segurança e boas práticas
 USER node

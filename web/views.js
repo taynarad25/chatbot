@@ -978,19 +978,34 @@ function renderIndexHtml() {
 
       // Lógica de Status detalhada
       let statusText = 'Desconectado';
-      if (json.connected) statusText = 'Conectado ✅';
-      else if (json.canceling) statusText = 'Cancelando... 🛑';
-      else if (json.hasQr) statusText = 'QR Code Gerado! Aguardando leitura... 📱';
-      else if (json.generatingQr) statusText = 'Gerando QR Code... ⚙️';
-      else if (json.initializing) statusText = 'Inicializando... ⏳';
+      if (json.connected) {
+        statusText = 'Conectado ✅';
+      } else if (json.authenticated) {
+        const perc = (json.loadingPercent !== undefined && json.loadingPercent !== null) ? ' (' + json.loadingPercent + '%)' : '';
+        const msg = json.loadingMessage ? ' - ' + json.loadingMessage : '';
+        statusText = 'Autenticado! Sincronizando dados com o WhatsApp... 🔄' + perc + msg;
+      } else if (json.canceling) {
+        statusText = 'Cancelando... 🛑';
+      } else if (json.hasQr) {
+        statusText = 'QR Code Gerado! Aguardando leitura no celular... 📱';
+      } else if (json.generatingQr) {
+        statusText = 'Gerando QR Code... ⚙️';
+      } else if (json.initializing) {
+        statusText = 'Inicializando navegador... ⏳';
+      }
 
       document.getElementById('status').innerHTML = '<strong>Status:</strong> ' + statusText;
       
-      if (json.hasQr) document.getElementById('qr').innerHTML = '<img src="'+json.qrDataUrl+'" />';
-      else document.getElementById('qr').innerHTML = '';
+      if (json.hasQr && !json.authenticated && !json.connected) {
+        document.getElementById('qr').innerHTML = '<img src="'+json.qrDataUrl+'" alt="QR Code WhatsApp" />';
+      } else if (json.authenticated && !json.connected) {
+        document.getElementById('qr').innerHTML = '<div style="padding: 24px; text-align: center; color: #38bdf8; background: rgba(56, 189, 248, 0.08); border-radius: 12px; border: 1px dashed rgba(56, 189, 248, 0.3); margin-top: 15px;"><span style="font-size: 2.2rem;">📲</span><br/><strong style="font-size: 1.05rem; display: block; margin: 8px 0; color: #f3f4f6;">QR Code escaneado com sucesso!</strong>Sincronizando mensagens e conversas com o WhatsApp... Aguarde um instante.</div>';
+      } else {
+        document.getElementById('qr').innerHTML = '';
+      }
 
       // Regra de exibição dos botões
-      const isWorking = json.initializing || json.generatingQr || json.hasQr || json.canceling;
+      const isWorking = json.initializing || json.generatingQr || json.hasQr || json.canceling || json.authenticated;
       document.getElementById('disconnect').style.display = json.connected ? 'inline-block' : 'none';
       document.getElementById('cancelQr').style.display = isWorking && !json.connected ? 'inline-block' : 'none';
       document.getElementById('requestQr').style.display = !json.connected && !isWorking ? 'inline-block' : 'none';

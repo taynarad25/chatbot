@@ -192,6 +192,9 @@ const etapas = {};
 
 let client;
 let clientReady = false;
+let clientAuthenticated = false;
+let loadingPercent = 0;
+let loadingMessage = "";
 let isInitializing = false;
 let pendingQr = null;
 let clientId = "bot";
@@ -240,14 +243,19 @@ function criarClient() {
 
   const puppeteerOpts = {
     headless: true,
-    timeout: 60000, // Aumenta o tempo limite para abrir o Chrome na VM
+    timeout: 120000, // Aumenta o tempo limite de inicialização para 2 minutos
     args: [
       '--no-sandbox',
-      '--disable-dev-shm-usage',
       '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
       '--disable-gpu',
       '--disable-extensions',
-      '--no-zygote',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
     ]
   };
 
@@ -257,33 +265,48 @@ function criarClient() {
     puppeteerOpts.executablePath = '/usr/bin/chromium';
   }
 
+  // Define User-Agent condizente com o sistema operacional para evitar bloqueio por spoofing inconsistente
+  const defaultUserAgent = process.platform === 'win32'
+    ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
   const clientOptions = {
     authStrategy: new LocalAuth({ clientId, dataPath: path.join(ROOT_DIR, ".wwebjs_auth") }),
-    authTimeoutMs: 60000, // Aumenta tempo de espera da autenticação
+    authTimeoutMs: 0, // Desativa timeout de autenticação rígido para evitar cancelamento prematuro na sincronização
     puppeteer: puppeteerOpts,
-    userAgent: process.env.WHATSAPP_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    userAgent: process.env.WHATSAPP_USER_AGENT || defaultUserAgent,
   };
 
-  // Suporte a cache de versão do WhatsApp Web para estabilidade de downloadMedia
+  // Suporte a cache de versão do WhatsApp Web para máxima estabilidade
+  const defaultRemotePath = 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html';
   if (process.env.WWEB_VERSION_REMOTE_PATH) {
     clientOptions.webVersionCache = {
       type: 'remote',
       remotePath: process.env.WWEB_VERSION_REMOTE_PATH,
-      strict: true,
+      strict: false,
     };
-    console.log(`[Config] webVersionCache remoto configurado: ${process.env.WWEB_VERSION_REMOTE_PATH}`);
+    console.log(`[Config] webVersionCache remoto customizado configurado: ${process.env.WWEB_VERSION_REMOTE_PATH}`);
   } else if (process.env.WWEB_CACHE_TYPE === 'local' || process.env.WWEB_VERSION) {
     clientOptions.webVersionCache = {
       type: 'local',
       path: path.join(ROOT_DIR, '.wwebjs_cache'),
     };
     console.log(`[Config] webVersionCache local configurado em .wwebjs_cache`);
+  } else {
+    clientOptions.webVersionCache = {
+      type: 'remote',
+      remotePath: defaultRemotePath,
+      strict: false,
+    };
+    console.log(`[Config] webVersionCache remoto configurado com versão homologada da comunidade.`);
   }
 
   client = new Client(clientOptions);
 
   client.on("qr", async (qr) => {
     console.log("✅ QR Code gerado com sucesso.");
+    clientAuthenticated = false;
+    loadingPercent = 0;
     try {
       const dataUrl = await qrcode.toDataURL(qr);
       pendingQr = { qr, dataUrl, createdAt: new Date().toISOString() };
@@ -293,12 +316,31 @@ function criarClient() {
     }
   });
 
+  client.on("authenticated", () => {
+    clientAuthenticated = true;
+    pendingQr = null; // Remove o QR Code da tela imediatamente após a leitura
+    isGeneratingQr = false;
+    console.log("✅ Autenticado no WhatsApp com sucesso! Sincronizando dados e conversas...");
+  });
+
+  client.on("loading_screen", (percent, message) => {
+    loadingPercent = percent;
+    loadingMessage = message || "WhatsApp";
+    console.log(`[WhatsApp] ⏳ Sincronizando dados: ${percent}% (${message || 'Carregando'})`);
+  });
+
+  client.on("change_state", (state) => {
+    console.log(`[WhatsApp] 📶 Estado da sessão alterado para: ${state}`);
+  });
+
   client.on("ready", async () => {
     clientReady = true;
+    clientAuthenticated = true;
     pendingQr = null;
     isGeneratingQr = false;
+    loadingPercent = 100;
     saveBotState(true); // Salva como ativo apenas quando a conexão é confirmada
-    console.log("✅ Bot conectado!");
+    console.log("✅ Bot conectado e pronto para uso!");
 
     try {
       const waVersion = await client.getWWebVersion();
@@ -368,13 +410,11 @@ function criarClient() {
     }
   });
 
-  client.on("authenticated", () => {
-    console.log("✅ Autenticado no WhatsApp");
-  });
-
   client.on("auth_failure", (msg) => {
     console.error("Falha na autenticação:", msg);
     clientReady = false;
+    clientAuthenticated = false;
+    loadingPercent = 0;
     pendingQr = null;
     isGeneratingQr = false;
     isInitializing = false;
@@ -383,6 +423,8 @@ function criarClient() {
 
   client.on("disconnected", async (reason) => {
     clientReady = false;
+    clientAuthenticated = false;
+    loadingPercent = 0;
     pendingQr = null;
     isGeneratingQr = false;
     isInitializing = false;
@@ -516,6 +558,9 @@ async function cancelQr() {
     client = null;
     saveBotState(false); // Salva que o bot DEVE estar parado
     clientReady = false;
+    clientAuthenticated = false;
+    loadingPercent = 0;
+    loadingMessage = "";
     isInitializing = false;
     isGeneratingQr = false;
     pendingQr = null;
@@ -536,6 +581,9 @@ async function disconnectClient(shouldLogout = true) {
   const currentClient = client;
   client = null;
   clientReady = false;
+  clientAuthenticated = false;
+  loadingPercent = 0;
+  loadingMessage = "";
   isInitializing = false;
   isGeneratingQr = false;
   pendingQr = null;
@@ -581,6 +629,9 @@ async function disconnectClient(shouldLogout = true) {
   } finally {
     client = null;
     clientReady = false;
+    clientAuthenticated = false;
+    loadingPercent = 0;
+    loadingMessage = "";
     isInitializing = false;
     isGeneratingQr = false;
     pendingQr = null;
@@ -590,10 +641,13 @@ async function disconnectClient(shouldLogout = true) {
 function getStatus() {
   return {
     connected: clientReady,
+    authenticated: clientAuthenticated,
+    loadingPercent,
+    loadingMessage,
     initializing: isInitializing,
     generatingQr: isGeneratingQr,
     canceling: isCanceling,
-    hasQr: !!pendingQr,
+    hasQr: !!pendingQr && !clientAuthenticated,
     qrDataUrl: pendingQr?.dataUrl || null,
     qrCreatedAt: pendingQr?.createdAt || null,
   };
