@@ -16,7 +16,7 @@ const { createMessageHandler } = require("./messageHandler");
 const { telefonesLideres, loadLideres, listLideres } = require("../web/lideres");
 const { notificarAlerta, extrairAlerta } = require("./alertas");
 const { garantirDiretorioTemp, limparMidiasAntigas } = require("./mediaStorage");
-const { aplicarResilienciaClient } = require("./senderResiliente");
+const { aplicarResilienciaClient, injetarPatchesCompatibilidade } = require("./senderResiliente");
 const db = require("../db");
 
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
@@ -372,7 +372,8 @@ function criarClient() {
             window.WWebJS._patchedIdSerialization = true;
           }
         });
-        console.log("[WhatsApp] 🛡️ Patch de serialização de IDs de mensagens injetado no navegador.");
+        await injetarPatchesCompatibilidade(client.pupPage);
+        console.log("[WhatsApp] 🛡️ Patches de serialização e resiliência de mensagens injetados no navegador.");
       }
     } catch (errPatch) {
       console.warn(`[WhatsApp] Aviso ao aplicar patch de IDs no navegador: ${errPatch.message}`);

@@ -30,8 +30,100 @@ function isTransientPuppeteerError(err) {
     msg.includes("Cannot read properties of undefined (reading 'getChat')") ||
     msg.includes("Cannot read properties of undefined (reading 'sendMessage')") ||
     msg.includes("WWebJS is not defined") ||
-    msg.includes("Evaluation failed")
+    msg.includes("Evaluation failed") ||
+    msg.includes("Data passed to getter must include an id property") ||
+    msg.includes("it's how we memoize")
   );
+}
+
+/**
+ * Injeta correções no ambiente de execução do navegador para contornar problemas de compatibilidade
+ * de versões recentes do WhatsApp Web (como MsgKey._serialized indefinido que gera erro de memoização no Store.Msg.get).
+ * @param {object} pupPage 
+ */
+async function injetarPatchesCompatibilidade(pupPage) {
+  if (!pupPage || typeof pupPage.evaluate !== "function") return;
+  try {
+    await pupPage.evaluate(() => {
+      try {
+        if (typeof window === "undefined") return;
+
+        // 1. Garante getters _serialized nos protótipos de MsgKey e Wid
+        if (window.Store) {
+          if (window.Store.MsgKey && window.Store.MsgKey.prototype) {
+            const desc = Object.getOwnPropertyDescriptor(window.Store.MsgKey.prototype, "_serialized");
+            if (!desc || typeof desc.get !== "function") {
+              Object.defineProperty(window.Store.MsgKey.prototype, "_serialized", {
+                get: function () {
+                  return this.$1 || (typeof this.toString === "function" ? this.toString() : "");
+                },
+                configurable: true,
+                enumerable: true,
+              });
+            }
+          }
+
+          if (window.Store.Wid && window.Store.Wid.prototype) {
+            const desc = Object.getOwnPropertyDescriptor(window.Store.Wid.prototype, "_serialized");
+            if (!desc || typeof desc.get !== "function") {
+              Object.defineProperty(window.Store.Wid.prototype, "_serialized", {
+                get: function () {
+                  return this.$1 || (typeof this.toString === "function" ? this.toString() : "");
+                },
+                configurable: true,
+                enumerable: true,
+              });
+            }
+          }
+
+          // 2. Protege window.Store.Msg.get contra chamadas com id indefinido que geram erro de memoize
+          if (window.Store.Msg && typeof window.Store.Msg.get === "function" && !window.Store.Msg._patchedMemoizeSafe) {
+            const originalGet = window.Store.Msg.get.bind(window.Store.Msg);
+            window.Store.Msg.get = function (id) {
+              if (!id) return null;
+              try {
+                return originalGet(id);
+              } catch (err) {
+                if (err && err.message && err.message.includes("Data passed to getter must include an id property")) {
+                  return null;
+                }
+                throw err;
+              }
+            };
+            window.Store.Msg._patchedMemoizeSafe = true;
+          }
+        }
+
+        // 3. Protege window.WWebJS.sendMessage para recuperar a mensagem enviada caso o getter final falhe
+        if (window.WWebJS && typeof window.WWebJS.sendMessage === "function" && !window.WWebJS.sendMessage._patchedMemoize) {
+          const originalSendMessage = window.WWebJS.sendMessage;
+          const patchedSendMessage = async function (chat, message, options = {}, sendMsgResult) {
+            try {
+              return await originalSendMessage(chat, message, options, sendMsgResult);
+            } catch (err) {
+              const msgErro = err?.message || "";
+              if (msgErro.includes("Data passed to getter must include an id property") || msgErro.includes("it's how we memoize")) {
+                // A mensagem já foi inserida e enviada pelo Store.SendMessage. Tenta recuperar do chat.
+                if (chat && chat.msgs) {
+                  if (typeof chat.msgs.last === "function") {
+                    const last = chat.msgs.last();
+                    if (last) return last;
+                  }
+                  if (Array.isArray(chat.msgs._models) && chat.msgs._models.length > 0) {
+                    return chat.msgs._models[chat.msgs._models.length - 1];
+                  }
+                }
+                return { id: message?.id || {}, ack: 1, body: message?.body || "" };
+              }
+              throw err;
+            }
+          };
+          patchedSendMessage._patchedMemoize = true;
+          window.WWebJS.sendMessage = patchedSendMessage;
+        }
+      } catch (_) {}
+    });
+  } catch (_) {}
 }
 
 /**
@@ -59,6 +151,7 @@ async function garantirAmbientePronto(client, timeoutMs = 8000) {
       });
 
       if (pronto) {
+        await injetarPatchesCompatibilidade(client.pupPage);
         return true;
       }
     } catch (_) {
@@ -169,6 +262,7 @@ function aplicarResilienciaClient(client) {
 
 module.exports = {
   isTransientPuppeteerError,
+  injetarPatchesCompatibilidade,
   garantirAmbientePronto,
   enviarComRetry,
   enviarMensagemResiliente,

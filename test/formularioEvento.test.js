@@ -9,6 +9,9 @@ const {
   PERGUNTAS_FORMULARIO,
   ENDERECO_IGREJA,
   CONTATO_TESOURARIA,
+  extrairDataIso,
+  salvarFormularioEvento,
+  obterFormularioEvento,
 } = require("../bot/formularioEvento");
 
 function criarClienteFalso() {
@@ -153,11 +156,12 @@ test("iniciarFormularioEvento: evento com dados anteriores pula campos repetidos
   assert.ok(idsPerguntas.includes("valor_inscricao"), "deve conter valor_inscricao");
   assert.ok(idsPerguntas.includes("precisa_valor_ministerio"), "deve conter precisa_valor_ministerio");
   assert.ok(idsPerguntas.includes("prazo_imagem"), "deve conter prazo_imagem");
+  assert.ok(idsPerguntas.includes("data_maxima_divulgacao"), "deve conter data_maxima_divulgacao");
   assert.ok(idsPerguntas.includes("objetivo_espiritual"), "deve conter objetivo_espiritual");
   assert.ok(!idsPerguntas.includes("resultado_esperado"), "resultado_esperado foi unificado no objetivo_espiritual");
 
-  // Total de perguntas filtradas: 24 - 4 = 20 perguntas
-  assert.equal(etapas[solicitanteId].perguntas.length, 20);
+  // Total de perguntas filtradas: 25 - 4 = 21 perguntas
+  assert.equal(etapas[solicitanteId].perguntas.length, 21);
 
   // Mensagem inicial destaca os dados já salvos
   assert.equal(client.mensagensEnviadas.length, 1);
@@ -167,7 +171,7 @@ test("iniciarFormularioEvento: evento com dados anteriores pula campos repetidos
   assert.match(msgIntro, /16:00 às 19:00/);
   assert.match(msgIntro, /Salão Nobre/);
   assert.match(msgIntro, /Chá de Mulheres/);
-  assert.match(msgIntro, /1\/20/);
+  assert.match(msgIntro, /1\/21/);
 });
 
 test("iniciarFormularioEvento: se dadosIniciais for de reunião, NUNCA inicia o formulário", async () => {
@@ -465,7 +469,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   assert.match(diretasEnviadas[0].texto, /Agendamento Confirmado e Gravado/);
   assert.match(diretasEnviadas[1].texto, /FORMULÁRIO INTERNO DO EVENTO/);
   assert.match(diretasEnviadas[1].texto, /Conferência Atos 2/);
-  assert.match(diretasEnviadas[1].texto, /1\/20/); // 24 perguntas menos as 4 puladas (nome, data, horario, local) = 20
+  assert.match(diretasEnviadas[1].texto, /1\/21/); // 25 perguntas menos as 4 puladas (nome, data, horario, local) = 21
 
   // 3. Líder responde o formulário conversacional
   assert.ok(etapas[NUMERO_LIDER]);
@@ -489,6 +493,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     "Recepção: 4 pessoas, Limpeza: 3 pessoas", // equipe
     "Som, 2 microfones sem fio, projetor", // materiais
     "10/12/2026", // prazo_imagem
+    "01/12/2026", // data_maxima_divulgacao
     "19h Louvor, 20h Ministração, 21h30 Jantar", // cronograma
     "Chegar com 1h de antecedência", // observacoes
     "Edificação das famílias e muitas vidas transformadas", // objetivo_espiritual
@@ -497,7 +502,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   for (let i = 0; i < respostasParaEnviar.length; i++) {
     const resp = await enviarPrivado(respostasParaEnviar[i]);
     if (i < respostasParaEnviar.length - 1) {
-      assert.match(resp[0], new RegExp(`\\[${i + 2}\\/20\\]`));
+      assert.match(resp[0], new RegExp(`\\[${i + 2}\\/21\\]`));
     } else {
       // Última resposta
       assert.match(resp[0], /Gerando o documento oficial no Google Docs/);
@@ -525,6 +530,8 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     contato_tesouraria: CONTATO_TESOURARIA,
     aviso_tesouraria: `Entrar em contato com a tesouraria: ${CONTATO_TESOURARIA}`,
     resultado_esperado: "Edificação das famílias e muitas vidas transformadas",
+    data_maxima_divulgacao: "01/12/2026",
+    dataMaximaDivulgacao: "2026-12-01",
     publico: "Casais e Famílias",
     tema: "A Família no Altar",
     versiculo: "Josué 24:15",
@@ -538,6 +545,7 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
     equipe: "Recepção: 4 pessoas, Limpeza: 3 pessoas",
     materiais: "Som, 2 microfones sem fio, projetor",
     prazo_imagem: "10/12/2026",
+    data_maxima_divulgacao: "01/12/2026",
     cronograma: "19h Louvor, 20h Ministração, 21h30 Jantar",
     observacoes: "Chegar com 1h de antecedência",
     objetivo_espiritual: "Edificação das famílias e muitas vidas transformadas",
@@ -623,4 +631,44 @@ test("processarRespostaFormulario: envia notificação estruturada ao grupo MULT
   assert.match(multimidiasNotificados[0], /Flyer para feed e stories/);
   assert.match(multimidiasNotificados[0], /Divulgar 10 dias antes/);
   assert.match(multimidiasNotificados[0], /Azul e branco/);
+});
+
+test("extrairDataIso: extrai corretamente formatos DD/MM/AAAA, DD/MM, AAAA-MM-DD e ignora respostas negativas", () => {
+  assert.equal(extrairDataIso("15/10/2026"), "2026-10-15");
+  assert.equal(extrairDataIso("15-10-2026"), "2026-10-15");
+  assert.equal(extrairDataIso("2026-10-15"), "2026-10-15");
+  assert.equal(extrairDataIso("05/11", 2026), "2026-11-05");
+  assert.equal(extrairDataIso("Não haverá divulgação"), null);
+  assert.equal(extrairDataIso("Sem divulgação"), null);
+  assert.equal(extrairDataIso("nao"), null);
+  assert.equal(extrairDataIso(""), null);
+  assert.equal(extrairDataIso(null), null);
+});
+
+test("salvarFormularioEvento e processarRespostaFormulario: salva dataMaximaDivulgacao e notifica MULTIMÍDIAS", async () => {
+  const { multimidiasNotificados } = await simularPreenchimentoFormulario({
+    dadosIniciais: {
+      rede: "Rede de Homens",
+      evento: "Congresso de Homens 2026",
+      local: "Igreja",
+      dataFormatada: "25/11/2026",
+      horarioInicio: "19:00",
+      horarioFim: "22:00",
+    },
+    enviarWebhook: async () => ({ status: "success", url: "https://docs.google.com/document/d/congresso-homens" }),
+    obterResposta: (pergunta) => {
+      if (pergunta.id === "data_maxima_divulgacao") return "01/11/2026";
+      if (pergunta.id === "prazo_imagem") return "Feed, stories e banners";
+      return "Resposta padrao";
+    },
+  });
+
+  const formSalvo = obterFormularioEvento("Congresso de Homens 2026");
+  assert.ok(formSalvo, "formulário deve ser encontrado no banco");
+  assert.equal(formSalvo.dataMaximaDivulgacao, "2026-11-01");
+  assert.equal(formSalvo.payload.data_maxima_divulgacao, "01/11/2026");
+
+  assert.equal(multimidiasNotificados.length, 1);
+  assert.match(multimidiasNotificados[0], /DEMANDA DE MÍDIA & COMUNICAÇÃO DE EVENTO/);
+  assert.match(multimidiasNotificados[0], /Data Máxima para Início da Divulgação:\* 01\/11\/2026/);
 });

@@ -11,6 +11,7 @@ const assert = require("node:assert/strict");
 const db = require("../db");
 const {
   montarMensagemLembrete,
+  montarMensagemLembreteMultimidia,
   montarMensagemConfirmacaoAtendimento,
   montarMensagemConfirmacaoReuniao,
   ehEnsaio,
@@ -22,6 +23,7 @@ const {
   buscarLembreteEnviado,
   registrarLembreteEnviado,
   processarLembretesEventos,
+  processarLembretesDivulgacaoMultimidia,
 } = require("../bot/lembretes");
 const { salvarFormularioEvento } = require("../bot/formularioEvento");
 const { addLider, listLideres, obterLideresPorDepartamento, obterUsuarioPorTelefone } = require("../web/lideres");
@@ -578,4 +580,171 @@ test("Atendimento Pastoral: confirmação é enviada para o pastor que a marcou 
   assert.doesNotMatch(mensagens[0].to, /@g\.us/); // NUNCA no grupo
   assert.match(mensagens[0].txt, /Olá, \*Pastor Gabriel\*! Tudo bem\?/);
   assert.match(mensagens[0].txt, /o atendimento pastoral com \*Marcos Ferreira\* agendado para amanhã \(19\/09\/2026 às \*16:00\*\) está confirmado\?/);
+});
+
+test("montarMensagemLembreteMultimidia formata detalhes de demanda e contatos de líder para a equipe de multimídia", () => {
+  const msg = montarMensagemLembreteMultimidia({
+    evento: "Retiro de Jovens Epifania",
+    departamento: "Epifania",
+    dataEvento: "2026-10-25",
+    horario: "19:00 às 22:00",
+    local: "Acampamento Betel",
+    dataDivulgacao: "2026-10-15",
+    diasRestantes: 5,
+    nomeLider: "Lucas Santos",
+    telefoneLider: "5511999991111",
+    tema: "Firmes na Rocha",
+    versiculo: "1 Co 15:58",
+    cores: "Azul marinho e dourado",
+    midias: "Flyer feed, stories e vídeo teaser",
+    canais: "Instagram e Telão do culto",
+    docUrl: "https://docs.google.com/document/d/doc-retiro-123",
+  });
+
+  assert.match(msg, /LEMBRETE DE DIVULGAÇÃO - MULTIMÍDIAS/);
+  assert.match(msg, /Faltam \*5 dias\* para a data máxima de início da divulgação do evento!/);
+  assert.match(msg, /Retiro de Jovens Epifania/);
+  assert.match(msg, /Epifania/);
+  assert.match(msg, /25\/10\/2026/);
+  assert.match(msg, /15\/10\/2026/);
+  assert.match(msg, /Lucas Santos \(5511999991111\)/);
+  assert.match(msg, /Firmes na Rocha/);
+  assert.match(msg, /1 Co 15:58/);
+  assert.match(msg, /Azul marinho e dourado/);
+  assert.match(msg, /Flyer feed, stories e vídeo teaser/);
+  assert.match(msg, /Instagram e Telão do culto/);
+  assert.match(msg, /https:\/\/docs\.google\.com\/document\/d\/doc-retiro-123/);
+});
+
+test("processarLembretesDivulgacaoMultimidia: envia lembrete ao grupo MULTIMÍDIAS com 5 dias e 3 dias antes", async () => {
+  const dataEvento = "2026-11-20";
+  const dataDivulgacao = "2026-11-10";
+
+  salvarFormularioEvento({
+    evento: "Noite de Louvor e Adoração",
+    departamento: "Rede Ruach",
+    data: "20/11/2026",
+    dataMaximaDivulgacao: dataDivulgacao,
+    solicitanteId: "5511988882222",
+    payload: {
+      nome_lider: "Renata Louvor",
+      departamento: "Rede Ruach",
+      data: "20/11/2026",
+      horario_inicio: "19:30",
+      horario_termino: "22:00",
+      tema: "Mais Perto de Ti",
+      estilo: "Flyer stories",
+      prazo_imagem: "Instagram",
+      data_maxima_divulgacao: "10/11/2026",
+    },
+    docUrl: "https://docs.google.com/document/d/louvor-doc",
+  });
+
+  const mensagensMultimidia = [];
+  const fakeNotificar = async (client, msg) => {
+    mensagensMultimidia.push(msg);
+  };
+
+  // 1. Teste de 5 dias antes (data base: 2026-11-05)
+  const dataBase5 = new Date("2026-11-05T12:00:00.000Z");
+  const res5 = await processarLembretesDivulgacaoMultimidia({
+    client: {},
+    diasAntecedencia: 5,
+    dataBase: dataBase5,
+    notificarFn: fakeNotificar,
+  });
+
+  assert.equal(res5.enviados, 1);
+  assert.equal(mensagensMultimidia.length, 1);
+  assert.match(mensagensMultimidia[0], /Faltam \*5 dias\*/);
+  assert.match(mensagensMultimidia[0], /Noite de Louvor e Adoração/);
+  assert.match(mensagensMultimidia[0], /Renata Louvor/);
+  assert.match(mensagensMultimidia[0], /Mais Perto de Ti/);
+
+  // Idempotência para 5 dias
+  const res5Dup = await processarLembretesDivulgacaoMultimidia({
+    client: {},
+    diasAntecedencia: 5,
+    dataBase: dataBase5,
+    notificarFn: fakeNotificar,
+  });
+  assert.equal(res5Dup.enviados, 0, "não deve enviar novamente o lembrete de 5 dias");
+  assert.equal(mensagensMultimidia.length, 1);
+
+  // 2. Teste de 3 dias antes (data base: 2026-11-07)
+  const dataBase3 = new Date("2026-11-07T12:00:00.000Z");
+  const res3 = await processarLembretesDivulgacaoMultimidia({
+    client: {},
+    diasAntecedencia: 3,
+    dataBase: dataBase3,
+    notificarFn: fakeNotificar,
+  });
+
+  assert.equal(res3.enviados, 1);
+  assert.equal(mensagensMultimidia.length, 2);
+  assert.match(mensagensMultimidia[1], /Faltam \*3 dias\*/);
+  assert.match(mensagensMultimidia[1], /Noite de Louvor e Adoração/);
+
+  // Idempotência para 3 dias
+  const res3Dup = await processarLembretesDivulgacaoMultimidia({
+    client: {},
+    diasAntecedencia: 3,
+    dataBase: dataBase3,
+    notificarFn: fakeNotificar,
+  });
+  assert.equal(res3Dup.enviados, 0, "não deve enviar novamente o lembrete de 3 dias");
+  assert.equal(mensagensMultimidia.length, 2);
+});
+
+test("processarLembretesEventos: envia lembrete de confirmação de evento ao líder faltando 3 dias", async () => {
+  const NUMERO_LIDER_3DIAS = "5511977770003";
+  addLider({
+    nome: "Tiago Líder",
+    telefone: NUMERO_LIDER_3DIAS,
+    cargos: ["lider"],
+    departamento: "Rede de Homens",
+  });
+
+  salvarFormularioEvento({
+    evento: "Café com Deus Homens",
+    departamento: "Rede de Homens",
+    data: "23/09/2026",
+    solicitanteId: NUMERO_LIDER_3DIAS,
+    payload: {
+      nome_lider: "Tiago Líder",
+      departamento: "Rede de Homens",
+    },
+  });
+
+  const dataBase = new Date("2026-09-20T10:00:00.000Z");
+  // Faltando 3 dias: 2026-09-23
+  const eventosAgenda = [
+    {
+      id: "ev-homens-3dias",
+      summary: "Café com Deus Homens",
+      start: { dateTime: "2026-09-23T08:00:00-03:00" },
+      calendarId: "agenda-homens",
+    },
+  ];
+
+  const mensagensLider = [];
+  const fakeClient = {
+    sendMessage: async (to, txt) => {
+      mensagensLider.push({ to, txt });
+    },
+  };
+
+  const res = await processarLembretesEventos({
+    client: fakeClient,
+    buscarEventos: async () => eventosAgenda,
+    agendasParaLer: [],
+    diasAntecedencia: 3,
+    dataBase,
+  });
+
+  assert.equal(res.enviados, 1);
+  assert.equal(mensagensLider.length, 1);
+  assert.equal(mensagensLider[0].to, `${NUMERO_LIDER_3DIAS}@c.us`);
+  assert.match(mensagensLider[0].txt, /Faltam \*3 dias\* para a realização do seu evento:/);
+  assert.match(mensagensLider[0].txt, /Café com Deus Homens/);
 });

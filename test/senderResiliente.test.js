@@ -23,6 +23,9 @@ test("senderResiliente: isTransientPuppeteerError detecta erros de CDP e context
   const erroWWebJSNaoDefinido = new Error("Cannot read properties of undefined (reading 'sendMessage')");
   assert.equal(isTransientPuppeteerError(erroWWebJSNaoDefinido), true);
 
+  const erroMemoizeGetter = new Error("Data passed to getter must include an id property (it's how we memoize) but got undefined");
+  assert.equal(isTransientPuppeteerError(erroMemoizeGetter), true);
+
   const erroNaoTransiente = new Error("Número de telefone não registrado no WhatsApp");
   assert.equal(isTransientPuppeteerError(erroNaoTransiente), false);
 

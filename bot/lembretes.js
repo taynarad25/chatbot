@@ -1,6 +1,7 @@
 const db = require("../db");
 const { REDES } = require("./redes");
 const { obterFormularioEvento } = require("./formularioEvento");
+const { notificarMultimidia } = require("./secretaria");
 const { obterUsuarioPorTelefone, obterLideresPorDepartamento } = require("../web/lideres");
 
 function formatarDataBrasil(isoOrDateStr) {
@@ -153,6 +154,64 @@ function montarMensagemLembrete({
   }
 
   msg += `\n_Que Deus abençoe ricamente a realização deste evento!_ 🙏✨`;
+  return msg;
+}
+
+function montarMensagemLembreteMultimidia({
+  evento = "",
+  departamento = "",
+  dataEvento = "",
+  horario = "",
+  local = "",
+  dataDivulgacao = "",
+  diasRestantes = 5,
+  nomeLider = "",
+  telefoneLider = "",
+  tema = "",
+  versiculo = "",
+  cores = "",
+  midias = "",
+  canais = "",
+  docUrl = "",
+} = {}) {
+  const dataEventoBr = formatarDataBrasil(dataEvento);
+  const dataDivulgacaoBr = formatarDataBrasil(dataDivulgacao);
+
+  let msg =
+    `📢 *LEMBRETE DE DIVULGAÇÃO - MULTIMÍDIAS*\n\n` +
+    `Faltam *${diasRestantes} dias* para a data máxima de início da divulgação do evento!\n\n` +
+    `📅 *Evento:* ${evento}\n`;
+
+  if (departamento) {
+    msg += `🏢 *Departamento:* ${departamento}\n`;
+  }
+  if (dataEventoBr) {
+    msg += `📆 *Data do Evento:* ${dataEventoBr}\n`;
+  }
+  if (horario) {
+    msg += `⏰ *Horário:* ${horario}\n`;
+  }
+  if (local) {
+    msg += `📍 *Local:* ${local}\n`;
+  }
+  if (dataDivulgacaoBr) {
+    msg += `🗓️ *Data Limite para Iniciar Divulgação:* ${dataDivulgacaoBr}\n`;
+  }
+  if (nomeLider) {
+    msg += `👤 *Líder Responsável:* ${nomeLider}${telefoneLider ? ` (${telefoneLider})` : ""}\n`;
+  }
+
+  if (tema) msg += `✨ *Tema:* ${tema}\n`;
+  if (versiculo) msg += `📖 *Versículo Base:* ${versiculo}\n`;
+  if (cores) msg += `🎨 *Cores/Identidade Visual:* ${cores}\n`;
+  if (midias) msg += `📱 *Mídias Solicitadas:* ${midias}\n`;
+  if (canais) msg += `📢 *Canais / Prazo da Arte:* ${canais}\n`;
+
+  if (docUrl) {
+    msg += `\n📄 *Documento Oficial (Google Docs):*\n${docUrl}\n`;
+  }
+
+  msg += `\n_Equipe de Multimídia, favor verificar o alinhamento das publicações e materiais de divulgação!_ 🙏✨`;
   return msg;
 }
 
@@ -438,6 +497,97 @@ async function processarLembretesEventos({
   return { processados: eventos.length, enviados: totalEnviados };
 }
 
+/**
+ * Processa formulários de eventos salvos no banco e envia lembretes para o grupo MULTIMÍDIAS
+ * 5 dias e 3 dias antes da data máxima para início da divulgação.
+ */
+async function processarLembretesDivulgacaoMultimidia({
+  client,
+  diasAntecedencia = 5,
+  dataBase = new Date(),
+  notificarFn = notificarMultimidia,
+} = {}) {
+  const targetDate = new Date(dataBase);
+  targetDate.setDate(targetDate.getDate() + diasAntecedencia);
+
+  const ano = targetDate.getFullYear();
+  const mes = String(targetDate.getMonth() + 1).padStart(2, "0");
+  const dia = String(targetDate.getDate()).padStart(2, "0");
+  const dataAlvoIso = `${ano}-${mes}-${dia}`;
+  const dataAlvoBr = `${dia}/${mes}/${ano}`;
+
+  console.log(`[Multimídia] Verificando eventos para início de divulgação (${diasAntecedencia} dias) em ${dataAlvoIso}...`);
+
+  let rows = [];
+  try {
+    rows = db.prepare(`
+      SELECT * FROM formularios_eventos
+      WHERE dataMaximaDivulgacao IS NOT NULL
+        AND (dataMaximaDivulgacao = ? OR dataMaximaDivulgacao = ?)
+    `).all(dataAlvoIso, dataAlvoBr);
+  } catch (err) {
+    console.error("[Multimídia] Erro ao consultar formulários de eventos para divulgação:", err.message);
+    return { processados: 0, enviados: 0, erro: err.message };
+  }
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    console.log(`[Multimídia] Nenhum evento com divulgação agendada para o dia ${dataAlvoIso}.`);
+    return { processados: 0, enviados: 0 };
+  }
+
+  let totalEnviados = 0;
+  const tipoLembrete = `multimidia_divulgacao_${diasAntecedencia}_dias`;
+
+  for (const row of rows) {
+    const eventoId = `divulgacao_${row.evento}`;
+    const jaEnviado = buscarLembreteEnviado(eventoId, tipoLembrete);
+    if (jaEnviado) {
+      continue;
+    }
+
+    let payload = {};
+    try {
+      payload = JSON.parse(row.payload || "{}");
+    } catch {}
+
+    const liderUser = row.solicitanteId ? obterUsuarioPorTelefone(row.solicitanteId) : null;
+    const nomeLider = liderUser?.nome || payload.nome_lider || payload.nomeSolicitante || "";
+    const telefoneLider = row.solicitanteId || "";
+
+    const msg = montarMensagemLembreteMultimidia({
+      evento: row.evento,
+      departamento: row.departamento || payload.departamento,
+      dataEvento: row.data || payload.data,
+      horario: payload.horario_inicio_termino || (payload.horario_inicio && payload.horario_termino ? `${payload.horario_inicio} às ${payload.horario_termino}` : payload.horario_inicio),
+      local: payload.local,
+      dataDivulgacao: row.dataMaximaDivulgacao || dataAlvoBr,
+      diasRestantes: diasAntecedencia,
+      nomeLider,
+      telefoneLider,
+      tema: payload.tema,
+      versiculo: payload.versiculo,
+      cores: payload.cores || payload.paleta,
+      midias: payload.midias || payload.estilo,
+      canais: payload.divulgacao || payload.prazo_imagem,
+      docUrl: row.docUrl || payload.docUrl,
+    });
+
+    try {
+      if (typeof notificarFn === "function") {
+        await notificarFn(client, msg);
+        console.log(`[Multimídia] Lembrete de divulgação (${diasAntecedencia} dias) enviado sobre "${row.evento}".`);
+        totalEnviados++;
+      }
+    } catch (errNotif) {
+      console.error(`[Multimídia] Erro ao notificar grupo sobre divulgação do evento "${row.evento}":`, errNotif.message);
+    }
+
+    registrarLembreteEnviado(eventoId, tipoLembrete, "MULTIMÍDIAS");
+  }
+
+  return { processados: rows.length, enviados: totalEnviados };
+}
+
 function iniciarAgendadorLembretes({
   client,
   buscarEventos,
@@ -450,7 +600,7 @@ function iniciarAgendadorLembretes({
     if (executando) return;
     executando = true;
     try {
-      // 1. Lembretes de eventos gerais (5 dias de antecedência)
+      // 1. Lembretes de eventos gerais para os líderes (5 dias de antecedência)
       await processarLembretesEventos({
         client,
         buscarEventos,
@@ -458,12 +608,32 @@ function iniciarAgendadorLembretes({
         diasAntecedencia: 5,
       });
 
-      // 2. Lembretes de reuniões e atendimentos pastorais (1 dia antes)
+      // 2. Lembretes de eventos gerais para os líderes (3 dias de antecedência)
+      await processarLembretesEventos({
+        client,
+        buscarEventos,
+        agendasParaLer,
+        diasAntecedencia: 3,
+      });
+
+      // 3. Lembretes de reuniões e atendimentos pastorais (1 dia antes)
       await processarLembretesEventos({
         client,
         buscarEventos,
         agendasParaLer,
         diasAntecedencia: 1,
+      });
+
+      // 4. Lembretes de divulgação no grupo MULTIMÍDIAS (5 dias antes)
+      await processarLembretesDivulgacaoMultimidia({
+        client,
+        diasAntecedencia: 5,
+      });
+
+      // 5. Lembretes de divulgação no grupo MULTIMÍDIAS (3 dias antes)
+      await processarLembretesDivulgacaoMultimidia({
+        client,
+        diasAntecedencia: 3,
       });
     } catch (err) {
       console.error("[Agendador Lembretes] Erro no processamento:", err);
@@ -496,6 +666,7 @@ module.exports = {
   formatarHoraBrasil,
   formatarJidWhatsApp,
   montarMensagemLembrete,
+  montarMensagemLembreteMultimidia,
   montarMensagemConfirmacaoAtendimento,
   montarMensagemConfirmacaoReuniao,
   ehEnsaio,
@@ -506,5 +677,6 @@ module.exports = {
   registrarAgendamentoPastoral,
   buscarPastorAgendamento,
   processarLembretesEventos,
+  processarLembretesDivulgacaoMultimidia,
   iniciarAgendadorLembretes,
 };

@@ -56,6 +56,7 @@ db.exec(`
     evento TEXT NOT NULL,
     departamento TEXT,
     data TEXT,
+    dataMaximaDivulgacao TEXT,
     solicitanteId TEXT,
     payload TEXT NOT NULL,
     docUrl TEXT,
@@ -98,6 +99,12 @@ try {
   if (!cols.some((c) => c.name === "departamento")) {
     db.exec("ALTER TABLE lideres ADD COLUMN departamento TEXT NOT NULL DEFAULT ''");
   }
+
+  const feCols = db.prepare("PRAGMA table_info(formularios_eventos)").all();
+  if (!feCols.some((c) => c.name === "dataMaximaDivulgacao")) {
+    db.exec("ALTER TABLE formularios_eventos ADD COLUMN dataMaximaDivulgacao TEXT");
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_formularios_divulgacao ON formularios_eventos(dataMaximaDivulgacao)");
 } catch {
   // Tabela ainda sendo criada ou erro ignorável
 }

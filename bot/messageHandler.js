@@ -2145,7 +2145,7 @@ Escolha uma opção:
               `7 - Convidado / Louvor / Preletor\n` +
               `8 - Decoração ou Alimentação\n` +
               `9 - Equipe ou Materiais necessários\n` +
-              `10 - Prazo da imagem de divulgação\n` +
+              `10 - Prazo da imagem e início da divulgação\n` +
               `11 - Cronograma ou Observações\n` +
               `12 - Objetivo espiritual\n` +
               `13 - Outra alteração (descreva livremente)\n` +
@@ -2186,7 +2186,7 @@ Escolha uma opção:
               "7": { id: "convidado_louvor", label: "Convidado / Louvor / Preletor", prompt: "🎤 Informe os novos detalhes sobre convidados, preletor ou louvor:" },
               "8": { id: "decoracao_alimentacao", label: "Decoração ou Alimentação", prompt: "☕ Informe os novos detalhes sobre decoração e alimentação:" },
               "9": { id: "equipe_materiais", label: "Equipe ou Materiais necessários", prompt: "📦 Informe os novos detalhes sobre equipe e materiais necessários:" },
-              "10": { id: "prazo_imagem", label: "Prazo da imagem de divulgação", prompt: "🖼️ Até quando você precisa da imagem de divulgação pronta? (Ex: 15/12)" },
+              "10": { id: "prazo_imagem", label: "Prazo da imagem e início da divulgação", prompt: "📢 Qual é a data máxima para início da divulgação e prazo da arte? (Ex: 15/12 ou DD/MM/AAAA)" },
               "11": { id: "cronograma_observacoes", label: "Cronograma ou Observações", prompt: "⏱️ Digite o novo cronograma e/ou observações do evento:" },
               "12": { id: "objetivo_espiritual", label: "Objetivo espiritual", prompt: "🙏 Qual é o novo objetivo espiritual do evento?" },
               "13": { id: "outros", label: "Outra alteração no formulário", prompt: "📝 Descreva detalhadamente o que deseja alterar ou atualizar no formulário:" },
@@ -2266,6 +2266,16 @@ Escolha uma opção:
             } else if (campo.id === "prazo_imagem") {
               payload.prazo_imagem = novoValor;
               payload.divulgacao = novoValor;
+              const { extrairDataIso } = require("./formularioEvento");
+              const dataIso = extrairDataIso(novoValor);
+              if (dataIso) {
+                payload.data_maxima_divulgacao = novoValor;
+                payload.dataMaximaDivulgacao = dataIso;
+              }
+            } else if (campo.id === "data_maxima_divulgacao") {
+              payload.data_maxima_divulgacao = novoValor;
+              const { extrairDataIso } = require("./formularioEvento");
+              payload.dataMaximaDivulgacao = extrairDataIso(novoValor) || novoValor;
             } else if (campo.id === "cronograma_observacoes") {
               payload.cronograma = novoValor;
               payload.observacoes = novoValor;
@@ -2294,6 +2304,7 @@ Escolha uma opção:
               evento: evento.summary,
               departamento: info.departamento,
               data: d.format("DD/MM/YYYY"),
+              dataMaximaDivulgacao: payload.dataMaximaDivulgacao || payload.data_maxima_divulgacao,
               solicitanteId: numero,
               payload,
               docUrl: linkDoc,
@@ -2315,7 +2326,8 @@ Escolha uma opção:
               (versiculoVal ? `\n📖 *Versículo Base:* ${versiculoVal}` : "") +
               (coresVal ? `\n🎨 *Cores:* ${coresVal}` : "") +
               (midiasVal ? `\n📱 *Mídias:* ${midiasVal}` : "") +
-              (divulgacaoVal ? `\n📢 *Divulgação:* ${divulgacaoVal}` : "");
+              (divulgacaoVal ? `\n📢 *Divulgação:* ${divulgacaoVal}` : "") +
+              (payload.data_maxima_divulgacao ? `\n🗓️ *Início da Divulgação:* ${payload.data_maxima_divulgacao}` : "");
 
             const linhaDocSecretaria = linkDoc
               ? `\n\n📄 *Documento Oficial Atualizado (Google Docs):*\n${linkDoc}`
@@ -2336,7 +2348,7 @@ Escolha uma opção:
             await notificarSecretaria(client, notifSecretaria);
 
             // Notifica o grupo MULTIMÍDIAS quando a alteração envolver demandas de comunicação/mídia
-            const camposMidia = ["midias", "cores", "divulgacao", "tema", "versiculo", "paleta", "estilo", "prazo_imagem"];
+            const camposMidia = ["midias", "cores", "divulgacao", "tema", "versiculo", "paleta", "estilo", "prazo_imagem", "data_maxima_divulgacao"];
             if (camposMidia.includes(campo.chave) || midiasVal || divulgacaoVal) {
               const notifMultimidia =
                 `📢 *ATUALIZAÇÃO DE MÍDIA / FORMULÁRIO DE EVENTO*\n\n` +

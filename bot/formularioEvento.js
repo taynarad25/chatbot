@@ -28,24 +28,67 @@ function temConteudoRelevante(valor) {
   );
 }
 
-function salvarFormularioEvento({ evento, departamento, data, solicitanteId, payload, docUrl }) {
+function extrairDataIso(texto, anoPadrao = new Date().getFullYear()) {
+  if (!texto) return null;
+  const limpo = String(texto).trim();
+  if (/^(n[aã]o|sem\s|nenhum|a\s*definir|cancel)/i.test(limpo)) {
+    return null;
+  }
+  // YYYY-MM-DD
+  const mIso = limpo.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (mIso) {
+    return `${mIso[1]}-${mIso[2]}-${mIso[3]}`;
+  }
+  // DD/MM/YYYY ou DD-MM-YYYY
+  const mCompleto = limpo.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/);
+  if (mCompleto) {
+    const dia = mCompleto[1].padStart(2, "0");
+    const mes = mCompleto[2].padStart(2, "0");
+    const ano = mCompleto[3];
+    return `${ano}-${mes}-${dia}`;
+  }
+  // DD/MM ou DD-MM
+  const mCurto = limpo.match(/\b(\d{1,2})[\/\-](\d{1,2})\b/);
+  if (mCurto) {
+    const dia = mCurto[1].padStart(2, "0");
+    const mes = mCurto[2].padStart(2, "0");
+    return `${anoPadrao}-${mes}-${dia}`;
+  }
+  return null;
+}
+
+function salvarFormularioEvento({ evento, departamento, data, dataMaximaDivulgacao, solicitanteId, payload, docUrl }) {
   try {
     const agora = new Date().toISOString();
-    const payloadStr = typeof payload === "string" ? payload : JSON.stringify(payload);
+    const payloadStr = typeof payload === "string" ? payload : JSON.stringify(payload || {});
+    let parsedPayload = {};
+    if (typeof payload === "object" && payload !== null) {
+      parsedPayload = payload;
+    } else if (typeof payload === "string") {
+      try {
+        parsedPayload = JSON.parse(payload);
+      } catch {}
+    }
+
+    let dataDivulgacaoFinal = dataMaximaDivulgacao || parsedPayload.data_maxima_divulgacao || parsedPayload.dataMaximaDivulgacao || null;
+    if (dataDivulgacaoFinal) {
+      dataDivulgacaoFinal = extrairDataIso(dataDivulgacaoFinal) || dataDivulgacaoFinal;
+    }
+
     const existing = db.prepare("SELECT id FROM formularios_eventos WHERE evento = ? ORDER BY id DESC LIMIT 1").get(evento);
 
     if (existing) {
       db.prepare(`
         UPDATE formularios_eventos
-        SET departamento = ?, data = ?, solicitanteId = ?, payload = ?, docUrl = ?, atualizadoEm = ?
+        SET departamento = ?, data = ?, dataMaximaDivulgacao = ?, solicitanteId = ?, payload = ?, docUrl = ?, atualizadoEm = ?
         WHERE id = ?
-      `).run(departamento || "", data || "", solicitanteId || "", payloadStr, docUrl || "", agora, existing.id);
+      `).run(departamento || "", data || "", dataDivulgacaoFinal || null, solicitanteId || "", payloadStr, docUrl || "", agora, existing.id);
       return existing.id;
     } else {
       const info = db.prepare(`
-        INSERT INTO formularios_eventos (evento, departamento, data, solicitanteId, payload, docUrl, criadoEm, atualizadoEm)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(evento, departamento || "", data || "", solicitanteId || "", payloadStr, docUrl || "", agora, agora);
+        INSERT INTO formularios_eventos (evento, departamento, data, dataMaximaDivulgacao, solicitanteId, payload, docUrl, criadoEm, atualizadoEm)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(evento, departamento || "", data || "", dataDivulgacaoFinal || null, solicitanteId || "", payloadStr, docUrl || "", agora, agora);
       return info.lastInsertRowid;
     }
   } catch (err) {
@@ -174,13 +217,19 @@ const PERGUNTAS_DEFINICOES = [
     "📢 *Divulgação e Prazo:*\nAté quando você precisa da imagem/arte de divulgação pronta para a mídia e quais os canais? (Informe a data limite ou prazo desejado)",
   ],
 
-  // 22. Cronograma do evento
+  // 22. Data Máxima para Início da Divulgação
+  [
+    "data_maxima_divulgacao",
+    "🗓️ *Data Máxima para Início da Divulgação:*\nQual é a data máxima para começar a divulgação deste evento? (Ex: DD/MM/AAAA - informe a data limite para iniciar as postagens ou responda *Não haverá* se não houver divulgação)",
+  ],
+
+  // 23. Cronograma do evento
   ["cronograma", "⏱️ *Cronograma do evento:*\nQual é o cronograma previsto do evento? (Ex: 19h Abertura, 19h30 Louvor, 20h Palavra, 21h Término)"],
 
-  // 23. Observações
+  // 24. Observações
   ["observacoes", "📝 *Observações:*\nAlguma observação, detalhe extra ou necessidade especial? (Ou responda *Nenhuma*)"],
 
-  // 24. Objetivo espiritual do evento (pergunta única unificada)
+  // 25. Objetivo espiritual do evento (pergunta única unificada)
   [
     "objetivo_espiritual",
     "🙏 *Objetivo espiritual do evento:*\nQual é o objetivo espiritual e o resultado esperado deste evento? (Descreva o propósito principal e o impacto esperado em vidas)",
@@ -292,6 +341,9 @@ function formatarResumoEventoGrupo(payload, { incluirTesouraria = true } = {}) {
   if (divulgacao) {
     resumo += `\n📢 *Divulgação:* ${divulgacao}`;
   }
+  if (temConteudoRelevante(payload.data_maxima_divulgacao)) {
+    resumo += `\n🗓️ *Início da Divulgação:* ${payload.data_maxima_divulgacao}`;
+  }
 
   if (incluirTesouraria && precisaDeValorDoMinisterio(payload.precisa_valor_ministerio)) {
     resumo += `\n💰 *Tesouraria:* Solicita valor do ministério (Contato: ${CONTATO_TESOURARIA})`;
@@ -304,6 +356,7 @@ const CAMPOS_RESPOSTAS_LIVRES = [
   "publico", "tema", "versiculo", "paleta", "estilo",
   "responsavel_geral", "convidado", "louvor", "decoracao",
   "alimentacao", "equipe", "materiais", "prazo_imagem",
+  "data_maxima_divulgacao",
   "cronograma", "observacoes", "objetivo_espiritual",
 ];
 
@@ -314,6 +367,8 @@ function montarPayloadFormulario(dadosIniciais = {}, respostas = {}) {
   const hFaixa = respostas.horario_inicio_termino || (hInicio && hFim ? `${hInicio} às ${hFim}` : "");
   const taxa = respostas.valor_inscricao || respostas.valor || "";
   const querTesouraria = precisaDeValorDoMinisterio(respostas.precisa_valor_ministerio);
+  const dataMaxDiv = respostas.data_maxima_divulgacao || respostas.dataMaximaDivulgacao || "";
+  const dataMaxDivIso = extrairDataIso(dataMaxDiv);
 
   const payload = {
     nome_lider: respostas.nome_lider || "",
@@ -332,6 +387,8 @@ function montarPayloadFormulario(dadosIniciais = {}, respostas = {}) {
     contato_tesouraria: querTesouraria ? CONTATO_TESOURARIA : "",
     aviso_tesouraria: querTesouraria ? `Entrar em contato com a tesouraria: ${CONTATO_TESOURARIA}` : "",
     resultado_esperado: respostas.objetivo_espiritual || "",
+    data_maxima_divulgacao: dataMaxDiv,
+    dataMaximaDivulgacao: dataMaxDivIso || dataMaxDiv,
   };
 
   for (const c of CAMPOS_RESPOSTAS_LIVRES) {
@@ -444,6 +501,7 @@ async function processarRespostaFormulario({
       evento: payload.nome_evento,
       departamento: payload.departamento,
       data: payload.data,
+      dataMaximaDivulgacao: payload.dataMaximaDivulgacao || payload.data_maxima_divulgacao,
       solicitanteId: numero,
       payload,
       docUrl: linkDoc,
@@ -501,7 +559,8 @@ async function processarRespostaFormulario({
     const temMidia = temConteudoRelevante(payload.midias || payload.estilo);
     const temDivulgacao = temConteudoRelevante(payload.divulgacao || payload.prazo_imagem);
     const temCores = temConteudoRelevante(payload.cores || payload.paleta);
-    if (temMidia || temDivulgacao || temCores) {
+    const temDataDivulgacao = temConteudoRelevante(payload.data_maxima_divulgacao);
+    if (temMidia || temDivulgacao || temCores || temDataDivulgacao) {
       const horario =
         payload.horario_inicio_termino ||
         (payload.horario_inicio && payload.horario_termino
@@ -521,6 +580,7 @@ async function processarRespostaFormulario({
       if (temCores) resumoMultimidia += `\n🎨 *Cores/Estilo:* ${payload.cores || payload.paleta}`;
       if (temMidia) resumoMultimidia += `\n📱 *Mídias Solicitadas:* ${payload.midias || payload.estilo}`;
       if (temDivulgacao) resumoMultimidia += `\n📢 *Divulgação / Prazo:* ${payload.divulgacao || payload.prazo_imagem}`;
+      if (temDataDivulgacao) resumoMultimidia += `\n🗓️ *Data Máxima para Início da Divulgação:* ${payload.data_maxima_divulgacao}`;
       if (linkDoc) resumoMultimidia += `\n\n📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}`;
 
       try {
@@ -602,5 +662,6 @@ module.exports = {
   formatarJidWhatsApp,
   salvarFormularioEvento,
   obterFormularioEvento,
+  extrairDataIso,
   temConteudoRelevante,
 };
