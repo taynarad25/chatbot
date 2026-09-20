@@ -313,7 +313,7 @@ async function enviarWebhookGoogleDocs(payload, { webhookUrl = WEBHOOK_GOOGLE_DO
 
 function normalizarDadosIniciais(dadosIniciais = {}) {
   let dataFormatada = dadosIniciais.dataFormatada || "";
-  if (!dataFormatada && dadosIniciais.dia && dadosIniciais.mes) {
+  if ((!dataFormatada || dataFormatada.split("/").length === 2) && dadosIniciais.dia && dadosIniciais.mes) {
     const ano = dadosIniciais.ano || new Date().getFullYear();
     dataFormatada = `${String(dadosIniciais.dia).padStart(2, "0")}/${String(dadosIniciais.mes).padStart(2, "0")}/${ano}`;
   }

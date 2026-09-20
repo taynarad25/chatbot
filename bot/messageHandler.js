@@ -1,4 +1,5 @@
 const fs = require("fs");
+const db = require("../db");
 let MessageMedia;
 try {
   MessageMedia = require("whatsapp-web.js").MessageMedia;
@@ -33,8 +34,8 @@ const { notificarSecretaria, notificarPastoral, notificarMultimidia, NOME_GRUPO_
 const { executarBroadcast, BROADCAST_CONFIG } = require("./broadcast");
 const { baixarMidiaComRetry } = require("./mediaStorage");
 const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
-const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
-const { registrarAgendamentoPastoral } = require("./lembretes");
+const { salvarPendente, buscarPendente, buscarPendentePorPastor, atualizarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
+const { registrarAgendamentoPastoral, buscarPastorAgendamento } = require("./lembretes");
 const {
   iniciarFormularioEvento,
   processarRespostaFormulario,
@@ -776,8 +777,96 @@ function createMessageHandler({
     }
   }
 
-  async function avisarPastoresConcorrenciaSalao({
-    conflitos,
+  function obterPastorDoAtendimento(at) {
+    if (!at) return null;
+    const desc = at.description || "";
+    const summary = at.summary || "";
+
+    // a) Tenta extrair nome do discípulo da descrição ou do summary
+    let discipulo = "";
+    const matchDisc = desc.match(/(?:Disc[ií]pulo|Membro|Pessoa|Com)\s*:\s*([^\n\r,]+)/i);
+    if (matchDisc) {
+      discipulo = matchDisc[1].trim();
+    } else {
+      const matchDiscSummary = summary.match(/(?:Atendimento(?:\s*Pastoral)?\s*[-–—:]?\s*(?:com\s+)?)([^\n\r,\)\-]+)/i);
+      if (matchDiscSummary) {
+        discipulo = matchDiscSummary[1].trim();
+      }
+    }
+
+    // b) Busca no banco agendamentos_pastorais pelo ID do evento ou nome do discípulo
+    const agendamento = buscarPastorAgendamento(at.id, discipulo);
+    if (agendamento && agendamento.pastorTelefone) {
+      return {
+        telefone: String(agendamento.pastorTelefone).replace(/\D/g, ""),
+        nome: agendamento.pastorNome || "Pastor",
+      };
+    }
+
+    // c) Tenta extrair telefone do pastor na descrição do evento (ex: "Telefone Pastor: 5511...", "Pastor: Gabriel (5511...)")
+    const matchTelPastor = desc.match(/(?:Telefone\s*Pastor|Pastor(?:\s*Respons[aá]vel)?)[^0-9]*((?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?9\d{4}[-\s]?\d{4})/i)
+      || desc.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?9\d{4}[-\s]?\d{4}/);
+    if (matchTelPastor) {
+      const matchNomePastor = desc.match(/(?:Pastor|Pr\.?)\s*:\s*([^\n\r,]+)/i)
+        || summary.match(/(?:Pastor|Pr\.?)\s*([^\n\r,\)\-]+)/i);
+      return {
+        telefone: (matchTelPastor[1] || matchTelPastor[0]).replace(/\D/g, ""),
+        nome: matchNomePastor ? matchNomePastor[1].trim() : "Pastor",
+      };
+    }
+
+    // d) Tenta extrair nome do pastor na descrição ou no título e buscar em líderes/usuários
+    const matchNomePastor = desc.match(/(?:Pastor|Pr\.?)\s*:\s*([^\n\r,]+)/i)
+      || summary.match(/(?:Pastor|Pr\.?)\s*([^\n\r,\)\-]+)/i);
+    if (matchNomePastor) {
+      const nomePastor = matchNomePastor[1].trim();
+      try {
+        const cadastrados = (typeof listLideres === "function" ? listLideres() : []) || [];
+        const encontrado = cadastrados.find((u) => (u.nome || "").toLowerCase().includes(nomePastor.toLowerCase()));
+        if (encontrado && encontrado.telefone) {
+          return {
+            telefone: String(encontrado.telefone).replace(/\D/g, ""),
+            nome: encontrado.nome,
+          };
+        }
+        const pastorRow = db.prepare("SELECT * FROM lideres WHERE LOWER(nome) LIKE '%' || LOWER(?) || '%'").get(nomePastor);
+        if (pastorRow && pastorRow.telefone) {
+          return {
+            telefone: String(pastorRow.telefone).replace(/\D/g, ""),
+            nome: pastorRow.nome,
+          };
+        }
+      } catch (_) {}
+    }
+
+    // e) Fallback: busca pastor em listLideres() ou no banco SQLite
+    try {
+      const cadastrados = (typeof listLideres === "function" ? listLideres() : []) || [];
+      const pastorCad = cadastrados.find((u) => {
+        const c = Array.isArray(u.cargos) ? u.cargos.join(" ") : String(u.cargos || "");
+        return c.toLowerCase().includes("pastor");
+      });
+      if (pastorCad && pastorCad.telefone) {
+        return {
+          telefone: String(pastorCad.telefone).replace(/\D/g, ""),
+          nome: pastorCad.nome,
+        };
+      }
+      const pastorRow = db.prepare("SELECT * FROM lideres WHERE LOWER(cargos) LIKE '%pastor%' LIMIT 1").get();
+      if (pastorRow && pastorRow.telefone) {
+        return {
+          telefone: String(pastorRow.telefone).replace(/\D/g, ""),
+          nome: pastorRow.nome,
+        };
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  async function consultarPastorConcorrenciaSalao({
+    pastor,
+    atendimento,
     solicitante,
     tipoAtividade,
     nomeAtividade,
@@ -785,38 +874,38 @@ function createMessageHandler({
     horario,
     codigo,
   }) {
-    if (!conflitos || conflitos.length === 0) return;
+    if (!pastor || !pastor.telefone) return false;
+    const atStart = atendimento?.start?.dateTime ? moment.tz(atendimento.start.dateTime, "America/Sao_Paulo").format("HH:mm") : "";
+    const atEnd = atendimento?.end?.dateTime ? moment.tz(atendimento.end.dateTime, "America/Sao_Paulo").format("HH:mm") : "";
+    const horarioAtendimento = atStart && atEnd ? `${atStart} às ${atEnd}` : (atStart || "Horário agendado");
 
-    for (const at of conflitos) {
-      const atStart = at.start?.dateTime ? moment.tz(at.start.dateTime, "America/Sao_Paulo").format("HH:mm") : "";
-      const atEnd = at.end?.dateTime ? moment.tz(at.end.dateTime, "America/Sao_Paulo").format("HH:mm") : "";
-      const horarioAtendimento = atStart && atEnd ? `${atStart} às ${atEnd}` : (atStart || "Horário agendado");
-      const localAtendimento = at.location || "Gabinete Pastoral";
+    const jidPastor = pastor.telefone.includes("@") ? pastor.telefone : `${pastor.telefone}@c.us`;
+    const saudacao = pastor.nome ? `Olá, Pastor *${pastor.nome}*!` : "Olá, Pastor!";
 
-      let msgPastores =
-        `⚠️ *ATENÇÃO PASTORES - CONCORRÊNCIA COM ATENDIMENTO PASTORAL*\n\n` +
-        `Consta um Atendimento Pastoral agendado para o mesmo horário (mesmo que no Gabinete Pastoral):\n` +
-        `📌 *Atendimento:* ${at.summary || "Atendimento Pastoral"}\n` +
-        `📆 *Data:* ${dataFormatada}\n` +
-        `⏰ *Horário do Atendimento:* ${horarioAtendimento}\n` +
-        `📍 *Local do Atendimento:* ${localAtendimento}\n\n` +
-        `🏛️ *Nova Solicitação Usando o Salão da Igreja:*\n` +
-        `👤 *Solicitante:* ${solicitante}\n` +
-        `🏢 *Atividade:* ${tipoAtividade} - ${nomeAtividade}\n` +
-        `⏰ *Horário Solicitado no Salão:* ${horario}\n\n` +
-        `❓ *Pastores, autorizam marcar este(a) ${tipoAtividade.toLowerCase()} no salão da igreja no mesmo horário do atendimento pastoral?*\n` +
-        `Por favor, confirmem respondendo a esta mensagem se pode ou não ser realizado no salão neste horário.`;
+    const msgConsulta =
+      `⚠️ *CONSULTA PASTORAL - CONCORRÊNCIA COM ATENDIMENTO*\n\n` +
+      `${saudacao}\n\n` +
+      `Consta um Atendimento Pastoral seu agendado:\n` +
+      `📌 *Atendimento:* ${atendimento?.summary || "Atendimento Pastoral"}\n` +
+      `📆 *Data:* ${dataFormatada}\n` +
+      `⏰ *Horário do Atendimento:* ${horarioAtendimento}\n\n` +
+      `🏛️ *Nova Solicitação Usando o Salão da Igreja:*\n` +
+      `👤 *Solicitante:* ${solicitante}\n` +
+      `🏢 *Atividade:* ${tipoAtividade} - ${nomeAtividade}\n` +
+      `⏰ *Horário Solicitado no Salão:* ${horario}\n\n` +
+      `❓ *Pastor, você autoriza o uso do salão da igreja neste mesmo horário do atendimento pastoral?*\n\n` +
+      `Por favor, responda diretamente a esta mensagem com:\n` +
+      `👉 *SIM* (para autorizar o uso do salão)\n` +
+      `👉 *NÃO* (para recusar o uso do salão)\n\n` +
+      `_Código: ${codigo}_`;
 
-      if (codigo) {
-        msgPastores += `\n\n_Código: ${codigo}_`;
-      }
-
-      try {
-        await notificarPastoral(client, msgPastores);
-        console.log(`[Pastoral] Aviso de concorrência enviado aos pastores para "${nomeAtividade}".`);
-      } catch (errNotif) {
-        console.error("[Pastoral] Falha ao enviar aviso de concorrência aos pastores:", errNotif.message);
-      }
+    try {
+      await client.sendMessage(jidPastor, msgConsulta);
+      console.log(`[Pastoral] Consulta de concorrência enviada no privado do pastor ${pastor.nome} (${mascararTelefone(pastor.telefone)}) para "${nomeAtividade}".`);
+      return true;
+    } catch (errSend) {
+      console.error(`[ALERTA:whatsapp] Falha ao enviar consulta de concorrência ao pastor ${mascararTelefone(pastor.telefone)}:`, errSend.message);
+      return false;
     }
   }
 
@@ -826,27 +915,11 @@ function createMessageHandler({
   async function finalizarNovoAgendamento({ msg, numero, contato, info, dataFinal, isLider }) {
     try {
       const dataFormatada = moment(dataFinal).format("DD/MM");
-      const resumo = `✅ *Solicitação de Agendamento*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}\n*Data:* ${dataFormatada}\n*Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n🧹 *Compromisso com o Salão e Dependências:*\nLembramos que o salão deve ser entregue após o evento exatamente da mesma forma como foi encontrado (organização das cadeiras, lixo recolhido e limpeza geral).\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
-
-      const dadosAgendamento = {
-        solicitanteId: numero,
-        evento: info.nome,
-        local: info.local,
-        rede: info.rede,
-        dia: dataFinal.getDate(),
-        mes: dataFinal.getMonth() + 1,
-        horarioInicio: info.horarioInicio,
-        horarioFim: info.horarioFim,
-        isDiaInteiro: info.isDiaInteiro,
-      };
-      const codigo = salvarPendente(dadosAgendamento);
-      const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
-      await notificarSecretaria(client, resumoGrupo);
-
-      // Concorrência com Atendimento Pastoral: obrigatório consultar os pastores quando usa o salão da igreja
       const usaSalao = !info.local || !(/online|externo/i.test(info.local));
+
+      let conflitosPastoral = [];
       if (usaSalao) {
-        const conflitosPastoral = await checarConcorrenciaAtendimentoPastoral({
+        conflitosPastoral = await checarConcorrenciaAtendimentoPastoral({
           dia: dataFinal.getDate(),
           mes: dataFinal.getMonth() + 1,
           ano: dataFinal.getFullYear(),
@@ -854,19 +927,63 @@ function createMessageHandler({
           horarioFim: info.horarioFim,
           isDiaInteiro: info.isDiaInteiro,
         });
-        if (conflitosPastoral.length > 0) {
-          await avisarPastoresConcorrenciaSalao({
-            conflitos: conflitosPastoral,
-            solicitante: nomeSolicitante(contato, numero),
-            tipoAtividade: "Evento",
-            nomeAtividade: info.nome,
-            dataFormatada,
-            horario: `${info.horarioInicio} às ${info.horarioFim}`,
-            codigo,
-          });
-        }
       }
 
+      const pastorResponsavel = conflitosPastoral.length > 0 ? obterPastorDoAtendimento(conflitosPastoral[0]) : null;
+      const temConflitoPastoral = conflitosPastoral.length > 0 && Boolean(pastorResponsavel);
+
+      const dadosAgendamento = {
+        solicitanteId: numero,
+        solicitanteNome: nomeSolicitante(contato, numero),
+        evento: info.nome,
+        local: info.local,
+        rede: info.rede,
+        dia: dataFinal.getDate(),
+        mes: dataFinal.getMonth() + 1,
+        ano: dataFinal.getFullYear(),
+        dataFormatada,
+        horarioInicio: info.horarioInicio,
+        horarioFim: info.horarioFim,
+        isDiaInteiro: info.isDiaInteiro,
+      };
+
+      if (temConflitoPastoral) {
+        dadosAgendamento.aguardandoPastor = true;
+        dadosAgendamento.pastorTelefone = pastorResponsavel.telefone;
+        dadosAgendamento.pastorNome = pastorResponsavel.nome;
+        dadosAgendamento.conflitoAtendimentoSummary = conflitosPastoral[0].summary || "Atendimento Pastoral";
+        dadosAgendamento.horarioConflito = `${info.horarioInicio} - ${info.horarioFim}`;
+
+        const codigo = salvarPendente(dadosAgendamento);
+
+        await consultarPastorConcorrenciaSalao({
+          pastor: pastorResponsavel,
+          atendimento: conflitosPastoral[0],
+          solicitante: nomeSolicitante(contato, numero),
+          tipoAtividade: "Evento",
+          nomeAtividade: info.nome,
+          dataFormatada,
+          horario: `${info.horarioInicio} às ${info.horarioFim}`,
+          codigo,
+        });
+
+        const avisoLider =
+          `⏳ *Solicitação em Análise Pastoral*\n\n` +
+          `*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}\n*Data:* ${dataFormatada}\n*Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n` +
+          `⚠️ Consta um Atendimento Pastoral agendado para o mesmo horário. Uma consulta foi enviada diretamente ao Pastor responsável (*${pastorResponsavel.nome || "Pastor"}*) no WhatsApp privado dele.\n\n` +
+          `Assim que o Pastor responder autorizando, sua solicitação será encaminhada para confirmação da Secretaria! 🙏\n\n` +
+          `Digite *menu* para voltar ao menu principal.`;
+
+        console.log(`Agendamento de evento aguardando aprovação do pastor ${pastorResponsavel.nome} para ${identificarUsuario(contato, numero, isLider)}`);
+        return await msg.reply(avisoLider);
+      }
+
+      // Sem conflito pastoral: salva e envia diretamente para a secretaria
+      const codigo = salvarPendente(dadosAgendamento);
+      const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
+      await notificarSecretaria(client, resumoGrupo);
+
+      const resumo = `✅ *Solicitação de Agendamento*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}\n*Data:* ${dataFormatada}\n*Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n🧹 *Compromisso com o Salão e Dependências:*\nLembramos que o salão deve ser entregue após o evento exatamente da mesma forma como foi encontrado (organização das cadeiras, lixo recolhido e limpeza geral).\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
       console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
       await msg.reply(resumo);
     } catch (e) {
@@ -1647,6 +1764,121 @@ function createMessageHandler({
       const isMembro = temPermissao(usuario, "membro");
 
       console.log(`[Mensagem Recebida] De: ${identificarUsuario(contato, numero, isLider, usuario)} | Texto: "${msg.body}"`);
+
+      // Intercepta resposta do Pastor à consulta de concorrência com o Salão (no privado)
+      let codigoPastor = null;
+      if (msg.hasQuotedMsg) {
+        try {
+          const quoted = await comRetry(() => msg.getQuotedMessage());
+          if (quoted && quoted.body) {
+            codigoPastor = extrairCodigo(quoted.body);
+          }
+        } catch (_) {}
+      }
+      if (!codigoPastor) {
+        codigoPastor = extrairCodigo(msg.body);
+      }
+
+      const pendentePastor = buscarPendentePorPastor(numero, codigoPastor);
+      if (pendentePastor) {
+        const bodyTrim = (msg.body || "").trim().toLowerCase();
+        const isAutorizado =
+          /^(sim|pode|autoriz|autorizado|autorizo|liberado|ok|pode marcar)/i.test(bodyTrim) ||
+          bodyTrim.includes("pode marcar") ||
+          bodyTrim.includes("autorizo");
+        const isRecusado =
+          /^(n[aã]o|nao|recus|recuso|recusado|n[aã]o pode|nao pode|n[aã]o autorizo|nao autorizo)/i.test(bodyTrim) ||
+          bodyTrim.includes("não pode") ||
+          bodyTrim.includes("nao pode") ||
+          bodyTrim.includes("não autorizo") ||
+          bodyTrim.includes("nao autorizo");
+
+        if (isAutorizado) {
+          pendentePastor.aguardandoPastor = false;
+          pendentePastor.pastorAutorizou = true;
+          pendentePastor.autorizadoPorPastorEm = new Date().toISOString();
+          atualizarPendente(pendentePastor.codigo, pendentePastor);
+
+          const nomeAtiv = pendentePastor.evento || pendentePastor.nomeEvento || pendentePastor.finalidade || "Atividade no Salão";
+          await msg.reply(`✅ Obrigado, Pastor! Sua autorização para a realização de *${nomeAtiv}* no salão foi registrada com sucesso.\n\nA solicitação agora foi encaminhada para a aprovação final da Secretaria.`);
+
+          // Notifica o solicitante
+          try {
+            const feedbackSolicitante =
+              `✅ *Pastor Autorizou o Uso do Salão!*\n\n` +
+              `O Pastor responsável pelo atendimento no mesmo horário autorizou a realização da sua atividade (*${nomeAtiv}*).\n\n` +
+              `Sua solicitação foi encaminhada agora para a Secretaria para confirmação e agendamento oficial. Aguarde a confirmação final! 🙏\n\n` +
+              `Digite *menu* para voltar ao menu principal.`;
+            await client.sendMessage(pendentePastor.solicitanteId, feedbackSolicitante);
+          } catch (errSol) {
+            console.error(`[ALERTA:whatsapp] Erro ao avisar solicitante sobre autorização do pastor:`, errSol.message);
+          }
+
+          // Encaminha agora para o grupo da Secretaria com a autorização confirmada
+          try {
+            let resumoSecretaria = "";
+            if (pendentePastor.tipo === "uso_salao") {
+              resumoSecretaria =
+                `🏛️ *NOVA SOLICITAÇÃO DE USO DO SALÃO*\n\n` +
+                `👤 *Solicitante:* ${pendentePastor.nomeSolicitante}\n` +
+                `📆 *Data:* ${pendentePastor.dataFormatada}\n` +
+                `⏰ *Horário:* ${pendentePastor.horarioInicio} às ${pendentePastor.horarioFim}\n` +
+                `📝 *Finalidade:* ${pendentePastor.finalidade}\n` +
+                `📜 *Termo de Responsabilidade:* Aceito pelo solicitante.\n\n` +
+                `👔 *Autorização Pastoral:* O Pastor ${pendentePastor.pastorNome || ""} já autorizou o uso do salão no horário do atendimento pastoral. ✅\n\n` +
+                `_Responda a este resumo com "aprovar salão" ou "recusar salão" para confirmar._\n\n` +
+                `_Código: ${pendentePastor.codigo}_`;
+            } else if (pendentePastor.tipo === "reuniao") {
+              resumoSecretaria =
+                `🤝 *NOVA REUNIÃO SOLICITADA*\n\n` +
+                `👤 *Solicitante:* ${pendentePastor.solicitanteNome || pendentePastor.solicitanteId}\n` +
+                `🏢 *Departamento:* ${pendentePastor.departamento}\n` +
+                `📆 *Data:* ${pendentePastor.dataFormatada}\n` +
+                `⏰ *Horário:* ${pendentePastor.horarioInicio} - ${pendentePastor.horarioFim}\n` +
+                `📍 *Local:* ${pendentePastor.local || "Igreja"}\n\n` +
+                `👔 *Autorização Pastoral:* O Pastor ${pendentePastor.pastorNome || ""} já autorizou o uso do salão no horário do atendimento pastoral. ✅\n\n` +
+                `_Responda a este resumo com "marcar reunião" ou "não marcar" para aprovar._\n\n` +
+                `_Código: ${pendentePastor.codigo}_`;
+            } else {
+              resumoSecretaria =
+                `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n` +
+                `👤 *Solicitante:* ${pendentePastor.solicitanteNome || pendentePastor.solicitanteId}\n` +
+                `📅 *Evento:* ${pendentePastor.evento}\n` +
+                `📍 *Local:* ${pendentePastor.local}\n` +
+                `🏢 *Depto:* ${pendentePastor.rede}\n` +
+                `📆 *Data:* ${pendentePastor.dataFormatada}\n` +
+                `⏰ *Horário:* ${pendentePastor.horarioInicio} - ${pendentePastor.horarioFim}\n\n` +
+                `👔 *Autorização Pastoral:* O Pastor ${pendentePastor.pastorNome || ""} já autorizou o uso do salão no horário do atendimento pastoral. ✅\n\n` +
+                `_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n` +
+                `_Código: ${pendentePastor.codigo}_`;
+            }
+            await notificarSecretaria(client, resumoSecretaria);
+          } catch (errSec) {
+            console.error(`[ALERTA:secretaria] Erro ao enviar resumo autorizado para a secretaria:`, errSec.message);
+          }
+
+          return;
+        } else if (isRecusado) {
+          removerPendente(pendentePastor.codigo);
+          const nomeAtiv = pendentePastor.evento || pendentePastor.nomeEvento || pendentePastor.finalidade || "Atividade no Salão";
+          await msg.reply(`❌ Resposta registrada! A solicitação de uso do salão para *${nomeAtiv}* foi recusada e cancelada.`);
+
+          // Notifica o solicitante sobre a recusa do pastor
+          try {
+            const feedbackRecusa =
+              `❌ *Solicitação Não Autorizada*\n\n` +
+              `Infelizmente o Pastor responsável pelo atendimento pastoral agendado no mesmo horário não pôde autorizar o uso do salão para "*${nomeAtiv}*".\n\n` +
+              `Por favor, escolha outro dia ou horário para realizar sua atividade.\n\n` +
+              `Digite *menu* para voltar ao menu principal.`;
+            await client.sendMessage(pendentePastor.solicitanteId, feedbackRecusa);
+          } catch (errSol) {
+            console.error(`[ALERTA:whatsapp] Erro ao avisar solicitante sobre recusa do pastor:`, errSol.message);
+          }
+
+          // NÃO envia para a secretaria!
+          return;
+        }
+      }
 
       const ehSaudacao = texto.length <= 50 && SAUDACOES_REGEX.test(texto);
 
@@ -3822,13 +4054,10 @@ Escolha uma opção:
             };
 
             try {
-              const codigo = salvarPendente(dadosReuniao);
-              const resumoGrupo = `🤝 *NOVA REUNIÃO SOLICITADA*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Departamento:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n\n_Responda a este resumo com "marcar reunião" ou "não marcar" para aprovar._\n\n_Código: ${codigo}_`;
-              await notificarSecretaria(client, resumoGrupo);
-
-              // Concorrência com Atendimento Pastoral: obrigatório consultar os pastores quando reunião é presencial na igreja/salão
+              // Concorrência com Atendimento Pastoral: obrigatório consultar o pastor quando reunião é presencial na igreja/salão
+              let conflitosPastoral = [];
               if (info.reuniaoLocal !== "Online") {
-                const conflitosPastoral = await checarConcorrenciaAtendimentoPastoral({
+                conflitosPastoral = await checarConcorrenciaAtendimentoPastoral({
                   dia: info.reuniaoData.dia,
                   mes: info.reuniaoData.mes,
                   ano: info.reuniaoData.ano,
@@ -3836,18 +4065,51 @@ Escolha uma opção:
                   horarioFim: info.reuniaoHorarioFim,
                   isDiaInteiro: false,
                 });
-                if (conflitosPastoral.length > 0) {
-                  await avisarPastoresConcorrenciaSalao({
-                    conflitos: conflitosPastoral,
-                    solicitante: nomeSolicitante(contato, numero),
-                    tipoAtividade: "Reunião",
-                    nomeAtividade: tituloReuniao,
-                    dataFormatada: info.reuniaoData.formatada,
-                    horario: `${info.reuniaoHorarioInicio} às ${info.reuniaoHorarioFim}`,
-                    codigo,
-                  });
-                }
               }
+
+              const pastorResponsavel = conflitosPastoral.length > 0 ? obterPastorDoAtendimento(conflitosPastoral[0]) : null;
+              const temConflitoPastoral = conflitosPastoral.length > 0 && Boolean(pastorResponsavel);
+
+              if (temConflitoPastoral) {
+                dadosReuniao.aguardandoPastor = true;
+                dadosReuniao.pastorTelefone = pastorResponsavel.telefone;
+                dadosReuniao.pastorNome = pastorResponsavel.nome;
+                dadosReuniao.conflitoAtendimentoSummary = conflitosPastoral[0].summary || "Atendimento Pastoral";
+                dadosReuniao.horarioConflito = `${info.reuniaoHorarioInicio} às ${info.reuniaoHorarioFim}`;
+                dadosReuniao.dataFormatada = info.reuniaoData.formatada;
+                dadosReuniao.solicitanteNome = nomeSolicitante(contato, numero);
+
+                const codigo = salvarPendente(dadosReuniao);
+
+                await consultarPastorConcorrenciaSalao({
+                  pastor: pastorResponsavel,
+                  atendimento: conflitosPastoral[0],
+                  solicitante: nomeSolicitante(contato, numero),
+                  tipoAtividade: "Reunião",
+                  nomeAtividade: tituloReuniao,
+                  dataFormatada: info.reuniaoData.formatada,
+                  horario: `${info.reuniaoHorarioInicio} às ${info.reuniaoHorarioFim}`,
+                  codigo,
+                });
+
+                const resumoLider =
+                  `⏳ *Solicitação de Reunião em Análise Pastoral*\n\n` +
+                  `🏢 *Departamento:* ${info.reuniaoDepartamento}\n` +
+                  `📆 *Data:* ${info.reuniaoData.formatada}\n` +
+                  `⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n` +
+                  `📍 *Local:* ${info.reuniaoLocal}\n\n` +
+                  `⚠️ Consta um Atendimento Pastoral agendado para o mesmo horário. Uma consulta foi enviada diretamente ao Pastor responsável (*${pastorResponsavel.nome || "Pastor"}*) no WhatsApp privado dele.\n\n` +
+                  `Assim que o Pastor responder autorizando, sua reunião será encaminhada para a aprovação final da Secretaria! 🙏\n\n` +
+                  `Digite *menu* para voltar ao menu principal.`;
+
+                delete etapas[numero];
+                return msg.reply(resumoLider);
+              }
+
+              // Sem conflito pastoral: salva e envia diretamente para a secretaria
+              const codigo = salvarPendente(dadosReuniao);
+              const resumoGrupo = `🤝 *NOVA REUNIÃO SOLICITADA*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Departamento:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n\n_Responda a este resumo com "marcar reunião" ou "não marcar" para aprovar._\n\n_Código: ${codigo}_`;
+              await notificarSecretaria(client, resumoGrupo);
 
               const resumoLider = `✅ *Solicitação de Reunião Enviada!*\n\n🏢 *Departamento:* ${info.reuniaoDepartamento}\n📆 *Data:* ${info.reuniaoData.formatada}\n⏰ *Horário:* ${info.reuniaoHorarioInicio} - ${info.reuniaoHorarioFim}\n📍 *Local:* ${info.reuniaoLocal}\n\nSua solicitação foi enviada para aprovação da secretaria. Assim que confirmada, você receberá a confirmação e a Ata de Reunião. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
               delete etapas[numero];
@@ -4214,6 +4476,53 @@ Escolha uma opção:
             };
 
             try {
+              // Concorrência com Atendimento Pastoral: obrigatório consultar o pastor no uso do salão
+              const conflitosPastoral = await checarConcorrenciaAtendimentoPastoral({
+                dia: info.dia,
+                mes: info.mes,
+                ano: info.ano,
+                horarioInicio: info.horarioInicio,
+                horarioFim: info.horarioFim,
+                isDiaInteiro: false,
+              });
+
+              const pastorResponsavel = conflitosPastoral.length > 0 ? obterPastorDoAtendimento(conflitosPastoral[0]) : null;
+              const temConflitoPastoral = conflitosPastoral.length > 0 && Boolean(pastorResponsavel);
+
+              if (temConflitoPastoral) {
+                dadosUso.aguardandoPastor = true;
+                dadosUso.pastorTelefone = pastorResponsavel.telefone;
+                dadosUso.pastorNome = pastorResponsavel.nome;
+                dadosUso.conflitoAtendimentoSummary = conflitosPastoral[0].summary || "Atendimento Pastoral";
+                dadosUso.horarioConflito = `${dadosUso.horarioInicio} às ${dadosUso.horarioFim}`;
+
+                const codigo = salvarPendente(dadosUso);
+
+                await consultarPastorConcorrenciaSalao({
+                  pastor: pastorResponsavel,
+                  atendimento: conflitosPastoral[0],
+                  solicitante: nomeSol,
+                  tipoAtividade: "Uso do Salão",
+                  nomeAtividade: info.finalidade,
+                  dataFormatada: dadosUso.dataFormatada,
+                  horario: `${dadosUso.horarioInicio} às ${dadosUso.horarioFim}`,
+                  codigo,
+                });
+
+                const resumoMembro =
+                  `⏳ *Solicitação de Uso do Salão em Análise Pastoral*\n\n` +
+                  `📆 *Data:* ${dadosUso.dataFormatada}\n` +
+                  `⏰ *Horário:* ${dadosUso.horarioInicio} às ${dadosUso.horarioFim}\n` +
+                  `📝 *Finalidade:* ${dadosUso.finalidade}\n\n` +
+                  `⚠️ Consta um Atendimento Pastoral agendado para o mesmo horário. Uma consulta foi enviada diretamente ao Pastor responsável (*${pastorResponsavel.nome || "Pastor"}*) no WhatsApp privado dele.\n\n` +
+                  `Assim que o Pastor responder autorizando, sua solicitação será encaminhada para a aprovação final da Secretaria! 🙏\n\n` +
+                  `Digite *menu* para voltar ao menu principal.`;
+
+                delete etapas[numero];
+                return msg.reply(resumoMembro);
+              }
+
+              // Sem conflito pastoral: segue direto para a Secretaria
               const codigo = salvarPendente(dadosUso);
               const resumoGrupo =
                 `🏛️ *NOVA SOLICITAÇÃO DE USO DO SALÃO*\n\n` +
@@ -4225,27 +4534,6 @@ Escolha uma opção:
                 `_Responda a este resumo com "aprovar salão" ou "recusar salão" para confirmar._\n\n` +
                 `_Código: ${codigo}_`;
               await notificarSecretaria(client, resumoGrupo);
-
-              // Concorrência com Atendimento Pastoral: obrigatório consultar os pastores no uso do salão
-              const conflitosPastoral = await checarConcorrenciaAtendimentoPastoral({
-                dia: info.dia,
-                mes: info.mes,
-                ano: info.ano,
-                horarioInicio: info.horarioInicio,
-                horarioFim: info.horarioFim,
-                isDiaInteiro: false,
-              });
-              if (conflitosPastoral.length > 0) {
-                await avisarPastoresConcorrenciaSalao({
-                  conflitos: conflitosPastoral,
-                  solicitante: nomeSol,
-                  tipoAtividade: "Uso do Salão",
-                  nomeAtividade: info.finalidade,
-                  dataFormatada: dadosUso.dataFormatada,
-                  horario: `${dadosUso.horarioInicio} às ${dadosUso.horarioFim}`,
-                  codigo,
-                });
-              }
 
               const resumoMembro =
                 `✅ *Solicitação de Uso do Salão Enviada!*\n\n` +

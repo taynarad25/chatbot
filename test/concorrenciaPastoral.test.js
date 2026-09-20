@@ -111,12 +111,14 @@ function criarHarness({ usuarios = [], calendarEvents = [] } = {}) {
   };
 }
 
-test("Concorrência Pastoral: notifica pastores quando uso do salão coincide com atendimento pastoral", async () => {
+test("Concorrência Pastoral: consulta pastor no privado quando uso do salão coincide com atendimento pastoral (não envia à secretaria ainda)", async () => {
   const NUMERO_MEMBRO = "5511988887777";
+  const NUMERO_PASTOR = "5511999991111";
   const eventosAtendimento = [
     {
       id: "ev-atendimento-02",
       summary: "Atendimento Pastoral - Casal Silva",
+      description: `👤 Discípulo: Casal Silva\n👔 Pastor: Pr. Gabriel\n📱 Telefone Pastor: ${NUMERO_PASTOR}`,
       location: "Gabinete Pastoral",
       calendarId: AGENDAS_INTERNAS.ATENDIMENTO,
       start: { dateTime: "2026-11-10T14:00:00-03:00" },
@@ -126,11 +128,14 @@ test("Concorrência Pastoral: notifica pastores quando uso do salão coincide co
   ];
 
   const harness = criarHarness({
-    usuarios: [{ nome: "Mariana Costa", telefone: NUMERO_MEMBRO, cargos: ["membro"] }],
+    usuarios: [
+      { nome: "Mariana Costa", telefone: NUMERO_MEMBRO, cargos: ["membro"] },
+      { nome: "Pr. Gabriel", telefone: NUMERO_PASTOR, cargos: ["pastor"] },
+    ],
     calendarEvents: eventosAtendimento,
   });
 
-  // 1. Solicita uso do salão
+  // 1. Membro solicita uso do salão
   await harness.enviar(NUMERO_MEMBRO, "5");
   await harness.enviar(NUMERO_MEMBRO, "10/11/2026");
   await harness.enviar(NUMERO_MEMBRO, "14:00");
@@ -138,24 +143,85 @@ test("Concorrência Pastoral: notifica pastores quando uso do salão coincide co
   await harness.enviar(NUMERO_MEMBRO, "Confraternização de Casais");
   const [resFinal] = await harness.enviar(NUMERO_MEMBRO, "SIM");
 
-  assert.match(resFinal, /Solicitação de Uso do Salão Enviada!/);
+  // Solicitante recebe aviso de análise pastoral
+  assert.match(resFinal, /Solicitação de Uso do Salão em Análise Pastoral/);
+  assert.match(resFinal, /Pr\. Gabriel/);
 
-  // Verifica se o aviso foi enviado aos pastores no grupo pastoral
-  const msgPas = harness.gruposEnviados.find(m => m.texto.includes("CONCORRÊNCIA COM ATENDIMENTO PASTORAL"));
-  assert.ok(msgPas, "Pastores devem ser notificados sobre concorrência no uso do salão");
-  assert.match(msgPas.texto, /Atendimento Pastoral - Casal Silva/);
-  assert.match(msgPas.texto, /Gabinete Pastoral/);
-  assert.match(msgPas.texto, /Confraternização de Casais/);
-  assert.match(msgPas.texto, /autorizam marcar este\(a\) uso do salão no salão da igreja/i);
+  // Consulta DEVE ter ido exclusivamente para o WhatsApp privado do Pastor, e NÃO no grupo
+  const msgPrivadaPastor = harness.gruposEnviados.find(m => m.to.includes(NUMERO_PASTOR) && m.texto.includes("CONSULTA PASTORAL"));
+  assert.ok(msgPrivadaPastor, "Pastor do atendimento deve receber a consulta no seu privado");
+  assert.match(msgPrivadaPastor.texto, /Atendimento Pastoral - Casal Silva/);
+  assert.match(msgPrivadaPastor.texto, /Confraternização de Casais/);
+  assert.match(msgPrivadaPastor.texto, /autoriza o uso do salão/i);
+
+  // NÃO deve ter sido enviado para o grupo da Secretaria ainda!
+  const msgSecInicial = harness.gruposEnviados.find(m => m.to === harness.JID_GRUPO_SECRETARIA);
+  assert.equal(msgSecInicial, undefined, "Secretaria NÃO deve ser consultada antes do pastor responder");
+
+  // 2. Pastor responde "SIM" no privado
+  const resPastor = await harness.enviar(NUMERO_PASTOR, "SIM");
+  assert.match(resPastor[0], /autorização para a realização de \*Confraternização de Casais\* no salão foi registrada/);
+
+  // Agora SIM deve ter sido encaminhado para o grupo da Secretaria com a autorização pastoral
+  const msgSecFinal = harness.gruposEnviados.find(m => m.to === harness.JID_GRUPO_SECRETARIA);
+  assert.ok(msgSecFinal, "Secretaria DEVE receber a solicitação após autorização do pastor");
+  assert.match(msgSecFinal.texto, /NOVA SOLICITAÇÃO DE USO DO SALÃO/);
+  assert.match(msgSecFinal.texto, /Autorização Pastoral/);
 });
 
-test("Concorrência Pastoral: notifica pastores quando reunião na igreja coincide com atendimento pastoral", async () => {
+test("Concorrência Pastoral: se pastor responder NÃO no privado, cancela e NÃO envia para a secretaria", async () => {
+  const NUMERO_MEMBRO = "5511988887777";
+  const NUMERO_PASTOR = "5511999991111";
+  const eventosAtendimento = [
+    {
+      id: "ev-atendimento-recusa",
+      summary: "Atendimento Pastoral - Casal Silva",
+      description: `Telefone Pastor: ${NUMERO_PASTOR}`,
+      location: "Gabinete Pastoral",
+      calendarId: AGENDAS_INTERNAS.ATENDIMENTO,
+      start: { dateTime: "2026-11-10T14:00:00-03:00" },
+      end: { dateTime: "2026-11-10T16:00:00-03:00" },
+      status: "confirmed",
+    },
+  ];
+
+  const harness = criarHarness({
+    usuarios: [
+      { nome: "Mariana Costa", telefone: NUMERO_MEMBRO, cargos: ["membro"] },
+      { nome: "Pr. Gabriel", telefone: NUMERO_PASTOR, cargos: ["pastor"] },
+    ],
+    calendarEvents: eventosAtendimento,
+  });
+
+  await harness.enviar(NUMERO_MEMBRO, "5");
+  await harness.enviar(NUMERO_MEMBRO, "10/11/2026");
+  await harness.enviar(NUMERO_MEMBRO, "14:00");
+  await harness.enviar(NUMERO_MEMBRO, "16:00");
+  await harness.enviar(NUMERO_MEMBRO, "Confraternização de Casais");
+  await harness.enviar(NUMERO_MEMBRO, "SIM");
+
+  // Pastor responde NÃO no privado
+  const resPastor = await harness.enviar(NUMERO_PASTOR, "NÃO");
+  assert.match(resPastor[0], /foi recusada e cancelada/);
+
+  // Membro solicitante é avisado da recusa
+  const msgMembroRecusa = harness.gruposEnviados.find(m => m.to.includes(NUMERO_MEMBRO) && m.texto.includes("Solicitação Não Autorizada"));
+  assert.ok(msgMembroRecusa, "Membro solicitante deve ser avisado sobre a recusa do pastor");
+
+  // NUNCA envia para a Secretaria
+  const msgSec = harness.gruposEnviados.find(m => m.to === harness.JID_GRUPO_SECRETARIA);
+  assert.equal(msgSec, undefined, "Secretaria NUNCA deve receber solicitação recusada pelo pastor");
+});
+
+test("Concorrência Pastoral: notifica pastor no privado quando reunião na igreja coincide com atendimento pastoral", async () => {
   const NUMERO_LIDER = "5511977776666";
   const JID_LIDER = `${NUMERO_LIDER}@c.us`;
+  const NUMERO_PASTOR = "5511999992222";
   const eventosAtendimento = [
     {
       id: "ev-atendimento-reuniao",
       summary: "Atendimento Pastoral - Discípulo Pedro",
+      description: `Telefone Pastor: ${NUMERO_PASTOR}`,
       location: "Gabinete Pastoral",
       calendarId: AGENDAS_INTERNAS.ATENDIMENTO,
       start: { dateTime: "2026-11-12T19:30:00-03:00" },
@@ -165,7 +231,10 @@ test("Concorrência Pastoral: notifica pastores quando reunião na igreja coinci
   ];
 
   const harness = criarHarness({
-    usuarios: [{ nome: "Líder Pedro", telefone: NUMERO_LIDER, cargos: ["lider"], departamentos: ["Rede de Homens"] }],
+    usuarios: [
+      { nome: "Líder Pedro", telefone: NUMERO_LIDER, cargos: ["lider"], departamentos: ["Rede de Homens"] },
+      { nome: "Pr. Marcos", telefone: NUMERO_PASTOR, cargos: ["pastor"] },
+    ],
     calendarEvents: eventosAtendimento,
   });
 
@@ -179,35 +248,73 @@ test("Concorrência Pastoral: notifica pastores quando reunião na igreja coinci
   };
 
   const [resFinal] = await harness.enviar(NUMERO_LIDER, "1"); // 1 - Na Igreja
-  assert.match(resFinal, /Solicitação de Reunião Enviada!/);
+  assert.match(resFinal, /Solicitação de Reunião em Análise Pastoral/);
 
-  // Verifica se o aviso foi enviado aos pastores
-  const msgPas = harness.gruposEnviados.find(m => m.texto.includes("CONCORRÊNCIA COM ATENDIMENTO PASTORAL"));
-  assert.ok(msgPas, "Pastores devem ser notificados sobre concorrência de reunião na igreja");
-  assert.match(msgPas.texto, /Atendimento Pastoral - Discípulo Pedro/);
-  assert.match(msgPas.texto, /Gabinete Pastoral/);
-  assert.match(msgPas.texto, /autorizam marcar este\(a\) reunião no salão da igreja/i);
+  // Verifica se a consulta foi enviada no privado do pastor
+  const msgPrivadaPastor = harness.gruposEnviados.find(m => m.to.includes(NUMERO_PASTOR) && m.texto.includes("CONSULTA PASTORAL"));
+  assert.ok(msgPrivadaPastor, "Pastor deve receber consulta no privado sobre a reunião");
+  assert.match(msgPrivadaPastor.texto, /Atendimento Pastoral - Discípulo Pedro/);
+  assert.match(msgPrivadaPastor.texto, /autoriza o uso do salão da igreja/i);
 });
 
-test("Grupo Pastoral: pastores autorizam uso do salão concorrente", async () => {
-  const harness = criarHarness();
+test("Concorrência Pastoral: evento com conflito pastoral vai pro pastor no privado e só após SIM vai pra secretaria", async () => {
+  const NUMERO_LIDER = "5511977778888";
+  const JID_LIDER = `${NUMERO_LIDER}@c.us`;
+  const NUMERO_PASTOR = "5511999993333";
+  const eventosAtendimento = [
+    {
+      id: "ev-atendimento-evento",
+      summary: "Atendimento Pastoral - Discípulo Lucas",
+      description: `Pastor: Pr. Daniel (5511999993333)`,
+      location: "Gabinete Pastoral",
+      calendarId: AGENDAS_INTERNAS.ATENDIMENTO,
+      start: { dateTime: "2026-11-20T19:00:00-03:00" },
+      end: { dateTime: "2026-11-20T21:00:00-03:00" },
+      status: "confirmed",
+    },
+  ];
 
-  const codigo = salvarPendente({
-    tipo: "uso_salao",
-    solicitanteId: "5511988884444",
-    nomeSolicitante: "Membro Lucas",
-    finalidade: "Aniversário infantil",
+  const harness = criarHarness({
+    usuarios: [
+      { nome: "Líder Carlos", telefone: NUMERO_LIDER, cargos: ["lider"], departamentos: ["Rede de Jovens"] },
+      { nome: "Pr. Daniel", telefone: NUMERO_PASTOR, cargos: ["pastor"] },
+    ],
+    calendarEvents: eventosAtendimento,
   });
 
-  // Pastor responde "pode sim" citando o código no grupo de Atendimento Pastoral
-  const [resAutorizado] = await harness.responderNoGrupoPastoral(
-    "pode sim",
-    `_Código: ${codigo}_`
-  );
+  // Fluxo de agendamento de novo evento na igreja
+  await harness.enviar(NUMERO_LIDER, "7"); // Área do líder
+  await harness.enviar(NUMERO_LIDER, "1"); // Agenda
+  await harness.enviar(NUMERO_LIDER, "1"); // Eventos
+  await harness.enviar(NUMERO_LIDER, "1"); // Agendar novo evento
+  await harness.enviar(NUMERO_LIDER, "Culto Jovem Especial");
+  await harness.enviar(NUMERO_LIDER, "igreja");
+  await harness.enviar(NUMERO_LIDER, "1"); // Rede de Jovens (único departamento do líder)
+  await harness.enviar(NUMERO_LIDER, "11"); // Novembro
+  await harness.enviar(NUMERO_LIDER, "1"); // Data específica
+  await harness.enviar(NUMERO_LIDER, "20"); // Dia 20
+  await harness.enviar(NUMERO_LIDER, "19:00"); // Inicio
+  const [resFinal] = await harness.enviar(NUMERO_LIDER, "21:00"); // Fim
 
-  assert.match(resAutorizado, /Resposta dos pastores registrada!/);
-  assert.match(resAutorizado, /foi autorizado e a secretaria foi comunicada/);
+  assert.match(resFinal, /Solicitação em Análise Pastoral/);
 
-  const avisoSec = harness.gruposEnviados.find(m => m.texto.includes("PASTORES AUTORIZARAM"));
-  assert.ok(avisoSec, "Secretaria deve ser comunicada da autorização pastoral");
+  // Secretaria não deve ter recebido ainda
+  assert.equal(harness.gruposEnviados.find(m => m.to === harness.JID_GRUPO_SECRETARIA), undefined);
+
+  // Pastor recebeu a consulta no privado
+  const msgPastor = harness.gruposEnviados.find(m => m.to.includes(NUMERO_PASTOR) && m.texto.includes("CONSULTA PASTORAL"));
+  assert.ok(msgPastor);
+  assert.match(msgPastor.texto, /Culto Jovem Especial/);
+
+  // Pastor autoriza no privado
+  const [resPastor] = await harness.enviar(NUMERO_PASTOR, "autorizo");
+  assert.match(resPastor, /registrada com sucesso/);
+
+  // Agora sim secretaria recebe
+  const msgSec = harness.gruposEnviados.find(m => m.to === harness.JID_GRUPO_SECRETARIA);
+  assert.ok(msgSec);
+  assert.match(msgSec.texto, /NOVO AGENDAMENTO SOLICITADO/);
+  assert.match(msgSec.texto, /Autorização Pastoral/);
 });
+
+

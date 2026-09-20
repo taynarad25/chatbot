@@ -156,12 +156,27 @@ async function executarBroadcast({
   let falhas = 0;
   const destinatariosEnviados = [];
 
-  // Instancia MessageMedia se vier como objeto serializado simples
-  let mediaObj = media;
-  if (media && MessageMedia && !(media instanceof MessageMedia) && media.data && media.mimetype) {
+  // Prioriza carregar do arquivo em disco para garantir integridade binária da mídia
+  let mediaObj = null;
+  if (media?.caminhoArquivo && fs.existsSync(media.caminhoArquivo)) {
     try {
-      mediaObj = new MessageMedia(media.mimetype, media.data, media.filename);
-    } catch (_) {
+      mediaObj = carregarMidiaDeDisco(media.caminhoArquivo);
+      console.log(`[Broadcast] Mídia carregada diretamente do arquivo em disco: ${media.caminhoArquivo}`);
+    } catch (errCarregar) {
+      console.warn(`[Broadcast] Falha ao carregar mídia do disco (${media.caminhoArquivo}):`, errCarregar.message);
+      mediaObj = null;
+    }
+  }
+
+  // Fallback para objeto MessageMedia em memória
+  if (!mediaObj && media) {
+    if (MessageMedia && !(media instanceof MessageMedia) && media.data && media.mimetype) {
+      try {
+        mediaObj = new MessageMedia(media.mimetype, media.data, media.filename);
+      } catch (_) {
+        mediaObj = media;
+      }
+    } else {
       mediaObj = media;
     }
   }
@@ -189,17 +204,23 @@ async function executarBroadcast({
     try {
       let resEnvio = null;
       if (mediaObj && client && typeof client.sendMessage === "function") {
-        const options = texto ? { caption: texto } : {};
-        console.log(`[Broadcast] (${i + 1}/${total}) Enviando mídia (${mediaObj.mimetype || "sem mimetype"}) para ${dest.nome} (${mascararTelefone(dest.telefone)})...`);
+        const options = {
+          caption: texto || undefined,
+          sendMediaAsDocument: false,
+          waitUntilMsgSent: true,
+        };
+        console.log(`[Broadcast] (${i + 1}/${total}) Enviando mídia (${mediaObj.mimetype || "sem mimetype"}) para ${dest.nome} [JID: ${jid}] (${mascararTelefone(dest.telefone)})...`);
         resEnvio = await enviarMensagemResiliente(client, jid, mediaObj, options, { jid });
       } else if (texto && client && typeof client.sendMessage === "function") {
-        console.log(`[Broadcast] (${i + 1}/${total}) Enviando texto para ${dest.nome} (${mascararTelefone(dest.telefone)})...`);
+        console.log(`[Broadcast] (${i + 1}/${total}) Enviando texto para ${dest.nome} [JID: ${jid}] (${mascararTelefone(dest.telefone)})...`);
         resEnvio = await enviarMensagemResiliente(client, jid, texto, {}, { jid });
       }
 
-      if (resEnvio === null || (typeof resEnvio === "object" && resEnvio !== null && resEnvio.id && Object.keys(resEnvio.id).length === 0 && !resEnvio.ack && !resEnvio._serialized)) {
+      if (resEnvio === false || (typeof resEnvio === "object" && resEnvio !== null && resEnvio.id && Object.keys(resEnvio.id).length === 0 && !resEnvio.ack && !resEnvio._serialized)) {
         throw new Error("Envio não confirmado pelo cliente WhatsApp");
       }
+
+
 
       enviados++;
       enviadoComSucesso = true;
@@ -216,8 +237,8 @@ async function executarBroadcast({
         try {
           console.log(`[Broadcast] Tentando fallback enviando mídia do arquivo em disco: ${media.caminhoArquivo}...`);
           const mediaDoDisco = carregarMidiaDeDisco(media.caminhoArquivo);
-          const resFallback = await enviarMensagemResiliente(client, jid, mediaDoDisco, texto ? { caption: texto } : {}, { jid });
-          if (resFallback === null || (typeof resFallback === "object" && resFallback !== null && resFallback.id && Object.keys(resFallback.id).length === 0 && !resFallback.ack && !resFallback._serialized)) {
+          const resFallback = await enviarMensagemResiliente(client, jid, mediaDoDisco, texto ? { caption: texto, sendMediaAsDocument: false, waitUntilMsgSent: true } : { sendMediaAsDocument: false, waitUntilMsgSent: true }, { jid });
+          if (!resFallback || (typeof resFallback === "object" && resFallback !== null && resFallback.id && Object.keys(resFallback.id).length === 0 && !resFallback.ack && !resFallback._serialized)) {
             throw new Error("Envio via fallback de disco não confirmado");
           }
           enviados++;

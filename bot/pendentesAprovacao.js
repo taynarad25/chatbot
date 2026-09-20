@@ -56,10 +56,57 @@ function removerPendente(codigo) {
   if (info.changes > 0) console.log(`[Pendentes] Solicitação ${codigo} removida.`);
 }
 
-// Extrai o código de uma mensagem do bot (ex: "_Código: A3F9_").
-function extrairCodigo(texto) {
-  const match = (texto || "").match(/Código:\s*([A-Z0-9]{4,8})/);
-  return match ? match[1] : null;
+// Atualiza os dados de uma solicitação pendente existente
+function atualizarPendente(codigo, dados) {
+  try {
+    const info = db.prepare("UPDATE pendentes SET dados = ? WHERE codigo = ?").run(JSON.stringify(dados), codigo);
+    return info.changes > 0;
+  } catch (err) {
+    console.error("[Pendentes] Erro ao atualizar solicitação pendente:", err);
+    return false;
+  }
 }
 
-module.exports = { salvarPendente, buscarPendente, removerPendente, extrairCodigo };
+// Busca solicitação pendente que esteja aguardando autorização de um pastor específico
+function buscarPendentePorPastor(pastorTelefone, codigoOpcional = null) {
+  try {
+    if (!pastorTelefone) return null;
+    const telLimpo = String(pastorTelefone).replace(/\D/g, "");
+    if (!telLimpo) return null;
+
+    const rows = db.prepare("SELECT codigo, dados, criadoEm FROM pendentes ORDER BY rowid DESC").all();
+    for (const row of rows) {
+      try {
+        const dados = JSON.parse(row.dados);
+        if (dados.aguardandoPastor) {
+          const telPendente = String(dados.pastorTelefone || "").replace(/\D/g, "");
+          const matchCodigo = !codigoOpcional || String(row.codigo).toUpperCase() === String(codigoOpcional).toUpperCase();
+          const matchTel = telPendente && (telPendente.endsWith(telLimpo) || telLimpo.endsWith(telPendente));
+          if (matchCodigo && matchTel) {
+            return { codigo: row.codigo, ...dados, criadoEm: row.criadoEm };
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  } catch (err) {
+    console.error("[Pendentes] Erro ao buscar pendente por pastor:", err);
+    return null;
+  }
+}
+
+// Extrai o código de uma mensagem do bot (ex: "_Código: A3F9_").
+function extrairCodigo(texto) {
+  const match = (texto || "").match(/Código:\s*([A-Z0-9]{4,8})/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+module.exports = {
+  salvarPendente,
+  buscarPendente,
+  buscarPendentePorPastor,
+  atualizarPendente,
+  removerPendente,
+  extrairCodigo,
+};
+

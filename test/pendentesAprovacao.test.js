@@ -8,7 +8,7 @@ process.env.DB_PATH = path.join(tmpDir, "dados.db");
 
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
-const { salvarPendente, buscarPendente, removerPendente, extrairCodigo } = require("../bot/pendentesAprovacao");
+const { salvarPendente, buscarPendente, buscarPendentePorPastor, atualizarPendente, removerPendente, extrairCodigo } = require("../bot/pendentesAprovacao");
 
 after(() => {
   try {
@@ -78,3 +78,36 @@ test("extrairCodigo: retorna null quando não há código na mensagem", () => {
   assert.equal(extrairCodigo(""), null);
   assert.equal(extrairCodigo(undefined), null);
 });
+
+test("atualizarPendente: atualiza dados de uma solicitação existente", () => {
+  const dados = dadosExemplo({ evento: "Retiro" });
+  const codigo = salvarPendente(dados);
+  const ok = atualizarPendente(codigo, { ...dados, pastorAutorizou: true });
+  assert.equal(ok, true);
+  const atualizado = buscarPendente(codigo);
+  assert.equal(atualizado.pastorAutorizou, true);
+});
+
+test("buscarPendentePorPastor: localiza solicitação aguardando resposta do pastor correto", () => {
+  const telPastor = "5511988887777";
+  const dados = dadosExemplo({
+    evento: "Uso do Salão",
+    aguardandoPastor: true,
+    pastorTelefone: telPastor,
+    pastorNome: "Pr. Lucas",
+  });
+  const codigo = salvarPendente(dados);
+
+  const encontrado = buscarPendentePorPastor(telPastor);
+  assert.ok(encontrado, "deve encontrar a pendência do pastor");
+  assert.equal(encontrado.codigo, codigo);
+  assert.equal(encontrado.pastorNome, "Pr. Lucas");
+
+  const encontradoPorCodigo = buscarPendentePorPastor("5511988887777", codigo);
+  assert.ok(encontradoPorCodigo);
+  assert.equal(encontradoPorCodigo.codigo, codigo);
+
+  const naoEncontradoOutroPastor = buscarPendentePorPastor("5511911112222");
+  assert.equal(naoEncontradoOutroPastor, null);
+});
+
