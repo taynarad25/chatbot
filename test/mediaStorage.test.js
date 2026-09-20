@@ -9,6 +9,7 @@ const {
   salvarMidiaEmDisco,
   carregarMidiaDeDisco,
   limparMidiasAntigas,
+  extrairSerializedId,
   baixarMidiaComRetry,
 } = require("../bot/mediaStorage");
 
@@ -205,4 +206,117 @@ test("suite mediaStorage", async (t) => {
     assert.equal(resultado, null);
     assert.equal(chamado, false, "Não deveria tentar baixar mídia de mensagem de texto comum");
   });
+
+  await t.test("extrairSerializedId extrai IDs no formato clássico, formato $1 e por reconstrução de objeto", () => {
+    // 1. Clássico _serialized
+    assert.equal(
+      extrairSerializedId({ _serialized: "false_120363@g.us_3EB0123" }),
+      "false_120363@g.us_3EB0123"
+    );
+
+    // 2. Novo padrão $1 do WhatsApp Web 2.3000.x
+    assert.equal(
+      extrairSerializedId({ $1: "true_5511999990001@c.us_3EB0456" }),
+      "true_5511999990001@c.us_3EB0456"
+    );
+
+    // 3. String direta
+    assert.equal(
+      extrairSerializedId("false_120363@g.us_3EB0789"),
+      "false_120363@g.us_3EB0789"
+    );
+
+    // 4. Objeto puro sem _serialized nem $1
+    assert.equal(
+      extrairSerializedId({
+        fromMe: false,
+        remote: "120363999999999999@g.us",
+        id: "3EB0ABCDEF123456",
+      }),
+      "false_120363999999999999@g.us_3EB0ABCDEF123456"
+    );
+
+    // 5. Objeto com remote aninhado e participant
+    assert.equal(
+      extrairSerializedId({
+        fromMe: false,
+        remote: { _serialized: "120363888888888888@g.us" },
+        id: "3EB09999",
+        participant: "5511988880001@c.us",
+      }),
+      "false_120363888888888888@g.us_3EB09999_5511988880001@c.us"
+    );
+
+    // 6. Inválido ou nulo
+    assert.equal(extrairSerializedId(null), null);
+    assert.equal(extrairSerializedId({}), null);
+  });
+
+  await t.test("baixarMidiaComRetry normaliza msg.id sem _serialized e evita passar [object Object] para getMessageById", async () => {
+    let idRecebidoNoGet = null;
+    const fakeBase64 = Buffer.from("conteudo_imagem").toString("base64");
+
+    const clientMock = {
+      getMessageById: async (msgId) => {
+        idRecebidoNoGet = msgId;
+        return {
+          id: { _serialized: msgId },
+          downloadMedia: async () => ({
+            mimetype: "image/jpeg",
+            data: fakeBase64,
+            filename: "foto_recarregada.jpg",
+          }),
+        };
+      },
+    };
+
+    // Mensagem com id sem _serialized (formato moderno que gerava [object Object])
+    const msgMock = {
+      id: {
+        fromMe: false,
+        remote: "120363999999999999@g.us",
+        id: "3EB01234567890AB",
+      },
+      hasMedia: true,
+      type: "image",
+      downloadMedia: async function () {
+        // Na 1ª e 2ª tentativa lança o erro r característico de msgId undefined
+        throw new Error("r: r");
+      },
+    };
+
+    const resultado = await baixarMidiaComRetry(msgMock, {
+      client: clientMock,
+      contexto: "TesteIdObjeto",
+      tentativas: 3,
+      esperaMs: 10,
+      salvarEmDisco: false,
+    });
+
+    assert.ok(resultado, "Deveria ter recuperado na 3ª tentativa via getMessageById");
+    assert.equal(msgMock.id._serialized, "false_120363999999999999@g.us_3EB01234567890AB");
+    assert.equal(idRecebidoNoGet, "false_120363999999999999@g.us_3EB01234567890AB");
+    assert.notEqual(idRecebidoNoGet, "[object Object]");
+  });
+
+  await t.test("Client.prototype.getMessageById serializa objeto de ID automaticamente", async () => {
+    const { Client } = require("whatsapp-web.js");
+    let chamadoCom = null;
+    const fakeClient = Object.create(Client.prototype);
+    fakeClient.pupPage = {
+      evaluate: async (fn, arg) => {
+        chamadoCom = arg;
+        return null;
+      },
+    };
+
+    await fakeClient.getMessageById({
+      fromMe: false,
+      remote: "120363999999999999@g.us",
+      id: "3EB0TESTE123",
+    });
+
+    assert.equal(chamadoCom, "false_120363999999999999@g.us_3EB0TESTE123");
+  });
 });
+

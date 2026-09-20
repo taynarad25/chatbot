@@ -354,6 +354,30 @@ function criarClient() {
       console.warn(`[WhatsApp] Não foi possível consultar a versão do WhatsApp Web: ${errVer.message}`);
     }
 
+    // Injeta patch de compatibilidade para serialização de IDs no WhatsApp Web (formato 2.3000.x e $1)
+    try {
+      if (client.pupPage && !client.pupPage.isClosed?.()) {
+        await client.pupPage.evaluate(() => {
+          if (window.WWebJS && window.WWebJS.getMessageModel && !window.WWebJS._patchedIdSerialization) {
+            const originalGetModel = window.WWebJS.getMessageModel;
+            window.WWebJS.getMessageModel = function (message) {
+              const res = originalGetModel(message);
+              if (res && res.id) {
+                if (!res.id._serialized) {
+                  res.id._serialized = res.id.$1 || (res.id.remote && res.id.id ? `${res.id.fromMe ? 'true' : 'false'}_${res.id.remote?._serialized || res.id.remote}_${res.id.id}` : null);
+                }
+              }
+              return res;
+            };
+            window.WWebJS._patchedIdSerialization = true;
+          }
+        });
+        console.log("[WhatsApp] 🛡️ Patch de serialização de IDs de mensagens injetado no navegador.");
+      }
+    } catch (errPatch) {
+      console.warn(`[WhatsApp] Aviso ao aplicar patch de IDs no navegador: ${errPatch.message}`);
+    }
+
     try {
       const inviteSec = "KsHKE5q5BiI81KvJ1ARdUp";
       const invitePas = "I2AxSM7v9CI211RGWJBX2Y";
