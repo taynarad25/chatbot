@@ -899,6 +899,7 @@ function renderIndexHtml() {
       <form id="addLiderForm">
         <input name="nome" placeholder="Nome completo" required />
         <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" autocomplete="off" required />
+        <input id="liderDataNascimento" name="dataNascimento" placeholder="Data de Nascimento (Ex: 15/04 ou 15/04/1990)" maxlength="10" autocomplete="off" />
         <div class="deptos-container" style="margin-bottom: 14px;">
           <span class="cargos-title" style="display:block; font-size: 0.85rem; color: #a1a1aa; margin-bottom: 6px;">Departamentos / Ministérios (marque todos os que se aplicam):</span>
           <div class="deptos-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; max-height: 140px; overflow-y: auto; padding: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;">
@@ -1182,6 +1183,16 @@ function renderIndexHtml() {
           span.appendChild(badgeDepto);
         });
 
+        if (l.dataNascimento) {
+          const badgeNasc = document.createElement('span');
+          badgeNasc.className = 'badge';
+          badgeNasc.style.background = 'rgba(236, 72, 153, 0.15)';
+          badgeNasc.style.color = '#f472b6';
+          badgeNasc.style.borderColor = 'rgba(236, 72, 153, 0.3)';
+          badgeNasc.textContent = '🎂 ' + l.dataNascimento;
+          span.appendChild(badgeNasc);
+        }
+
         li.appendChild(span);
 
         // Agrupa os dois botões numa única "coluna" à direita
@@ -1233,6 +1244,7 @@ function renderIndexHtml() {
       const form = document.getElementById('addLiderForm');
       form.nome.value = lider.nome;
       form.telefone.value = formatarTelefone(lider.telefone);
+      if (form.dataNascimento) form.dataNascimento.value = lider.dataNascimento || '';
       
       const deptos = Array.isArray(lider.departamentos)
         ? lider.departamentos
@@ -1255,6 +1267,7 @@ function renderIndexHtml() {
       liderEmEdicao = null;
       const form = document.getElementById('addLiderForm');
       form.reset();
+      if (form.dataNascimento) form.dataNascimento.value = '';
       form.querySelectorAll('input[name="departamentos"]').forEach(cb => {
         cb.checked = false;
       });

@@ -28,8 +28,11 @@ function formatarHoraBrasil(isoStr) {
 
 function formatarJidWhatsApp(telefone) {
   if (!telefone) return "";
-  const limpo = String(telefone).replace(/\D/g, "");
+  let limpo = String(telefone).replace(/\D/g, "");
   if (!limpo) return "";
+  if ((limpo.length === 10 || limpo.length === 11) && !limpo.startsWith("55")) {
+    limpo = `55${limpo}`;
+  }
   return limpo.endsWith("@c.us") ? limpo : `${limpo}@c.us`;
 }
 
@@ -325,6 +328,29 @@ async function processarLembretesEventos({
       });
     }
 
+    // Se não encontrou pelo formulário, tenta extrair solicitante da descrição do evento (ex: "Solicitante: Pr Maurício\nTelefone: 5511...")
+    if (destinatarios.length === 0 && ev.description) {
+      let solicitanteDesc = "";
+      let telSolicitanteDesc = "";
+      const matchSol = ev.description.match(/Solicitante\s*:\s*([^\n\r]+)/i);
+      if (matchSol) solicitanteDesc = matchSol[1].trim();
+      const matchTel = ev.description.match(/(?:Telefone\s*(?:Solicitante)?|Tel(?:efone)?)\s*:\s*([^\n\r]+)/i);
+      if (matchTel) telSolicitanteDesc = matchTel[1].trim().replace(/\D/g, "");
+
+      if (telSolicitanteDesc) {
+        const user = obterUsuarioPorTelefone(telSolicitanteDesc);
+        const nomeLider = user?.nome || solicitanteDesc || "";
+        destinatarios.push({
+          telefone: telSolicitanteDesc,
+          nome: nomeLider,
+          docUrl: form?.docUrl || "",
+          departamento: form?.departamento || "",
+        });
+      }
+    }
+
+    const foiAgendadoPeloBot = Boolean(form) || /agendado via bot/i.test(ev.description || "");
+
     let discipulo = "";
     if (isPastoral) {
       const matchDiscDesc = (ev.description || "").match(/Disc[ií]pulo\s*:\s*([^\n\r]+)/i);
@@ -407,8 +433,9 @@ async function processarLembretesEventos({
       }
     }
 
-    // 3. Se não encontrou formulário ou solicitante, tenta descobrir pelos departamentos cadastrados
-    if (destinatarios.length === 0) {
+    // 3. Se não encontrou formulário ou solicitante, E O EVENTO NÃO FOI AGENDADO PELO BOT:
+    // O bot só notifica o líder do departamento quando o evento foi agendado diretamente no Google Calendar sem passar pelo bot.
+    if (destinatarios.length === 0 && !foiAgendadoPeloBot && !isPastoral) {
       let depto = "";
       if (ev.calendarId && agendasParaLer.length > 0) {
         const redeEncontrada = REDES.find((r) => agendasParaLer[r.agendaIndex] === ev.calendarId);
@@ -722,7 +749,7 @@ async function processarEnvioAgendaSecretarias({
     return { processados: 0, enviados: 0, erro: err.message };
   }
 
-  // Resolve as secretárias destinatárias (Isabelly Lacerda e Gabriela Diniz)
+  // Resolve as secretárias destinatárias (exclusivamente Isabelly Lacerda e Gabriela Diniz)
   let listaDest = destinatarios;
   if (!listaDest || listaDest.length === 0) {
     listaDest = [];
@@ -730,17 +757,33 @@ async function processarEnvioAgendaSecretarias({
       const rows = db.prepare(`
         SELECT telefone, nome FROM lideres 
         WHERE LOWER(nome) LIKE '%isabelly%' 
-           OR LOWER(nome) LIKE '%gabriela diniz%' 
-           OR LOWER(nome) LIKE '%gabriela%' 
-           OR LOWER(cargos) LIKE '%secretaria%'
+           OR LOWER(nome) LIKE '%gabriela diniz%'
       `).all();
       for (const r of rows) {
+        const nomeLower = (r.nome || "").toLowerCase();
+        if (nomeLower.includes("henrique")) continue;
         if (r.telefone && !listaDest.some((d) => d.telefone === r.telefone)) {
           listaDest.push({ telefone: r.telefone, nome: r.nome });
         }
       }
     } catch (e) {
       console.error("[Lembretes:Secretaria] Erro ao consultar secretárias no banco:", e.message);
+    }
+
+    // Garante que Gabriela Diniz e Isabelly Lacerda estejam sempre na lista pelos números oficiais
+    const telefonesPadrao = [
+      { nome: "Gabriela Diniz", telefone: "5511942685501" },
+      { nome: "Isabelly Lacerda", telefone: "5511970498716" },
+    ];
+    for (const padrao of telefonesPadrao) {
+      const telDigitos = padrao.telefone.replace(/\D/g, "");
+      const existe = listaDest.some((d) => {
+        const dTel = String(d.telefone || "").replace(/\D/g, "");
+        return dTel.endsWith(telDigitos.slice(-9)) || (d.nome && d.nome.toLowerCase().includes(padrao.nome.toLowerCase()));
+      });
+      if (!existe) {
+        listaDest.push(padrao);
+      }
     }
 
     if (process.env.SECRETARIA_TELEFONES) {
@@ -752,6 +795,12 @@ async function processarEnvioAgendaSecretarias({
       }
     }
   }
+
+  // Sob nenhuma hipótese Gabriela Henrique deve receber a agenda de segunda-feira
+  listaDest = listaDest.filter((d) => {
+    const nomeLower = (d.nome || "").toLowerCase();
+    return !nomeLower.includes("henrique");
+  });
 
   if (listaDest.length === 0) {
     console.warn("[Lembretes:Secretaria] Nenhuma secretária (Isabelly / Gabriela) encontrada para envio.");
@@ -782,11 +831,282 @@ async function processarEnvioAgendaSecretarias({
   return { processados: eventos.length, enviados: totalEnviados };
 }
 
+/**
+ * Mensagem carinhosa de aniversário assinada pela Comunidade Cristã Curados
+ */
+function montarMensagemAniversario({ nome = "" } = {}) {
+  const saudacao = nome ? `Olá, *${nome}*! 🎉` : "Olá! 🎉";
+  return (
+    `${saudacao}\n\n` +
+    `Hoje é um dia muito especial e toda a nossa comunidade celebra com você! 🎂✨\n\n` +
+    `Desejamos que o Senhor derrame ricas bênçãos sobre a sua vida, com muita saúde, paz, alegria e realizações neste novo ciclo que se inicia. Que a graça e o favor de Deus acompanhem cada um dos seus passos!\n\n` +
+    `_\"O Senhor te abençoe e te guarde; o Senhor faça resplandecer o seu rosto sobre ti e te conceda a paz.\" (Números 6:24-26)_\n\n` +
+    `Com muito carinho,\n` +
+    `*Comunidade Cristã Curados* ❤️🙏`
+  );
+}
+
+/**
+ * Rotina diária de verificação de aniversariantes do dia.
+ * Compara o dia e mês atuais com a dataNascimento de todos os membros cadastrados.
+ */
+async function processarAniversariantesDoDia({
+  client,
+  dataBase = new Date(),
+  listLideresFn = null,
+} = {}) {
+  const diaHoje = String(dataBase.getDate()).padStart(2, "0");
+  const mesHoje = String(dataBase.getMonth() + 1).padStart(2, "0");
+  const anoHoje = String(dataBase.getFullYear());
+  const diaMesAlvo = `${diaHoje}/${mesHoje}`;
+
+  console.log(`[Aniversários] Verificando aniversariantes do dia (${diaMesAlvo})...`);
+
+  let membros = [];
+  try {
+    if (typeof listLideresFn === "function") {
+      membros = listLideresFn();
+    } else {
+      const { listLideres } = require("../web/lideres");
+      membros = listLideres();
+    }
+  } catch (err) {
+    console.error("[Aniversários] Erro ao buscar membros/líderes:", err.message);
+    return { processados: 0, enviados: 0, erro: err.message };
+  }
+
+  if (!Array.isArray(membros) || membros.length === 0) {
+    return { processados: 0, enviados: 0 };
+  }
+
+  const aniversariantes = [];
+  for (const m of membros) {
+    if (!m.dataNascimento || !m.telefone) continue;
+    const partes = String(m.dataNascimento).trim().split("/");
+    if (partes.length >= 2) {
+      const d = partes[0].padStart(2, "0");
+      const mMes = partes[1].padStart(2, "0");
+      if (d === diaHoje && mMes === mesHoje) {
+        aniversariantes.push(m);
+      }
+    }
+  }
+
+  if (aniversariantes.length === 0) {
+    console.log(`[Aniversários] Nenhum aniversariante encontrado para ${diaMesAlvo}.`);
+    return { processados: membros.length, aniversariantes: 0, enviados: 0 };
+  }
+
+  let totalEnviados = 0;
+  for (const pessoa of aniversariantes) {
+    const telLimpo = String(pessoa.telefone).replace(/\D/g, "");
+    const eventoId = `aniversario_${telLimpo}_${anoHoje}`;
+    const jaEnviado = buscarLembreteEnviado(eventoId, "aniversario");
+    if (jaEnviado) {
+      console.log(`[Aniversários] Parabéns já enviado este ano para ${pessoa.nome} (${pessoa.telefone}).`);
+      continue;
+    }
+
+    const mensagem = montarMensagemAniversario({ nome: pessoa.nome });
+    const jid = formatarJidWhatsApp(pessoa.telefone);
+
+    if (client && typeof client.sendMessage === "function") {
+      try {
+        await client.sendMessage(jid, mensagem);
+        console.log(`[Aniversários] Mensagem de parabéns enviada para ${pessoa.nome} (${pessoa.telefone}).`);
+        totalEnviados++;
+      } catch (errSend) {
+        console.error(`[Aniversários] Falha ao enviar parabéns para ${pessoa.telefone}:`, errSend.message);
+      }
+    } else {
+      console.log(`[Aniversários] [Simulação] Parabéns para ${pessoa.telefone}:\n${mensagem}`);
+      totalEnviados++;
+    }
+
+    registrarLembreteEnviado(eventoId, "aniversario", pessoa.telefone);
+  }
+
+  return { processados: membros.length, aniversariantes: aniversariantes.length, enviados: totalEnviados };
+}
+
+const REGEX_A_DEFINIR = /\b(a\s*definir|em\s*defini[çc][ãa]o|ser[áa]\s*definid[oa]s?|vai\s*definir|ainda\s*n[ãa]o\s*definid[oa]s?|n[ãa]o\s*definid[oa]s?|indefinid[oa]s?|a\s*confirmar|pendente|ainda\s*vamos?\s*definir)\b/i;
+
+const LABELS_CAMPOS_FORM = {
+  tema: "Tema",
+  versiculo: "Versículo",
+  horario_inicio: "Horário de Início",
+  horario_termino: "Horário de Término",
+  horario_inicio_termino: "Horário",
+  local: "Local",
+  preletor: "Preletor(a)",
+  louvor: "Equipe de Louvor",
+  intercessao: "Intercessão",
+  copa: "Copa / Recepção",
+  estacionamento: "Estacionamento",
+  transmissao: "Transmissão",
+  midias: "Mídias / Fotos",
+  estilo: "Estilo da Arte",
+  cores: "Paleta de Cores",
+  paleta: "Paleta de Cores",
+  divulgacao: "Canais de Divulgação",
+  prazo_imagem: "Prazo para Imagem",
+  observacoes: "Observações Gerais",
+};
+
+function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens = [] } = {}) {
+  const saudacao = nome ? `Olá, *${nome}*! Tudo bem?` : "Olá! Tudo bem?";
+  const dataFormatada = formatarDataBrasil(data);
+  const dataStr = dataFormatada ? ` em *${dataFormatada}*` : "";
+
+  let listaItens = "";
+  for (const item of itens) {
+    listaItens += `• *${item.campo}:* _${item.valor}_\n`;
+  }
+
+  return (
+    `🔔 *Lembrete de Alinhamento - Faltam 7 dias!*\n\n` +
+    `${saudacao}\n\n` +
+    `Faltam apenas *7 dias* para a realização do evento *${evento}*${dataStr}!\n\n` +
+    `No formulário de agendamento, os seguintes itens haviam ficado marcados como *a definir*:\n` +
+    `${listaItens}\n` +
+    `Eles já foram definidos? Se sim, você pode atualizar o formulário diretamente comigo respondendo aqui, ou nos enviar as definições para alinharmos tudo certinho!\n\n` +
+    `_Seguimos à disposição e em oração pelo seu evento!_ 🙏✨`
+  );
+}
+
+/**
+ * Faltando 7 dias para o evento, verifica se há respostas "a definir" no formulário
+ * e envia uma mensagem ao líder perguntando se já foram definidas.
+ */
+async function processarLembretesItensADefinir({
+  client,
+  buscarEventos,
+  agendasParaLer = [],
+  diasAntecedencia = 7,
+  dataBase = new Date(),
+} = {}) {
+  if (!buscarEventos || typeof buscarEventos !== "function") {
+    return { processados: 0, enviados: 0 };
+  }
+
+  const targetDate = new Date(dataBase);
+  targetDate.setDate(targetDate.getDate() + diasAntecedencia);
+
+  const ano = targetDate.getFullYear();
+  const mes = String(targetDate.getMonth() + 1).padStart(2, "0");
+  const dia = String(targetDate.getDate()).padStart(2, "0");
+  const dataAlvoStr = `${ano}-${mes}-${dia}`;
+
+  const inicioDia = new Date(ano, targetDate.getMonth(), targetDate.getDate(), 0, 0, 0).toISOString();
+  const fimDia = new Date(ano, targetDate.getMonth(), targetDate.getDate(), 23, 59, 59).toISOString();
+
+  console.log(`[Itens a Definir] Verificando eventos de ${dataAlvoStr} (7 dias)...`);
+
+  let eventos = [];
+  try {
+    eventos = await buscarEventos(inicioDia, fimDia);
+  } catch (err) {
+    console.error("[Itens a Definir] Erro ao buscar eventos:", err.message);
+    return { processados: 0, enviados: 0, erro: err.message };
+  }
+
+  if (!Array.isArray(eventos) || eventos.length === 0) {
+    return { processados: 0, enviados: 0 };
+  }
+
+  let totalEnviados = 0;
+  const tipoLembrete = `7_dias_itens_a_definir`;
+
+  for (const ev of eventos) {
+    if (ehEnsaio(ev) || ehReuniao(ev) || ehAtendimentoPastoral(ev)) {
+      continue;
+    }
+
+    const eventoId = ev.id || `${ev.summary}_${dataAlvoStr}`;
+    const jaEnviado = buscarLembreteEnviado(eventoId, tipoLembrete);
+    if (jaEnviado) {
+      continue;
+    }
+
+    const titulo = ev.summary || "Evento";
+    const form = obterFormularioEvento(titulo);
+    if (!form || !form.payload) {
+      continue;
+    }
+
+    let payload = {};
+    if (typeof form.payload === "string") {
+      try {
+        payload = JSON.parse(form.payload);
+      } catch {}
+    } else if (typeof form.payload === "object" && form.payload !== null) {
+      payload = form.payload;
+    }
+
+    const itensADefinir = [];
+    for (const [k, v] of Object.entries(payload)) {
+      if (typeof v === "string" && REGEX_A_DEFINIR.test(v.trim())) {
+        itensADefinir.push({
+          campo: LABELS_CAMPOS_FORM[k] || k,
+          valor: v.trim(),
+        });
+      }
+    }
+
+    if (itensADefinir.length === 0) {
+      continue;
+    }
+
+    let telDest = form.solicitanteId;
+    let nomeDest = payload.nomeSolicitante || payload.nome_lider || "";
+
+    if (!telDest && ev.description) {
+      const matchTel = ev.description.match(/(?:Telefone\s*(?:Solicitante)?|Tel(?:efone)?)\s*:\s*([^\n\r]+)/i);
+      if (matchTel) telDest = matchTel[1].trim().replace(/\D/g, "");
+      const matchSol = ev.description.match(/Solicitante\s*:\s*([^\n\r]+)/i);
+      if (matchSol) nomeDest = matchSol[1].trim();
+    }
+
+    if (!telDest) {
+      continue;
+    }
+
+    const user = obterUsuarioPorTelefone(telDest);
+    if (user && user.nome) nomeDest = user.nome;
+
+    const dataEv = ev.start?.dateTime ? ev.start.dateTime.split("T")[0] : (ev.start?.date || dataAlvoStr);
+    const mensagem = montarMensagemItensADefinir({
+      nome: nomeDest,
+      evento: titulo,
+      data: dataEv,
+      itens: itensADefinir,
+    });
+
+    const jid = formatarJidWhatsApp(telDest);
+    if (client && typeof client.sendMessage === "function") {
+      try {
+        await client.sendMessage(jid, mensagem);
+        console.log(`[Itens a Definir] Lembrete de 7 dias enviado para ${nomeDest} (${telDest}) sobre "${titulo}".`);
+        totalEnviados++;
+      } catch (errSend) {
+        console.error(`[Itens a Definir] Falha ao enviar lembrete para ${telDest}:`, errSend.message);
+      }
+    } else {
+      console.log(`[Itens a Definir] [Simulação] Envio para ${telDest} sobre "${titulo}":\n${mensagem}`);
+      totalEnviados++;
+    }
+
+    registrarLembreteEnviado(eventoId, tipoLembrete, telDest);
+  }
+
+  return { processados: eventos.length, enviados: totalEnviados };
+}
+
 function iniciarAgendadorLembretes({
   client,
   buscarEventos,
   agendasParaLer = [],
-  horaExecucao = 9,
+  horaExecucao = 8,
 } = {}) {
   let executando = false;
 
@@ -794,7 +1114,20 @@ function iniciarAgendadorLembretes({
     if (executando) return;
     executando = true;
     try {
-      // 1. Lembretes de eventos gerais para os líderes (5 dias de antecedência)
+      // 0. Parabéns aos aniversariantes do dia (diariamente às 08:00)
+      await processarAniversariantesDoDia({
+        client,
+      });
+
+      // 1. Lembretes de itens a definir no formulário (7 dias antes)
+      await processarLembretesItensADefinir({
+        client,
+        buscarEventos,
+        agendasParaLer,
+        diasAntecedencia: 7,
+      });
+
+      // 2. Lembretes de eventos gerais para os líderes (5 dias de antecedência)
       await processarLembretesEventos({
         client,
         buscarEventos,
@@ -802,7 +1135,7 @@ function iniciarAgendadorLembretes({
         diasAntecedencia: 5,
       });
 
-      // 2. Lembretes de eventos gerais para os líderes (3 dias de antecedência)
+      // 3. Lembretes de eventos gerais para os líderes (3 dias de antecedência)
       await processarLembretesEventos({
         client,
         buscarEventos,
@@ -810,7 +1143,7 @@ function iniciarAgendadorLembretes({
         diasAntecedencia: 3,
       });
 
-      // 3. Lembretes de reuniões e atendimentos pastorais (1 dia antes)
+      // 4. Lembretes de reuniões e atendimentos pastorais (1 dia antes)
       await processarLembretesEventos({
         client,
         buscarEventos,
@@ -818,19 +1151,19 @@ function iniciarAgendadorLembretes({
         diasAntecedencia: 1,
       });
 
-      // 4. Lembretes de divulgação no grupo MULTIMÍDIAS (5 dias antes)
+      // 5. Lembretes de divulgação no grupo MULTIMÍDIAS (5 dias antes)
       await processarLembretesDivulgacaoMultimidia({
         client,
         diasAntecedencia: 5,
       });
 
-      // 5. Lembretes de divulgação no grupo MULTIMÍDIAS (3 dias antes)
+      // 6. Lembretes de divulgação no grupo MULTIMÍDIAS (3 dias antes)
       await processarLembretesDivulgacaoMultimidia({
         client,
         diasAntecedencia: 3,
       });
 
-      // 6. Agenda quinzenal para secretárias (toda segunda-feira)
+      // 7. Agenda quinzenal para secretárias (toda segunda-feira)
       await processarEnvioAgendaSecretarias({
         client,
         buscarEventos,
@@ -848,12 +1181,12 @@ function iniciarAgendadorLembretes({
     checarExecutar();
   }, 60 * 1000);
 
-  // Executa diariamente por volta das 09:00
+  // Executa diariamente no horário configurado (padrão 08:00)
   let ultimoDiaExecutado = null;
   const timer = setInterval(() => {
     const agora = new Date();
     const diaHoje = agora.toISOString().slice(0, 10);
-    if (agora.getHours() === horaExecucao && ultimoDiaExecutado !== diaHoje) {
+    if (agora.getHours() >= horaExecucao && ultimoDiaExecutado !== diaHoje) {
       ultimoDiaExecutado = diaHoje;
       checarExecutar();
     }
@@ -871,6 +1204,8 @@ module.exports = {
   montarMensagemConfirmacaoAtendimento,
   montarMensagemConfirmacaoReuniao,
   montarMensagemAgendaQuinzenalSecretarias,
+  montarMensagemAniversario,
+  montarMensagemItensADefinir,
   ehEnsaio,
   ehReuniao,
   ehAtendimentoPastoral,
@@ -881,5 +1216,9 @@ module.exports = {
   processarLembretesEventos,
   processarLembretesDivulgacaoMultimidia,
   processarEnvioAgendaSecretarias,
+  processarAniversariantesDoDia,
+  processarLembretesItensADefinir,
   iniciarAgendadorLembretes,
+  REGEX_A_DEFINIR,
+  LABELS_CAMPOS_FORM,
 };

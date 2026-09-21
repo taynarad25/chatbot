@@ -28,7 +28,7 @@ const {
   processarEnvioAgendaSecretarias,
 } = require("../bot/lembretes");
 const { salvarFormularioEvento } = require("../bot/formularioEvento");
-const { addLider, listLideres, obterLideresPorDepartamento, obterUsuarioPorTelefone } = require("../web/lideres");
+const { addLider, removeLider, listLideres, obterLideresPorDepartamento, obterUsuarioPorTelefone } = require("../web/lideres");
 const { createMessageHandler } = require("../bot/messageHandler");
 
 after(() => {
@@ -975,3 +975,133 @@ test("processarEnvioAgendaSecretarias: envia na segunda-feira para Isabelly e Ga
   assert.equal(resSegundaNovamente.pulado, true);
   assert.equal(mensagensEnviadas.length, 2); // Não aumentou
 });
+
+test("processarEnvioAgendaSecretarias: exclui categoricamente Gabriela Henrique e envia apenas para Gabriela Diniz e Isabelly Lacerda", async () => {
+  addLider({
+    nome: "Gabriela Henrique",
+    telefone: "5511999990099",
+    cargos: ["secretaria", "lider"],
+    departamentos: ["Secretaria"],
+  });
+
+  const eventosMock = [
+    {
+      summary: "Reunião Geral",
+      start: { dateTime: "2026-09-28T19:00:00-03:00" },
+      location: "Templo",
+    },
+  ];
+
+  const mensagensEnviadas = [];
+  const fakeClient = {
+    sendMessage: async (to, txt) => {
+      mensagensEnviadas.push({ to, txt });
+    },
+  };
+
+  await processarEnvioAgendaSecretarias({
+    client: fakeClient,
+    buscarEventos: async () => eventosMock,
+    dataBase: new Date("2026-09-28T10:00:00.000Z"), // Segunda-feira
+    forcar: true,
+  });
+
+  // Sob nenhuma hipótese Gabriela Henrique deve receber
+  assert.ok(!mensagensEnviadas.some((m) => m.to.includes("5511999990099")), "Gabriela Henrique NÃO pode receber a mensagem");
+
+  // Gabriela Diniz e Isabelly Lacerda devem estar entre as destinatárias
+  const temIsabelly = mensagensEnviadas.some((m) => m.to.includes("5511970498716") || m.to.includes("5511988880001"));
+  const temGabrielaDiniz = mensagensEnviadas.some((m) => m.to.includes("5511942685501") || m.to.includes("5511988880002"));
+  assert.ok(temIsabelly, "Isabelly Lacerda deve receber");
+  assert.ok(temGabrielaDiniz, "Gabriela Diniz deve receber");
+
+  removeLider("5511999990099");
+});
+
+test("processarLembretesEventos: evento agendado pelo bot notifica o solicitante; evento direto da agenda notifica o líder do depto", async () => {
+  const TEL_PRA_FERNANDA = "5511966661111";
+  const TEL_PR_MAURICIO = "5511966662222";
+
+  try {
+    removeLider(TEL_PRA_FERNANDA);
+    removeLider(TEL_PR_MAURICIO);
+  } catch {}
+
+  // Cadastra Pra Fernanda como líder de Intercessão
+  addLider({
+    nome: "Pra. Fernanda",
+    telefone: TEL_PRA_FERNANDA,
+    cargos: ["pastor", "lider"],
+    departamentos: ["Intercessão"],
+  });
+
+  // Cadastra Pr Maurício
+  addLider({
+    nome: "Pr. Maurício",
+    telefone: TEL_PR_MAURICIO,
+    cargos: ["pastor", "lider"],
+    departamentos: ["Pastoral"],
+  });
+
+  // Cenário 1: Evento agendado pelo bot (Pr Maurício marcou na Intercessão)
+  const eventoViaBot = {
+    id: "ev-bot-intercessao-unique",
+    summary: "Vigília Especial da Intercessão",
+    description: `Agendado via Bot - Solicitado pela Rede: Intercessão\n👤 Solicitante: Pr. Maurício\n📞 Telefone: ${TEL_PR_MAURICIO}`,
+    start: { dateTime: "2026-09-25T22:00:00-03:00" },
+    location: "Salão",
+  };
+
+  const enviadasBot = [];
+  const fakeClientBot = {
+    sendMessage: async (to, txt) => {
+      enviadasBot.push({ to, txt });
+    },
+  };
+
+  await processarLembretesEventos({
+    client: fakeClientBot,
+    buscarEventos: async () => [eventoViaBot],
+    agendasParaLer: [],
+    diasAntecedencia: 5,
+    dataBase: new Date("2026-09-20T10:00:00.000Z"),
+    notificarSecretariaFn: async () => {},
+  });
+
+  // Quem marcou foi o Pr Maurício -> Somente Pr Maurício deve receber! Pra Fernanda NÃO recebe.
+  assert.equal(enviadasBot.length, 1);
+  assert.match(enviadasBot[0].to, new RegExp(TEL_PR_MAURICIO));
+  assert.ok(!enviadasBot.some((m) => m.to.includes(TEL_PRA_FERNANDA)), "Pra Fernanda não deve ser notificada quando marcado por outra pessoa via bot");
+
+  // Cenário 2: Evento marcado DIRETO na agenda (sem bot, sem formulário, sem 'Agendado via Bot')
+  const eventoDiretoAgenda = {
+    id: "ev-direto-intercessao-unique",
+    summary: "Oração Matutina da Intercessão",
+    description: "Criado diretamente no Google Calendar pela liderança",
+    start: { dateTime: "2026-09-25T06:00:00-03:00" },
+    location: "Salão",
+  };
+
+  const enviadasDireto = [];
+  const fakeClientDireto = {
+    sendMessage: async (to, txt) => {
+      enviadasDireto.push({ to, txt });
+    },
+  };
+
+  await processarLembretesEventos({
+    client: fakeClientDireto,
+    buscarEventos: async () => [eventoDiretoAgenda],
+    agendasParaLer: [],
+    diasAntecedencia: 5,
+    dataBase: new Date("2026-09-20T10:00:00.000Z"),
+    notificarSecretariaFn: async () => {},
+  });
+
+  // Como foi marcado direto na agenda, aí sim deve notificar os líderes do departamento (incluindo Pra Fernanda)
+  assert.ok(enviadasDireto.some((m) => m.to.includes(TEL_PRA_FERNANDA)), "Pra Fernanda deve ser notificada quando marcado direto na agenda");
+
+  removeLider(TEL_PRA_FERNANDA);
+  removeLider(TEL_PR_MAURICIO);
+});
+

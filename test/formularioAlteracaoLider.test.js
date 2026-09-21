@@ -270,3 +270,53 @@ test("Menu Líder: alteração de informação do formulário (identidade visual
   assert.match(msgSec.texto, /Azul Marinho, Prata e Branco Neon/, "deve conter cores atualizadas");
   assert.match(msgSec.texto, /INFORMAÇÕES DE MÍDIA & COMUNICAÇÃO:/, "deve conter bloco de mídia");
 });
+
+test("Listagem de Eventos: oculta blocos de preparação e decoração ao listar eventos para alteração de formulário", async () => {
+  const NUMERO_LIDER = "5511999993333";
+  const eventos = [
+    {
+      id: "ev-mesa-posta",
+      summary: "Mesa posta",
+      start: { dateTime: "2026-10-24T15:00:00-03:00" },
+      end: { dateTime: "2026-10-24T18:00:00-03:00" },
+      location: "Igreja",
+    },
+    {
+      id: "ev-prep-mesa-posta",
+      summary: "[Preparação/Decoração] Mesa posta",
+      start: { dateTime: "2026-10-24T13:00:00-03:00" },
+      end: { dateTime: "2026-10-24T15:00:00-03:00" },
+      location: "Igreja",
+    },
+    {
+      id: "ev-pilates",
+      summary: "Pilates e palestra",
+      start: { dateTime: "2026-10-31T09:00:00-03:00" },
+      end: { dateTime: "2026-10-31T11:00:00-03:00" },
+      location: "Igreja",
+    },
+  ];
+
+  const harness = criarHarness({
+    usuarios: [{ nome: "Líder Mulheres", telefone: NUMERO_LIDER, cargos: ["lider"] }],
+    calendarEvents: eventos,
+  });
+
+  // 1. Entra no menu de eventos -> alterar formulário
+  await harness.enviar(NUMERO_LIDER, "7");
+  await harness.enviar(NUMERO_LIDER, "1");
+  await harness.enviar(NUMERO_LIDER, "1");
+  await harness.enviar(NUMERO_LIDER, "4"); // Opção 4: Alterar formulário
+
+  // 2. Escolhe departamento 8 (Rede de Mulheres)
+  const [rBusca, rLista] = await harness.enviar(NUMERO_LIDER, "8");
+  const listaTexto = rLista || rBusca;
+
+  // Deve listar Mesa posta e Pilates
+  assert.match(listaTexto, /Mesa posta/);
+  assert.match(listaTexto, /Pilates e palestra/);
+
+  // NÃO deve listar [Preparação/Decoração] Mesa posta
+  assert.doesNotMatch(listaTexto, /\[Preparação\/Decoração\]/);
+});
+

@@ -4,11 +4,15 @@ const moment = require("moment-timezone");
 // solicitação pendente. `ano` é calculado pelo chamador no momento da aprovação
 // (não fica salvo junto com a solicitação).
 function montarResourceEvento(dados, ano) {
-  const { evento, rede, local, dia, mes, horarioInicio, horarioFim, isDiaInteiro } = dados;
+  const { evento, rede, local, dia, mes, horarioInicio, horarioFim, isDiaInteiro, solicitanteNome, solicitanteId } = dados;
+
+  let desc = `Agendado via Bot - Solicitado pela Rede: ${rede}`;
+  if (solicitanteNome) desc += `\n👤 Solicitante: ${solicitanteNome}`;
+  if (solicitanteId) desc += `\n📞 Telefone: ${solicitanteId}`;
 
   const resource = {
     summary: evento,
-    description: `Agendado via Bot - Solicitado pela Rede: ${rede}`,
+    description: desc,
     location: local || "Comunidade Cristã Curados",
   };
 

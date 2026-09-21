@@ -21,7 +21,8 @@ function dadosExemplo(overrides = {}) {
 test("montarResourceEvento: evento com horário", () => {
   const resource = montarResourceEvento(dadosExemplo(), 2026);
   assert.equal(resource.summary, "Encontro de Casais");
-  assert.equal(resource.description, "Agendado via Bot - Solicitado pela Rede: Rede de Casais");
+  assert.match(resource.description, /Agendado via Bot - Solicitado pela Rede: Rede de Casais/);
+  assert.match(resource.description, /Telefone: 5511999999999/);
   assert.equal(resource.location, "Comunidade Cristã Curados");
   assert.equal(resource.start.dateTime, "2026-07-18T19:30:00-03:00");
   assert.equal(resource.end.dateTime, "2026-07-18T21:00:00-03:00");

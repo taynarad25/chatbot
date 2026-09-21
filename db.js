@@ -31,9 +31,12 @@ db.exec(`
     telefone TEXT PRIMARY KEY,
     nome TEXT NOT NULL,
     cargos TEXT NOT NULL DEFAULT '["lider"]',
+    departamento TEXT NOT NULL DEFAULT '',
+    dataNascimento TEXT NOT NULL DEFAULT '',
     createdAt TEXT,
     updatedAt TEXT
   );
+
 
   CREATE TABLE IF NOT EXISTS pendentes (
     codigo TEXT PRIMARY KEY,
@@ -98,6 +101,9 @@ try {
   }
   if (!cols.some((c) => c.name === "departamento")) {
     db.exec("ALTER TABLE lideres ADD COLUMN departamento TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.some((c) => c.name === "dataNascimento")) {
+    db.exec("ALTER TABLE lideres ADD COLUMN dataNascimento TEXT NOT NULL DEFAULT ''");
   }
 
   const feCols = db.prepare("PRAGMA table_info(formularios_eventos)").all();

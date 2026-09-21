@@ -1431,7 +1431,7 @@ function createMessageHandler({
                     const tituloEvento = formatarTituloReuniao(departamento);
                     const resource = {
                       summary: tituloEvento,
-                      description: `Agendado via Bot - Departamento: ${departamento}`,
+                      description: `Agendado via Bot - Departamento: ${departamento}\nSolicitante: ${dados.solicitanteNome || ""}\nTelefone: ${solicitanteId || ""}`,
                       location: dados.local || ENDERECO_IGREJA,
                       start: {
                         dateTime: moment.tz(`${dados.dia}/${dados.mes}/${ano} ${dados.horarioInicio}`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format(),
@@ -1444,6 +1444,22 @@ function createMessageHandler({
                     };
 
                     await calendar.events.insert({ calendarId: AGENDAS_INTERNAS.REUNIOES, resource });
+                    try {
+                      salvarFormularioEvento({
+                        evento: tituloEvento,
+                        departamento: departamento,
+                        data: `${dados.dia}/${dados.mes}/${ano}`,
+                        solicitanteId: solicitanteId,
+                        payload: {
+                          nomeSolicitante: dados.solicitanteNome || "",
+                          departamento,
+                          data: `${dados.dia}/${dados.mes}/${ano}`,
+                          horario: `${dados.horarioInicio} às ${dados.horarioFim}`,
+                        },
+                      });
+                    } catch (eForm) {
+                      console.error("[Secretaria] Erro ao registrar formulário inicial de reunião:", eForm.message);
+                    }
                     removerPendente(codigo);
 
                     const feedback = `✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo e também pode ser acessado pelo link:\n${LINK_ATA_REUNIAO}\n\nEle deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.`;
@@ -1476,6 +1492,25 @@ function createMessageHandler({
                   const resource = montarResourceEvento(dados, ano);
 
                   await calendar.events.insert({ calendarId: agendaId, resource });
+                  try {
+                    salvarFormularioEvento({
+                      evento: dados.nomeEvento,
+                      departamento: rede,
+                      data: `${dados.dia}/${dados.mes}/${ano}`,
+                      solicitanteId: solicitanteId,
+                      payload: {
+                        nomeSolicitante: dados.solicitanteNome || "",
+                        nome_lider: dados.solicitanteNome || "",
+                        departamento: rede,
+                        data: `${dados.dia}/${dados.mes}/${ano}`,
+                        horario_inicio: dados.horarioInicio,
+                        horario_termino: dados.horarioFim,
+                        local: dados.local || "",
+                      },
+                    });
+                  } catch (eForm) {
+                    console.error("[Secretaria] Erro ao registrar formulário inicial de evento:", eForm.message);
+                  }
                   removerPendente(codigo);
 
                   const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏";
@@ -2023,7 +2058,9 @@ Escolha uma opção:
 
               // Busca eventos especificamente na agenda do departamento selecionado
               const eventosBuscados = await buscarEventos(inicioBusca, fimAno, info.calendarIdBusca);
-              const filtrados = (eventosBuscados || []).filter(ev => isEventoFuturo(ev, agora));
+              const filtrados = (eventosBuscados || []).filter(
+                (ev) => isEventoFuturo(ev, agora) && !/\[(?:prepara[çc][ãa]o|decora[çc][ãa]o|limpeza|montagem)[^\]]*\]/i.test(ev.summary || "")
+              );
 
               if (filtrados.length === 0) {
                 delete etapas[numero];
@@ -2334,7 +2371,9 @@ Escolha uma opção:
               const fimAno = agora.clone().endOf("year").add(1, "year").format();
 
               const eventosBuscados = await buscarEventos(inicioBusca, fimAno, info.calendarIdBusca);
-              const filtrados = (eventosBuscados || []).filter((ev) => isEventoFuturo(ev, agora));
+              const filtrados = (eventosBuscados || []).filter(
+                (ev) => isEventoFuturo(ev, agora) && !/\[(?:prepara[çc][ãa]o|decora[çc][ãa]o|limpeza|montagem)[^\]]*\]/i.test(ev.summary || "")
+              );
 
               if (filtrados.length === 0) {
                 delete etapas[numero];

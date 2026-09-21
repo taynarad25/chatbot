@@ -76,6 +76,44 @@ function normalizarDepartamentos(deptos) {
   return Array.from(new Set(limpos));
 }
 
+function normalizarDataNascimento(dataStr) {
+  if (!dataStr) return "";
+  const limpo = String(dataStr).trim();
+  if (!limpo) return "";
+
+  // Formato AAAA-MM-DD
+  const matchIso = limpo.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (matchIso) {
+    const [, a, m, d] = matchIso;
+    const diaNum = parseInt(d, 10);
+    const mesNum = parseInt(m, 10);
+    if (diaNum >= 1 && diaNum <= 31 && mesNum >= 1 && mesNum <= 12) {
+      return `${String(diaNum).padStart(2, "0")}/${String(mesNum).padStart(2, "0")}/${a}`;
+    }
+    return "";
+  }
+
+  // Formato DD/MM/AAAA ou DD/MM
+  const matchBr = limpo.match(/^(\d{1,2})[-/](\d{1,2})(?:[-/](\d{2,4}))?$/);
+  if (matchBr) {
+    const [, d, m, a] = matchBr;
+    const diaNum = parseInt(d, 10);
+    const mesNum = parseInt(m, 10);
+    if (diaNum >= 1 && diaNum <= 31 && mesNum >= 1 && mesNum <= 12) {
+      const dia = String(diaNum).padStart(2, "0");
+      const mes = String(mesNum).padStart(2, "0");
+      if (a) {
+        const ano = a.length === 2 ? `20${a}` : a;
+        return `${dia}/${mes}/${ano}`;
+      }
+      return `${dia}/${mes}`;
+    }
+    return "";
+  }
+
+  return "";
+}
+
 function loadLideres() {
   try {
     seedFromEnvSeNecessario();
@@ -90,6 +128,7 @@ function loadLideres() {
         cargos,
         departamentos,
         departamento: departamentos.join(", "),
+        dataNascimento: row.dataNascimento || "",
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
       };
@@ -121,10 +160,11 @@ function obterUsuarioPorTelefone(telefone) {
     cargos: [],
     departamentos: [],
     departamento: "",
+    dataNascimento: "",
   };
 }
 
-function addLider({ nome, telefone, cargos, departamentos, departamento }) {
+function addLider({ nome, telefone, cargos, departamentos, departamento, dataNascimento }) {
   const telefoneNormalizado = normalizarTelefone(telefone);
   if (!telefoneNormalizado) return { ok: false, message: "Telefone inválido." };
   if (!nome || !nome.trim()) return { ok: false, message: "Nome é obrigatório." };
@@ -134,15 +174,16 @@ function addLider({ nome, telefone, cargos, departamentos, departamento }) {
 
   const cargosNormalizados = normalizarCargos(cargos);
   const deptosNormalizados = normalizarDepartamentos(departamentos !== undefined ? departamentos : departamento);
+  const dataNascimentoNormalizada = normalizarDataNascimento(dataNascimento);
 
-  db.prepare("INSERT INTO lideres (telefone, nome, cargos, departamento, createdAt) VALUES (?, ?, ?, ?, ?)")
-    .run(telefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), JSON.stringify(deptosNormalizados), new Date().toISOString());
+  db.prepare("INSERT INTO lideres (telefone, nome, cargos, departamento, dataNascimento, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(telefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), JSON.stringify(deptosNormalizados), dataNascimentoNormalizada, new Date().toISOString());
   sincronizarTelefones();
-  console.log(`[Lideres] Usuário adicionado: ${nome.trim()} (${telefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Deptos: [${deptosNormalizados.join(", ") || "Nenhum"}]`);
+  console.log(`[Lideres] Usuário adicionado: ${nome.trim()} (${telefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Deptos: [${deptosNormalizados.join(", ") || "Nenhum"}] - Nasc: ${dataNascimentoNormalizada || "N/A"}`);
   return { ok: true, message: "Usuário adicionado com sucesso." };
 }
 
-function updateLider(telefoneAtual, { nome, telefone, cargos, departamentos, departamento }) {
+function updateLider(telefoneAtual, { nome, telefone, cargos, departamentos, departamento, dataNascimento }) {
   const telefoneAtualNormalizado = normalizarTelefone(telefoneAtual);
   const novoTelefoneNormalizado = normalizarTelefone(telefone);
   if (!novoTelefoneNormalizado) return { ok: false, message: "Telefone inválido." };
@@ -159,12 +200,13 @@ function updateLider(telefoneAtual, { nome, telefone, cargos, departamentos, dep
   const cargosNormalizados = normalizarCargos(cargos !== undefined ? cargos : liderExistente.cargos);
   const deptosFonte = departamentos !== undefined ? departamentos : (departamento !== undefined ? departamento : liderExistente.departamento);
   const deptosNormalizados = normalizarDepartamentos(deptosFonte);
+  const dataNascFonte = dataNascimento !== undefined ? normalizarDataNascimento(dataNascimento) : (liderExistente.dataNascimento || "");
 
   db.prepare("DELETE FROM lideres WHERE telefone = ?").run(telefoneAtualNormalizado);
-  db.prepare("INSERT INTO lideres (telefone, nome, cargos, departamento, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(novoTelefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), JSON.stringify(deptosNormalizados), liderExistente.createdAt, new Date().toISOString());
+  db.prepare("INSERT INTO lideres (telefone, nome, cargos, departamento, dataNascimento, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(novoTelefoneNormalizado, nome.trim(), JSON.stringify(cargosNormalizados), JSON.stringify(deptosNormalizados), dataNascFonte, liderExistente.createdAt, new Date().toISOString());
   sincronizarTelefones();
-  console.log(`[Lideres] Usuário editado: ${telefoneAtualNormalizado} -> ${nome.trim()} (${novoTelefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Deptos: [${deptosNormalizados.join(", ") || "Nenhum"}]`);
+  console.log(`[Lideres] Usuário editado: ${telefoneAtualNormalizado} -> ${nome.trim()} (${novoTelefoneNormalizado}) - Cargos: [${cargosNormalizados.join(", ")}] - Deptos: [${deptosNormalizados.join(", ") || "Nenhum"}] - Nasc: ${dataNascFonte || "N/A"}`);
   return { ok: true, message: "Usuário atualizado com sucesso." };
 }
 
@@ -202,6 +244,7 @@ module.exports = {
   removeLider,
   normalizarCargos,
   normalizarDepartamentos,
+  normalizarDataNascimento,
   obterUsuarioPorTelefone,
   obterLideresPorDepartamento,
 };

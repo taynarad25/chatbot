@@ -264,7 +264,7 @@ async function notificarMultimidia(client, mensagem, midiaAnexa = null) {
             if (midiaAnexa?.caminhoArquivo && fs.existsSync(midiaAnexa.caminhoArquivo)) {
               try {
                 console.log(`[Multimídia] Tentando envio de mídia direto do disco: ${midiaAnexa.caminhoArquivo}`);
-                const mediaDisco = carregarMidiaDeDisco(midiaAnexa.caminhoArquivo);
+                const mediaDisco = carregarMidiaDeDisco(midiaAnexa.caminhoArquivo, midiaAnexa.mimetype);
                 await client.sendMessage(cachedJid, mediaDisco, { caption: mensagem });
                 enviouDisco = true;
                 console.log(`[Multimídia] ✅ Mídia enviada com sucesso via fallback de disco.`);
@@ -295,8 +295,21 @@ async function notificarMultimidia(client, mensagem, midiaAnexa = null) {
           try {
             await client.sendMessage(grupo.id._serialized, mediaParaEnviar, { caption: mensagem });
           } catch (mErr) {
-            console.warn(`[Multimídia] Falha ao enviar mídia anexa via busca, enviando texto:`, mErr.message);
-            await client.sendMessage(grupo.id._serialized, mensagem + "\n\n⚠️ _Nota: Não foi possível anexar o arquivo de mídia diretamente._");
+            console.warn(`[Multimídia] Falha ao enviar mídia anexa via busca, tentando fallback de disco:`, mErr.message);
+            let enviouDiscoBusca = false;
+            if (midiaAnexa?.caminhoArquivo && fs.existsSync(midiaAnexa.caminhoArquivo)) {
+              try {
+                const mediaDisco = carregarMidiaDeDisco(midiaAnexa.caminhoArquivo, midiaAnexa.mimetype);
+                await client.sendMessage(grupo.id._serialized, mediaDisco, { caption: mensagem });
+                enviouDiscoBusca = true;
+                console.log(`[Multimídia] ✅ Mídia enviada via busca e fallback de disco.`);
+              } catch (dErrBusca) {
+                console.warn(`[Multimídia] Falha no fallback de disco via busca:`, dErrBusca.message);
+              }
+            }
+            if (!enviouDiscoBusca) {
+              await client.sendMessage(grupo.id._serialized, mensagem + "\n\n⚠️ _Nota: Não foi possível anexar o arquivo de mídia diretamente._");
+            }
           }
         } else {
           await client.sendMessage(grupo.id._serialized, mensagem);

@@ -120,9 +120,17 @@ function salvarMidiaEmDisco(media, { prefixo = "media", nomeArquivo = null } = {
 
   const dir = garantirDiretorioTemp();
   const extensao = obterExtensaoMime(media.mimetype);
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).slice(2, 8);
-  const finalFilename = nomeArquivo || `${prefixo}_${timestamp}_${randomSuffix}${extensao}`;
+  let finalFilename = nomeArquivo;
+  if (!finalFilename) {
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).slice(2, 8);
+    finalFilename = `${prefixo}_${timestamp}_${randomSuffix}${extensao}`;
+  } else {
+    const extAtual = path.extname(finalFilename);
+    if (!extAtual || extAtual === ".") {
+      finalFilename = `${finalFilename}${extensao}`;
+    }
+  }
   const caminhoCompleto = path.join(dir, finalFilename);
 
   try {
@@ -146,27 +154,33 @@ function salvarMidiaEmDisco(media, { prefixo = "media", nomeArquivo = null } = {
 /**
  * Carrega uma mídia salva do disco e a transforma em MessageMedia (ou objeto compatível).
  */
-function carregarMidiaDeDisco(caminho) {
+function carregarMidiaDeDisco(caminho, mimetypeConhecido = null) {
   if (!caminho || !fs.existsSync(caminho)) {
     throw new Error(`Arquivo de mídia não encontrado: ${caminho}`);
   }
 
-  if (MessageMedia && typeof MessageMedia.fromFilePath === "function") {
-    return MessageMedia.fromFilePath(caminho);
-  }
-
   const buffer = fs.readFileSync(caminho);
   const ext = path.extname(caminho).toLowerCase();
-  let mimetype = "application/octet-stream";
-  if (ext === ".jpg" || ext === ".jpeg") mimetype = "image/jpeg";
-  else if (ext === ".png") mimetype = "image/png";
-  else if (ext === ".webp") mimetype = "image/webp";
-  else if (ext === ".pdf") mimetype = "application/pdf";
+  let mimetype = mimetypeConhecido || "application/octet-stream";
+  if (mimetype === "application/octet-stream" || !mimetype) {
+    if (ext === ".jpg" || ext === ".jpeg") mimetype = "image/jpeg";
+    else if (ext === ".png") mimetype = "image/png";
+    else if (ext === ".webp") mimetype = "image/webp";
+    else if (ext === ".pdf") mimetype = "application/pdf";
+    else if (ext === ".mp4") mimetype = "video/mp4";
+  }
+
+  const base64Data = buffer.toString("base64");
+  const filename = path.basename(caminho);
+
+  if (MessageMedia) {
+    return new MessageMedia(mimetype, base64Data, filename, buffer.length);
+  }
 
   return {
-    data: buffer.toString("base64"),
+    data: base64Data,
     mimetype,
-    filename: path.basename(caminho),
+    filename,
     filesize: buffer.length,
   };
 }

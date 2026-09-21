@@ -26,8 +26,11 @@ const BROADCAST_CONFIG = {
 
 function formatarJidWhatsApp(telefone) {
   if (!telefone) return "";
-  const limpo = String(telefone).replace(/\D/g, "");
+  let limpo = String(telefone).replace(/\D/g, "");
   if (!limpo) return "";
+  if ((limpo.length === 10 || limpo.length === 11) && !limpo.startsWith("55")) {
+    limpo = `55${limpo}`;
+  }
   return limpo.endsWith("@c.us") ? limpo : `${limpo}@c.us`;
 }
 
@@ -39,38 +42,28 @@ function mascararTelefone(jidOuTel) {
 
 /**
  * Busca destinatários do broadcast no banco de dados SQLite (tabela 'lideres')
- * ou via listLideres (caso injetado).
+ * ou usa a lista customizada informada.
  * - Em modo teste: busca exclusivamente Gabriela Diniz por nome.
- * - Em modo geral: busca todos os membros/líderes cadastrados no banco.
+ * - Em produção: retorna todos os líderes cadastrados com número válido.
  */
 function buscarDestinatariosBroadcast({ modoTeste = BROADCAST_CONFIG.modoTeste, listLideres = null } = {}) {
   try {
-    let listaInjetada = [];
-    if (typeof listLideres === "function") {
-      try {
-        listaInjetada = listLideres() || [];
-      } catch (_) {
-        listaInjetada = [];
-      }
-    }
-
     if (modoTeste) {
       const termo = BROADCAST_CONFIG.nomeTeste.toLowerCase();
-
-      // 1. Tenta encontrar na lista injetada primeiro
-      if (listaInjetada.length > 0) {
-        let matches = listaInjetada.filter((u) => (u.nome || "").toLowerCase().trim() === termo);
+      // 1. Tenta usar a lista injetada (se fornecida via DI)
+      if (typeof listLideres === "function") {
+        const listaInjetada = listLideres() || [];
+        let matches = listaInjetada.filter((u) => (u.nome || "").toLowerCase().includes(termo));
         if (matches.length === 0) {
-          matches = listaInjetada.filter((u) => (u.nome || "").toLowerCase().includes(termo));
-        }
-        if (matches.length === 0) {
+          // Fallback para primeiro nome
           matches = listaInjetada.filter((u) => (u.nome || "").toLowerCase().includes("gabriela"));
         }
         if (matches.length > 0) {
-          return matches.map((r) => ({
+          const r = matches[0];
+          return [{
             telefone: r.telefone,
             nome: r.nome || BROADCAST_CONFIG.nomeTeste,
-          }));
+          }];
         }
       }
 
@@ -85,13 +78,13 @@ function buscarDestinatariosBroadcast({ modoTeste = BROADCAST_CONFIG.modoTeste, 
       }
 
       if (rows.length > 0) {
-        return rows.map((r) => ({
+        const r = rows[0];
+        return [{
           telefone: r.telefone,
           nome: r.nome || BROADCAST_CONFIG.nomeTeste,
-        }));
+        }];
       }
 
-      // Se não encontrada no banco, verifica se há número configurado em env var de fallback
       if (process.env.BROADCAST_TESTE_TELEFONE) {
         return [
           {
@@ -105,22 +98,17 @@ function buscarDestinatariosBroadcast({ modoTeste = BROADCAST_CONFIG.modoTeste, 
       return [];
     }
 
-    // Modo Geral: se houver lista injetada com membros
-    if (listaInjetada.length > 0) {
-      return listaInjetada
-        .filter((u) => u.telefone)
-        .map((r) => ({
-          telefone: r.telefone,
-          nome: r.nome || "Membro",
-        }));
+    // Modo produção: retorna todos os líderes com telefone válido cadastrado
+    if (typeof listLideres === "function") {
+      const listaInjetada = listLideres() || [];
+      const validos = listaInjetada.filter((l) => l.telefone && String(l.telefone).trim() !== "");
+      if (validos.length > 0) {
+        return validos.map((l) => ({ telefone: l.telefone, nome: l.nome || "" }));
+      }
     }
 
-    // Retorna todos os membros/usuários cadastrados com telefone no SQLite
     const todos = db.prepare("SELECT telefone, nome FROM lideres WHERE telefone IS NOT NULL AND telefone != ''").all();
-    return todos.map((r) => ({
-      telefone: r.telefone,
-      nome: r.nome || "Membro",
-    }));
+    return todos.map((r) => ({ telefone: r.telefone, nome: r.nome || "" }));
   } catch (err) {
     console.error("[Broadcast] Erro ao consultar destinatários no banco:", err.message);
     return [];
@@ -129,23 +117,22 @@ function buscarDestinatariosBroadcast({ modoTeste = BROADCAST_CONFIG.modoTeste, 
 
 /**
  * Executa o envio de transmissão (broadcast) para a lista de destinatários
- * com intervalo de segurança (delay) entre cada mensagem.
  */
 async function executarBroadcast({
   client,
   media = null,
   texto = "",
-  delayMs = BROADCAST_CONFIG.delayMs,
-  modoTeste = BROADCAST_CONFIG.modoTeste,
   destinatarios = null,
   listLideres = null,
+  delayMs = BROADCAST_CONFIG.delayMs,
+  modoTeste = BROADCAST_CONFIG.modoTeste,
 } = {}) {
   const listaAlvo = destinatarios || buscarDestinatariosBroadcast({ modoTeste, listLideres });
   const total = listaAlvo.length;
 
   if (total === 0) {
     console.warn("[Broadcast] Nenhum destinatário encontrado para o envio.");
-    return { total: 0, enviados: 0, falhas: 0, modoTeste, destinatariosEnviados: [] };
+    return { enviados: 0, falhas: 0, total: 0, destinatarios: [] };
   }
 
   console.log(
@@ -160,7 +147,7 @@ async function executarBroadcast({
   let mediaObj = null;
   if (media?.caminhoArquivo && fs.existsSync(media.caminhoArquivo)) {
     try {
-      mediaObj = carregarMidiaDeDisco(media.caminhoArquivo);
+      mediaObj = carregarMidiaDeDisco(media.caminhoArquivo, media.mimetype);
       console.log(`[Broadcast] Mídia carregada diretamente do arquivo em disco: ${media.caminhoArquivo}`);
     } catch (errCarregar) {
       console.warn(`[Broadcast] Falha ao carregar mídia do disco (${media.caminhoArquivo}):`, errCarregar.message);
@@ -170,14 +157,15 @@ async function executarBroadcast({
 
   // Fallback para objeto MessageMedia em memória
   if (!mediaObj && media) {
-    if (MessageMedia && !(media instanceof MessageMedia) && media.data && media.mimetype) {
-      try {
-        mediaObj = new MessageMedia(media.mimetype, media.data, media.filename);
-      } catch (_) {
-        mediaObj = media;
-      }
-    } else {
-      mediaObj = media;
+    mediaObj = media;
+  }
+
+  // Se MessageMedia estiver disponível, garante que mediaObj seja uma instância de MessageMedia
+  if (mediaObj && MessageMedia && !(mediaObj instanceof MessageMedia) && mediaObj.data && mediaObj.mimetype) {
+    try {
+      mediaObj = new MessageMedia(mediaObj.mimetype, mediaObj.data, mediaObj.filename || "imagem.jpg", mediaObj.filesize);
+    } catch (errWrap) {
+      console.warn("[Broadcast] Aviso ao instanciar MessageMedia:", errWrap.message);
     }
   }
 
