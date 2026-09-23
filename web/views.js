@@ -1181,8 +1181,8 @@ function renderIndexHtml() {
     <div class="tabs">
       <button class="tab-btn active" onclick="openTab(event, 'tab-whatsapp')">WhatsApp</button>
       <button class="tab-btn" id="btn-tab-eventos" onclick="openTab(event, 'tab-eventos')">Eventos</button>
-      <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">Perfil de Acesso</button>
-      <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">Usuários & Cargos</button>
+      <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">Usuários</button>
+      <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">Líderes e Cargos</button>
       <button class="tab-btn" id="btn-tab-logs" style="display:none;" onclick="openTab(event, 'tab-logs')">Logs</button>
     </div>
     
@@ -1485,7 +1485,7 @@ function renderIndexHtml() {
           '<td style="color: var(--cor-texto-mutado); font-size: 0.82rem;">' + (item.email || '-') + '</td>' +
           '<td style="text-align: center;">' + statusBadge + '</td>' +
           '<td style="text-align: center;">' +
-            '<select onchange="alterarStatusPresenca(\'' + item.id + '\', this.value)" style="padding: 5px 8px; background: #22222a; color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 0.78rem; cursor: pointer;">' +
+            '<select data-id="' + item.id + '" onchange="alterarStatusPresenca(this.dataset.id, this.value)" style="padding: 5px 8px; background: #22222a; color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 0.78rem; cursor: pointer;">' +
               '<option value="">Alterar...</option>' +
               '<option value="confirmado" ' + (item.statusConfirmacao === 'confirmado' ? 'selected' : '') + '>Confirmado ✅</option>' +
               '<option value="pendente" ' + (item.statusConfirmacao === 'pendente' ? 'selected' : '') + '>Pendente ⏳</option>' +
@@ -1528,8 +1528,9 @@ function renderIndexHtml() {
 
         const userRes = await fetch('/secretaria/api/user-info');
         if (userRes.status === 401) { window.location.href = '/secretaria/login'; return; }
+        if (!userRes.ok) return;
         const userJson = await userRes.json();
-        const isAdmin = userJson.ok && userJson.user.role === 'admin';
+        const isAdmin = Boolean(userJson && userJson.ok && userJson.user && userJson.user.role === 'admin');
         document.getElementById('btn-tab-admin').style.display = isAdmin ? 'block' : 'none';
         document.getElementById('btn-tab-lideres').style.display = isAdmin ? 'block' : 'none';
         document.getElementById('btn-tab-logs').style.display = isAdmin ? 'block' : 'none';
