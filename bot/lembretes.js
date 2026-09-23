@@ -7,11 +7,152 @@ const { obterUsuarioPorTelefone, obterLideresPorDepartamento } = require("../web
 
 function formatarDataBrasil(isoOrDateStr) {
   if (!isoOrDateStr) return "";
-  const match = String(isoOrDateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const str = String(isoOrDateStr).trim();
+  if (str.includes(" a ")) {
+    return str
+      .split(" a ")
+      .map((p) => formatarDataBrasil(p.trim()))
+      .join(" a ");
+  }
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (match) {
     return `${match[3]}/${match[2]}/${match[1]}`;
   }
-  return String(isoOrDateStr);
+  return str;
+}
+
+function normalizarDataParaIso(dataStr) {
+  if (!dataStr) return "";
+  const s = String(dataStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const match = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (match) {
+    const d = match[1].padStart(2, "0");
+    const m = match[2].padStart(2, "0");
+    const y = match[3] ? (match[3].length === 2 ? `20${match[3]}` : match[3]) : new Date().getFullYear().toString();
+    return `${y}-${m}-${d}`;
+  }
+  try {
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+  } catch {}
+  return "";
+}
+
+function extrairDatasEvento(ev) {
+  let primeiroDia = "";
+  let ultimoDia = "";
+  let ehMultiplosDias = false;
+  let dataExibicao = "";
+
+  // 1. Google Calendar start / end
+  if (ev?.start) {
+    if (ev.start.dateTime) {
+      primeiroDia = ev.start.dateTime.split("T")[0];
+    } else if (ev.start.date) {
+      primeiroDia = ev.start.date.split("T")[0];
+    }
+  }
+
+  if (ev?.end) {
+    if (ev.end.dateTime) {
+      ultimoDia = ev.end.dateTime.split("T")[0];
+      if (primeiroDia && ultimoDia && ultimoDia !== primeiroDia) {
+        ehMultiplosDias = true;
+      }
+    } else if (ev.end.date) {
+      // Data de término 'date' no Google Calendar é exclusiva
+      const endD = new Date(`${ev.end.date}T00:00:00`);
+      endD.setDate(endD.getDate() - 1);
+      const anoFim = endD.getFullYear();
+      const mesFim = String(endD.getMonth() + 1).padStart(2, "0");
+      const diaFim = String(endD.getDate()).padStart(2, "0");
+      ultimoDia = `${anoFim}-${mesFim}-${diaFim}`;
+      if (primeiroDia && ultimoDia && ultimoDia !== primeiroDia) {
+        ehMultiplosDias = true;
+      }
+    }
+  }
+
+  // 2. Consulta descricoes_eventos
+  const titulo = ev?.summary || "";
+  const tituloBase = titulo.replace(/\s*-\s*Sess[ãa]o\s*\d+/i, "").replace(/\s*\(Sess[ãa]o\s*\d+\)/i, "").trim();
+  let descObj = null;
+  try {
+    const { buscarDescricaoEvento } = require("./descricaoEvento");
+    descObj = buscarDescricaoEvento(titulo) || (tituloBase !== titulo ? buscarDescricaoEvento(tituloBase) : null);
+  } catch {}
+
+  if (descObj) {
+    if (descObj.tipoDuracao === "consecutivo") {
+      ehMultiplosDias = true;
+      const h = Array.isArray(descObj.horarios) ? descObj.horarios[0] : descObj.horarios;
+      if (h?.dataInicio) {
+        const dIniIso = normalizarDataParaIso(h.dataInicio);
+        if (dIniIso) primeiroDia = dIniIso;
+      }
+      if (h?.dataFim) {
+        const dFimIso = normalizarDataParaIso(h.dataFim);
+        if (dFimIso) ultimoDia = dFimIso;
+      }
+    } else if (descObj.tipoDuracao === "multiplo") {
+      ehMultiplosDias = true;
+      const blocos = Array.isArray(descObj.horarios) ? descObj.horarios : [descObj.horarios];
+      const datasIso = blocos.map(b => normalizarDataParaIso(b.data)).filter(Boolean).sort();
+      if (datasIso.length > 0) {
+        primeiroDia = datasIso[0];
+        ultimoDia = datasIso[datasIso.length - 1];
+        if (datasIso.length > 1 && datasIso[0] !== datasIso[datasIso.length - 1]) {
+          ehMultiplosDias = true;
+        }
+      }
+    }
+  }
+
+  // 3. Consulta formularios_eventos
+  if (!ehMultiplosDias) {
+    try {
+      const form = obterFormularioEvento(titulo) || (tituloBase !== titulo ? obterFormularioEvento(tituloBase) : null);
+      if (form) {
+        if (form.data && form.data.includes(" a ")) {
+          ehMultiplosDias = true;
+          const [d1, d2] = form.data.split(" a ").map(s => s.trim());
+          const d1Iso = normalizarDataParaIso(d1);
+          const d2Iso = normalizarDataParaIso(d2);
+          if (d1Iso) primeiroDia = d1Iso;
+          if (d2Iso) ultimoDia = d2Iso;
+        } else if (form.payload) {
+          let p = form.payload;
+          if (typeof p === "string") {
+            try { p = JSON.parse(p); } catch {}
+          }
+          if (p?.tipoDuracao === "consecutivo" || p?.tipoDuracao === "multiplo") {
+            ehMultiplosDias = true;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  if (ehMultiplosDias && primeiroDia && ultimoDia && primeiroDia !== ultimoDia) {
+    const pBr = formatarDataBrasil(primeiroDia);
+    const uBr = formatarDataBrasil(ultimoDia);
+    dataExibicao = `${pBr} a ${uBr}`;
+  } else if (primeiroDia) {
+    dataExibicao = formatarDataBrasil(primeiroDia);
+  }
+
+  return {
+    primeiroDia,
+    ultimoDia: ultimoDia || primeiroDia,
+    ehMultiplosDias,
+    dataExibicao
+  };
 }
 
 function formatarHoraBrasil(isoStr) {
@@ -302,16 +443,31 @@ async function processarLembretesEventos({
       continue;
     }
 
-    const eventoId = ev.id || `${ev.summary}_${dataAlvoStr}`;
+    const datasInfo = extrairDatasEvento(ev);
+    const primeiroDia = datasInfo.primeiroDia;
+    const ehMultiplosDias = datasInfo.ehMultiplosDias;
+
+    // Para eventos com mais de 1 dia o dia do lembrete conta como o primeiro e somente esse:
+    // Se a data que dispararia o lembrete (dataAlvoStr) não for o primeiro dia do evento, ignora!
+    if (ehMultiplosDias && primeiroDia && primeiroDia !== dataAlvoStr) {
+      console.log(`[Lembretes] Evento com mais de 1 dia "${ev.summary}" ignorado para ${dataAlvoStr} (o lembrete conta apenas pelo 1º dia: ${primeiroDia}).`);
+      continue;
+    }
+    if (primeiroDia && primeiroDia !== dataAlvoStr) {
+      continue;
+    }
+
+    const titulo = ev.summary || "Evento";
+    const tituloBase = titulo.replace(/\s*-\s*Sess[ãa]o\s*\d+/i, "").replace(/\s*\(Sess[ãa]o\s*\d+\)/i, "").trim();
+    const eventoId = ev.id || `${tituloBase}_${primeiroDia || dataAlvoStr}`;
     const jaEnviado = buscarLembreteEnviado(eventoId, tipoLembrete);
     if (jaEnviado) {
       continue;
     }
 
     const horario = formatarHoraBrasil(ev.start?.dateTime);
-    const dataEv = ev.start?.dateTime ? ev.start.dateTime.split("T")[0] : (ev.start?.date || dataAlvoStr);
+    const dataEv = datasInfo.dataExibicao || (ev.start?.dateTime ? ev.start.dateTime.split("T")[0] : (ev.start?.date || dataAlvoStr));
     const local = ev.location || "";
-    const titulo = ev.summary || "Evento";
 
     // 1. Tenta buscar formulário no banco SQLite
     const form = obterFormularioEvento(titulo);
@@ -1022,13 +1178,27 @@ async function processarLembretesItensADefinir({
       continue;
     }
 
-    const eventoId = ev.id || `${ev.summary}_${dataAlvoStr}`;
+    const datasInfo = extrairDatasEvento(ev);
+    const primeiroDia = datasInfo.primeiroDia;
+    const ehMultiplosDias = datasInfo.ehMultiplosDias;
+
+    // Para eventos com mais de 1 dia o dia do lembrete conta como o primeiro e somente esse
+    if (ehMultiplosDias && primeiroDia && primeiroDia !== dataAlvoStr) {
+      console.log(`[Itens a Definir] Evento com mais de 1 dia "${ev.summary}" ignorado para ${dataAlvoStr} (o lembrete conta apenas pelo 1º dia: ${primeiroDia}).`);
+      continue;
+    }
+    if (primeiroDia && primeiroDia !== dataAlvoStr) {
+      continue;
+    }
+
+    const titulo = ev.summary || "Evento";
+    const tituloBase = titulo.replace(/\s*-\s*Sess[ãa]o\s*\d+/i, "").replace(/\s*\(Sess[ãa]o\s*\d+\)/i, "").trim();
+    const eventoId = ev.id || `${tituloBase}_${primeiroDia || dataAlvoStr}`;
     const jaEnviado = buscarLembreteEnviado(eventoId, tipoLembrete);
     if (jaEnviado) {
       continue;
     }
 
-    const titulo = ev.summary || "Evento";
     const form = obterFormularioEvento(titulo);
     if (!form || !form.payload) {
       continue;
@@ -1074,7 +1244,7 @@ async function processarLembretesItensADefinir({
     const user = obterUsuarioPorTelefone(telDest);
     if (user && user.nome) nomeDest = user.nome;
 
-    const dataEv = ev.start?.dateTime ? ev.start.dateTime.split("T")[0] : (ev.start?.date || dataAlvoStr);
+    const dataEv = datasInfo.dataExibicao || (ev.start?.dateTime ? ev.start.dateTime.split("T")[0] : (ev.start?.date || dataAlvoStr));
     const mensagem = montarMensagemItensADefinir({
       nome: nomeDest,
       evento: titulo,
@@ -1227,6 +1397,8 @@ module.exports = {
   processarAniversariantesDoDia,
   processarLembretesItensADefinir,
   iniciarAgendadorLembretes,
+  extrairDatasEvento,
+  normalizarDataParaIso,
   REGEX_A_DEFINIR,
   LABELS_CAMPOS_FORM,
 };

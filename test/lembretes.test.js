@@ -26,6 +26,9 @@ const {
   processarLembretesEventos,
   processarLembretesDivulgacaoMultimidia,
   processarEnvioAgendaSecretarias,
+  processarLembretesItensADefinir,
+  extrairDatasEvento,
+  normalizarDataParaIso,
 } = require("../bot/lembretes");
 const { salvarFormularioEvento } = require("../bot/formularioEvento");
 const { addLider, removeLider, listLideres, obterLideresPorDepartamento, obterUsuarioPorTelefone } = require("../web/lideres");
@@ -1104,4 +1107,212 @@ test("processarLembretesEventos: evento agendado pelo bot notifica o solicitante
   removeLider(TEL_PRA_FERNANDA);
   removeLider(TEL_PR_MAURICIO);
 });
+
+test("extrairDatasEvento identifica corretamente eventos de 1 dia e múltiplos dias", () => {
+  // 1 dia com dateTime
+  const ev1 = {
+    summary: "Culto de Domingo",
+    start: { dateTime: "2026-10-10T19:00:00-03:00" },
+    end: { dateTime: "2026-10-10T21:00:00-03:00" },
+  };
+  const res1 = extrairDatasEvento(ev1);
+  assert.equal(res1.ehMultiplosDias, false);
+  assert.equal(res1.primeiroDia, "2026-10-10");
+  assert.equal(res1.dataExibicao, "10/10/2026");
+
+  // Vários dias consecutivos com dateTime
+  const evConsecutivo = {
+    summary: "Conferência de Avivamento",
+    start: { dateTime: "2026-10-10T19:00:00-03:00" },
+    end: { dateTime: "2026-10-12T21:00:00-03:00" },
+  };
+  const res2 = extrairDatasEvento(evConsecutivo);
+  assert.equal(res2.ehMultiplosDias, true);
+  assert.equal(res2.primeiroDia, "2026-10-10");
+  assert.equal(res2.ultimoDia, "2026-10-12");
+  assert.equal(res2.dataExibicao, "10/10/2026 a 12/10/2026");
+
+  // Vários dias com date (dia inteiro no Google Calendar, data de término exclusiva)
+  const evAllDay = {
+    summary: "Retiro Espiritual",
+    start: { date: "2026-10-10" },
+    end: { date: "2026-10-13" }, // 10, 11, 12 (3 dias)
+  };
+  const res3 = extrairDatasEvento(evAllDay);
+  assert.equal(res3.ehMultiplosDias, true);
+  assert.equal(res3.primeiroDia, "2026-10-10");
+  assert.equal(res3.ultimoDia, "2026-10-12");
+  assert.equal(res3.dataExibicao, "10/10/2026 a 12/10/2026");
+});
+
+test("processarLembretesEventos: para eventos com mais de 1 dia o lembrete conta como o primeiro e somente esse", async () => {
+  const TEL_LIDER = "5511977778888";
+  addLider({
+    nome: "Pastor Lucas",
+    telefone: TEL_LIDER,
+    cargos: ["lider", "pastor"],
+    departamento: "Geral",
+  });
+
+  salvarFormularioEvento({
+    evento: "Congresso de Homens",
+    departamento: "Geral",
+    data: "10/10/2026 a 12/10/2026",
+    solicitanteId: TEL_LIDER,
+    payload: {
+      nomeSolicitante: "Pastor Lucas",
+      tipoDuracao: "consecutivo",
+    },
+    docUrl: "https://docs.google.com/doc/congresso-homens",
+  });
+
+  const eventoMultiplo = {
+    id: "ev-congresso-homens-multi",
+    summary: "Congresso de Homens",
+    start: { dateTime: "2026-10-10T19:00:00-03:00" },
+    end: { dateTime: "2026-10-12T22:00:00-03:00" },
+    location: "Templo Central",
+  };
+
+  // CENÁRIO 1: 5 dias antes do 1º DIA (Data base: 2026-10-05 -> alvo: 2026-10-10, o 1º dia)
+  // DEVE enviar o lembrete!
+  const msgsDia1 = [];
+  const fakeClient1 = {
+    sendMessage: async (to, txt) => {
+      msgsDia1.push({ to, txt });
+    },
+  };
+
+  const resDia1 = await processarLembretesEventos({
+    client: fakeClient1,
+    buscarEventos: async () => [eventoMultiplo],
+    agendasParaLer: [],
+    diasAntecedencia: 5,
+    dataBase: new Date("2026-10-05T10:00:00.000Z"),
+    notificarSecretariaFn: async () => {},
+  });
+
+  assert.equal(resDia1.enviados, 1);
+  assert.equal(msgsDia1.length, 1);
+  assert.match(msgsDia1[0].txt, /Congresso de Homens/);
+  assert.match(msgsDia1[0].txt, /Faltam \*5 dias\*/);
+  assert.match(msgsDia1[0].txt, /10\/10\/2026 a 12\/10\/2026/);
+
+  // CENÁRIO 2: 5 dias antes do 2º DIA (Data base: 2026-10-06 -> alvo: 2026-10-11, o 2º dia)
+  // O evento com mais de 1 dia ainda estaria ativo na busca do Google, MAS NÃO DEVE ENVIAR LEMBRETE!
+  const msgsDia2 = [];
+  const fakeClient2 = {
+    sendMessage: async (to, txt) => {
+      msgsDia2.push({ to, txt });
+    },
+  };
+
+  const resDia2 = await processarLembretesEventos({
+    client: fakeClient2,
+    buscarEventos: async () => [eventoMultiplo],
+    agendasParaLer: [],
+    diasAntecedencia: 5,
+    dataBase: new Date("2026-10-06T10:00:00.000Z"),
+    notificarSecretariaFn: async () => {},
+  });
+
+  assert.equal(resDia2.enviados, 0, "Não deve enviar lembrete referente ao 2º dia de evento de vários dias");
+  assert.equal(msgsDia2.length, 0);
+
+  // CENÁRIO 3: 5 dias antes do 3º DIA (Data base: 2026-10-07 -> alvo: 2026-10-12, o 3º dia)
+  // NÃO DEVE ENVIAR LEMBRETE!
+  const msgsDia3 = [];
+  const fakeClient3 = {
+    sendMessage: async (to, txt) => {
+      msgsDia3.push({ to, txt });
+    },
+  };
+
+  const resDia3 = await processarLembretesEventos({
+    client: fakeClient3,
+    buscarEventos: async () => [eventoMultiplo],
+    agendasParaLer: [],
+    diasAntecedencia: 5,
+    dataBase: new Date("2026-10-07T10:00:00.000Z"),
+    notificarSecretariaFn: async () => {},
+  });
+
+  assert.equal(resDia3.enviados, 0, "Não deve enviar lembrete referente ao 3º dia de evento de vários dias");
+  assert.equal(msgsDia3.length, 0);
+
+  removeLider(TEL_LIDER);
+});
+
+test("processarLembretesItensADefinir: para eventos com mais de 1 dia o lembrete conta apenas pelo 1º dia", async () => {
+  const TEL_LIDER = "5511966667777";
+  addLider({
+    nome: "Diácono Paulo",
+    telefone: TEL_LIDER,
+    cargos: ["lider"],
+    departamento: "Louvor",
+  });
+
+  salvarFormularioEvento({
+    evento: "Workshop de Louvor e Artes",
+    departamento: "Louvor",
+    data: "20/10/2026 a 22/10/2026",
+    solicitanteId: TEL_LIDER,
+    payload: {
+      nomeSolicitante: "Diácono Paulo",
+      tipoDuracao: "consecutivo",
+      preletor: "a definir",
+    },
+  });
+
+  const eventoWorkshop = {
+    id: "ev-workshop-louvor-multi",
+    summary: "Workshop de Louvor e Artes",
+    start: { dateTime: "2026-10-20T19:00:00-03:00" },
+    end: { dateTime: "2026-10-22T22:00:00-03:00" },
+    location: "Auditório",
+  };
+
+  // 1. 7 dias antes do 1º DIA (Data base: 2026-10-13 -> alvo: 2026-10-20, 1º dia)
+  // DEVE enviar!
+  const msgs1 = [];
+  const fakeClient1 = {
+    sendMessage: async (to, txt) => {
+      msgs1.push({ to, txt });
+    },
+  };
+
+  const res1 = await processarLembretesItensADefinir({
+    client: fakeClient1,
+    buscarEventos: async () => [eventoWorkshop],
+    diasAntecedencia: 7,
+    dataBase: new Date("2026-10-13T10:00:00.000Z"),
+  });
+
+  assert.equal(res1.enviados, 1);
+  assert.equal(msgs1.length, 1);
+  assert.match(msgs1[0].txt, /Preletor\(a\)/);
+  assert.match(msgs1[0].txt, /Faltam apenas \*7 dias\*/);
+
+  // 2. 7 dias antes do 2º DIA (Data base: 2026-10-14 -> alvo: 2026-10-21, 2º dia)
+  // NÃO DEVE enviar!
+  const msgs2 = [];
+  const fakeClient2 = {
+    sendMessage: async (to, txt) => {
+      msgs2.push({ to, txt });
+    },
+  };
+
+  const res2 = await processarLembretesItensADefinir({
+    client: fakeClient2,
+    buscarEventos: async () => [eventoWorkshop],
+    diasAntecedencia: 7,
+    dataBase: new Date("2026-10-14T10:00:00.000Z"),
+  });
+
+  assert.equal(res2.enviados, 0, "Não deve enviar lembrete referente ao 2º dia");
+  assert.equal(msgs2.length, 0);
+
+  removeLider(TEL_LIDER);
+});
+
 
