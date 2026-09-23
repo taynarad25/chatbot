@@ -30,8 +30,10 @@ RUN npm ci --ignore-scripts --omit=dev && npm cache clean --force
 # ignorado, etc.) pra dentro da imagem.
 COPY --chown=node:node bot/ ./bot/
 COPY --chown=node:node web/ ./web/
+COPY --chown=node:node public/ ./public/
 COPY --chown=node:node web.js ./
 COPY --chown=node:node db.js ./
+COPY --chown=node:node the_chosen_inscricoes.json* ./
 
 EXPOSE 3000
 CMD [ "node", "bot/chatbot.js" ]

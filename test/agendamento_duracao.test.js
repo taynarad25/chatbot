@@ -315,7 +315,7 @@ test("web API: /secretaria/api/eventos/gerar-descricao gera descrição rica via
     assert.match(data.descricao, /09:00/);
     assert.match(data.descricao, /Diretoria/);
   } finally {
-    server.close();
+    await new Promise(resolve => server.close(resolve));
   }
 });
 
@@ -385,6 +385,6 @@ test("web API: /secretaria/api/eventos cadastra evento e rejeita início genéri
     assert.ok(encontrado, "Evento cadastrado deve constar na listagem");
     assert.equal(encontrado.tipoDuracao, "consecutivo");
   } finally {
-    server.close();
+    await new Promise(resolve => server.close(resolve));
   }
 });

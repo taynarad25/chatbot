@@ -217,3 +217,59 @@ test('The Chosen: notificações WhatsApp simulam envio com sucesso para cliente
   assert.equal(lembreteRes.enviados, 1);
   assert.ok(mensagensEnviadas[1].text.includes('Lembrete & Confirmação de Presença'));
 });
+
+test('The Chosen: persistência durável no SQLite (dados.db) sobrevive a reinicializações', () => {
+  const db = require('../db');
+  
+  const inscricaoTeste = {
+    id: 'test-uuid-sqlite-123',
+    codigo: 'TC-SQLTEST1',
+    quantidade: 2,
+    participantes: ['Pedro Rocha', 'Mariana Rocha'],
+    titular: 'Pedro Rocha',
+    telefone: '11988887777',
+    email: 'pedro@rocha.com',
+    evento: 'Pré-estreia The Chosen - Temporada 6',
+    dataEvento: '03/10/2026 19:00',
+    statusConfirmacao: 'pendente',
+    confirmadoEm: null,
+    lembrete3DiasEnviado: false,
+    dataLembrete3Dias: null,
+    lembreteDiaEventoEnviado: false,
+    dataLembreteDiaEvento: null,
+    whatsappConfirmacaoEnviado: false,
+    criadoEm: new Date().toISOString()
+  };
+
+  try {
+    // 1. Salva no SQLite
+    const okSalvar = theChosen.salvarInscricoesNoBanco([inscricaoTeste], db);
+    assert.equal(okSalvar, true);
+
+    // 2. Lê do SQLite simulando um novo carregamento (reboot)
+    const doBanco = theChosen.carregarInscricoesDoBanco(db);
+    const itemRecuperado = doBanco.find(i => i.id === 'test-uuid-sqlite-123');
+    assert.ok(itemRecuperado, 'Deveria recuperar o registro persistido no SQLite');
+    assert.equal(itemRecuperado.codigo, 'TC-SQLTEST1');
+    assert.equal(itemRecuperado.quantidade, 2);
+    assert.deepEqual(itemRecuperado.participantes, ['Pedro Rocha', 'Mariana Rocha']);
+    assert.equal(itemRecuperado.titular, 'Pedro Rocha');
+    assert.equal(itemRecuperado.telefone, '11988887777');
+    assert.equal(itemRecuperado.statusConfirmacao, 'pendente');
+
+    // 3. Atualiza status no banco e verifica consistência
+    itemRecuperado.statusConfirmacao = 'confirmado';
+    itemRecuperado.confirmadoEm = new Date().toISOString();
+    itemRecuperado.lembrete3DiasEnviado = true;
+    theChosen.salvarInscricoesNoBanco([itemRecuperado], db);
+
+    const reloaded = theChosen.carregarInscricoesDoBanco(db).find(i => i.id === 'test-uuid-sqlite-123');
+    assert.equal(reloaded.statusConfirmacao, 'confirmado');
+    assert.equal(reloaded.lembrete3DiasEnviado, true);
+    assert.ok(reloaded.confirmadoEm);
+  } finally {
+    // Limpeza do registro de teste no SQLite
+    db.prepare('DELETE FROM the_chosen_inscricoes WHERE id = ?').run('test-uuid-sqlite-123');
+  }
+});
+

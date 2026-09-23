@@ -111,7 +111,29 @@ db.exec(`
     executadoEm TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS the_chosen_inscricoes (
+    id TEXT PRIMARY KEY,
+    codigo TEXT UNIQUE NOT NULL,
+    quantidade INTEGER NOT NULL,
+    participantes TEXT NOT NULL,
+    titular TEXT NOT NULL,
+    telefone TEXT NOT NULL,
+    email TEXT NOT NULL,
+    evento TEXT NOT NULL,
+    dataEvento TEXT NOT NULL,
+    statusConfirmacao TEXT NOT NULL DEFAULT 'pendente',
+    confirmadoEm TEXT,
+    lembrete3DiasEnviado INTEGER NOT NULL DEFAULT 0,
+    dataLembrete3Dias TEXT,
+    lembreteDiaEventoEnviado INTEGER NOT NULL DEFAULT 0,
+    dataLembreteDiaEvento TEXT,
+    whatsappConfirmacaoEnviado INTEGER NOT NULL DEFAULT 0,
+    criadoEm TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_descricoes_evento ON descricoes_eventos(evento);
+  CREATE INDEX IF NOT EXISTS idx_tc_telefone ON the_chosen_inscricoes(telefone);
+  CREATE INDEX IF NOT EXISTS idx_tc_codigo ON the_chosen_inscricoes(codigo);
 `);
 
 try {
@@ -131,6 +153,14 @@ try {
     db.exec("ALTER TABLE formularios_eventos ADD COLUMN dataMaximaDivulgacao TEXT");
   }
   db.exec("CREATE INDEX IF NOT EXISTS idx_formularios_divulgacao ON formularios_eventos(dataMaximaDivulgacao)");
+
+  const tcCols = db.prepare("PRAGMA table_info(the_chosen_inscricoes)").all();
+  if (!tcCols.some((c) => c.name === "dataLembrete3Dias")) {
+    db.exec("ALTER TABLE the_chosen_inscricoes ADD COLUMN dataLembrete3Dias TEXT");
+  }
+  if (!tcCols.some((c) => c.name === "dataLembreteDiaEvento")) {
+    db.exec("ALTER TABLE the_chosen_inscricoes ADD COLUMN dataLembreteDiaEvento TEXT");
+  }
 } catch {
   // Tabela ainda sendo criada ou erro ignorável
 }

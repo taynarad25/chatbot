@@ -12,6 +12,13 @@
     "email": "teste@curados.com",
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "pendente",
+    "confirmadoEm": null,
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": false,
     "criadoEm": "2026-09-23T17:52:12.943Z"
   },
   {
@@ -30,7 +37,9 @@
     "statusConfirmacao": "pendente",
     "confirmadoEm": null,
     "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": false,
     "criadoEm": "2026-09-23T18:37:36.024Z"
   },
@@ -50,7 +59,9 @@
     "statusConfirmacao": "pendente",
     "confirmadoEm": null,
     "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": false,
     "criadoEm": "2026-09-23T18:39:20.732Z"
   },
@@ -70,7 +81,9 @@
     "statusConfirmacao": "pendente",
     "confirmadoEm": null,
     "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": false,
     "criadoEm": "2026-09-23T18:40:42.395Z"
   },
@@ -90,7 +103,9 @@
     "statusConfirmacao": "pendente",
     "confirmadoEm": null,
     "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": false,
     "criadoEm": "2026-09-23T18:48:19.824Z"
   },
@@ -110,7 +125,9 @@
     "statusConfirmacao": "pendente",
     "confirmadoEm": null,
     "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": false,
     "criadoEm": "2026-09-23T19:00:23.132Z"
   },
@@ -130,7 +147,9 @@
     "statusConfirmacao": "pendente",
     "confirmadoEm": null,
     "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": false,
     "criadoEm": "2026-09-23T19:38:56.094Z"
   },
@@ -150,8 +169,74 @@
     "statusConfirmacao": "pendente",
     "confirmadoEm": null,
     "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": false,
     "criadoEm": "2026-09-23T19:43:58.443Z"
+  },
+  {
+    "id": "ce1413c1-991b-40c3-8549-dce33be68681",
+    "codigo": "TC-CEC9CA",
+    "quantidade": 2,
+    "participantes": [
+      "Gabriel Teste",
+      "Acompanhante Teste"
+    ],
+    "titular": "Gabriel Teste",
+    "telefone": "11942685501",
+    "email": "teste@curados.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "pendente",
+    "confirmadoEm": null,
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": false,
+    "criadoEm": "2026-09-23T20:55:09.093Z"
+  },
+  {
+    "id": "2e0a843b-b79d-4ed2-9e6a-b98512e19e6f",
+    "codigo": "TC-7188E7",
+    "quantidade": 2,
+    "participantes": [
+      "Gabriel Teste",
+      "Acompanhante Teste"
+    ],
+    "titular": "Gabriel Teste",
+    "telefone": "11942685501",
+    "email": "teste@curados.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "pendente",
+    "confirmadoEm": null,
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": false,
+    "criadoEm": "2026-09-23T20:58:51.534Z"
+  },
+  {
+    "id": "86ccf93f-cc79-49b3-99ca-a79d13ae5eee",
+    "codigo": "TC-D88CD0",
+    "quantidade": 2,
+    "participantes": [
+      "Gabriel Teste",
+      "Acompanhante Teste"
+    ],
+    "titular": "Gabriel Teste",
+    "telefone": "11942685501",
+    "email": "teste@curados.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "pendente",
+    "confirmadoEm": null,
+    "lembrete3DiasEnviado": false,
+    "lembreteDiaEventoEnviado": false,
+    "whatsappConfirmacaoEnviado": false,
+    "criadoEm": "2026-09-23T21:02:18.231Z"
   }
 ]

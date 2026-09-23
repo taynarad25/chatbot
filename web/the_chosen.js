@@ -2,14 +2,173 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DATA_FILE = process.env.THE_CHOSEN_DATA_PATH || path.join(__dirname, '..', 'the_chosen_inscricoes.json');
+let db;
+try {
+  db = require('../db');
+} catch (err) {
+  console.warn('[The Chosen] Não foi possível carregar db.js:', err.message);
+}
+
+function getDataFile() {
+  return process.env.THE_CHOSEN_DATA_PATH || path.join(__dirname, '..', 'the_chosen_inscricoes.json');
+}
+
 const LIMITE_VAGAS = 50;
 const DATA_EXPIRACAO = new Date('2026-10-04T00:00:00-03:00');
 
-function carregarInscricoes() {
+function formatarInscricaoDoBanco(row) {
+  let participantes = [];
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, 'utf8');
+    participantes = typeof row.participantes === 'string' ? JSON.parse(row.participantes) : row.participantes;
+    if (!Array.isArray(participantes)) participantes = [row.titular];
+  } catch {
+    participantes = [row.titular];
+  }
+
+  return {
+    id: row.id,
+    codigo: row.codigo,
+    quantidade: Number(row.quantidade) || 1,
+    participantes,
+    titular: row.titular,
+    telefone: row.telefone,
+    email: row.email,
+    evento: row.evento,
+    dataEvento: row.dataEvento,
+    statusConfirmacao: row.statusConfirmacao || 'pendente',
+    confirmadoEm: row.confirmadoEm || null,
+    lembrete3DiasEnviado: Boolean(row.lembrete3DiasEnviado),
+    dataLembrete3Dias: row.dataLembrete3Dias || null,
+    lembreteDiaEventoEnviado: Boolean(row.lembreteDiaEventoEnviado),
+    dataLembreteDiaEvento: row.dataLembreteDiaEvento || null,
+    whatsappConfirmacaoEnviado: Boolean(row.whatsappConfirmacaoEnviado),
+    criadoEm: row.criadoEm
+  };
+}
+
+function carregarInscricoesDoBanco(banco = db) {
+  if (!banco) return [];
+  try {
+    const rows = banco.prepare('SELECT * FROM the_chosen_inscricoes ORDER BY criadoEm ASC').all();
+    return (rows || []).map(formatarInscricaoDoBanco);
+  } catch (err) {
+    console.error('[The Chosen] Erro ao ler the_chosen_inscricoes no banco:', err.message);
+    return [];
+  }
+}
+
+function salvarInscricoesNoBanco(inscricoes, banco = db) {
+  if (!banco) return false;
+  try {
+    const upsertStmt = banco.prepare(`
+      INSERT INTO the_chosen_inscricoes (
+        id, codigo, quantidade, participantes, titular, telefone, email, evento, dataEvento,
+        statusConfirmacao, confirmadoEm, lembrete3DiasEnviado, dataLembrete3Dias,
+        lembreteDiaEventoEnviado, dataLembreteDiaEvento, whatsappConfirmacaoEnviado, criadoEm
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        codigo = excluded.codigo,
+        quantidade = excluded.quantidade,
+        participantes = excluded.participantes,
+        titular = excluded.titular,
+        telefone = excluded.telefone,
+        email = excluded.email,
+        evento = excluded.evento,
+        dataEvento = excluded.dataEvento,
+        statusConfirmacao = excluded.statusConfirmacao,
+        confirmadoEm = excluded.confirmadoEm,
+        lembrete3DiasEnviado = excluded.lembrete3DiasEnviado,
+        dataLembrete3Dias = excluded.dataLembrete3Dias,
+        lembreteDiaEventoEnviado = excluded.lembreteDiaEventoEnviado,
+        dataLembreteDiaEvento = excluded.dataLembreteDiaEvento,
+        whatsappConfirmacaoEnviado = excluded.whatsappConfirmacaoEnviado,
+        criadoEm = excluded.criadoEm
+    `);
+
+    banco.exec('BEGIN');
+    try {
+      const ids = (inscricoes || []).map(i => i.id).filter(Boolean);
+      if (ids.length === 0) {
+        banco.exec('DELETE FROM the_chosen_inscricoes');
+      } else {
+        const placeholders = ids.map(() => '?').join(',');
+        banco.prepare(`DELETE FROM the_chosen_inscricoes WHERE id NOT IN (${placeholders})`).run(...ids);
+      }
+
+      for (const item of (inscricoes || [])) {
+        upsertStmt.run(
+          item.id,
+          item.codigo,
+          Number(item.quantidade) || 1,
+          JSON.stringify(item.participantes || []),
+          item.titular || '',
+          item.telefone || '',
+          item.email || '',
+          item.evento || 'Pré-estreia The Chosen - Temporada 6',
+          item.dataEvento || '03/10/2026 19:00',
+          item.statusConfirmacao || 'pendente',
+          item.confirmadoEm || null,
+          item.lembrete3DiasEnviado ? 1 : 0,
+          item.dataLembrete3Dias || null,
+          item.lembreteDiaEventoEnviado ? 1 : 0,
+          item.dataLembreteDiaEvento || null,
+          item.whatsappConfirmacaoEnviado ? 1 : 0,
+          item.criadoEm || new Date().toISOString()
+        );
+      }
+      banco.exec('COMMIT');
+      return true;
+    } catch (txErr) {
+      try { banco.exec('ROLLBACK'); } catch {}
+      throw txErr;
+    }
+  } catch (err) {
+    console.error('[The Chosen] Erro ao salvar inscrições no SQLite:', err.message);
+    return false;
+  }
+}
+
+function carregarInscricoes() {
+  const dataFile = getDataFile();
+
+  if (process.env.THE_CHOSEN_DATA_PATH) {
+    try {
+      if (fs.existsSync(dataFile)) {
+        const raw = fs.readFileSync(dataFile, 'utf8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) return data;
+      }
+    } catch (err) {
+      console.error('[The Chosen] Erro ao ler arquivo de teste:', err.message);
+    }
+    return [];
+  }
+
+  if (db) {
+    try {
+      const doBanco = carregarInscricoesDoBanco(db);
+      if (doBanco.length > 0) {
+        return doBanco;
+      }
+
+      if (fs.existsSync(dataFile)) {
+        const raw = fs.readFileSync(dataFile, 'utf8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data) && data.length > 0) {
+          console.log(`[The Chosen] Migrando ${data.length} inscrições do arquivo JSON para o banco SQLite...`);
+          salvarInscricoesNoBanco(data, db);
+          return data;
+        }
+      }
+      return [];
+    } catch (err) {
+      console.error('[The Chosen] Falha ao consultar SQLite, tentando arquivo JSON:', err.message);
+    }
+  }
+
+  try {
+    if (fs.existsSync(dataFile)) {
+      const raw = fs.readFileSync(dataFile, 'utf8');
       const data = JSON.parse(raw);
       if (Array.isArray(data)) return data;
     }
@@ -20,15 +179,32 @@ function carregarInscricoes() {
 }
 
 function salvarInscricoes(inscricoes) {
-  try {
-    const tmpFile = `${DATA_FILE}.tmp`;
-    fs.writeFileSync(tmpFile, JSON.stringify(inscricoes, null, 2), 'utf8');
-    fs.renameSync(tmpFile, DATA_FILE);
-    return true;
-  } catch (err) {
-    console.error('[The Chosen] Erro ao salvar inscrições:', err.message);
-    return false;
+  const dataFile = getDataFile();
+
+  if (process.env.THE_CHOSEN_DATA_PATH) {
+    try {
+      fs.writeFileSync(dataFile, JSON.stringify(inscricoes, null, 2), 'utf8');
+      return true;
+    } catch (err) {
+      console.error('[The Chosen] Erro ao salvar arquivo de teste:', err.message);
+      return false;
+    }
   }
+
+  let salvoBanco = false;
+  if (db) {
+    salvoBanco = salvarInscricoesNoBanco(inscricoes, db);
+  }
+
+  let salvoArquivo = false;
+  try {
+    fs.writeFileSync(dataFile, JSON.stringify(inscricoes, null, 2), 'utf8');
+    salvoArquivo = true;
+  } catch (err) {
+    console.error('[The Chosen] Erro ao sincronizar arquivo JSON de inscrições:', err.message);
+  }
+
+  return salvoBanco || salvoArquivo;
 }
 
 function estaExpirado(dataReferencia = new Date()) {
@@ -374,8 +550,12 @@ module.exports = {
   listarInscricoes,
   carregarInscricoes,
   salvarInscricoes,
+  carregarInscricoesDoBanco,
+  salvarInscricoesNoBanco,
+  formatarInscricaoDoBanco,
   buscarInscricaoPorTelefoneOuCodigo,
   confirmarPresenca,
   obterEstatisticasConfirmacao,
   renderTheChosenPdfHtml
 };
+
