@@ -1236,6 +1236,9 @@ function renderIndexHtml() {
             <button onclick="window.open('/the-chosen/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #0284c7, #00bcd4); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0, 188, 212, 0.3);">
               📄 Exportar como PDF
             </button>
+            <button onclick="limparInscricoesDeTeste()" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(239, 68, 68, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Remover todas as inscrições identificadas como teste">
+              🧹 Limpar Testes
+            </button>
             <button onclick="fetchTheChosenInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
               🔄 Atualizar
             </button>
@@ -1293,7 +1296,7 @@ function renderIndexHtml() {
               <th>WhatsApp / Contato</th>
               <th>E-mail</th>
               <th style="width: 130px; text-align: center;">Presença</th>
-              <th style="width: 110px; text-align: center;">Ações</th>
+              <th style="width: 145px; text-align: center;">Ações</th>
             </tr>
           </thead>
           <tbody id="tcTbodyInscritos">
@@ -1808,12 +1811,17 @@ function renderIndexHtml() {
           '<td style="color: var(--cor-texto-mutado); font-size: 0.82rem;">' + (item.email || '-') + '</td>' +
           '<td style="text-align: center;">' + statusBadge + '</td>' +
           '<td style="text-align: center;">' +
-            '<select data-id="' + item.id + '" onchange="alterarStatusPresenca(this.dataset.id, this.value)" style="padding: 5px 8px; background: #22222a; color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 0.78rem; cursor: pointer;">' +
-              '<option value="">Alterar...</option>' +
-              '<option value="confirmado" ' + (item.statusConfirmacao === 'confirmado' ? 'selected' : '') + '>Confirmado ✅</option>' +
-              '<option value="pendente" ' + (item.statusConfirmacao === 'pendente' ? 'selected' : '') + '>Pendente ⏳</option>' +
-              '<option value="cancelado" ' + (item.statusConfirmacao === 'cancelado' ? 'selected' : '') + '>Cancelar ❌</option>' +
-            '</select>' +
+            '<div style="display: flex; gap: 6px; align-items: center; justify-content: center;">' +
+              '<select data-id="' + item.id + '" onchange="alterarStatusPresenca(this.dataset.id, this.value)" style="padding: 5px 8px; background: #22222a; color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 0.78rem; cursor: pointer;">' +
+                '<option value="">Alterar...</option>' +
+                '<option value="confirmado" ' + (item.statusConfirmacao === 'confirmado' ? 'selected' : '') + '>Confirmado ✅</option>' +
+                '<option value="pendente" ' + (item.statusConfirmacao === 'pendente' ? 'selected' : '') + '>Pendente ⏳</option>' +
+                '<option value="cancelado" ' + (item.statusConfirmacao === 'cancelado' ? 'selected' : '') + '>Cancelar ❌</option>' +
+              '</select>' +
+              '<button data-id="' + item.id + '" data-nome="' + (item.titular || '').replace(/"/g, '&quot;') + '" onclick="excluirTheChosenInscricao(this.dataset.id, this.dataset.nome)" title="Excluir inscrição permanentemente" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background=\'rgba(239, 68, 68, 0.35)\'" onmouseout="this.style.background=\'rgba(239, 68, 68, 0.15)\'">' +
+                '🗑️' +
+              '</button>' +
+            '</div>' +
           '</td>' +
         '</tr>';
       }).join('');
@@ -1834,6 +1842,50 @@ function renderIndexHtml() {
         }
       } catch (err) {
         console.error('Erro ao alterar status:', err);
+      }
+    }
+
+    async function excluirTheChosenInscricao(id, nome) {
+      if (!id) return;
+      const confirmou = confirm('Tem certeza que deseja EXCLUIR permanentemente a inscrição de "' + (nome || 'Participante') + '"?\nAs vagas ocupadas serão liberadas imediatamente.');
+      if (!confirmou) return;
+
+      try {
+        const res = await fetch('/the-chosen/api/excluir-inscricao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          fetchTheChosenInscricoes();
+        } else {
+          alert(data.message || 'Erro ao excluir inscrição.');
+        }
+      } catch (err) {
+        console.error('Erro ao excluir inscrição:', err);
+        alert('Erro de conexão ao tentar excluir inscrição.');
+      }
+    }
+
+    async function limparInscricoesDeTeste() {
+      const confirmou = confirm('Deseja realmente remover todas as inscrições identificadas como TESTE?\nEsta ação limpará registros de testes e liberará as vagas no painel.');
+      if (!confirmou) return;
+
+      try {
+        const res = await fetch('/the-chosen/api/limpar-testes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          alert((data.removidas || 0) + ' inscrição(ões) de teste removida(s) com sucesso!');
+          fetchTheChosenInscricoes();
+        } else {
+          alert(data.message || 'Erro ao limpar inscrições de teste.');
+        }
+      } catch (err) {
+        console.error('Erro ao limpar testes:', err);
       }
     }
 

@@ -375,6 +375,50 @@ function confirmarPresenca(termo, status = 'confirmado') {
   return { ok: true, inscricao: inscricoes[idx] };
 }
 
+function excluirInscricao(termo) {
+  if (!termo) return { ok: false, message: 'Identificador da inscrição não informado.' };
+
+  const inscricoes = carregarInscricoes();
+  const termoLimpo = String(termo || '').trim().toUpperCase();
+  const telBusca = normalizarTelefone(termo);
+
+  let idx = inscricoes.findIndex(i => i.codigo && i.codigo.toUpperCase() === termoLimpo);
+  if (idx === -1) {
+    idx = inscricoes.findIndex(i => i.id === termo);
+  }
+  if (idx === -1 && telBusca.length >= 8) {
+    idx = inscricoes.findIndex(i => {
+      const iTel = normalizarTelefone(i.telefone);
+      return iTel.endsWith(telBusca) || telBusca.endsWith(iTel);
+    });
+  }
+
+  if (idx === -1) {
+    return { ok: false, message: 'Inscrição não encontrada para exclusão.' };
+  }
+
+  const [removida] = inscricoes.splice(idx, 1);
+  salvarInscricoes(inscricoes);
+
+  return { ok: true, message: 'Inscrição excluída com sucesso!', inscricao: removida };
+}
+
+function limparInscricoesTeste() {
+  let inscricoes = carregarInscricoes();
+  const antes = inscricoes.length;
+  inscricoes = inscricoes.filter(i => {
+    const tit = String(i.titular || '').toLowerCase();
+    const mail = String(i.email || '').toLowerCase();
+    const parts = (i.participantes || []).join(' ').toLowerCase();
+    const isTeste = tit.includes('teste') || mail.includes('teste') || parts.includes('teste');
+    return !isTeste;
+  });
+
+  const removidas = antes - inscricoes.length;
+  salvarInscricoes(inscricoes);
+  return { ok: true, removidas, totalAtual: inscricoes.length };
+}
+
 function obterEstatisticasConfirmacao() {
   const inscricoes = carregarInscricoes();
   let totalInscricoes = inscricoes.length;
@@ -555,7 +599,10 @@ module.exports = {
   formatarInscricaoDoBanco,
   buscarInscricaoPorTelefoneOuCodigo,
   confirmarPresenca,
+  excluirInscricao,
+  limparInscricoesTeste,
   obterEstatisticasConfirmacao,
   renderTheChosenPdfHtml
 };
+
 

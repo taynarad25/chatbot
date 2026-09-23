@@ -371,6 +371,42 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
       }
 
+      // API: Excluir inscrição (Secretaria)
+      if ((req.method === 'POST' && pathname === '/the-chosen/api/excluir-inscricao') ||
+          (req.method === 'DELETE' && pathname.startsWith('/the-chosen/api/inscricoes/'))) {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          let termo = '';
+          if (req.method === 'DELETE') {
+            termo = decodeURIComponent(pathname.replace('/the-chosen/api/inscricoes/', ''));
+          } else {
+            const body = await parseRequestBody(req);
+            termo = body.id || body.codigo || body.telefone;
+          }
+          const resultado = theChosen.excluirInscricao(termo);
+          return sendJson(res, resultado.ok ? 200 : 404, resultado);
+        } catch (err) {
+          console.error('[The Chosen] Erro ao excluir inscrição:', err.message);
+          return sendJson(res, 500, { ok: false, message: 'Erro interno ao excluir inscrição.' });
+        }
+      }
+
+      // API: Limpar todas as inscrições de teste (Secretaria)
+      if (req.method === 'POST' && pathname === '/the-chosen/api/limpar-testes') {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          const resultado = theChosen.limparInscricoesTeste();
+          return sendJson(res, 200, resultado);
+        } catch (err) {
+          console.error('[The Chosen] Erro ao limpar inscrições de teste:', err.message);
+          return sendJson(res, 500, { ok: false, message: 'Erro interno ao limpar testes.' });
+        }
+      }
+
       if (req.method === 'GET' && pathname === '/secretaria/login') {
         return sendHtml(res, renderLoginHtml());
       }

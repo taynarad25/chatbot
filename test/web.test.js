@@ -10,6 +10,8 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-web-test-"));
 process.env.DB_PATH = path.join(tmpDir, "dados.db");
 process.env.COMBINED_LOG_PATH = path.join(tmpDir, "combined.log");
 fs.writeFileSync(process.env.COMBINED_LOG_PATH, "linha de log de teste\n");
+process.env.THE_CHOSEN_DATA_PATH = path.join(tmpDir, "the_chosen_test.json");
+fs.writeFileSync(process.env.THE_CHOSEN_DATA_PATH, "[]\n");
 
 const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
@@ -196,7 +198,7 @@ test("API /the-chosen: consulta de vagas e realização de inscrição", async (
   assert.equal(jsonInscricao.inscricao.quantidade, 2);
 });
 
-test("API /the-chosen: relatório PDF e confirmação de presença exigem autenticação", async () => {
+test("API /the-chosen: relatório PDF, confirmação de presença e exclusão exigem autenticação", async () => {
   // Sem autenticação: relatorio-pdf redireciona para login
   const resPdfAnonimo = await fetch(`${baseUrl}/the-chosen/api/relatorio-pdf`, { redirect: 'manual' });
   assert.equal(resPdfAnonimo.status, 302);
@@ -209,6 +211,58 @@ test("API /the-chosen: relatório PDF e confirmação de presença exigem autent
     body: JSON.stringify({ id: 'invalido', status: 'confirmado' })
   });
   assert.equal(resConfAnonimo.status, 401);
+
+  // Sem autenticação: excluir-inscricao retorna 401
+  const resExcluirAnonimo = await fetch(`${baseUrl}/the-chosen/api/excluir-inscricao`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: 'invalido' })
+  });
+  assert.equal(resExcluirAnonimo.status, 401);
+});
+
+test("API /the-chosen: exclusão de inscrição e limpeza de testes funcionam quando autenticado", async () => {
+  sessions["sess-admin-the-chosen"] = { username: "admin", role: "admin", status: "active", createdAt: Date.now() };
+
+  // 1. Cria uma inscrição
+  const resInscrever = await fetch(`${baseUrl}/the-chosen/api/inscrever`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quantidade: 1,
+      participantes: ["Exclusao Teste"],
+      telefone: "11988887777",
+      email: "exclusao@teste.com"
+    })
+  });
+  const dataIns = await resInscrever.json();
+  assert.equal(dataIns.ok, true);
+  const inscricaoId = dataIns.inscricao.id;
+
+  // 2. Exclui com autenticação
+  const resExcluir = await fetch(`${baseUrl}/the-chosen/api/excluir-inscricao`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Cookie": "whatsapp_control_session=sess-admin-the-chosen"
+    },
+    body: JSON.stringify({ id: inscricaoId })
+  });
+  assert.equal(resExcluir.status, 200);
+  const dataExcluir = await resExcluir.json();
+  assert.equal(dataExcluir.ok, true);
+
+  // 3. Limpa testes
+  const resLimpar = await fetch(`${baseUrl}/the-chosen/api/limpar-testes`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Cookie": "whatsapp_control_session=sess-admin-the-chosen"
+    }
+  });
+  assert.equal(resLimpar.status, 200);
+  const dataLimpar = await resLimpar.json();
+  assert.equal(dataLimpar.ok, true);
 });
 
 
