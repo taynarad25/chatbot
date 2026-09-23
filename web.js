@@ -302,16 +302,23 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
       }
 
-      // API: Consulta de vagas em tempo real
+      // API: Consulta de vagas em tempo real (sincronizada com Google Sheets)
       if (req.method === 'GET' && pathname === '/the-chosen/api/vagas') {
-        return sendJson(res, 200, theChosen.obterStatusVagas());
+        const statusVagas = typeof theChosen.obterStatusVagasAsync === 'function'
+          ? await theChosen.obterStatusVagasAsync()
+          : theChosen.obterStatusVagas();
+        return sendJson(res, 200, statusVagas);
       }
 
-      // API: Processamento de inscrição
-      if (req.method === 'POST' && pathname === '/the-chosen/api/inscrever') {
+      // API: Processamento de inscrição (/the-chosen/api/inscrever e /the-chosen)
+      if (req.method === 'POST' && (
+        pathname === '/the-chosen/api/inscrever' ||
+        pathname === '/the-chosen' ||
+        pathname === '/the-chosen/'
+      )) {
         try {
           const body = await parseRequestBody(req);
-          const resultado = theChosen.realizarInscricao(body);
+          const resultado = await theChosen.realizarInscricao(body);
           if (resultado.ok) {
             // Disparo não-bloqueante de confirmação oficial no WhatsApp do participante
             try {

@@ -9,11 +9,18 @@ try {
   console.warn('[The Chosen] Não foi possível carregar db.js:', err.message);
 }
 
+let theChosenSheets;
+try {
+  theChosenSheets = require('./the_chosen_sheets');
+} catch (err) {
+  console.warn('[The Chosen] Não foi possível carregar the_chosen_sheets:', err.message);
+}
+
 function getDataFile() {
   return process.env.THE_CHOSEN_DATA_PATH || path.join(__dirname, '..', 'the_chosen_inscricoes.json');
 }
 
-const LIMITE_VAGAS = 50;
+const LIMITE_VAGAS = parseInt(process.env.THE_CHOSEN_LIMITE_VAGAS || '100', 10);
 const DATA_EXPIRACAO = new Date('2026-10-04T00:00:00-03:00');
 
 function formatarInscricaoDoBanco(row) {
@@ -213,7 +220,7 @@ function estaExpirado(dataReferencia = new Date()) {
 
 function obterStatusVagas(dataReferencia = new Date()) {
   const inscricoes = carregarInscricoes();
-  const preenchidas = inscricoes.reduce((acc, curr) => acc + (Number(curr.quantidade) || 0), 0);
+  let preenchidas = inscricoes.reduce((acc, curr) => acc + (Number(curr.quantidade) || 0), 0);
   const restantes = Math.max(0, LIMITE_VAGAS - preenchidas);
   const expirado = estaExpirado(dataReferencia);
 
@@ -228,7 +235,34 @@ function obterStatusVagas(dataReferencia = new Date()) {
   };
 }
 
-function realizarInscricao({ quantidade, participantes, telefone, email }, dataReferencia = new Date()) {
+async function obterStatusVagasAsync(dataReferencia = new Date()) {
+  const inscricoes = carregarInscricoes();
+  let preenchidas = inscricoes.reduce((acc, curr) => acc + (Number(curr.quantidade) || 0), 0);
+  if (theChosenSheets) {
+    try {
+      const qtdPlanilha = await theChosenSheets.obterTotalIngressosPlanilha();
+      if (typeof qtdPlanilha === 'number' && !isNaN(qtdPlanilha)) {
+        preenchidas = Math.max(preenchidas, qtdPlanilha);
+      }
+    } catch (err) {
+      console.warn('[The Chosen] Aviso ao sincronizar vagas com Google Sheets:', err.message);
+    }
+  }
+  const restantes = Math.max(0, LIMITE_VAGAS - preenchidas);
+  const expirado = estaExpirado(dataReferencia);
+
+  return {
+    total: LIMITE_VAGAS,
+    preenchidas,
+    restantes,
+    esgotado: restantes <= 0,
+    expirado,
+    dataEvento: '03/10/2026 às 19:00',
+    dataExpiracao: DATA_EXPIRACAO.toISOString()
+  };
+}
+
+async function realizarInscricao({ quantidade, participantes, telefone, email }, dataReferencia = new Date()) {
   if (estaExpirado(dataReferencia)) {
     return { ok: false, code: 'EVENTO_EXPIRADO', message: 'As inscrições para este evento foram encerradas no dia 04/10.' };
   }
@@ -261,9 +295,20 @@ function realizarInscricao({ quantidade, participantes, telefone, email }, dataR
     return { ok: false, code: 'EMAIL_INVALIDO', message: 'Informe um e-mail válido para contato.' };
   }
 
-  // Trava de concorrência e estoque
+  // Trava de concorrência e estoque (valida diretamente contra Google Sheets se disponível)
   const inscricoes = carregarInscricoes();
-  const preenchidas = inscricoes.reduce((acc, curr) => acc + (Number(curr.quantidade) || 0), 0);
+  let preenchidas = inscricoes.reduce((acc, curr) => acc + (Number(curr.quantidade) || 0), 0);
+  if (theChosenSheets) {
+    try {
+      const qtdPlanilha = await theChosenSheets.obterTotalIngressosPlanilha();
+      if (typeof qtdPlanilha === 'number' && !isNaN(qtdPlanilha)) {
+        preenchidas = Math.max(preenchidas, qtdPlanilha);
+      }
+    } catch (err) {
+      console.warn('[The Chosen] Aviso ao sincronizar vagas antes da inscrição:', err.message);
+    }
+  }
+
   const restantes = Math.max(0, LIMITE_VAGAS - preenchidas);
 
   if (qtd > restantes) {
@@ -301,6 +346,15 @@ function realizarInscricao({ quantidade, participantes, telefone, email }, dataR
 
   if (!salvo) {
     return { ok: false, code: 'ERRO_SALVAMENTO', message: 'Ocorreu um erro interno ao registrar sua inscrição. Tente novamente.' };
+  }
+
+  // Integração direta com Google Sheets (adiciona linha na planilha)
+  if (theChosenSheets) {
+    try {
+      await theChosenSheets.adicionarInscricaoPlanilha(novaInscricao);
+    } catch (sheetErr) {
+      console.error('[The Chosen] Erro ao adicionar linha na planilha do Google Sheets:', sheetErr.message);
+    }
   }
 
   return {
@@ -532,7 +586,7 @@ function renderTheChosenPdfHtml() {
       <div class="header-meta">
         <strong>Data do Evento:</strong> Sábado, 03/10/2026 às 19:00 &nbsp;|&nbsp; 
         <strong>Local:</strong> Auditório Principal &nbsp;|&nbsp; 
-        <strong>Capacidade:</strong> 50 vagas &nbsp;|&nbsp;
+        <strong>Capacidade:</strong> ${stats.limite || LIMITE_VAGAS} vagas &nbsp;|&nbsp;
         <strong>Gerado em:</strong> ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
       </div>
     </div>
@@ -590,6 +644,7 @@ module.exports = {
   DATA_EXPIRACAO,
   estaExpirado,
   obterStatusVagas,
+  obterStatusVagasAsync,
   realizarInscricao,
   listarInscricoes,
   carregarInscricoes,

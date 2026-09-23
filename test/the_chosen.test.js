@@ -6,8 +6,10 @@ const path = require('path');
 // Define arquivo de dados isolado para os testes
 const TEST_DATA_FILE = path.join(__dirname, 'the_chosen_test.json');
 process.env.THE_CHOSEN_DATA_PATH = TEST_DATA_FILE;
+process.env.THE_CHOSEN_LIMITE_VAGAS = '100';
 
 const theChosen = require('../web/the_chosen');
+const theChosenSheets = require('../web/the_chosen_sheets');
 const theChosenNotificacoes = require('../web/the_chosen_notificacoes');
 
 // Limpar arquivo de teste antes e depois
@@ -15,51 +17,52 @@ function cleanup() {
   if (fs.existsSync(TEST_DATA_FILE)) {
     try { fs.unlinkSync(TEST_DATA_FILE); } catch {}
   }
+  theChosenSheets.limparCacheParaTestes();
 }
 
 before(() => cleanup());
 after(() => cleanup());
 
-test('The Chosen: capacidade inicial configurada para 50 vagas', () => {
+test('The Chosen: capacidade inicial configurada para 100 vagas', () => {
   cleanup();
   const status = theChosen.obterStatusVagas();
-  assert.equal(status.total, 50);
+  assert.equal(status.total, 100);
   assert.equal(status.preenchidas, 0);
-  assert.equal(status.restantes, 50);
+  assert.equal(status.restantes, 100);
   assert.equal(status.esgotado, false);
 });
 
-test('The Chosen: validações de formulário rejeitam entradas inválidas', () => {
+test('The Chosen: validações de formulário rejeitam entradas inválidas', async () => {
   cleanup();
   // Quantidade inválida
-  let res = theChosen.realizarInscricao({ quantidade: 0, participantes: [], telefone: '11999999999', email: 'teste@email.com' });
+  let res = await theChosen.realizarInscricao({ quantidade: 0, participantes: [], telefone: '11999999999', email: 'teste@email.com' });
   assert.equal(res.ok, false);
   assert.equal(res.code, 'QUANTIDADE_INVALIDA');
 
   // Participantes não correspondem à quantidade
-  res = theChosen.realizarInscricao({ quantidade: 2, participantes: ['João'], telefone: '11999999999', email: 'teste@email.com' });
+  res = await theChosen.realizarInscricao({ quantidade: 2, participantes: ['João'], telefone: '11999999999', email: 'teste@email.com' });
   assert.equal(res.ok, false);
   assert.equal(res.code, 'PARTICIPANTES_INVALIDOS');
 
   // Nome muito curto ou vazio
-  res = theChosen.realizarInscricao({ quantidade: 1, participantes: ['Jo'], telefone: '11999999999', email: 'teste@email.com' });
+  res = await theChosen.realizarInscricao({ quantidade: 1, participantes: ['Jo'], telefone: '11999999999', email: 'teste@email.com' });
   assert.equal(res.ok, false);
   assert.equal(res.code, 'NOMES_INVALIDOS');
 
   // Telefone inválido
-  res = theChosen.realizarInscricao({ quantidade: 1, participantes: ['João Silva'], telefone: '123', email: 'teste@email.com' });
+  res = await theChosen.realizarInscricao({ quantidade: 1, participantes: ['João Silva'], telefone: '123', email: 'teste@email.com' });
   assert.equal(res.ok, false);
   assert.equal(res.code, 'TELEFONE_INVALIDO');
 
   // Email inválido
-  res = theChosen.realizarInscricao({ quantidade: 1, participantes: ['João Silva'], telefone: '11999999999', email: 'email-invalido' });
+  res = await theChosen.realizarInscricao({ quantidade: 1, participantes: ['João Silva'], telefone: '11999999999', email: 'email-invalido' });
   assert.equal(res.ok, false);
   assert.equal(res.code, 'EMAIL_INVALIDO');
 });
 
-test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 50 vagas', () => {
+test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 100 vagas', async () => {
   cleanup();
-  const res = theChosen.realizarInscricao({
+  const res = await theChosen.realizarInscricao({
     quantidade: 3,
     participantes: ['Ana Paula Silva', 'Carlos Eduardo Silva', 'Mariana Silva'],
     telefone: '+55 (11) 94268-5501',
@@ -71,16 +74,16 @@ test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 50 vag
   assert.equal(res.inscricao.quantidade, 3);
   assert.equal(res.inscricao.participantes.length, 3);
   assert.equal(res.inscricao.statusConfirmacao, 'pendente');
-  assert.equal(res.vagasRestantes, 47);
+  assert.equal(res.vagasRestantes, 97);
 
   const status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 3);
-  assert.equal(status.restantes, 47);
+  assert.equal(status.restantes, 97);
 });
 
-test('The Chosen: confirmação de presença e busca por código/telefone', () => {
+test('The Chosen: confirmação de presença e busca por código/telefone', async () => {
   cleanup();
-  const insc = theChosen.realizarInscricao({
+  const insc = await theChosen.realizarInscricao({
     quantidade: 2,
     participantes: ['Gabriel Diniz', 'Taynara Diniz'],
     telefone: '11999998888',
@@ -112,17 +115,17 @@ test('The Chosen: confirmação de presença e busca por código/telefone', () =
   assert.equal(stats.totalIngressos, 2);
   assert.equal(stats.confirmados, 1);
   assert.equal(stats.ingressosConfirmados, 2);
-  assert.equal(stats.restantes, 48);
+  assert.equal(stats.restantes, 98);
 });
 
-test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa vagas disponíveis', () => {
+test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa vagas disponíveis (100 vagas)', async () => {
   cleanup();
-  // Inscreve 48 vagas (em lotes de 10)
+  // Inscreve 98 vagas (em lotes de 10)
   const partes = [];
-  for (let i = 0; i < 48; i++) partes.push(`Participante ${i + 1}`);
+  for (let i = 0; i < 98; i++) partes.push(`Participante ${i + 1}`);
   while (partes.length > 0) {
     const chunk = partes.splice(0, Math.min(10, partes.length));
-    theChosen.realizarInscricao({
+    await theChosen.realizarInscricao({
       quantidade: chunk.length,
       participantes: chunk,
       telefone: '11999999999',
@@ -134,7 +137,7 @@ test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa va
   assert.equal(status.restantes, 2);
 
   // Tenta inscrever 3 vagas quando só restam 2
-  const res = theChosen.realizarInscricao({
+  const res = await theChosen.realizarInscricao({
     quantidade: 3,
     participantes: ['P1 Sobrando', 'P2 Sobrando', 'P3 Sobrando'],
     telefone: '11999999999',
@@ -145,7 +148,7 @@ test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa va
   assert.equal(res.code, 'VAGAS_INSUFICIENTES');
 
   // Preenche as 2 restantes
-  const resFinal = theChosen.realizarInscricao({
+  const resFinal = await theChosen.realizarInscricao({
     quantidade: 2,
     participantes: ['P1 Final', 'P2 Final'],
     telefone: '11999999999',
@@ -153,13 +156,13 @@ test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa va
   });
   assert.equal(resFinal.ok, true);
 
-  // Agora está esgotado (0 vagas de 50)
+  // Agora está esgotado (0 vagas de 100)
   const statusEsgotado = theChosen.obterStatusVagas();
   assert.equal(statusEsgotado.restantes, 0);
   assert.equal(statusEsgotado.esgotado, true);
 
   // Tentativa com 0 vagas retorna ESGOTADO
-  const resEsgotado = theChosen.realizarInscricao({
+  const resEsgotado = await theChosen.realizarInscricao({
     quantidade: 1,
     participantes: ['Tarde Demais'],
     telefone: '11999999999',
@@ -169,9 +172,9 @@ test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa va
   assert.equal(resEsgotado.code, 'ESGOTADO');
 });
 
-test('The Chosen: renderização da folha de presença em PDF contém participantes e métricas', () => {
+test('The Chosen: renderização da folha de presença em PDF contém participantes e métricas de 100 vagas', async () => {
   cleanup();
-  theChosen.realizarInscricao({
+  await theChosen.realizarInscricao({
     quantidade: 2,
     participantes: ['Marcos Silva', 'Luciana Silva'],
     telefone: '11988887777',
@@ -182,13 +185,13 @@ test('The Chosen: renderização da folha de presença em PDF contém participan
   assert.ok(html.includes('Lista Oficial de Portaria & Presença'));
   assert.ok(html.includes('Marcos Silva'));
   assert.ok(html.includes('Luciana Silva'));
-  assert.ok(html.includes('50 vagas'));
+  assert.ok(html.includes('100 vagas'));
   assert.ok(html.includes('window.print()'));
 });
 
 test('The Chosen: notificações WhatsApp simulam envio com sucesso para cliente mock', async () => {
   cleanup();
-  const reg = theChosen.realizarInscricao({
+  const reg = await theChosen.realizarInscricao({
     quantidade: 1,
     participantes: ['Sara Teste'],
     telefone: '11977776666',
@@ -290,11 +293,11 @@ test('The Chosen: persistência durável no SQLite sobrevive a reinicializaçõe
   assert.ok(reloaded.confirmadoEm);
 });
 
-test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e liberam vagas', () => {
+test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e liberam vagas', async () => {
   cleanup();
 
   // Cria 2 inscrições (uma de teste e uma normal)
-  const ins1 = theChosen.realizarInscricao({
+  const ins1 = await theChosen.realizarInscricao({
     quantidade: 2,
     participantes: ['Fulano Teste', 'Amigo Teste'],
     telefone: '11911112222',
@@ -302,7 +305,7 @@ test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e l
   });
   assert.equal(ins1.ok, true);
 
-  const ins2 = theChosen.realizarInscricao({
+  const ins2 = await theChosen.realizarInscricao({
     quantidade: 3,
     participantes: ['Ana Maria', 'Lucas Silva', 'Julia Silva'],
     telefone: '11933334444',
@@ -312,7 +315,7 @@ test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e l
 
   let status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 5);
-  assert.equal(status.restantes, 45);
+  assert.equal(status.restantes, 95);
 
   // 1. Exclui individualmente a inscrição 2
   const resExcluir = theChosen.excluirInscricao(ins2.inscricao.id);
@@ -321,7 +324,7 @@ test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e l
 
   status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 2);
-  assert.equal(status.restantes, 48);
+  assert.equal(status.restantes, 98);
 
   // 2. Limpa inscrições de teste (remove ins1 que tem 'teste' no nome/email)
   const resLimpar = theChosen.limparInscricoesTeste();
@@ -330,6 +333,65 @@ test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e l
 
   status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 0);
-  assert.equal(status.restantes, 50);
+  assert.equal(status.restantes, 100);
 });
 
+test('Google Sheets: adiciona linha formatada e consulta contagem com mock do Sheets API', async () => {
+  cleanup();
+  const linhasMock = [
+    ['Nome Completo', 'Telefone', 'E-mail', 'Quantidade de Ingressos', 'Data/Hora', 'Código', 'Participantes']
+  ];
+  let appendChamado = false;
+
+  const mockSheets = {
+    spreadsheets: {
+      values: {
+        get: async ({ range }) => {
+          return { data: { values: linhasMock } };
+        },
+        append: async ({ requestBody }) => {
+          appendChamado = true;
+          linhasMock.push(requestBody.values[0]);
+          return { data: { updates: { updatedRange: 'Inscrições!A2:G2' } } };
+        },
+        update: async () => {
+          return { data: {} };
+        }
+      }
+    }
+  };
+
+  theChosenSheets.setSheetsClientForTest(mockSheets);
+  theChosenSheets.setSpreadsheetIdForTest('test-sheet-id-123');
+
+  // 1. Total inicial da planilha
+  const totalInicial = await theChosenSheets.obterTotalIngressosPlanilha(true);
+  assert.equal(totalInicial, 0);
+
+  // 2. Adiciona inscrição na planilha
+  const resAppend = await theChosenSheets.adicionarInscricaoPlanilha({
+    titular: 'Renata Alencar',
+    participantes: ['Renata Alencar', 'Marcos Alencar'],
+    telefone: '11987654321',
+    email: 'renata@exemplo.com',
+    quantidade: 2,
+    codigo: 'TC-TESTSHEET'
+  });
+
+  assert.equal(resAppend.ok, true);
+  assert.equal(appendChamado, true);
+  assert.equal(linhasMock.length, 2);
+  assert.equal(linhasMock[1][0], 'Renata Alencar');
+  assert.equal(linhasMock[1][3], 2);
+  assert.equal(linhasMock[1][5], 'TC-TESTSHEET');
+
+  // 3. Total atualizado na planilha
+  const totalApos = await theChosenSheets.obterTotalIngressosPlanilha(true);
+  assert.equal(totalApos, 2);
+
+  // 4. Status de vagas reflete a contagem da planilha
+  const statusAsync = await theChosen.obterStatusVagasAsync();
+  assert.equal(statusAsync.total, 100);
+  assert.equal(statusAsync.preenchidas, 2);
+  assert.equal(statusAsync.restantes, 98);
+});

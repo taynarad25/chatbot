@@ -4,6 +4,7 @@ node_modules/
 temp/
 *.deb
 credenciais-google.json
+credentials.json
 .env
 dados.db
 dados.db-journal

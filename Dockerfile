@@ -34,6 +34,7 @@ COPY --chown=node:node public/ ./public/
 COPY --chown=node:node web.js ./
 COPY --chown=node:node db.js ./
 COPY --chown=node:node the_chosen_inscricoes.json* ./
+COPY --chown=node:node credenciais-google.json* credentials.json* ./
 
 EXPOSE 3000
 CMD [ "node", "bot/chatbot.js" ]

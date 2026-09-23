@@ -176,7 +176,7 @@ test("API /the-chosen: consulta de vagas e realização de inscrição", async (
   const resVagas = await fetch(`${baseUrl}/the-chosen/api/vagas`);
   assert.equal(resVagas.status, 200);
   const jsonVagas = await resVagas.json();
-  assert.equal(jsonVagas.total, 50);
+  assert.equal(jsonVagas.total, 100);
   assert.ok(jsonVagas.restantes >= 0);
 
   // 2. Inscrição com sucesso
@@ -646,6 +646,33 @@ test("rota desconhecida dentro de /secretaria sem sessão: redireciona para /sec
 test("rota desconhecida fora de /secretaria: 404 direto, sem exigir login (livre para uma futura landing page)", async () => {
   const res = await fetch(`${baseUrl}/essa-rota-nao-existe`, { redirect: "manual" });
   assert.equal(res.status, 404, "só o que está sob /secretaria é protegido por login; o resto do site fica livre");
+});
+
+test("The Chosen HTTP API: GET /the-chosen/api/vagas retorna status das 100 vagas", async () => {
+  const res = await fetch(`${baseUrl}/the-chosen/api/vagas`);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.total, 100);
+  assert.ok(data.restantes <= 100);
+  assert.equal(typeof data.esgotado, "boolean");
+});
+
+test("The Chosen HTTP API: POST /the-chosen realiza inscrição com sucesso", async () => {
+  const res = await fetch(`${baseUrl}/the-chosen`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quantidade: 1,
+      participantes: ["Mariana Web Teste"],
+      telefone: "11988889999",
+      email: "mariana.web@teste.com"
+    })
+  });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.ok(data.inscricao.codigo.startsWith("TC-"));
+  assert.equal(data.inscricao.titular, "Mariana Web Teste");
 });
 
 // Deixado por último de propósito: consome o limite de tentativas do rate limiter,

@@ -12,6 +12,7 @@ services:
       - ./combined.log:/usr/src/app/combined.log
       - ./dados.db:/usr/src/app/dados.db
       - ./credenciais-google.json:/usr/src/app/credenciais-google.json
+      - ./credentials.json:/usr/src/app/credentials.json
       - ./the_chosen_inscricoes.json:/usr/src/app/the_chosen_inscricoes.json
     networks:
       - bot-bridge
