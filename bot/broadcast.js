@@ -26,12 +26,12 @@ const BROADCAST_CONFIG = {
 
 function formatarJidWhatsApp(telefone) {
   if (!telefone) return "";
-  let limpo = String(telefone).replace(/\D/g, "");
+  let limpo = String(telefone).replace(/@.*$/, "").replace(/\D/g, "");
   if (!limpo) return "";
   if ((limpo.length === 10 || limpo.length === 11) && !limpo.startsWith("55")) {
     limpo = `55${limpo}`;
   }
-  return limpo.endsWith("@c.us") ? limpo : `${limpo}@c.us`;
+  return `${limpo}@c.us`;
 }
 
 function mascararTelefone(jidOuTel) {
@@ -176,11 +176,20 @@ async function executarBroadcast({
       try {
         const contactId = await client.getNumberId(dest.telefone);
         if (contactId && contactId._serialized) {
-          jid = contactId._serialized;
+          if (contactId._serialized.endsWith("@c.us")) {
+            jid = contactId._serialized;
+          } else {
+            console.warn(`[Broadcast] getNumberId retornou JID não-padrão (${contactId._serialized}) para ${dest.telefone}. Descartando e usando JID direto do telefone: ${jid}`);
+          }
         }
       } catch (errId) {
         console.warn(`[Broadcast] Falha ao resolver numberId para ${dest.telefone}:`, errId.message);
       }
+    }
+
+    // Sob nenhuma circunstância envia para @lid (mensagens enviadas para @lid não chegam ao WhatsApp do usuário)
+    if (jid.endsWith("@lid") || !jid.endsWith("@c.us")) {
+      jid = formatarJidWhatsApp(dest.telefone);
     }
 
     if (!jid || jid.includes("@g.us")) {
@@ -195,7 +204,6 @@ async function executarBroadcast({
         const options = {
           caption: texto || undefined,
           sendMediaAsDocument: false,
-          waitUntilMsgSent: true,
         };
         console.log(`[Broadcast] (${i + 1}/${total}) Enviando mídia (${mediaObj.mimetype || "sem mimetype"}) para ${dest.nome} [JID: ${jid}] (${mascararTelefone(dest.telefone)})...`);
         resEnvio = await enviarMensagemResiliente(client, jid, mediaObj, options, { jid });
@@ -225,7 +233,7 @@ async function executarBroadcast({
         try {
           console.log(`[Broadcast] Tentando fallback enviando mídia do arquivo em disco: ${media.caminhoArquivo}...`);
           const mediaDoDisco = carregarMidiaDeDisco(media.caminhoArquivo);
-          const resFallback = await enviarMensagemResiliente(client, jid, mediaDoDisco, texto ? { caption: texto, sendMediaAsDocument: false, waitUntilMsgSent: true } : { sendMediaAsDocument: false, waitUntilMsgSent: true }, { jid });
+          const resFallback = await enviarMensagemResiliente(client, jid, mediaDoDisco, texto ? { caption: texto, sendMediaAsDocument: false } : { sendMediaAsDocument: false }, { jid });
           if (!resFallback || (typeof resFallback === "object" && resFallback !== null && resFallback.id && Object.keys(resFallback.id).length === 0 && !resFallback.ack && !resFallback._serialized)) {
             throw new Error("Envio via fallback de disco não confirmado");
           }

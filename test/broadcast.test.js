@@ -134,6 +134,29 @@ test("broadcast: executarBroadcast envia mídia com caption e texto simples resp
   assert.equal(mensagensEnviadas[0].options?.caption, "Culto Especial neste Domingo às 18h!");
 });
 
+test("broadcast: executarBroadcast rejeita @lid retornado por getNumberId e envia para @c.us canônico", async () => {
+  const mensagensEnviadas = [];
+  const clientMock = {
+    getNumberId: async () => ({ _serialized: "98947540508698@lid" }),
+    sendMessage: async (to, content, options) => {
+      mensagensEnviadas.push({ to, content, options });
+    },
+  };
+
+  const resultado = await executarBroadcast({
+    client: clientMock,
+    texto: "Aviso importante de teste",
+    destinatarios: [
+      { nome: "Gabriela Diniz", telefone: "5511942685501" },
+    ],
+  });
+
+  assert.equal(resultado.enviados, 1);
+  assert.equal(mensagensEnviadas.length, 1);
+  assert.equal(mensagensEnviadas[0].to, "5511942685501@c.us");
+  assert.notEqual(mensagensEnviadas[0].to, "98947540508698@lid");
+});
+
 test("broadcast: executarBroadcast aplica delay entre múltiplos destinatários no modo geral", async () => {
   const timestamps = [];
   const clientMock = {

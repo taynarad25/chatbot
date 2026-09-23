@@ -553,7 +553,8 @@ function renderIndexHtml() {
       min-height: 100vh;
     }
     .container {
-      max-width: 980px;
+      max-width: 1260px;
+      width: 100%;
       margin: 0 auto;
       background: var(--cor-card);
       padding: 2.2rem;
@@ -832,9 +833,256 @@ function renderIndexHtml() {
     .badge-diretor { background: rgba(123, 44, 191, 0.18); color: #c084fc; border: 1px solid rgba(123, 44, 191, 0.35); }
     .badge-membro { background: rgba(255, 255, 255, 0.08); color: #9ca3af; border: 1px solid rgba(255, 255, 255, 0.15); }
     .badge-depto { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+    /* Layout em 2 colunas para Usuários & Cargos */
+    .lideres-grid-layout {
+      display: grid;
+      grid-template-columns: 1fr 440px;
+      gap: 28px;
+      align-items: start;
+    }
+    .lideres-col-lista {
+      min-width: 0;
+    }
+    .lideres-col-form {
+      min-width: 0;
+    }
+    .form-sticky-card {
+      position: sticky;
+      top: 24px;
+      background: var(--cor-card-alt);
+      border: 1px solid var(--cor-borda);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .form-sticky-card.editando-destaque {
+      border-color: var(--cor-ciano) !important;
+      box-shadow: 0 0 20px rgba(0, 188, 212, 0.35) !important;
+      animation: pulseHighlight 0.8s ease-in-out;
+    }
+    @keyframes pulseHighlight {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+    .lideres-lista-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .lideres-contador {
+      font-size: 0.85rem;
+      color: var(--cor-texto-mutado);
+      font-weight: 500;
+      display: block;
+    }
+    .btn-novo-usuario {
+      background: rgba(0, 188, 212, 0.12);
+      color: var(--cor-ciano);
+      border: 1px solid rgba(0, 188, 212, 0.3);
+      padding: 0.55rem 1.1rem;
+      font-size: 0.86rem;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .btn-novo-usuario:hover {
+      background: var(--cor-ciano);
+      color: #000000;
+      border-color: var(--cor-ciano);
+      transform: translateY(-1px);
+    }
+    .form-header-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--cor-borda);
+    }
+    .badge-modo-edicao {
+      background: rgba(0, 188, 212, 0.15);
+      color: var(--cor-ciano);
+      border: 1px solid rgba(0, 188, 212, 0.4);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .lider-cards-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+    }
+    .lider-card {
+      background: var(--cor-card-alt);
+      border: 1px solid var(--cor-borda);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+    .lider-card:hover {
+      background: #242430;
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+    .lider-card.card-em-edicao {
+      border-color: var(--cor-ciano);
+      background: rgba(0, 188, 212, 0.05);
+      box-shadow: 0 0 14px rgba(0, 188, 212, 0.22);
+    }
+    .lider-card-topo {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 10px;
+    }
+    .lider-card-identificacao {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .lider-card-nome-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .lider-card-nome {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+    }
+    .lider-card-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: var(--cor-texto-mutado);
+    }
+    .lider-card-meta .meta-tel {
+      color: #d1d5db;
+      font-family: monospace;
+      font-size: 0.88rem;
+    }
+    .badge-aniversario {
+      background: rgba(236, 72, 153, 0.15);
+      color: #f472b6;
+      border: 1px solid rgba(236, 72, 153, 0.35);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .lider-card-acoes {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .btn-card-edit {
+      background: #2f2f3d;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+    }
+    .btn-card-edit:hover {
+      background: var(--cor-ciano);
+      color: #000000;
+      border-color: var(--cor-ciano);
+    }
+    .btn-card-delete {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      padding: 6px 10px;
+      font-size: 0.82rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-card-delete:hover {
+      background: #ef4444;
+      color: #ffffff;
+    }
+    .lider-card-detalhes {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .lider-detalhe-linha {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.85rem;
+    }
+    .lider-detalhe-rotulo {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #a1a1aa;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      min-width: 82px;
+      padding-top: 3px;
+      flex-shrink: 0;
+    }
+    .lider-detalhe-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .lider-detalhe-vazio {
+      color: #71717a;
+      font-style: italic;
+      font-size: 0.8rem;
+    }
+    @media (max-width: 980px) {
+      .lideres-grid-layout {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+      .form-sticky-card {
+        position: static;
+        top: auto;
+      }
+    }
     @media (max-width: 600px) {
       .header-painel { flex-direction: column; align-items: flex-start; gap: 14px; }
       .filtros-lideres { flex-direction: column; gap: 0; }
+      .lider-card-topo { flex-direction: column; align-items: flex-start; }
+      .lider-card-acoes { width: 100%; justify-content: flex-end; }
     }
   </style>
 </head>
@@ -887,52 +1135,73 @@ function renderIndexHtml() {
     </div>
 
     <div id="tab-lideres" class="tab-content">
-      <h3 class="section-title-tab">Gestão de Usuários & Cargos</h3>
-      <div class="filtros-lideres">
-        <input id="filtroLiderNome" placeholder="🔍 Buscar por nome, cargo ou departamento" />
-        <input id="filtroLiderTelefone" placeholder="📱 Buscar por telefone" inputmode="numeric" autocomplete="off" />
+      <div class="lideres-grid-layout">
+        <!-- Coluna Esquerda: Lista de Usuários e Filtros -->
+        <div class="lideres-col-lista">
+          <div class="lideres-lista-header">
+            <div>
+              <h3 class="section-title-tab" style="margin: 0 0 4px 0;">Gestão de Usuários & Cargos</h3>
+              <span id="lideresContador" class="lideres-contador">Carregando usuários...</span>
+            </div>
+            <button type="button" class="btn-novo-usuario" id="btnNovoLiderTopo">
+              ➕ Novo Usuário
+            </button>
+          </div>
+          <div class="filtros-lideres">
+            <input id="filtroLiderNome" placeholder="🔍 Buscar por nome, cargo ou ministério" />
+            <input id="filtroLiderTelefone" placeholder="📱 Buscar por telefone" inputmode="numeric" autocomplete="off" />
+          </div>
+          <ul id="liderList" class="lider-cards-list"></ul>
+        </div>
+
+        <!-- Coluna Direita: Formulário Fixo / Sticky ao Lado -->
+        <div class="lideres-col-form" id="liderFormContainer">
+          <div class="form-sticky-card" id="liderFormCard">
+            <div class="form-header-flex">
+              <h4 id="liderFormTitle" style="font-size: 1.08rem; color: #ffffff; margin: 0;">Novo Usuário / Cargo</h4>
+              <span id="badgeModoEdicao" class="badge-modo-edicao" style="display:none;">✏️ Editando</span>
+            </div>
+            <div id="lideresMessage" class="message-box" style="display:none;"></div>
+            <form id="addLiderForm">
+              <input name="nome" placeholder="Nome completo" required />
+              <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" autocomplete="off" required />
+              <input id="liderDataNascimento" name="dataNascimento" placeholder="Data de Nascimento (Ex: 15/04 ou 15/04/1990)" maxlength="10" autocomplete="off" />
+              <div class="deptos-container" style="margin-bottom: 14px;">
+                <span class="cargos-title" style="display:block; font-size: 0.85rem; color: #a1a1aa; margin-bottom: 6px;">Departamentos / Ministérios:</span>
+                <div class="deptos-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; max-height: 160px; overflow-y: auto; padding: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;">
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Evangelismo" /> Evangelismo</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Epifania" /> Epifania</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Intercessão" /> Intercessão</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Projeto Social Seeds" /> Projeto Social Seeds</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Ruach" /> Rede Ruach</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Casais" /> Rede de Casais</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Homens" /> Rede de Homens</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Mulheres" /> Rede de Mulheres</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Kids" /> Rede Kids</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Departamento de Artes" /> Departamento de Artes</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Diaconia" /> Diaconia</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Relacionamentos" /> Relacionamentos</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Eventos Externos" /> Eventos Externos</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Outros" /> Outros</label>
+                </div>
+              </div>
+              <div class="cargos-container" style="margin-top: 0;">
+                <span class="cargos-title">Cargos / Permissões Ministeriais:</span>
+                <div class="cargos-checkboxes">
+                  <label><input type="checkbox" name="cargos" value="lider" checked /> Líder</label>
+                  <label><input type="checkbox" name="cargos" value="pastor" /> Pastor</label>
+                  <label><input type="checkbox" name="cargos" value="diretor" /> Diretor</label>
+                  <label><input type="checkbox" name="cargos" value="membro" /> Membro</label>
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 14px;">
+                <button type="submit" id="liderSubmitBtn" class="primary" style="flex: 1;">Adicionar</button>
+                <button type="button" id="cancelarEdicaoLider" style="display:none;">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
-      <ul id="liderList"></ul>
-      <hr>
-      <h4 id="liderFormTitle" style="font-size: 1.1rem; color: #ffffff; margin-bottom: 0.75rem;">Novo Usuário / Cargo</h4>
-      <div id="lideresMessage" class="message-box" style="display:none;"></div>
-      <form id="addLiderForm">
-        <input name="nome" placeholder="Nome completo" required />
-        <input id="liderTelefone" name="telefone" placeholder="Ex: +55 (11) 94308-6727" inputmode="numeric" maxlength="19" autocomplete="off" required />
-        <input id="liderDataNascimento" name="dataNascimento" placeholder="Data de Nascimento (Ex: 15/04 ou 15/04/1990)" maxlength="10" autocomplete="off" />
-        <div class="deptos-container" style="margin-bottom: 14px;">
-          <span class="cargos-title" style="display:block; font-size: 0.85rem; color: #a1a1aa; margin-bottom: 6px;">Departamentos / Ministérios (marque todos os que se aplicam):</span>
-          <div class="deptos-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; max-height: 140px; overflow-y: auto; padding: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;">
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Evangelismo" /> Evangelismo</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Epifania" /> Epifania</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Intercessão" /> Intercessão</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Projeto Social Seeds" /> Projeto Social Seeds</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Ruach" /> Rede Ruach</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Casais" /> Rede de Casais</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Homens" /> Rede de Homens</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Mulheres" /> Rede de Mulheres</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Kids" /> Rede Kids</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Departamento de Artes" /> Departamento de Artes</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Diaconia" /> Diaconia</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Relacionamentos" /> Relacionamentos</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Eventos Externos" /> Eventos Externos</label>
-            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Outros" /> Outros</label>
-          </div>
-        </div>
-        <div class="cargos-container">
-          <span class="cargos-title">Cargos / Permissões Ministeriais:</span>
-          <div class="cargos-checkboxes">
-            <label><input type="checkbox" name="cargos" value="lider" checked /> Líder</label>
-            <label><input type="checkbox" name="cargos" value="pastor" /> Pastor</label>
-            <label><input type="checkbox" name="cargos" value="diretor" /> Diretor</label>
-            <label><input type="checkbox" name="cargos" value="membro" /> Membro</label>
-          </div>
-        </div>
-        <div style="display: flex; gap: 10px;">
-          <button type="submit" id="liderSubmitBtn" class="primary">Adicionar</button>
-          <button type="button" id="cancelarEdicaoLider" style="display:none;">Cancelar</button>
-        </div>
-      </form>
     </div>
 
     <div id="tab-logs" class="tab-content">
@@ -1133,12 +1402,12 @@ function renderIndexHtml() {
 
     // Remove acentos para a busca por nome encontrar "joao" mesmo quando o líder está cadastrado como "João"
     function normalizarBusca(texto) {
-      return (texto || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+      return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
 
     function renderLideres() {
       const filtroNome = normalizarBusca(document.getElementById('filtroLiderNome').value);
-      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\\D/g, '');
+      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\D/g, '');
 
       const filtrados = lideresCache.filter(l => {
         const cargosStr = Array.isArray(l.cargos) ? l.cargos.join(' ') : (l.cargos || '');
@@ -1148,71 +1417,157 @@ function renderIndexHtml() {
         return nomeOk && telefoneOk;
       });
 
+      const contadorEl = document.getElementById('lideresContador');
+      if (contadorEl) {
+        if (lideresCache.length === 0) {
+          contadorEl.textContent = 'Nenhum usuário cadastrado';
+        } else if (filtrados.length === lideresCache.length) {
+          contadorEl.textContent = lideresCache.length + ' usuário(s) cadastrado(s)';
+        } else {
+          contadorEl.textContent = 'Exibindo ' + filtrados.length + ' de ' + lideresCache.length + ' usuário(s)';
+        }
+      }
+
       const list = document.getElementById('liderList');
       list.innerHTML = '';
 
       if (filtrados.length === 0) {
         const li = document.createElement('li');
-        li.textContent = lideresCache.length === 0 ? 'Nenhum usuário cadastrado.' : 'Nenhum usuário encontrado com esse filtro.';
+        li.className = 'lider-card';
+        li.style.textAlign = 'center';
+        li.style.color = 'var(--cor-texto-mutado)';
+        li.style.padding = '24px';
+        li.textContent = lideresCache.length === 0 ? 'Nenhum usuário cadastrado ainda.' : 'Nenhum usuário encontrado com esse filtro.';
         list.appendChild(li);
         return;
       }
 
       filtrados.forEach(l => {
+        const emEdicao = liderEmEdicao === l.telefone;
         const li = document.createElement('li');
-        const span = document.createElement('span');
-        span.textContent = (l.nome || '(sem nome)') + ' | ' + formatarTelefone(l.telefone) + ' ';
+        li.className = 'lider-card' + (emEdicao ? ' card-em-edicao' : '');
 
+        // TOPO: Identificação e Ações
+        const topo = document.createElement('div');
+        topo.className = 'lider-card-topo';
+
+        const ident = document.createElement('div');
+        ident.className = 'lider-card-identificacao';
+
+        const nomeWrap = document.createElement('div');
+        nomeWrap.className = 'lider-card-nome-wrap';
+
+        const nomeEl = document.createElement('span');
+        nomeEl.className = 'lider-card-nome';
+        nomeEl.textContent = l.nome || '(sem nome)';
+        nomeWrap.appendChild(nomeEl);
+
+        if (emEdicao) {
+          const badgeEdit = document.createElement('span');
+          badgeEdit.className = 'badge-modo-edicao';
+          badgeEdit.textContent = '✏️ Editando Agora';
+          nomeWrap.appendChild(badgeEdit);
+        }
+
+        ident.appendChild(nomeWrap);
+
+        const meta = document.createElement('div');
+        meta.className = 'lider-card-meta';
+
+        const telSpan = document.createElement('span');
+        telSpan.className = 'meta-tel';
+        telSpan.textContent = '📱 ' + formatarTelefone(l.telefone);
+        meta.appendChild(telSpan);
+
+        if (l.dataNascimento) {
+          const badgeNasc = document.createElement('span');
+          badgeNasc.className = 'badge-aniversario';
+          badgeNasc.textContent = '🎂 ' + l.dataNascimento;
+          meta.appendChild(badgeNasc);
+        }
+
+        ident.appendChild(meta);
+        topo.appendChild(ident);
+
+        const acoes = document.createElement('div');
+        acoes.className = 'lider-card-acoes';
+
+        const btnEditar = document.createElement('button');
+        btnEditar.type = 'button';
+        btnEditar.className = 'btn-card-edit';
+        btnEditar.innerHTML = '✏️ Editar';
+        btnEditar.addEventListener('click', () => iniciarEdicaoLider(l));
+        acoes.appendChild(btnEditar);
+
+        const btnRemover = document.createElement('button');
+        btnRemover.type = 'button';
+        btnRemover.className = 'btn-card-delete';
+        btnRemover.title = 'Remover Usuário';
+        btnRemover.textContent = '🗑️';
+        btnRemover.addEventListener('click', () => deleteLider(l.telefone));
+        acoes.appendChild(btnRemover);
+
+        topo.appendChild(acoes);
+        li.appendChild(topo);
+
+        // DETALHES: Linha de Cargos e Linha de Departamentos
+        const detalhes = document.createElement('div');
+        detalhes.className = 'lider-card-detalhes';
+
+        // Linha de Cargos
+        const linhaCargos = document.createElement('div');
+        linhaCargos.className = 'lider-detalhe-linha';
+
+        const rotuloCargos = document.createElement('span');
+        rotuloCargos.className = 'lider-detalhe-rotulo';
+        rotuloCargos.textContent = 'Cargos:';
+        linhaCargos.appendChild(rotuloCargos);
+
+        const tagsCargos = document.createElement('div');
+        tagsCargos.className = 'lider-detalhe-tags';
         const cargos = Array.isArray(l.cargos) && l.cargos.length > 0 ? l.cargos : ['lider'];
         cargos.forEach(c => {
           const badge = document.createElement('span');
           badge.className = 'badge badge-' + c.toLowerCase();
           const nomeCargo = c.charAt(0).toUpperCase() + c.slice(1);
           badge.textContent = nomeCargo === 'Lider' ? 'Líder' : nomeCargo;
-          span.appendChild(badge);
+          tagsCargos.appendChild(badge);
         });
+        linhaCargos.appendChild(tagsCargos);
+        detalhes.appendChild(linhaCargos);
 
+        // Linha de Ministérios
+        const linhaDeptos = document.createElement('div');
+        linhaDeptos.className = 'lider-detalhe-linha';
+
+        const rotuloDeptos = document.createElement('span');
+        rotuloDeptos.className = 'lider-detalhe-rotulo';
+        rotuloDeptos.textContent = 'Ministérios:';
+        linhaDeptos.appendChild(rotuloDeptos);
+
+        const tagsDeptos = document.createElement('div');
+        tagsDeptos.className = 'lider-detalhe-tags';
         const deptosList = Array.isArray(l.departamentos) && l.departamentos.length > 0
           ? l.departamentos
           : (l.departamento ? (typeof l.departamento === 'string' ? l.departamento.split(',').map(d => d.trim()).filter(Boolean) : [l.departamento]) : []);
 
-        deptosList.forEach(depto => {
-          const badgeDepto = document.createElement('span');
-          badgeDepto.className = 'badge badge-depto';
-          badgeDepto.textContent = depto;
-          span.appendChild(badgeDepto);
-        });
-
-        if (l.dataNascimento) {
-          const badgeNasc = document.createElement('span');
-          badgeNasc.className = 'badge';
-          badgeNasc.style.background = 'rgba(236, 72, 153, 0.15)';
-          badgeNasc.style.color = '#f472b6';
-          badgeNasc.style.borderColor = 'rgba(236, 72, 153, 0.3)';
-          badgeNasc.textContent = '🎂 ' + l.dataNascimento;
-          span.appendChild(badgeNasc);
+        if (deptosList.length === 0) {
+          const vazio = document.createElement('span');
+          vazio.className = 'lider-detalhe-vazio';
+          vazio.textContent = 'Nenhum ministério vinculado';
+          tagsDeptos.appendChild(vazio);
+        } else {
+          deptosList.forEach(depto => {
+            const badgeDepto = document.createElement('span');
+            badgeDepto.className = 'badge badge-depto';
+            badgeDepto.textContent = depto;
+            tagsDeptos.appendChild(badgeDepto);
+          });
         }
+        linhaDeptos.appendChild(tagsDeptos);
+        detalhes.appendChild(linhaDeptos);
 
-        li.appendChild(span);
-
-        // Agrupa os dois botões numa única "coluna" à direita
-        const acoes = document.createElement('span');
-        acoes.style.display = 'flex';
-        acoes.style.gap = '8px';
-
-        const btnEditar = document.createElement('button');
-        btnEditar.textContent = 'Editar';
-        btnEditar.addEventListener('click', () => iniciarEdicaoLider(l));
-        acoes.appendChild(btnEditar);
-
-        const btnRemover = document.createElement('button');
-        btnRemover.className = 'danger';
-        btnRemover.textContent = 'Remover';
-        btnRemover.addEventListener('click', () => deleteLider(l.telefone));
-        acoes.appendChild(btnRemover);
-
-        li.appendChild(acoes);
-
+        li.appendChild(detalhes);
         list.appendChild(li);
       });
     }
@@ -1259,8 +1614,26 @@ function renderIndexHtml() {
       });
 
       document.getElementById('liderFormTitle').textContent = 'Editar Usuário / Cargo';
-      document.getElementById('liderSubmitBtn').textContent = 'Salvar';
+      document.getElementById('liderSubmitBtn').textContent = 'Salvar Alterações';
       document.getElementById('cancelarEdicaoLider').style.display = 'inline-block';
+
+      const badgeModo = document.getElementById('badgeModoEdicao');
+      if (badgeModo) {
+        badgeModo.style.display = 'inline-block';
+        badgeModo.textContent = '✏️ Editando: ' + (lider.nome || '').split(' ')[0];
+      }
+
+      const formCard = document.getElementById('liderFormCard');
+      if (formCard) {
+        formCard.classList.remove('editando-destaque');
+        void formCard.offsetWidth; // Dispara reflow para reiniciar animação
+        formCard.classList.add('editando-destaque');
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      if (form.nome) form.nome.focus();
+
+      renderLideres();
     }
 
     function cancelarEdicaoLider() {
@@ -1277,9 +1650,32 @@ function renderIndexHtml() {
       document.getElementById('liderFormTitle').textContent = 'Novo Usuário / Cargo';
       document.getElementById('liderSubmitBtn').textContent = 'Adicionar';
       document.getElementById('cancelarEdicaoLider').style.display = 'none';
+
+      const badgeModo = document.getElementById('badgeModoEdicao');
+      if (badgeModo) badgeModo.style.display = 'none';
+
+      const formCard = document.getElementById('liderFormCard');
+      if (formCard) formCard.classList.remove('editando-destaque');
+
+      renderLideres();
+    }
+
+    function focarNovoUsuario() {
+      cancelarEdicaoLider();
+      const formCard = document.getElementById('liderFormCard');
+      if (formCard) {
+        formCard.classList.remove('editando-destaque');
+        void formCard.offsetWidth;
+        formCard.classList.add('editando-destaque');
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      const form = document.getElementById('addLiderForm');
+      if (form && form.nome) form.nome.focus();
     }
 
     document.getElementById('cancelarEdicaoLider').addEventListener('click', cancelarEdicaoLider);
+    const btnNovoTopo = document.getElementById('btnNovoLiderTopo');
+    if (btnNovoTopo) btnNovoTopo.addEventListener('click', focarNovoUsuario);
 
     document.getElementById('addUserForm').addEventListener('submit', async (e) => {
       e.preventDefault();

@@ -28,12 +28,12 @@ function formatarHoraBrasil(isoStr) {
 
 function formatarJidWhatsApp(telefone) {
   if (!telefone) return "";
-  let limpo = String(telefone).replace(/\D/g, "");
+  let limpo = String(telefone).replace(/@.*$/, "").replace(/\D/g, "");
   if (!limpo) return "";
   if ((limpo.length === 10 || limpo.length === 11) && !limpo.startsWith("55")) {
     limpo = `55${limpo}`;
   }
-  return limpo.endsWith("@c.us") ? limpo : `${limpo}@c.us`;
+  return `${limpo}@c.us`;
 }
 
 const ID_AGENDA_ENSAIOS = "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com";
