@@ -1202,8 +1202,159 @@ function renderIndexHtml() {
     <div id="tab-eventos" class="tab-content">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px;">
         <div>
-          <h3 class="section-title-tab" style="margin-bottom: 4px;">Gestão de Eventos</h3>
-          <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">Acompanhamento de inscrições, confirmações de presença e relatórios para portaria.</p>
+          <h3 class="section-title-tab" style="margin-bottom: 4px;">Gestão de Eventos & Agendamento</h3>
+          <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">Cadastre novos eventos (1 dia, consecutivos ou múltiplos blocos), gere descrições com IA e acompanhe inscrições.</p>
+        </div>
+        <button id="btnToggleNovoEvento" onclick="toggleFormNovoEvento()" style="background: linear-gradient(135deg, #0284c7, #00bcd4); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0, 188, 212, 0.3);">
+          ➕ Agendar Novo Evento
+        </button>
+      </div>
+
+      <!-- Formulário Expansível de Cadastro de Eventos -->
+      <div id="cardNovoEvento" style="display: none; background: #1c1c24; border: 1px solid rgba(0, 188, 212, 0.3); border-radius: 18px; padding: 1.8rem; margin-bottom: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.35);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+          <h4 style="font-size: 1.15rem; color: #fff; margin: 0; display: flex; align-items: center; gap: 8px;">
+            ✨ Cadastro e Agendamento de Evento
+          </h4>
+          <button type="button" onclick="toggleFormNovoEvento(false)" style="background: transparent; color: #9ca3af; border: none; font-size: 1.2rem; cursor: pointer; padding: 4px 8px;">✕</button>
+        </div>
+
+        <div id="eventoFormMessage" class="message-box" style="display: none;"></div>
+
+        <form id="formNovoEvento" onsubmit="salvarNovoEventoWeb(event)">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+            <div>
+              <label class="cargos-title">Nome do Evento *</label>
+              <input id="evNome" placeholder="Ex: Conferência Avivamento e Fé" required style="margin-top: 4px;" />
+            </div>
+            <div>
+              <label class="cargos-title">Departamento / Ministério Organizador *</label>
+              <select id="evDepartamento" style="margin-top: 4px;">
+                <option value="Comunidade Cristã Curados">Comunidade Cristã Curados (Geral)</option>
+                <option value="Rede Ruach">Rede Ruach (Jovens)</option>
+                <option value="Rede Kids">Rede Kids (Crianças)</option>
+                <option value="Rede de Mulheres">Rede de Mulheres</option>
+                <option value="Rede de Homens">Rede de Homens</option>
+                <option value="Rede de Casais">Rede de Casais</option>
+                <option value="Evangelismo">Evangelismo</option>
+                <option value="Ministério de Louvor">Ministério de Louvor</option>
+                <option value="Ministério de Dança">Ministério de Dança</option>
+                <option value="Comunicação e Mídia">Comunicação e Mídia</option>
+                <option value="Diaconato">Diaconato</option>
+              </select>
+            </div>
+            <div>
+              <label class="cargos-title">Local do Evento *</label>
+              <input id="evLocal" value="Comunidade Cristã Curados - Templo" required style="margin-top: 4px;" />
+            </div>
+            <div>
+              <label class="cargos-title">Tema Central (Opcional)</label>
+              <input id="evTema" placeholder="Ex: Filipenses 4:13" style="margin-top: 4px;" />
+            </div>
+          </div>
+
+          <!-- Seleção do Formato de Duração -->
+          <div style="margin: 1.2rem 0;">
+            <label class="cargos-title" style="margin-bottom: 8px;">Tipo de Duração do Evento *</label>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <label class="tipo-duracao-btn" id="lblTipoUnico" style="background: rgba(0, 188, 212, 0.2); border: 1px solid var(--cor-ciano); padding: 10px 16px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600;">
+                <input type="radio" name="tipoDuracao" value="unico" checked onchange="trocarTipoDuracao(this.value)" style="margin: 0; width: auto;" />
+                📅 Evento de 1 Dia
+              </label>
+              <label class="tipo-duracao-btn" id="lblTipoConsecutivo" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); padding: 10px 16px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600;">
+                <input type="radio" name="tipoDuracao" value="consecutivo" onchange="trocarTipoDuracao(this.value)" style="margin: 0; width: auto;" />
+                🗓️ Vários Dias Consecutivos (Ex: Retiro)
+              </label>
+              <label class="tipo-duracao-btn" id="lblTipoMultiplo" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); padding: 10px 16px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600;">
+                <input type="radio" name="tipoDuracao" value="multiplo" onchange="trocarTipoDuracao(this.value)" style="margin: 0; width: auto;" />
+                📋 Múltiplos Dias / Horários Espalhados (Ex: Conferência)
+              </label>
+            </div>
+          </div>
+
+          <!-- Painel 1: Evento de 1 Dia -->
+          <div id="painelDuracaoUnico" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px 18px; margin-bottom: 1.2rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+              <div>
+                <label style="font-size: 0.82rem; color: #a1a1aa; font-weight: 600;">Data do Evento *</label>
+                <input type="date" id="evUnicoData" style="margin-top: 4px;" />
+              </div>
+              <div>
+                <label style="font-size: 0.82rem; color: #a1a1aa; font-weight: 600;">Horário de Início (Obrigatório) *</label>
+                <input type="time" id="evUnicoInicio" value="19:00" required style="margin-top: 4px;" />
+              </div>
+              <div>
+                <label style="font-size: 0.82rem; color: #a1a1aa; font-weight: 600;">Horário de Término *</label>
+                <input type="time" id="evUnicoFim" value="21:30" required style="margin-top: 4px;" />
+              </div>
+            </div>
+            <div style="font-size: 0.78rem; color: var(--cor-ciano); margin-top: 6px;">
+              ℹ️ O horário de início é estritamente obrigatório (não genérico), mesmo para eventos de dia inteiro.
+            </div>
+          </div>
+
+          <!-- Painel 2: Vários Dias Consecutivos -->
+          <div id="painelDuracaoConsecutivo" style="display: none; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px 18px; margin-bottom: 1.2rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+              <div>
+                <label style="font-size: 0.82rem; color: #a1a1aa; font-weight: 600;">Data de Início *</label>
+                <input type="date" id="evConsecDataIni" style="margin-top: 4px;" />
+              </div>
+              <div>
+                <label style="font-size: 0.82rem; color: #a1a1aa; font-weight: 600;">Horário de Início (1º Dia) *</label>
+                <input type="time" id="evConsecHoraIni" value="19:00" style="margin-top: 4px;" />
+              </div>
+              <div>
+                <label style="font-size: 0.82rem; color: #a1a1aa; font-weight: 600;">Data de Término *</label>
+                <input type="date" id="evConsecDataFim" style="margin-top: 4px;" />
+              </div>
+              <div>
+                <label style="font-size: 0.82rem; color: #a1a1aa; font-weight: 600;">Horário de Término (Último Dia) *</label>
+                <input type="time" id="evConsecHoraFim" value="17:00" style="margin-top: 4px;" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Painel 3: Múltiplos Dias / Horários Espalhados -->
+          <div id="painelDuracaoMultiplo" style="display: none; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px 18px; margin-bottom: 1.2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-size: 0.85rem; color: #fff; font-weight: 700;">Blocos de Horário / Sessões do Evento:</span>
+              <button type="button" onclick="adicionarBlocoMultiplo()" style="background: rgba(0, 188, 212, 0.15); color: var(--cor-ciano); border: 1px solid rgba(0,188,212,0.3); padding: 4px 10px; font-size: 0.8rem; border-radius: 8px;">
+                ➕ Adicionar Sessão
+              </button>
+            </div>
+            <div id="listaBlocosMultiplos" style="display: flex; flex-direction: column; gap: 8px;"></div>
+          </div>
+
+          <!-- Geração de Descrição IA -->
+          <div style="margin: 1.2rem 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="cargos-title" style="margin: 0;">Descrição do Evento (IA)</label>
+              <button type="button" id="btnGerarDescricaoIa" onclick="gerarDescricaoIaWeb()" style="background: linear-gradient(135deg, #7b2cbf, #e01a4f); color: #fff; padding: 6px 14px; font-size: 0.82rem; border-radius: 8px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                ✨ Gerar Descrição Automática (IA)
+              </button>
+            </div>
+            <textarea id="evDescricao" rows="6" placeholder="Clique em 'Gerar Descrição Automática (IA)' para compor um texto acolhedor e rico automaticamente, ou digite uma descrição personalizada..." style="width: 100%; padding: 12px; background: #202028; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; color: #fff; font-size: 0.88rem; line-height: 1.5; resize: vertical;"></textarea>
+            <span style="font-size: 0.76rem; color: var(--cor-texto-mutado);">Essa descrição gerada será gravada na base de dados/calendário e o bot a usará automaticamente ao responder sobre o evento no WhatsApp.</span>
+          </div>
+
+          <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.2rem;">
+            <button type="button" onclick="toggleFormNovoEvento(false)" style="background: rgba(255,255,255,0.08); color: #fff;">Cancelar</button>
+            <button type="submit" id="btnSalvarEvento" class="primary" style="background: linear-gradient(135deg, #0284c7, #00bcd4);">Salvar e Agendar Evento</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Lista de Eventos Agendados no Sistema -->
+      <div style="margin-bottom: 2.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h4 style="font-size: 1.15rem; color: #fff; margin: 0;">📋 Eventos Cadastrados no Sistema</h4>
+          <button onclick="fetchEventosCadastrados()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 6px 12px; font-size: 0.82rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); cursor: pointer;">🔄 Atualizar Lista</button>
+        </div>
+        <div id="gridEventosCadastrados" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
+          <div style="color: var(--cor-texto-mutado); font-size: 0.88rem; padding: 1rem; background: var(--cor-card-alt); border-radius: 12px; border: 1px solid var(--cor-borda);">
+            Carregando eventos...
+          </div>
         </div>
       </div>
 
@@ -1393,9 +1544,319 @@ function renderIndexHtml() {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(name).classList.add('active');
       evt.currentTarget.classList.add('active');
-      if(name === 'tab-eventos') fetchTheChosenInscricoes();
+      if(name === 'tab-eventos') { fetchTheChosenInscricoes(); fetchEventosCadastrados(); }
       if(name === 'tab-admin') fetchUsers();
       if(name === 'tab-lideres') fetchLideres();
+    }
+
+    let tipoDuracaoAtual = 'unico';
+    let blocosMultiplosData = [];
+
+    function toggleFormNovoEvento(forcar) {
+      const card = document.getElementById('cardNovoEvento');
+      const btn = document.getElementById('btnToggleNovoEvento');
+      if (!card) return;
+      const aberto = forcar !== undefined ? forcar : (card.style.display === 'none' || !card.style.display);
+      card.style.display = aberto ? 'block' : 'none';
+      if (btn) btn.textContent = aberto ? '✕ Fechar Formulário' : '➕ Agendar Novo Evento';
+      if (aberto) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (blocosMultiplosData.length === 0) {
+          adicionarBlocoMultiplo();
+        }
+      }
+    }
+
+    function trocarTipoDuracao(tipo) {
+      tipoDuracaoAtual = tipo;
+      const pUnico = document.getElementById('painelDuracaoUnico');
+      const pConsec = document.getElementById('painelDuracaoConsecutivo');
+      const pMult = document.getElementById('painelDuracaoMultiplo');
+
+      const lUnico = document.getElementById('lblTipoUnico');
+      const lConsec = document.getElementById('lblTipoConsecutivo');
+      const lMult = document.getElementById('lblTipoMultiplo');
+
+      if (pUnico) pUnico.style.display = tipo === 'unico' ? 'block' : 'none';
+      if (pConsec) pConsec.style.display = tipo === 'consecutivo' ? 'block' : 'none';
+      if (pMult) pMult.style.display = tipo === 'multiplo' ? 'block' : 'none';
+
+      const ativoEstilo = 'background: rgba(0, 188, 212, 0.2); border: 1px solid var(--cor-ciano);';
+      const inativoEstilo = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);';
+
+      if (lUnico) lUnico.style.cssText += tipo === 'unico' ? ativoEstilo : inativoEstilo;
+      if (lConsec) lConsec.style.cssText += tipo === 'consecutivo' ? ativoEstilo : inativoEstilo;
+      if (lMult) lMult.style.cssText += tipo === 'multiplo' ? ativoEstilo : inativoEstilo;
+
+      if (tipo === 'multiplo' && blocosMultiplosData.length === 0) {
+        adicionarBlocoMultiplo();
+      }
+    }
+
+    function adicionarBlocoMultiplo(dados) {
+      blocosMultiplosData.push(dados || { data: '', inicio: '19:00', fim: '21:30', titulo: '' });
+      renderBlocosMultiplos();
+    }
+
+    function removerBlocoMultiplo(idx) {
+      if (blocosMultiplosData.length <= 1) {
+        alert('O evento deve conter pelo menos uma sessão.');
+        return;
+      }
+      blocosMultiplosData.splice(idx, 1);
+      renderBlocosMultiplos();
+    }
+
+    function renderBlocosMultiplos() {
+      const container = document.getElementById('listaBlocosMultiplos');
+      if (!container) return;
+      container.innerHTML = '';
+      blocosMultiplosData.forEach((b, idx) => {
+        const div = document.createElement('div');
+        div.style.cssText = 'display: grid; grid-template-columns: 140px 110px 110px 1fr 40px; gap: 8px; align-items: center; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);';
+        div.innerHTML = 
+          '<div><label style="font-size: 0.72rem; color: #a1a1aa; display:block;">Data *</label><input type="date" value="' + (b.data || '') + '" onchange="blocosMultiplosData[' + idx + '].data = this.value" style="margin: 0; padding: 6px 8px; font-size: 0.85rem;" required /></div>' +
+          '<div><label style="font-size: 0.72rem; color: #a1a1aa; display:block;">Início *</label><input type="time" value="' + (b.inicio || '19:00') + '" onchange="blocosMultiplosData[' + idx + '].inicio = this.value" style="margin: 0; padding: 6px 8px; font-size: 0.85rem;" required /></div>' +
+          '<div><label style="font-size: 0.72rem; color: #a1a1aa; display:block;">Término *</label><input type="time" value="' + (b.fim || '21:30') + '" onchange="blocosMultiplosData[' + idx + '].fim = this.value" style="margin: 0; padding: 6px 8px; font-size: 0.85rem;" required /></div>' +
+          '<div><label style="font-size: 0.72rem; color: #a1a1aa; display:block;">Rótulo / Sessão (Opcional)</label><input type="text" placeholder="Ex: Sessão 1" value="' + (b.titulo || '') + '" onchange="blocosMultiplosData[' + idx + '].titulo = this.value" style="margin: 0; padding: 6px 8px; font-size: 0.85rem;" /></div>' +
+          '<div style="text-align: right; padding-top: 14px;"><button type="button" onclick="removerBlocoMultiplo(' + idx + ')" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: none; padding: 6px 8px; border-radius: 6px; cursor: pointer;">✕</button></div>';
+        container.appendChild(div);
+      });
+    }
+
+    function coletarDadosFormularioEvento() {
+      const nome = (document.getElementById('evNome')?.value || '').trim();
+      const departamento = document.getElementById('evDepartamento')?.value || 'Comunidade Cristã Curados';
+      const local = (document.getElementById('evLocal')?.value || '').trim() || 'Comunidade Cristã Curados';
+      const tema = (document.getElementById('evTema')?.value || '').trim();
+      const descricao = (document.getElementById('evDescricao')?.value || '').trim();
+
+      let horarios = null;
+      if (tipoDuracaoAtual === 'unico') {
+        const data = document.getElementById('evUnicoData')?.value;
+        const inicio = document.getElementById('evUnicoInicio')?.value;
+        const fim = document.getElementById('evUnicoFim')?.value;
+        horarios = [{ data, inicio, fim }];
+      } else if (tipoDuracaoAtual === 'consecutivo') {
+        const dataInicio = document.getElementById('evConsecDataIni')?.value;
+        const horaInicio = document.getElementById('evConsecHoraIni')?.value;
+        const dataFim = document.getElementById('evConsecDataFim')?.value;
+        const horaFim = document.getElementById('evConsecHoraFim')?.value;
+        horarios = { dataInicio, horaInicio, dataFim, horaFim };
+      } else if (tipoDuracaoAtual === 'multiplo') {
+        horarios = blocosMultiplosData.map(b => ({
+          data: b.data,
+          inicio: b.inicio,
+          fim: b.fim,
+          titulo: b.titulo
+        }));
+      }
+
+      return {
+        evento: nome,
+        departamento,
+        local,
+        tema,
+        tipoDuracao: tipoDuracaoAtual,
+        horarios,
+        descricao
+      };
+    }
+
+    async function gerarDescricaoIaWeb() {
+      const dados = coletarDadosFormularioEvento();
+      if (!dados.evento) {
+        alert('Por favor, informe o Nome do Evento antes de gerar a descrição com IA.');
+        document.getElementById('evNome')?.focus();
+        return;
+      }
+
+      const btn = document.getElementById('btnGerarDescricaoIa');
+      const textarea = document.getElementById('evDescricao');
+      const originalText = btn ? btn.textContent : '';
+      if (btn) {
+        btn.textContent = '⏳ Gerando com IA...';
+        btn.disabled = true;
+      }
+
+      try {
+        const res = await fetch('/secretaria/api/eventos/gerar-descricao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados)
+        });
+        const json = await res.json();
+        if (res.ok && json.descricao) {
+          if (textarea) textarea.value = json.descricao;
+        } else {
+          alert('Erro ao gerar descrição: ' + (json.message || 'Falha na resposta'));
+        }
+      } catch (err) {
+        console.error('Erro ao gerar descrição:', err);
+        alert('Erro ao conectar ao servidor para gerar descrição.');
+      } finally {
+        if (btn) {
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }
+      }
+    }
+
+    async function salvarNovoEventoWeb(e) {
+      e.preventDefault();
+      const dados = coletarDadosFormularioEvento();
+      const msgEl = document.getElementById('eventoFormMessage');
+      if (msgEl) msgEl.style.display = 'none';
+
+      // Validação de horário de início obrigatório no cliente
+      if (dados.tipoDuracao === 'unico') {
+        const h = dados.horarios[0];
+        if (!h.data || !h.inicio || !h.fim) {
+          mostrarMensagemEvento('Preencha a data, horário de início e término.', false);
+          return;
+        }
+      } else if (dados.tipoDuracao === 'consecutivo') {
+        const h = dados.horarios;
+        if (!h.dataInicio || !h.horaInicio || !h.dataFim || !h.horaFim) {
+          mostrarMensagemEvento('Preencha as datas e horários de início e término.', false);
+          return;
+        }
+      } else if (dados.tipoDuracao === 'multiplo') {
+        if (!dados.horarios || dados.horarios.length === 0) {
+          mostrarMensagemEvento('Adicione pelo menos uma sessão com data e horários.', false);
+          return;
+        }
+        for (let i = 0; i < dados.horarios.length; i++) {
+          const b = dados.horarios[i];
+          if (!b.data || !b.inicio || !b.fim) {
+            mostrarMensagemEvento('A sessão ' + (i + 1) + ' precisa de data, início e término preenchidos.', false);
+            return;
+          }
+        }
+      }
+
+      const btn = document.getElementById('btnSalvarEvento');
+      if (btn) {
+        btn.textContent = '⏳ Salvando...';
+        btn.disabled = true;
+      }
+
+      try {
+        const res = await fetch('/secretaria/api/eventos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados)
+        });
+        const json = await res.json();
+        if (res.ok) {
+          mostrarMensagemEvento('✅ ' + (json.message || 'Evento salvo com sucesso!'), true);
+          document.getElementById('formNovoEvento')?.reset();
+          if (document.getElementById('evDescricao')) document.getElementById('evDescricao').value = '';
+          blocosMultiplosData = [];
+          renderBlocosMultiplos();
+          setTimeout(() => {
+            toggleFormNovoEvento(false);
+            fetchEventosCadastrados();
+          }, 1200);
+        } else {
+          mostrarMensagemEvento('❌ ' + (json.message || 'Erro ao salvar evento.'), false);
+        }
+      } catch (err) {
+        console.error('Erro ao salvar evento:', err);
+        mostrarMensagemEvento('❌ Erro de conexão ao salvar evento.', false);
+      } finally {
+        if (btn) {
+          btn.textContent = 'Salvar e Agendar Evento';
+          btn.disabled = false;
+        }
+      }
+    }
+
+    function mostrarMensagemEvento(texto, sucesso) {
+      const msgEl = document.getElementById('eventoFormMessage');
+      if (!msgEl) return;
+      msgEl.style.display = 'block';
+      msgEl.textContent = texto;
+      msgEl.style.backgroundColor = sucesso ? 'rgba(22, 163, 74, 0.2)' : 'rgba(220, 38, 38, 0.2)';
+      msgEl.style.color = sucesso ? '#86efac' : '#fca5a5';
+      msgEl.style.border = sucesso ? '1px solid rgba(22, 163, 74, 0.4)' : '1px solid rgba(220, 38, 38, 0.4)';
+    }
+
+    async function fetchEventosCadastrados() {
+      const grid = document.getElementById('gridEventosCadastrados');
+      if (!grid) return;
+      try {
+        const res = await fetch('/secretaria/api/eventos');
+        if (!res.ok) return;
+        const data = await res.json();
+        renderEventosCadastrados(data.eventos || []);
+      } catch (err) {
+        console.error('Erro ao listar eventos:', err);
+        grid.innerHTML = '<div style="color: #f87171; padding: 1rem;">Erro ao carregar eventos cadastrados.</div>';
+      }
+    }
+
+    function renderEventosCadastrados(eventos) {
+      const grid = document.getElementById('gridEventosCadastrados');
+      if (!grid) return;
+      if (!eventos || eventos.length === 0) {
+        grid.innerHTML = '<div style="color: var(--cor-texto-mutado); font-size: 0.9rem; padding: 1.5rem; background: var(--cor-card-alt); border-radius: 12px; border: 1px solid var(--cor-borda); grid-column: 1 / -1;">Nenhum evento cadastrado ainda. Clique em "➕ Agendar Novo Evento" acima para cadastrar o primeiro!</div>';
+        return;
+      }
+
+      grid.innerHTML = eventos.map(ev => {
+        let formatoBadge = '1 DIA';
+        let corBadge = 'background: rgba(0, 188, 212, 0.15); color: #00bcd4; border: 1px solid rgba(0, 188, 212, 0.35);';
+        let horarioTexto = '';
+
+        if (ev.tipoDuracao === 'consecutivo') {
+          formatoBadge = 'CONSECUTIVO';
+          corBadge = 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35);';
+          const h = Array.isArray(ev.horarios) ? ev.horarios[0] : ev.horarios;
+          horarioTexto = (h?.dataInicio || '') + ' (' + (h?.horaInicio || '') + ') até ' + (h?.dataFim || '') + ' (' + (h?.horaFim || '') + ')';
+        } else if (ev.tipoDuracao === 'multiplo') {
+          formatoBadge = 'MÚLTIPLOS BLOCOS';
+          corBadge = 'background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.35);';
+          const totalSessoes = Array.isArray(ev.horarios) ? ev.horarios.length : 1;
+          horarioTexto = totalSessoes + ' sessões / dias cadastrados';
+        } else {
+          const h = Array.isArray(ev.horarios) ? ev.horarios[0] : ev.horarios;
+          horarioTexto = (h?.data || '') + ' das ' + (h?.inicio || '') + ' às ' + (h?.fim || '');
+        }
+
+        const safeDescricao = (ev.descricao || '').replace(/"/g, '&quot;');
+
+        return '<div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.2);">' +
+          '<div>' +
+            '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">' +
+              '<span class="badge" style="' + corBadge + '; margin: 0;">' + formatoBadge + '</span>' +
+              '<span style="font-size: 0.74rem; color: #a1a1aa;">' + (ev.departamento || 'Igreja') + '</span>' +
+            '</div>' +
+            '<h5 style="font-size: 1.05rem; color: #fff; margin: 0 0 6px; font-weight: 700;">' + ev.evento + '</h5>' +
+            '<p style="font-size: 0.82rem; color: var(--cor-texto-mutado); margin: 0 0 4px;">🗓️ ' + horarioTexto + '</p>' +
+            '<p style="font-size: 0.8rem; color: #9ca3af; margin: 0;">📍 ' + (ev.local || 'Comunidade Cristã Curados') + '</p>' +
+          '</div>' +
+          '<div style="display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; margin-top: 4px;">' +
+            '<button type="button" onclick="toggleCardDescricao(this)" data-desc="' + safeDescricao + '" style="flex: 1; background: rgba(0,188,212,0.12); color: var(--cor-ciano); border: 1px solid rgba(0,188,212,0.3); padding: 6px 10px; font-size: 0.8rem; border-radius: 8px; cursor: pointer;">✨ Ver Descrição IA</button>' +
+          '</div>' +
+          '<div class="box-desc-preview" style="display: none; background: #0c0c10; padding: 10px; border-radius: 8px; font-size: 0.78rem; line-height: 1.4; color: #e4e4e7; white-space: pre-wrap; max-height: 160px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1);">' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function toggleCardDescricao(btn) {
+      const card = btn.closest('div').parentElement;
+      const box = card.querySelector('.box-desc-preview');
+      if (!box) return;
+      const aberto = box.style.display === 'block';
+      box.style.display = aberto ? 'none' : 'block';
+      if (!aberto) {
+        box.textContent = btn.getAttribute('data-desc') || 'Sem descrição cadastrada.';
+        btn.textContent = '✕ Ocultar Descrição';
+      } else {
+        btn.textContent = '✨ Ver Descrição IA';
+      }
     }
 
     let tcInscricoesCache = [];

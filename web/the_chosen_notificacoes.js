@@ -29,18 +29,20 @@ async function enviarMensagemConfirmacaoInscricao(client, inscricao) {
 
 Olá, *${inscricao.titular}*! Sua inscrição para a Pré-estreia exclusiva de The Chosen (Episódio 1) foi confirmada com sucesso!
 
-🎟️ *Código do Voucher:* *${inscricao.codigo}*
 👥 *Quantidade de Ingressos:* ${inscricao.quantidade}
 📝 *Participantes:*
 ${nomesFormatados}
 
 📅 *Data:* Sábado, 03 de Outubro de 2026
-⏰ *Horário:* 19:00 (Portões abrem às 18:30)
+⏰ *Horário:* 19:00
 📍 *Local:* Comunidade Cristã Curados
 📌 *Endereço:* Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi
 
+⏰ *Importante:* Chegue cedo para garantir um bom lugar e não perder nada!
+🍿 *Especial:* Teremos pipoca e suco à vontade para você e sua família!
+
 👶 *Lembrete:* Crianças de colo não precisam de ingresso e não ocupam assento individual.
-Ao chegar na recepção/portaria, basta informar o seu código *${inscricao.codigo}* ou o seu nome completo.
+Ao chegar na recepção/portaria, basta informar o seu nome completo (*${inscricao.titular}*). Não é necessário código!
 
 Estamos preparando uma noite memorável e abençoada para você e sua família! Te esperamos lá! 🙏`;
 
@@ -165,10 +167,13 @@ async function enviarLembreteDiaEvento(client) {
 
 Olá, *${inscricao.titular}*! Chegou o grande dia da nossa sessão especial de The Chosen!
 
-⏰ *Horário:* 19:00 (portões abrem às 18:30)
+⏰ *Horário:* 19:00
 📍 *Local:* Comunidade Cristã Curados
 📌 *Endereço:* Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi
-🎟️ *Seu Código de Entrada:* *${inscricao.codigo}* (${inscricao.quantidade} ingresso(s))
+👥 *Sua Reserva:* ${inscricao.quantidade} ingresso(s) em nome de *${inscricao.titular}*
+
+⏰ *Aviso:* Chegue cedo para garantir um bom lugar e não perder nada!
+🍿 Teremos pipoca e suco à vontade! Na portaria, basta informar seu nome completo.
 
 Venha com o coração aberto para viver uma noite de comunhão e edificação.
 Até logo mais! 🙌`;

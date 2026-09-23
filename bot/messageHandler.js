@@ -33,7 +33,8 @@ const {
 const { notificarSecretaria, notificarPastoral, notificarMultimidia, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { executarBroadcast, BROADCAST_CONFIG } = require("./broadcast");
 const { baixarMidiaComRetry } = require("./mediaStorage");
-const { montarResourceEvento, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
+const { montarResourceEvento, montarResourcesMultiplosBlocos, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
+const { gerarDescricaoEvento, salvarDescricaoEvento, buscarDescricaoEvento } = require("./descricaoEvento");
 const { salvarPendente, buscarPendente, buscarPendentePorPastor, atualizarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
 const { registrarAgendamentoPastoral, buscarPastorAgendamento } = require("./lembretes");
 const {
@@ -215,6 +216,34 @@ function formatarDisponibilidadeNegativa(disp) {
   }
 
   return `em ${limpo}`;
+}
+
+function extrairOuValidarData(texto, mesFallback, anoFallback) {
+  if (!texto) return null;
+  const t = texto.trim();
+  const partes = t.split("/");
+  if (partes.length === 1) {
+    const dia = parseInt(partes[0], 10);
+    if (isNaN(dia) || dia < 1 || dia > 31) return null;
+    const m = moment.tz(`${dia}/${mesFallback}/${anoFallback}`, "D/M/YYYY", "America/Sao_Paulo");
+    return m.isValid() && m.date() === dia ? m : null;
+  }
+  if (partes.length === 2) {
+    const dia = parseInt(partes[0], 10);
+    const mes = parseInt(partes[1], 10);
+    if (isNaN(dia) || isNaN(mes)) return null;
+    const m = moment.tz(`${dia}/${mes}/${anoFallback}`, "D/M/YYYY", "America/Sao_Paulo");
+    return m.isValid() ? m : null;
+  }
+  if (partes.length === 3) {
+    const dia = parseInt(partes[0], 10);
+    const mes = parseInt(partes[1], 10);
+    const ano = parseInt(partes[2], 10);
+    if (isNaN(dia) || isNaN(mes) || isNaN(ano)) return null;
+    const m = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+    return m.isValid() ? m : null;
+  }
+  return null;
 }
 
 // Capitaliza a primeira letra de cada palavra em um nome
@@ -932,6 +961,36 @@ function createMessageHandler({
       const pastorResponsavel = conflitosPastoral.length > 0 ? obterPastorDoAtendimento(conflitosPastoral[0]) : null;
       const temConflitoPastoral = conflitosPastoral.length > 0 && Boolean(pastorResponsavel);
 
+      const tipoDuracao = info.tipoDuracao || "unico";
+      let cronogramaResumo = "";
+      if (tipoDuracao === "consecutivo") {
+        cronogramaResumo = `\n📆 *Período:* ${info.dataInicio} às ${info.horaInicio} até ${info.dataFim} às ${info.horaFim}`;
+      } else if (tipoDuracao === "multiplo" && Array.isArray(info.blocosHorarios)) {
+        const sessoesStr = info.blocosHorarios.map((b, idx) => `\n  • Sessão ${idx + 1}: ${b.data} (${b.inicio} às ${b.fim})`).join("");
+        cronogramaResumo = `\n📋 *Sessões Agendadas:*${sessoesStr}`;
+      } else {
+        cronogramaResumo = `\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}`;
+      }
+
+      // Gera a descrição com IA se ainda não existir
+      const descricaoGerada = info.descricao || gerarDescricaoEvento({
+        evento: info.nome,
+        tipoDuracao,
+        horarios: tipoDuracao === "multiplo" ? info.blocosHorarios : (tipoDuracao === "consecutivo" ? { dataInicio: info.dataInicio, horaInicio: info.horaInicio, dataFim: info.dataFim, horaFim: info.horaFim } : [{ data: dataFormatada, inicio: info.horarioInicio, fim: info.horarioFim }]),
+        departamento: info.rede,
+        local: info.local
+      });
+
+      // Salva no banco de dados SQLite para consultas instantâneas no chat
+      salvarDescricaoEvento({
+        evento: info.nome,
+        departamento: info.rede,
+        local: info.local,
+        tipoDuracao,
+        horarios: tipoDuracao === "multiplo" ? info.blocosHorarios : (tipoDuracao === "consecutivo" ? { dataInicio: info.dataInicio, horaInicio: info.horaInicio, dataFim: info.dataFim, horaFim: info.horaFim } : [{ data: dataFormatada, inicio: info.horarioInicio, fim: info.horarioFim }]),
+        descricao: descricaoGerada
+      });
+
       const dadosAgendamento = {
         solicitanteId: numero,
         solicitanteNome: nomeSolicitante(contato, numero),
@@ -944,7 +1003,14 @@ function createMessageHandler({
         dataFormatada,
         horarioInicio: info.horarioInicio,
         horarioFim: info.horarioFim,
-        isDiaInteiro: info.isDiaInteiro,
+        isDiaInteiro: false,
+        tipoDuracao,
+        dataInicio: info.dataInicio,
+        dataFim: info.dataFim,
+        horaInicio: info.horaInicio,
+        horaFim: info.horaFim,
+        blocos: info.blocosHorarios,
+        descricao: descricaoGerada
       };
 
       if (temConflitoPastoral) {
@@ -969,7 +1035,7 @@ function createMessageHandler({
 
         const avisoLider =
           `⏳ *Solicitação em Análise Pastoral*\n\n` +
-          `*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}\n*Data:* ${dataFormatada}\n*Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n` +
+          `*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}${cronogramaResumo}\n\n` +
           `⚠️ Consta um Atendimento Pastoral agendado para o mesmo horário. Uma consulta foi enviada diretamente ao Pastor responsável (*${pastorResponsavel.nome || "Pastor"}*) no WhatsApp privado dele.\n\n` +
           `Assim que o Pastor responder autorizando, sua solicitação será encaminhada para confirmação da Secretaria! 🙏\n\n` +
           `Digite *menu* para voltar ao menu principal.`;
@@ -980,10 +1046,10 @@ function createMessageHandler({
 
       // Sem conflito pastoral: salva e envia diretamente para a secretaria
       const codigo = salvarPendente(dadosAgendamento);
-      const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}\n📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
+      const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}${cronogramaResumo}\n\n✨ *Descrição Gerada (IA):*\n${descricaoGerada}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
       await notificarSecretaria(client, resumoGrupo);
 
-      const resumo = `✅ *Solicitação de Agendamento*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}\n*Data:* ${dataFormatada}\n*Horário:* ${info.horarioInicio} - ${info.horarioFim}\n\n🧹 *Compromisso com o Salão e Dependências:*\nLembramos que o salão deve ser entregue após o evento exatamente da mesma forma como foi encontrado (organização das cadeiras, lixo recolhido e limpeza geral).\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+      const resumo = `✅ *Solicitação de Agendamento Enviada!*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}${cronogramaResumo}\n\n✨ *Descrição do Evento (Gerada por IA):*\n${descricaoGerada}\n\n🧹 *Compromisso com o Salão e Dependências:*\nLembramos que o salão deve ser entregue após o evento exatamente da mesma forma como foi encontrado (organização das cadeiras, lixo recolhido e limpeza geral).\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
       console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
       await msg.reply(resumo);
     } catch (e) {
@@ -1489,9 +1555,27 @@ function createMessageHandler({
                 try {
                   const ano = moment().tz("America/Sao_Paulo").year();
                   const agendaId = agendasParaLer[mapearRedeParaAgendaIndex(rede)];
-                  const resource = montarResourceEvento(dados, ano);
 
-                  await calendar.events.insert({ calendarId: agendaId, resource });
+                  if (dados.tipoDuracao === "multiplo" && Array.isArray(dados.blocos)) {
+                    const resources = montarResourcesMultiplosBlocos(dados, ano);
+                    for (const resItem of resources) {
+                      await calendar.events.insert({ calendarId: agendaId, resource: resItem });
+                    }
+                  } else {
+                    const resource = montarResourceEvento(dados, ano);
+                    await calendar.events.insert({ calendarId: agendaId, resource });
+                  }
+
+                  if (dados.descricao) {
+                    salvarDescricaoEvento({
+                      evento: dados.evento || dados.nomeEvento,
+                      departamento: rede,
+                      local: dados.local,
+                      tipoDuracao: dados.tipoDuracao || "unico",
+                      horarios: dados.blocos || { inicio: dados.horarioInicio, fim: dados.horarioFim },
+                      descricao: dados.descricao
+                    });
+                  }
                   try {
                     salvarFormularioEvento({
                       evento: dados.nomeEvento,
@@ -2720,22 +2804,188 @@ Escolha uma opção:
             console.log(`[Agendamento] Mês: ${mes}`);
             info.mes = mes;
             info.etapa = "evento_modo_busca";
-            return msg.reply("📅 Como você quer escolher a data?\n\n1 - Já tenho uma data específica em mente\n2 - Quero ver as datas disponíveis baseado no dia da semana e horário");
+            return msg.reply(
+              "📅 *Qual o formato e duração do evento?*\n\n" +
+              "1 - Evento de 1 dia (data específica)\n" +
+              "2 - Evento de 1 dia (ver datas disponíveis por dia da semana)\n" +
+              "3 - Evento consecutivo de vários dias (ex: retiro de Sexta a Domingo)\n" +
+              "4 - Evento não consecutivo (múltiplos dias/horários espalhados - ex: conferência)"
+            );
           }
 
           if (info.etapa === "evento_modo_busca") {
             const opcao = msg.body.trim();
             if (opcao === "1") {
+              info.tipoDuracao = "unico";
               info.etapa = "evento_dia_especifico";
               return msg.reply(`📅 Qual o dia do mês? (Ex: 25, para o dia 25/${String(info.mes).padStart(2, "0")})`);
             }
             if (opcao === "2") {
+              info.tipoDuracao = "unico";
               info.etapa = "evento_tipo_dia";
-              return msg.reply("📅 Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Vários dias / Evento longo");
+              return msg.reply("📅 Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Todos os dias do mês");
             }
-            return msg.reply("❌ Opção inválida. Digite 1 para escolher uma data específica, ou 2 para ver as datas disponíveis.");
+            if (opcao === "3") {
+              info.tipoDuracao = "consecutivo";
+              info.etapa = "evento_consecutivo_data_inicio";
+              return msg.reply(`📅 Qual a *data de início* do evento? (Ex: 10/${String(info.mes).padStart(2, "0")} ou 10/${String(info.mes).padStart(2, "0")}/${moment().tz("America/Sao_Paulo").year()})`);
+            }
+            if (opcao === "4") {
+              info.tipoDuracao = "multiplo";
+              info.blocosHorarios = [];
+              info.etapa = "evento_multiplo_data";
+              return msg.reply(`📅 Vamos cadastrar o *1º dia/bloco* do evento.\n\nQual a *data* deste primeiro dia? (Ex: 16/${String(info.mes).padStart(2, "0")})`);
+            }
+            return msg.reply("❌ Opção inválida. Digite:\n1 - Evento de 1 dia (data específica)\n2 - Evento de 1 dia (por dia da semana)\n3 - Evento consecutivo de vários dias\n4 - Evento de múltiplos dias/horários espalhados");
           }
 
+          // Formato 2: Consecutivo de vários dias
+          if (info.etapa === "evento_consecutivo_data_inicio") {
+            const m = extrairOuValidarData(msg.body, info.mes);
+            if (!m) {
+              return msg.reply("❌ Data de início inválida. Por favor, digite no formato DD/MM ou DD/MM/AAAA (ex: 10/10 ou 10/10/2026).");
+            }
+            info.dataInicioMom = m;
+            info.dataInicio = m.format("DD/MM/YYYY");
+            info.etapa = "evento_consecutivo_hora_inicio";
+            return msg.reply("⏰ Qual o *horário de início* no primeiro dia? (Ex: 19:00)");
+          }
+
+          if (info.etapa === "evento_consecutivo_hora_inicio") {
+            const entrada = msg.body.toUpperCase().trim();
+            if (/dia\s*(todo|inteiro)/i.test(entrada)) {
+              return msg.reply("❌ O horário de início é obrigatório mesmo para eventos de dia todo. Por favor, use HH:MM (ex: 08:00 ou 19:00).");
+            }
+            if (!HORARIO_REGEX.test(entrada)) {
+              return msg.reply("❌ Formato de horário inválido. Por favor, use HH:MM (ex: 19:00).");
+            }
+            info.horaInicio = entrada;
+            info.horarioInicio = entrada;
+            info.etapa = "evento_consecutivo_data_fim";
+            return msg.reply("📅 Qual a *data de término* do evento? (Ex: 12/10 ou 12/10/2026)");
+          }
+
+          if (info.etapa === "evento_consecutivo_data_fim") {
+            const m = extrairOuValidarData(msg.body, info.mes);
+            if (!m) {
+              return msg.reply("❌ Data de término inválida. Por favor, digite no formato DD/MM ou DD/MM/AAAA (ex: 12/10 ou 12/10/2026).");
+            }
+            if (m.isBefore(info.dataInicioMom, "day")) {
+              return msg.reply("❌ A data de término deve ser igual ou posterior à data de início.");
+            }
+            info.dataFimMom = m;
+            info.dataFim = m.format("DD/MM/YYYY");
+            info.etapa = "evento_consecutivo_hora_fim";
+            return msg.reply("⏰ Qual o *horário de término* no último dia? (Ex: 17:00)");
+          }
+
+          if (info.etapa === "evento_consecutivo_hora_fim") {
+            const entrada = msg.body.toUpperCase().trim();
+            if (!HORARIO_REGEX.test(entrada)) {
+              return msg.reply("❌ Formato de horário inválido. Por favor, use HH:MM (ex: 17:00).");
+            }
+            if (info.dataInicioMom.isSame(info.dataFimMom, "day")) {
+              const [hIni, mIni] = info.horaInicio.split(":").map(Number);
+              const [hFim, mFim] = entrada.split(":").map(Number);
+              if (hFim < hIni || (hFim === hIni && mFim <= mIni)) {
+                return msg.reply("❌ O horário de término deve ser posterior ao horário de início.");
+              }
+            }
+            info.horaFim = entrada;
+            info.horarioFim = entrada;
+
+            await finalizarNovoAgendamento({
+              msg,
+              numero,
+              contato,
+              info,
+              dataFinal: info.dataInicioMom.toDate(),
+              isLider
+            });
+            delete etapas[numero];
+            return;
+          }
+
+          // Formato 3: Múltiplos blocos de horários espalhados
+          if (info.etapa === "evento_multiplo_data") {
+            const m = extrairOuValidarData(msg.body, info.mes);
+            if (!m) {
+              return msg.reply("❌ Data inválida. Por favor, digite no formato DD/MM ou DD/MM/AAAA (ex: 16/10 ou 16/10/2026).");
+            }
+            info.tempBlocoDataMom = m;
+            info.tempBlocoData = m.format("DD/MM/YYYY");
+            info.etapa = "evento_multiplo_inicio";
+            return msg.reply(`⏰ Qual o *horário de início* do dia ${info.tempBlocoData}? (Ex: 19:00)`);
+          }
+
+          if (info.etapa === "evento_multiplo_inicio") {
+            const entrada = msg.body.toUpperCase().trim();
+            if (/dia\s*(todo|inteiro)/i.test(entrada)) {
+              return msg.reply("❌ O horário de início é obrigatório mesmo para eventos de dia todo. Por favor, use HH:MM (ex: 08:00 ou 19:00).");
+            }
+            if (!HORARIO_REGEX.test(entrada)) {
+              return msg.reply("❌ Formato de horário inválido. Por favor, use HH:MM (ex: 19:00).");
+            }
+            info.tempBlocoInicio = entrada;
+            info.etapa = "evento_multiplo_fim";
+            return msg.reply(`⏰ Qual o *horário de término* do dia ${info.tempBlocoData}? (Ex: 21:30)`);
+          }
+
+          if (info.etapa === "evento_multiplo_fim") {
+            const entrada = msg.body.toUpperCase().trim();
+            if (!HORARIO_REGEX.test(entrada)) {
+              return msg.reply("❌ Formato de horário inválido. Por favor, use HH:MM (ex: 21:30).");
+            }
+            const [hIni, mIni] = info.tempBlocoInicio.split(":").map(Number);
+            const [hFim, mFim] = entrada.split(":").map(Number);
+            if (hFim < hIni || (hFim === hIni && mFim <= mIni)) {
+              return msg.reply("❌ O horário de término deve ser posterior ao horário de início.");
+            }
+
+            if (!Array.isArray(info.blocosHorarios)) {
+              info.blocosHorarios = [];
+            }
+            info.blocosHorarios.push({
+              data: info.tempBlocoData,
+              inicio: info.tempBlocoInicio,
+              fim: entrada
+            });
+
+            const listaBlocos = info.blocosHorarios.map((b, idx) => `  • Bloco ${idx + 1}: ${b.data} (${b.inicio} às ${b.fim})`).join("\n");
+            info.etapa = "evento_multiplo_mais";
+            return msg.reply(
+              `📋 *Sessões cadastradas até o momento:*\n${listaBlocos}\n\n` +
+              `Deseja adicionar mais um dia/bloco de horário para este evento?\n` +
+              `1 - Sim, adicionar mais um dia/horário\n` +
+              `2 - Não, concluir e agendar este evento`
+            );
+          }
+
+          if (info.etapa === "evento_multiplo_mais") {
+            const escolha = msg.body.trim();
+            if (escolha === "1") {
+              info.etapa = "evento_multiplo_data";
+              return msg.reply(`📅 Qual a *data* do próximo dia do evento? (Ex: 17/${String(info.mes).padStart(2, "0")})`);
+            }
+            if (escolha === "2") {
+              info.horarioInicio = info.blocosHorarios[0].inicio;
+              info.horarioFim = info.blocosHorarios[0].fim;
+              const dataPrimeiroBloco = moment.tz(info.blocosHorarios[0].data, "DD/MM/YYYY", "America/Sao_Paulo").toDate();
+              await finalizarNovoAgendamento({
+                msg,
+                numero,
+                contato,
+                info,
+                dataFinal: dataPrimeiroBloco,
+                isLider
+              });
+              delete etapas[numero];
+              return;
+            }
+            return msg.reply("❌ Opção inválida. Digite *1* para adicionar mais um bloco ou *2* para concluir e agendar.");
+          }
+
+          // Formato 1: Evento de 1 dia (data específica)
           if (info.etapa === "evento_dia_especifico") {
             const dia = parseInt(msg.body.trim());
             const ano = moment.tz("America/Sao_Paulo").year();
@@ -2775,7 +3025,7 @@ Escolha uma opção:
                 ? janelas.map((j) => `${j.inicio} às ${j.fim}`).join("\n")
                 : "(nenhum horário livre entre 07:00 e 22:00 nesse dia — considere outra data)";
 
-              return msg.reply(`✅ O dia ${resultado.dataFormatada} está livre!\n\n⏰ *Horários livres nesse dia* (considerando 1h de intervalo antes/depois de outros eventos):\n${listaJanelas}\n\nQual o *horário de início* do seu evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração.`);
+              return msg.reply(`✅ O dia ${resultado.dataFormatada} está livre!\n\n⏰ *Horários livres nesse dia* (considerando 1h de intervalo antes/depois de outros eventos):\n${listaJanelas}\n\nQual o *horário de início* do seu evento? (Ex: 19:30)`);
             } catch (e) {
               console.error(`[ALERTA:google-calendar] Erro ao verificar data específica para ${identificarUsuario(contato, numero, isLider)}:`, e);
               delete etapas[numero];
@@ -2785,21 +3035,17 @@ Escolha uma opção:
 
           if (info.etapa === "evento_horario_especifico") {
             const entrada = msg.body.toUpperCase().trim();
-            info.horarioInicio = entrada;
-            info.isDiaInteiro = entrada.includes("DIA");
-            console.log(`[Agendamento] Horário de início (data específica): ${entrada}`);
-
-            if (info.isDiaInteiro) {
-              info.horarioFim = "DIA TODO";
-              info.etapa = "confirmar_data_especifica";
-              // Não retorna aqui, deixa o fluxo cair para a próxima etapa
-            } else {
-              if (!HORARIO_REGEX.test(info.horarioInicio)) {
-                return msg.reply("❌ Formato de horário de início inválido. Use HH:MM (ex: 19:30) ou *DIA TODO*.");
-              }
-              info.etapa = "evento_horario_fim_especifico";
-              return msg.reply("⏰ Qual o *horário de término* do evento? (Ex: 21:00)");
+            if (/dia\s*(todo|inteiro)/i.test(entrada)) {
+              return msg.reply("❌ O horário de início é obrigatório mesmo para eventos de dia todo. Por favor, use HH:MM (ex: 08:00 ou 19:30).");
             }
+            if (!HORARIO_REGEX.test(entrada)) {
+              return msg.reply("❌ Formato de horário de início inválido. Por favor, use HH:MM (ex: 19:30).");
+            }
+            info.horarioInicio = entrada;
+            info.isDiaInteiro = false;
+            console.log(`[Agendamento] Horário de início (data específica): ${entrada}`);
+            info.etapa = "evento_horario_fim_especifico";
+            return msg.reply("⏰ Qual o *horário de término* do evento? (Ex: 21:00)");
           }
 
           if (info.etapa === "evento_horario_fim_especifico") {
@@ -2829,9 +3075,9 @@ Escolha uma opção:
                 evangelismoCalendarId: agendasParaLer[0],
                 ano: info.anoEspecifico, mes: info.mes, dia: info.diaEspecifico,
                 rede: info.rede,
-                isDiaInteiro: info.isDiaInteiro,
-                horarioInicio: info.isDiaInteiro ? undefined : info.horarioInicio,
-                horarioFim: info.isDiaInteiro ? undefined : info.horarioFim,
+                isDiaInteiro: false,
+                horarioInicio: info.horarioInicio,
+                horarioFim: info.horarioFim,
               });
 
               if (!resultado.disponivel) {
@@ -2850,6 +3096,7 @@ Escolha uma opção:
             }
           }
 
+          // Formato 1: Evento de 1 dia (por dia da semana)
           if (info.etapa === "evento_tipo_dia") {
             const escolha = msg.body;
             // Mapeamento: 1-Seg, 2-Ter, 3-Qua, 4-Qui, 5-Sex, 6-Sáb, 7-Dom, 8-Todos/Vários
@@ -2865,27 +3112,22 @@ Escolha uma opção:
             console.log(`Dia da semana selecionado por ${identificarUsuario(contato, numero, isLider)}: ${escolha} (${info.diaSemanaFiltro})`);
 
             info.etapa = "evento_horario";
-            return msg.reply("⏰ Qual o *horário de início* do evento? (Ex: 19:30)\nOu digite *DIA TODO* para eventos de longa duração ou vários dias.");
+            return msg.reply("⏰ Qual o *horário de início* do evento? (Ex: 19:30)");
           }
 
           if (info.etapa === "evento_horario") {
-            const entrada = msg.body.toUpperCase();
-            info.horarioInicio = entrada; // Armazena o horário de início
-            info.isDiaInteiro = entrada.includes("DIA");
-            console.log(`[Agendamento] Horário de início: ${entrada}`);
-
-            if (info.isDiaInteiro) {
-              info.horarioFim = "DIA TODO"; // Se for dia inteiro, o fim também é dia todo
-              info.etapa = "consultar_disponibilidade"; // Pula para a consulta
-              // Não retorna aqui, deixa o fluxo cair para a próxima etapa
-            } else {
-              // Valida o formato do horário de início
-              if (!HORARIO_REGEX.test(info.horarioInicio)) {
-                return msg.reply("❌ Formato de horário de início inválido. Por favor, use HH:MM (ex: 19:30) ou *DIA TODO*.");
-              }
-              info.etapa = "evento_horario_fim";
-              return msg.reply("⏰ Qual o *horário de término* do evento? (Ex: 21:00)");
+            const entrada = msg.body.toUpperCase().trim();
+            if (/dia\s*(todo|inteiro)/i.test(entrada)) {
+              return msg.reply("❌ O horário de início é obrigatório mesmo para eventos de dia todo. Por favor, use HH:MM (ex: 08:00 ou 19:30).");
             }
+            if (!HORARIO_REGEX.test(entrada)) {
+              return msg.reply("❌ Formato de horário de início inválido. Por favor, use HH:MM (ex: 19:30).");
+            }
+            info.horarioInicio = entrada;
+            info.isDiaInteiro = false;
+            console.log(`[Agendamento] Horário de início: ${entrada}`);
+            info.etapa = "evento_horario_fim";
+            return msg.reply("⏰ Qual o *horário de término* do evento? (Ex: 21:00)");
           }
 
           if (info.etapa === "evento_horario_fim") {
@@ -4743,6 +4985,22 @@ Digite *menu* para voltar ao menu principal.`;
           "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
           "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
         );
+      }
+
+      // Consulta de informações sobre evento com descrição gerada por IA
+      const matchPerguntaEvento = texto.match(/^(?:mais\s+)?(?:informa[cç][õo]es|detalhes|como\s+vai\s+ser|quando\s+vai\s+ser|onde\s+vai\s+ser|sobre\s+o\s+evento|sobre)\s+(?:sobre\s+)?(?:o\s+evento\s+|a\s+)?(.+)$/i);
+      if (matchPerguntaEvento) {
+        const termoBusca = matchPerguntaEvento[1].trim();
+        const descRegistro = buscarDescricaoEvento(termoBusca);
+        if (descRegistro) {
+          console.log(`[Info Evento] Descrição encontrada para "${termoBusca}": ${descRegistro.evento}`);
+          return msg.reply(descRegistro.descricao + "\n\nDigite *menu* para voltar ao menu principal.");
+        }
+      } else {
+        const descRegistro = buscarDescricaoEvento(texto);
+        if (descRegistro && (texto.includes("evento") || texto.includes("horário") || texto.includes("horario") || texto.includes("quando") || texto.includes("onde") || texto.includes("informação") || texto.includes("informacao") || texto.includes("detalhe"))) {
+          return msg.reply(descRegistro.descricao + "\n\nDigite *menu* para voltar ao menu principal.");
+        }
       }
 
       // Nenhuma opção reconhecida e nenhum fluxo ativo. Se a mensagem for só

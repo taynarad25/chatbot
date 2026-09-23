@@ -527,9 +527,10 @@ test("opção 3: eventos das agendas internas (Reuniões, Atendimento, Limpeza, 
 
 test("opção 6: eventos das agendas internas não impedem o agendamento de eventos da igreja", async () => {
   const agora = moment.tz("America/Sao_Paulo");
-  const mesAlvo = agora.month() + 1;
-  const anoAlvo = agora.year();
-  const diaAlvo = 22;
+  const dataAlvo = agora.clone().add(2, "days");
+  const mesAlvo = dataAlvo.month() + 1;
+  const anoAlvo = dataAlvo.year();
+  const diaAlvo = dataAlvo.date();
 
   const eventoLimpeza = {
     calendarId: AGENDAS[13], // Limpeza
@@ -553,9 +554,10 @@ test("opção 6: eventos das agendas internas não impedem o agendamento de even
 
 test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agendamento de novo evento", async () => {
   const agora = moment.tz("America/Sao_Paulo");
-  const mesAlvo = agora.month() + 1;
-  const anoAlvo = agora.year();
-  const diaAlvo = 22;
+  const dataAlvo = agora.clone().add(2, "days");
+  const mesAlvo = dataAlvo.month() + 1;
+  const anoAlvo = dataAlvo.year();
+  const diaAlvo = dataAlvo.date();
 
   const eventoExterno = {
     calendarId: AGENDAS[10], // Eventos Externos
@@ -582,8 +584,9 @@ test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agen
 
 test("opção 6: líder pode agendar evento escolhendo departamento 'Outros' (opção 13)", async () => {
   const agora = moment.tz("America/Sao_Paulo");
-  const mesAlvo = agora.month() + 1;
-  const diaAlvo = 22;
+  const dataAlvo = agora.clone().add(2, "days");
+  const mesAlvo = dataAlvo.month() + 1;
+  const diaAlvo = dataAlvo.date();
 
   const { handleMessage, gruposEnviados, eventosGravados } = criarContexto();
 
@@ -941,7 +944,7 @@ test("opção 6 (líder): endereço customizado (evento fora da igreja) é usado
   assert.doesNotMatch(escolha[0], /Rua Benedicto de Abreu Júnior/);
 });
 
-test("opção 7 (líder): evento de DIA TODO pula a pergunta de horário de término", async () => {
+test("opção 7 (líder): rejeita DIA TODO e exige horário de início específico obrigatório", async () => {
   const { handleMessage } = criarContexto({ eventos: [] });
 
   await enviar(handleMessage, NUMERO_LIDER, "7");
@@ -954,9 +957,14 @@ test("opção 7 (líder): evento de DIA TODO pula a pergunta de horário de tér
   await enviar(handleMessage, NUMERO_LIDER, "11"); // Novembro
   await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
   await enviar(handleMessage, NUMERO_LIDER, "8"); // Vários dias / evento longo
-  const resp = await enviar(handleMessage, NUMERO_LIDER, "DIA TODO");
+  const respRejeicao = await enviar(handleMessage, NUMERO_LIDER, "DIA TODO");
+  assert.match(respRejeicao[respRejeicao.length - 1], /horário de início é obrigatório/i);
 
-  assert.match(resp[resp.length - 1], /Datas Disponíveis/);
+  const respFim = await enviar(handleMessage, NUMERO_LIDER, "08:00");
+  assert.match(respFim[respFim.length - 1], /horário de término/i);
+
+  const respDatas = await enviar(handleMessage, NUMERO_LIDER, "21:00");
+  assert.match(respDatas[respDatas.length - 1], /Datas Disponíveis/);
 });
 
 // ---------------------------------------------------------------------------

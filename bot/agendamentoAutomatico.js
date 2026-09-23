@@ -1,14 +1,15 @@
 const moment = require("moment-timezone");
 
 // Monta o "resource" para a API do Google Calendar a partir dos dados da
-// solicitação pendente. `ano` é calculado pelo chamador no momento da aprovação
-// (não fica salvo junto com a solicitação).
+// solicitação pendente. `ano` é calculado pelo chamador no momento da aprovação.
 function montarResourceEvento(dados, ano) {
-  const { evento, rede, local, dia, mes, horarioInicio, horarioFim, isDiaInteiro, solicitanteNome, solicitanteId } = dados;
+  const { evento, rede, local, dia, mes, horarioInicio, horarioFim, isDiaInteiro, solicitanteNome, solicitanteId, tipoDuracao, dataInicio, dataFim, horaInicio, horaFim, descricao } = dados;
 
-  let desc = `Agendado via Bot - Solicitado pela Rede: ${rede}`;
-  if (solicitanteNome) desc += `\n👤 Solicitante: ${solicitanteNome}`;
-  if (solicitanteId) desc += `\n📞 Telefone: ${solicitanteId}`;
+  let desc = descricao || `Agendado via Bot - Solicitado pela Rede: ${rede}`;
+  if (!descricao) {
+    if (solicitanteNome) desc += `\n👤 Solicitante: ${solicitanteNome}`;
+    if (solicitanteId) desc += `\n📞 Telefone: ${solicitanteId}`;
+  }
 
   const resource = {
     summary: evento,
@@ -16,6 +17,22 @@ function montarResourceEvento(dados, ano) {
     location: local || "Comunidade Cristã Curados",
   };
 
+  // Formato consecutivo (vários dias seguidos com horário de início e fim)
+  if (tipoDuracao === "consecutivo" || (dataInicio && dataFim)) {
+    const dIniStr = dataInicio.includes("/") ? dataInicio : `${dataInicio}/${ano}`;
+    const dFimStr = dataFim.includes("/") ? dataFim : `${dataFim}/${ano}`;
+    const hIni = horaInicio || horarioInicio || "19:00";
+    const hFim = horaFim || horarioFim || "21:00";
+
+    const start = moment.tz(`${dIniStr} ${hIni}`, ["D/M/YYYY HH:mm", "DD/MM/YYYY HH:mm"], "America/Sao_Paulo");
+    const end = moment.tz(`${dFimStr} ${hFim}`, ["D/M/YYYY HH:mm", "DD/MM/YYYY HH:mm"], "America/Sao_Paulo");
+
+    resource.start = { dateTime: start.format(), timeZone: "America/Sao_Paulo" };
+    resource.end = { dateTime: end.format(), timeZone: "America/Sao_Paulo" };
+    return resource;
+  }
+
+  // Compatibilidade legada apenas para registros antigos/testes
   if (isDiaInteiro) {
     const start = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
     const end = start.clone().add(1, "day");
@@ -29,6 +46,25 @@ function montarResourceEvento(dados, ano) {
   }
 
   return resource;
+}
+
+// Monta lista de resources quando o evento possui múltiplos blocos espalhados (conferências)
+function montarResourcesMultiplosBlocos(dados, ano) {
+  const blocos = Array.isArray(dados.blocos || dados.horarios) ? (dados.blocos || dados.horarios) : [];
+  return blocos.map((bloco, idx) => {
+    const dataStr = bloco.data.includes("/") ? bloco.data : `${bloco.data}/${ano}`;
+    const start = moment.tz(`${dataStr} ${bloco.inicio}`, ["D/M/YYYY HH:mm", "DD/MM/YYYY HH:mm"], "America/Sao_Paulo");
+    const end = moment.tz(`${dataStr} ${bloco.fim}`, ["D/M/YYYY HH:mm", "DD/MM/YYYY HH:mm"], "America/Sao_Paulo");
+    const rotulo = bloco.titulo || bloco.sessao || `Sessão ${idx + 1}`;
+
+    return {
+      summary: `${dados.evento} - ${rotulo}`,
+      description: dados.descricao || `Sessão ${idx + 1} do evento ${dados.evento}\nSolicitado pela Rede: ${dados.rede}`,
+      location: dados.local || "Comunidade Cristã Curados",
+      start: { dateTime: start.format(), timeZone: "America/Sao_Paulo" },
+      end: { dateTime: end.format(), timeZone: "America/Sao_Paulo" }
+    };
+  });
 }
 
 // Monta o "resource" de patch para aplicar automaticamente uma alteração
@@ -80,4 +116,4 @@ function montarResourcePatchAlteracao(dados) {
   };
 }
 
-module.exports = { montarResourceEvento, montarResourcePatchAlteracao };
+module.exports = { montarResourceEvento, montarResourcesMultiplosBlocos, montarResourcePatchAlteracao };

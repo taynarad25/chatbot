@@ -92,6 +92,20 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_agendamentos_pastorais_ev ON agendamentos_pastorais(eventoId);
   CREATE INDEX IF NOT EXISTS idx_agendamentos_pastorais_disc ON agendamentos_pastorais(discipulo);
+
+  CREATE TABLE IF NOT EXISTS descricoes_eventos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evento TEXT NOT NULL,
+    departamento TEXT,
+    local TEXT,
+    tipoDuracao TEXT NOT NULL,
+    horariosJson TEXT NOT NULL,
+    descricao TEXT NOT NULL,
+    criadoEm TEXT NOT NULL,
+    atualizadoEm TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_descricoes_evento ON descricoes_eventos(evento);
 `);
 
 try {

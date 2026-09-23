@@ -10,6 +10,7 @@ const { createRateLimiter } = require("./web/rateLimiter");
 const { getClientIp } = require("./web/clientIp");
 const theChosen = require("./web/the_chosen");
 const theChosenNotificacoes = require("./web/the_chosen_notificacoes");
+const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
 const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
@@ -468,6 +469,111 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       if (req.method === 'GET' && pathname === '/secretaria/api/user-info') {
         const session = getSession(req);
         return sendJson(res, 200, { ok: true, user: session });
+      }
+
+      // API: Listar Eventos Cadastrados
+      if (req.method === 'GET' && pathname === '/secretaria/api/eventos') {
+        const eventos = listarDescricoesEventos();
+        return sendJson(res, 200, { ok: true, eventos });
+      }
+
+      // API: Gerar Descrição Automática (IA) para Evento
+      if (req.method === 'POST' && pathname === '/secretaria/api/eventos/gerar-descricao') {
+        try {
+          const body = await parseRequestBody(req);
+          const { evento, tipoDuracao, horarios, departamento, local, tema, publico, observacoes } = body;
+          if (!evento || !evento.trim()) {
+            return sendJson(res, 400, { ok: false, message: 'Nome do evento é obrigatório.' });
+          }
+          const descricao = gerarDescricaoEvento({
+            evento,
+            tipoDuracao: tipoDuracao || "unico",
+            horarios,
+            departamento: departamento || "Comunidade Cristã Curados",
+            local: local || "Comunidade Cristã Curados",
+            tema,
+            publico,
+            observacoes
+          });
+          return sendJson(res, 200, { ok: true, descricao });
+        } catch (err) {
+          console.error('[Web] Erro ao gerar descrição IA:', err.message);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao gerar descrição do evento.' });
+        }
+      }
+
+      // API: Cadastrar e Agendar Evento
+      if (req.method === 'POST' && pathname === '/secretaria/api/eventos') {
+        try {
+          const body = await parseRequestBody(req);
+          const { evento, departamento, local, tipoDuracao, horarios, descricao, tema, publico, observacoes } = body;
+          if (!evento || !evento.trim()) {
+            return sendJson(res, 400, { ok: false, message: 'Nome do evento é obrigatório.' });
+          }
+
+          // Validação rigorosa: horário de início obrigatório (sem 'dia todo' ou genérico)
+          if (tipoDuracao === "unico") {
+            const h = Array.isArray(horarios) ? horarios[0] : horarios;
+            if (!h || !h.data || !h.inicio || !h.fim) {
+              return sendJson(res, 400, { ok: false, message: 'Para evento de 1 dia, data, horário de início e término são obrigatórios.' });
+            }
+            if (/dia\s*(todo|inteiro)/i.test(h.inicio)) {
+              return sendJson(res, 400, { ok: false, message: 'O horário de início é obrigatório mesmo para eventos de dia todo. Informe no formato HH:MM.' });
+            }
+          } else if (tipoDuracao === "consecutivo") {
+            const h = Array.isArray(horarios) ? horarios[0] : horarios;
+            if (!h || !h.dataInicio || !h.horaInicio || !h.dataFim || !h.horaFim) {
+              return sendJson(res, 400, { ok: false, message: 'Para evento consecutivo, data/hora de início e data/hora de término são obrigatórias.' });
+            }
+            if (/dia\s*(todo|inteiro)/i.test(h.horaInicio)) {
+              return sendJson(res, 400, { ok: false, message: 'O horário de início é obrigatório. Informe no formato HH:MM.' });
+            }
+          } else if (tipoDuracao === "multiplo") {
+            const blocos = Array.isArray(horarios) ? horarios : [horarios];
+            if (!blocos || blocos.length === 0) {
+              return sendJson(res, 400, { ok: false, message: 'Adicione ao menos um bloco de horário.' });
+            }
+            for (let i = 0; i < blocos.length; i++) {
+              const b = blocos[i];
+              if (!b.data || !b.inicio || !b.fim) {
+                return sendJson(res, 400, { ok: false, message: `O bloco ${i + 1} está incompleto (data, início e fim são obrigatórios).` });
+              }
+              if (/dia\s*(todo|inteiro)/i.test(b.inicio)) {
+                return sendJson(res, 400, { ok: false, message: `O bloco ${i + 1} exige um horário de início específico no formato HH:MM.` });
+              }
+            }
+          }
+
+          const descFinal = descricao || gerarDescricaoEvento({
+            evento,
+            tipoDuracao: tipoDuracao || "unico",
+            horarios,
+            departamento,
+            local,
+            tema,
+            publico,
+            observacoes
+          });
+
+          const id = salvarDescricaoEvento({
+            evento,
+            departamento: departamento || "",
+            local: local || "",
+            tipoDuracao: tipoDuracao || "unico",
+            horarios,
+            descricao: descFinal
+          });
+
+          return sendJson(res, 200, { 
+            ok: true, 
+            message: 'Evento cadastrado e descrição gerada com sucesso!', 
+            id,
+            descricao: descFinal 
+          });
+        } catch (err) {
+          console.error('[Web] Erro ao cadastrar evento:', err.message);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao cadastrar evento no sistema.' });
+        }
       }
 
       // API: Deletar Usuário (Apenas Admin)
