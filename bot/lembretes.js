@@ -2,7 +2,7 @@ const db = require("../db");
 const { REDES } = require("./redes");
 const { obterFormularioEvento } = require("./formularioEvento");
 const { notificarMultimidia, notificarSecretaria } = require("./secretaria");
-const { unificarEventosPreparacaoLimpeza } = require("./agenda");
+const { unificarEventosPreparacaoLimpeza, isEventoTheChosen, URL_THE_CHOSEN } = require("./agenda");
 const { obterUsuarioPorTelefone, obterLideresPorDepartamento } = require("../web/lideres");
 
 function formatarDataBrasil(isoOrDateStr) {
@@ -872,6 +872,9 @@ function montarMensagemAgendaQuinzenalSecretarias(eventos = [], dataInicio = "",
       corpo += `• *${ev.summary || "Evento"}*${horaStr}${localStr}\n`;
       if (ev.horarioPreparacaoLimpeza) {
         corpo += `  🧹 _${ev.horarioPreparacaoLimpeza}_\n`;
+      }
+      if (isEventoTheChosen(ev)) {
+        corpo += `  🎟️ _Inscrições: ${URL_THE_CHOSEN}_\n`;
       }
     }
     corpo += `\n`;

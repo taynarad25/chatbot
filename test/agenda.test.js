@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const moment = require("moment-timezone");
-const { agruparEventosAgenda, montarMensagemAgenda, montarMensagemAgendaCompletaPorSecoes, montarDetalheEvento, interpretarPeriodoPersonalizado, isEventoFuturo } = require("../bot/agenda");
+const { agruparEventosAgenda, montarMensagemAgenda, montarMensagemAgendaCompletaPorSecoes, montarDetalheEvento, interpretarPeriodoPersonalizado, isEventoFuturo, URL_THE_CHOSEN, isEventoTheChosen } = require("../bot/agenda");
 const { AGENDAS_INTERNAS } = require("../bot/redes");
 
 function evento({ data, hora, horaFim, summary, location, description, diaTodo = false }) {
@@ -381,6 +381,53 @@ test("Unificação Agenda Completa: eventos múltiplos de pré-montagem e pós-l
   assert.match(msgCompleta, /⏰ 16:30 às 23:00 — horário para preparação e limpeza/);
   assert.doesNotMatch(msgCompleta, /\[Preparação\]/);
   assert.doesNotMatch(msgCompleta, /\[Limpeza\]/);
+});
+
+test("The Chosen na Agenda: montarMensagemAgenda inclui o link de inscrição quando o evento for The Chosen", () => {
+  const evNormal = evento({ data: "2026-10-11", hora: "18:00", horaFim: "20:00", summary: "Culto de Celebração" });
+  const evChosen = evento({ data: "2026-10-18", hora: "19:30", horaFim: "22:00", summary: "Pré-estreia The Chosen - Temporada 6 (Ep. 1)" });
+
+  const itens = agruparEventosAgenda([evNormal, evChosen]);
+  const msg = montarMensagemAgenda(itens, "Outubro");
+
+  assert.match(msg, /1 - 📌 \*11\/10\* às 18:00 \| Culto de Celebração/);
+  assert.match(msg, /2 - 📌 \*18\/10\* às 19:30 \| Pré-estreia The Chosen - Temporada 6 \(Ep\. 1\)/);
+  assert.match(msg, /🎟️ \*Inscrição:\* https:\/\/www\.comunidadecristacurados\.com\.br\/the-chosen/);
+});
+
+test("The Chosen na Agenda Completa: montarMensagemAgendaCompletaPorSecoes inclui o link de inscrição", () => {
+  const evChosen = evento({ data: "2026-10-18", hora: "19:30", horaFim: "22:00", summary: "Pré-estreia The Chosen" });
+  const itens = agruparEventosAgenda([evChosen]);
+  const msg = montarMensagemAgendaCompletaPorSecoes(itens, "Outubro", AGENDAS_INTERNAS);
+
+  assert.match(msg, /1 - 📌 \*18\/10\* às 19:30 \| Pré-estreia The Chosen/);
+  assert.match(msg, /🎟️ \*Inscrição:\* https:\/\/www\.comunidadecristacurados\.com\.br\/the-chosen/);
+});
+
+test("The Chosen nos Detalhes: montarDetalheEvento inclui o link de inscrição", () => {
+  const evChosen = evento({
+    data: "2026-10-18",
+    hora: "19:30",
+    horaFim: "22:00",
+    summary: "Pré-estreia The Chosen - Temporada 6",
+    location: "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi",
+    description: "Sessão especial de cinema com pipoca e suco gratuitos."
+  });
+  const itens = agruparEventosAgenda([evChosen]);
+  const detalhe = montarDetalheEvento(itens[0]);
+
+  assert.match(detalhe, /📌 \*Pré-estreia The Chosen - Temporada 6\*/);
+  assert.match(detalhe, /🎟️ \*Inscrições:\* Garanta sua vaga acessando:/);
+  assert.match(detalhe, /https:\/\/www\.comunidadecristacurados\.com\.br\/the-chosen/);
+});
+
+test("isEventoTheChosen: identifica corretamente eventos com variações do nome The Chosen", () => {
+  assert.equal(isEventoTheChosen({ summary: "Pré-estreia The Chosen" }), true);
+  assert.equal(isEventoTheChosen({ summary: "The-Chosen Ep 1" }), true);
+  assert.equal(isEventoTheChosen({ summary: "Sessão Chosen" }), true);
+  assert.equal(isEventoTheChosen({ eventos: [{ summary: "The Chosen Season 6" }] }), true);
+  assert.equal(isEventoTheChosen({ summary: "Culto de Domingo" }), false);
+  assert.equal(isEventoTheChosen(null), false);
 });
 
 

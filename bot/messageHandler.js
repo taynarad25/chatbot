@@ -865,7 +865,7 @@ function createMessageHandler({
             nome: pastorRow.nome,
           };
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // e) Fallback: busca pastor em listLideres() ou no banco SQLite
@@ -888,7 +888,7 @@ function createMessageHandler({
           nome: pastorRow.nome,
         };
       }
-    } catch (_) {}
+    } catch (_) { }
 
     return null;
   }
@@ -912,7 +912,7 @@ function createMessageHandler({
     const saudacao = pastor.nome ? `Olá, Pastor *${pastor.nome}*!` : "Olá, Pastor!";
 
     const msgConsulta =
-      `⚠️ *CONSULTA PASTORAL - CONCORRÊNCIA COM ATENDIMENTO*\n\n` +
+      `⚠️ *CONSULTA PASTORAL - CONCORRÊNCIA COM EVENTO*\n\n` +
       `${saudacao}\n\n` +
       `Consta um Atendimento Pastoral seu agendado:\n` +
       `📌 *Atendimento:* ${atendimento?.summary || "Atendimento Pastoral"}\n` +
@@ -1123,7 +1123,7 @@ function createMessageHandler({
               ehGrupoSecretaria = true;
               atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, msg.from);
             }
-          } catch (_) {}
+          } catch (_) { }
         }
 
         // Se for resposta citada com palavra-chave de aprovação, segue o fluxo de aprovação
@@ -1171,7 +1171,7 @@ function createMessageHandler({
             });
 
             if (typeof msg.react === "function") {
-              msg.react("📢").catch(() => {});
+              msg.react("📢").catch(() => { });
             }
 
             return resBroadcast;
@@ -1920,7 +1920,7 @@ function createMessageHandler({
           if (quoted && quoted.body) {
             codigoPastor = extrairCodigo(quoted.body);
           }
-        } catch (_) {}
+        } catch (_) { }
       }
       if (!codigoPastor) {
         codigoPastor = extrairCodigo(msg.body);
@@ -2185,8 +2185,8 @@ Escolha uma opção:
               const acaoLabel = info.acaoEvento === "cancelar"
                 ? "cancelar"
                 : info.acaoEvento === "preparacao_espaco"
-                ? "informar montagem/decoração"
-                : "alterar";
+                  ? "informar montagem/decoração"
+                  : "alterar";
               let lista = `📋 *Eventos de ${info.departamento}*\nQual você deseja ${acaoLabel}?\n\n`;
               info.eventosEncontrados.forEach((ev, i) => {
                 const d = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo");
@@ -4910,6 +4910,17 @@ Venha viver um tempo precioso na presença de Deus! 🙏🙌
 
 Digite *menu* para voltar ao menu principal.`;
         return msg.reply(mensagemCultos);
+      }
+
+      if (/the[\s\-_]*chosen|\bchosen\b/i.test(texto)) {
+        console.log(`[The Chosen] Consulta direta de The Chosen por ${identificarUsuario(contato, numero, isLider)}`);
+        return msg.reply(
+          `🎬 *Pré-estreia The Chosen — Temporada 6 (Ep. 1)*\n\n` +
+          `Participe desta noite especial com pipoca e suco gratuitos para toda a família!\n\n` +
+          `🎟️ *Faça sua inscrição e garanta sua vaga:*\n` +
+          `👉 https://www.comunidadecristacurados.com.br/the-chosen\n\n` +
+          `Digite *menu* para voltar ao menu principal.`
+        );
       }
 
       if (texto === "3" || texto === "agenda" || texto === "ver agenda") {
