@@ -1046,10 +1046,10 @@ function createMessageHandler({
 
       // Sem conflito pastoral: salva e envia diretamente para a secretaria
       const codigo = salvarPendente(dadosAgendamento);
-      const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}${cronogramaResumo}\n\n✨ *Descrição Gerada (IA):*\n${descricaoGerada}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
+      const resumoGrupo = `🔔 *NOVO AGENDAMENTO SOLICITADO*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n📅 *Evento:* ${info.nome}\n📍 *Local:* ${info.local}\n🏢 *Depto:* ${info.rede}${cronogramaResumo}\n\n_Responda a este resumo com "marcar evento" ou "não marcar" para realizar o agendamento automático._\n\n_Código: ${codigo}_`;
       await notificarSecretaria(client, resumoGrupo);
 
-      const resumo = `✅ *Solicitação de Agendamento Enviada!*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}${cronogramaResumo}\n\n✨ *Descrição do Evento (Gerada por IA):*\n${descricaoGerada}\n\n🧹 *Compromisso com o Salão e Dependências:*\nLembramos que o salão deve ser entregue após o evento exatamente da mesma forma como foi encontrado (organização das cadeiras, lixo recolhido e limpeza geral).\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+      const resumo = `✅ *Solicitação de Agendamento Enviada!*\n\n*Evento:* ${info.nome}\n*Local:* ${info.local}\n*Departamento:* ${info.rede}${cronogramaResumo}\n\n🧹 *Compromisso com o Salão e Dependências:*\nLembramos que o salão deve ser entregue após o evento exatamente da mesma forma como foi encontrado (organização das cadeiras, lixo recolhido e limpeza geral).\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
       console.log(`Agendamento solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
       await msg.reply(resumo);
     } catch (e) {
@@ -1132,6 +1132,11 @@ function createMessageHandler({
         if (!ehRespostaAprovacao) {
           // Se veio do grupo "Mensagens Secretaria" e NÃO é resposta a aprovação
           if (ehGrupoSecretaria) {
+            // Função de broadcast do grupo da secretaria desativada por padrão
+            if (!BROADCAST_CONFIG.ativo && process.env.BROADCAST_ATIVO !== "true") {
+              return;
+            }
+
             // Se for apenas uma palavra-chave de aprovação isolada sem mídia (ex: "marcar evento" ou "recusar"),
             // é provável esquecimento de usar "Responder" no pedido do bot
             if (!msg.hasMedia && PALAVRAS_CHAVE_APROVACAO.includes(textoMsg)) {
@@ -2806,10 +2811,9 @@ Escolha uma opção:
             info.etapa = "evento_modo_busca";
             return msg.reply(
               "📅 *Qual o formato e duração do evento?*\n\n" +
-              "1 - Evento de 1 dia (data específica)\n" +
-              "2 - Evento de 1 dia (ver datas disponíveis por dia da semana)\n" +
-              "3 - Evento consecutivo de vários dias (ex: retiro de Sexta a Domingo)\n" +
-              "4 - Evento não consecutivo (múltiplos dias/horários espalhados - ex: conferência)"
+              "1 - Evento de 1 dia\n" +
+              "2 - Evento consecutivo de vários dias (ex: retiro de Sexta a Domingo)\n" +
+              "3 - Evento não consecutivo (múltiplos dias/horários espalhados - ex: conferência)"
             );
           }
 
@@ -2817,26 +2821,39 @@ Escolha uma opção:
             const opcao = msg.body.trim();
             if (opcao === "1") {
               info.tipoDuracao = "unico";
-              info.etapa = "evento_dia_especifico";
-              return msg.reply(`📅 Qual o dia do mês? (Ex: 25, para o dia 25/${String(info.mes).padStart(2, "0")})`);
+              info.etapa = "evento_tipo_data_unico";
+              return msg.reply(
+                "📅 *Sobre a data do evento:*\n\n" +
+                "1 - Já tenho uma data específica\n" +
+                "2 - Quero ver de acordo com a disponibilidade\n\n" +
+                "_Digite 1 ou 2:_"
+              );
             }
             if (opcao === "2") {
-              info.tipoDuracao = "unico";
-              info.etapa = "evento_tipo_dia";
-              return msg.reply("📅 Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Todos os dias do mês");
-            }
-            if (opcao === "3") {
               info.tipoDuracao = "consecutivo";
               info.etapa = "evento_consecutivo_data_inicio";
               return msg.reply(`📅 Qual a *data de início* do evento? (Ex: 10/${String(info.mes).padStart(2, "0")} ou 10/${String(info.mes).padStart(2, "0")}/${moment().tz("America/Sao_Paulo").year()})`);
             }
-            if (opcao === "4") {
+            if (opcao === "3") {
               info.tipoDuracao = "multiplo";
               info.blocosHorarios = [];
               info.etapa = "evento_multiplo_data";
               return msg.reply(`📅 Vamos cadastrar o *1º dia/bloco* do evento.\n\nQual a *data* deste primeiro dia? (Ex: 16/${String(info.mes).padStart(2, "0")})`);
             }
-            return msg.reply("❌ Opção inválida. Digite:\n1 - Evento de 1 dia (data específica)\n2 - Evento de 1 dia (por dia da semana)\n3 - Evento consecutivo de vários dias\n4 - Evento de múltiplos dias/horários espalhados");
+            return msg.reply("❌ Opção inválida. Digite:\n1 - Evento de 1 dia\n2 - Evento consecutivo de vários dias\n3 - Evento não consecutivo (múltiplos dias/horários espalhados)");
+          }
+
+          if (info.etapa === "evento_tipo_data_unico") {
+            const opcao = msg.body.trim();
+            if (opcao === "1") {
+              info.etapa = "evento_dia_especifico";
+              return msg.reply(`📅 Qual o dia do mês? (Ex: 25, para o dia 25/${String(info.mes).padStart(2, "0")})`);
+            }
+            if (opcao === "2") {
+              info.etapa = "evento_tipo_dia";
+              return msg.reply("📅 Qual o dia da semana desejado?\n\n1 - Segunda-feira\n2 - Terça-feira\n3 - Quarta-feira\n4 - Quinta-feira\n5 - Sexta-feira\n6 - Sábado\n7 - Domingo\n8 - Todos os dias do mês");
+            }
+            return msg.reply("❌ Opção inválida. Digite:\n1 - Já tenho uma data específica\n2 - Quero ver de acordo com a disponibilidade");
           }
 
           // Formato 2: Consecutivo de vários dias

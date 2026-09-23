@@ -178,6 +178,28 @@ test("bot chat: responde com a descrição da IA quando usuário pergunta por ma
   assert.match(resp2[0], /ENCONTRO DE MULHERES PRECIOSAS/);
 });
 
+test("bot agendamento: Formato 1 (1 dia) pergunta se já tem data específica ou quer ver disponibilidade", async () => {
+  const { handleMessage } = criarContexto();
+
+  await enviar(handleMessage, NUMERO_LIDER, "7"); // Área do Líder
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendamentos
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Agendar Evento
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Confirmar ciência de regras
+  await enviar(handleMessage, NUMERO_LIDER, "Culto da Família");
+  await enviar(handleMessage, NUMERO_LIDER, "Templo Principal");
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Depto Evangelismo
+  await enviar(handleMessage, NUMERO_LIDER, "11"); // Novembro
+  const respModo = await enviar(handleMessage, NUMERO_LIDER, "1"); // Opção 1: Evento de 1 dia
+
+  assert.match(respModo[0], /Sobre a data do evento/i);
+  assert.match(respModo[0], /1 - Já tenho uma data específica/i);
+  assert.match(respModo[0], /2 - Quero ver de acordo com a disponibilidade/i);
+
+  // Escolhe 1: data específica
+  const respDataEsp = await enviar(handleMessage, NUMERO_LIDER, "1");
+  assert.match(respDataEsp[0], /Qual o dia do mês\?/i);
+});
+
 test("bot agendamento: Formato 2 (Consecutivo) solicita início e término e agenda com sucesso", async () => {
   const { handleMessage, gruposEnviados } = criarContexto();
 
@@ -189,7 +211,7 @@ test("bot agendamento: Formato 2 (Consecutivo) solicita início e término e age
   await enviar(handleMessage, NUMERO_LIDER, "Sítio Primavera");
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Depto Evangelismo
   await enviar(handleMessage, NUMERO_LIDER, "11"); // Novembro
-  await enviar(handleMessage, NUMERO_LIDER, "3"); // Opção 3: Consecutivo de vários dias
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // Opção 2: Consecutivo de vários dias
 
   // Data de início
   const respDataIni = await enviar(handleMessage, NUMERO_LIDER, "14/11/2026");
@@ -206,13 +228,16 @@ test("bot agendamento: Formato 2 (Consecutivo) solicita início e término e age
   // Horário de término
   const respFim = await enviar(handleMessage, NUMERO_LIDER, "16:00");
   assert.match(respFim[respFim.length - 1], /Solicitação de Agendamento Enviada/);
-  assert.match(respFim[respFim.length - 1], /Descrição do Evento \(Gerada por IA\)/i);
+  // Não envia descrição para o líder
+  assert.doesNotMatch(respFim[respFim.length - 1], /Descrição do Evento \(Gerada por IA\)/i);
 
   // Verifica notificação enviada à secretaria
   assert.ok(gruposEnviados.length > 0);
   const ultNotif = gruposEnviados[gruposEnviados.length - 1].texto;
   assert.match(ultNotif, /Acampamento de Jovens 2026/);
   assert.match(ultNotif, /14\/11\/2026 às 18:00 até 16\/11\/2026 às 16:00/);
+  // Não envia descrição para o grupo da secretaria
+  assert.doesNotMatch(ultNotif, /Descrição Gerada \(IA\)/i);
 });
 
 test("bot agendamento: Formato 3 (Múltiplos Blocos) cadastra sessões intercaladas e conclui", async () => {
@@ -226,7 +251,7 @@ test("bot agendamento: Formato 3 (Múltiplos Blocos) cadastra sessões intercala
   await enviar(handleMessage, NUMERO_LIDER, "Templo Sede");
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Depto Evangelismo
   await enviar(handleMessage, NUMERO_LIDER, "11"); // Novembro
-  await enviar(handleMessage, NUMERO_LIDER, "4"); // Opção 4: Múltiplos blocos espalhados
+  await enviar(handleMessage, NUMERO_LIDER, "3"); // Opção 3: Múltiplos blocos espalhados
 
   // Bloco 1: Data
   const respB1Data = await enviar(handleMessage, NUMERO_LIDER, "20/11/2026");

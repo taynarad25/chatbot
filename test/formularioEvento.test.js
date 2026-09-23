@@ -488,7 +488,8 @@ test("E2E: aprovação de evento inicia o formulário, líder responde tudo, web
   await enviarPrivado("igreja"); // local
   await enviarPrivado("7"); // departamento (Rede de Homens)
   await enviarPrivado("12"); // mês (Dezembro)
-  await enviarPrivado("1"); // data específica
+  await enviarPrivado("1"); // Evento de 1 dia
+  await enviarPrivado("1"); // Já tenho uma data específica
   await enviarPrivado("22"); // dia 22
   await enviarPrivado("19:00"); // inicio
   const rFim = await enviarPrivado("22:00"); // fim

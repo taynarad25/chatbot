@@ -10,6 +10,9 @@ try {
 const { enviarMensagemResiliente } = require("./senderResiliente");
 
 const BROADCAST_CONFIG = {
+  // Desativado por solicitação: mensagens no grupo da secretaria não são encaminhadas para Gabriela Diniz
+  ativo: process.env.BROADCAST_ATIVO === "true",
+
   // Quando true, envia EXCLUSIVAMENTE para Gabriela Diniz (fase de testes).
   // Para ativar para todos os membros após os testes, basta mudar para false (ou via env BROADCAST_MODO_TESTE=false).
   modoTeste: process.env.BROADCAST_MODO_TESTE !== "false",
@@ -126,7 +129,13 @@ async function executarBroadcast({
   listLideres = null,
   delayMs = BROADCAST_CONFIG.delayMs,
   modoTeste = BROADCAST_CONFIG.modoTeste,
+  forcar = false,
 } = {}) {
+  if (!forcar && !BROADCAST_CONFIG.ativo && !destinatarios && process.env.BROADCAST_ATIVO !== "true") {
+    console.log("[Broadcast] Transmissão do grupo da secretaria desativada.");
+    return { enviados: 0, falhas: 0, total: 0, destinatarios: [], desativado: true };
+  }
+
   const listaAlvo = destinatarios || buscarDestinatariosBroadcast({ modoTeste, listLideres });
   const total = listaAlvo.length;
 

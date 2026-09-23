@@ -381,6 +381,32 @@ function registrarLembreteEnviado(eventoId, tipo, destinatario) {
   }
 }
 
+function obterUltimaExecucaoRotina(nome) {
+  try {
+    const row = db.prepare("SELECT ultimaData FROM rotinas_executadas WHERE nome = ?").get(nome);
+    return row ? row.ultimaData : null;
+  } catch (err) {
+    console.error(`[Lembretes] Erro ao consultar execucao da rotina ${nome}:`, err.message);
+    return null;
+  }
+}
+
+function registrarExecucaoRotina(nome, dataRef) {
+  try {
+    const agora = new Date().toISOString();
+    const dataStr = dataRef || agora.slice(0, 10);
+    db.prepare(`
+      INSERT INTO rotinas_executadas (nome, ultimaData, executadoEm)
+      VALUES (?, ?, ?)
+      ON CONFLICT(nome) DO UPDATE SET ultimaData = excluded.ultimaData, executadoEm = excluded.executadoEm
+    `).run(nome, dataStr, agora);
+    return true;
+  } catch (err) {
+    console.error(`[Lembretes] Erro ao registrar execucao da rotina ${nome}:`, err.message);
+    return false;
+  }
+}
+
 async function processarLembretesEventos({
   client,
   buscarEventos,
@@ -1279,9 +1305,20 @@ function iniciarAgendadorLembretes({
   horaExecucao = 8,
 } = {}) {
   let executando = false;
+  let ultimoDiaExecutado = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
 
-  async function checarExecutar() {
+  async function checarExecutar(forcar = false) {
     if (executando) return;
+    const agora = new Date();
+    const diaHoje = agora.toISOString().slice(0, 10);
+    if (!forcar) {
+      const ultimaData = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
+      if (ultimaData === diaHoje) {
+        console.log(`[Agendador Lembretes] Rotina diária de lembretes já executada hoje (${diaHoje}). Pulando execução.`);
+        return;
+      }
+    }
+
     executando = true;
     try {
       // 0. Parabéns aos aniversariantes do dia (diariamente às 08:00)
@@ -1347,6 +1384,9 @@ function iniciarAgendadorLembretes({
       } catch (errTC) {
         console.error("[Agendador Lembretes] Erro na rotina The Chosen:", errTC.message);
       }
+
+      registrarExecucaoRotina("rotina_diaria_lembretes", diaHoje);
+      ultimoDiaExecutado = diaHoje;
     } catch (err) {
       console.error("[Agendador Lembretes] Erro no processamento:", err);
     } finally {
@@ -1354,18 +1394,23 @@ function iniciarAgendadorLembretes({
     }
   }
 
-  // Executa uma vez após 1 minuto da inicialização
+  // Executa uma vez após 1 minuto da inicialização SE ainda não executou hoje
   const timeoutInicial = setTimeout(() => {
-    checarExecutar();
+    const agora = new Date();
+    const diaHoje = agora.toISOString().slice(0, 10);
+    const ultimaData = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
+    if (agora.getHours() >= horaExecucao && ultimaData !== diaHoje) {
+      checarExecutar();
+    } else {
+      console.log(`[Agendador Lembretes] Inicialização: rotina já executada hoje (${ultimaData}) ou antes do horário (${agora.getHours()}h < ${horaExecucao}h).`);
+    }
   }, 60 * 1000);
 
   // Executa diariamente no horário configurado (padrão 08:00)
-  let ultimoDiaExecutado = null;
   const timer = setInterval(() => {
     const agora = new Date();
     const diaHoje = agora.toISOString().slice(0, 10);
     if (agora.getHours() >= horaExecucao && ultimoDiaExecutado !== diaHoje) {
-      ultimoDiaExecutado = diaHoje;
       checarExecutar();
     }
   }, 30 * 60 * 1000);
@@ -1389,6 +1434,8 @@ module.exports = {
   ehAtendimentoPastoral,
   buscarLembreteEnviado,
   registrarLembreteEnviado,
+  obterUltimaExecucaoRotina,
+  registrarExecucaoRotina,
   registrarAgendamentoPastoral,
   buscarPastorAgendamento,
   processarLembretesEventos,

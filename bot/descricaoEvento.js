@@ -44,7 +44,9 @@ function gerarDescricaoEvento({
   departamento = "Comunidade Cristã Curados",
   local = "Comunidade Cristã Curados",
   tema = "",
-  publico = "Toda a Igreja e Visitantes",
+  preletor = "",
+  louvor = "",
+  publico = "",
   observacoes = ""
 }) {
   const nomeLimpo = (evento || "Evento Especial").trim();
@@ -86,23 +88,20 @@ function gerarDescricaoEvento({
   }
 
   const blocoTema = tema ? `\n📖 *Tema Central:* ${tema}` : "";
+  const blocoPreletor = preletor ? `\n🎤 *Preletor(a):* ${preletor}` : "";
+  const blocoLouvor = louvor ? `\n🎵 *Louvor:* ${louvor}` : "";
+  const blocoPublico = publico ? `\n🎯 *Público-alvo:* ${publico}` : "";
   const blocoObs = observacoes ? `\n💡 *Observações:* ${observacoes}` : "";
 
   const descricao = 
-`✨ *COMUNIDADE CRISTÃ CURADOS • ${nomeLimpo.toUpperCase()}* ✨
-
-É com grande alegria e expectativa no coração que convidamos você e sua família para participarem deste momento especial! Nosso propósito é viver um tempo precioso de adoração, aprendizado bíblico e comunhão que marcará a nossa caminhada de fé.
+`✨ *${nomeLimpo.toUpperCase()}* ✨${blocoTema}
 
 ${blocoCronograma}
 📍 *Local:* ${localLimpo}
-🏢 *Ministério Responsável:* ${deptoLimpo}
-🎯 *Público-alvo:* ${publico}${blocoTema}${blocoObs}
+🏢 *Ministério Responsável:* ${deptoLimpo}${blocoPreletor}${blocoLouvor}${blocoPublico}${blocoObs}
 
-⏰ *Orientação Geral:* Chegue com antecedência para garantir seu lugar e desfrutar de toda a programação sem pressa.
-🤝 Venha com o coração aberto para ser edificado e traga amigos e familiares.
-
-Que Deus abençoe abundantemente a sua vida e até lá! 🙏
-_Comunidade Cristã Curados • Lugar de Restauração e Vida_`;
+⏰ *Orientação Geral:* Chegue com antecedência para garantir seu lugar.
+_Comunidade Cristã Curados_`;
 
   return descricao.trim();
 }

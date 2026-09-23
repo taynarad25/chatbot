@@ -342,36 +342,74 @@
             font-weight: normal;
         }
 
-        /* Seletor de Quantidade Dinâmico */
-        #the-chosen-page .qtd-selector-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
+        /* Seletor de Quantidade com Contador (+ e - até 5) */
+        #the-chosen-page .qtd-counter-wrapper {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 16px;
+            padding: 10px 18px;
+            margin-top: 6px;
         }
 
-        #the-chosen-page .qtd-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #ffffff;
-            font-size: 1.1rem;
-            font-weight: 800;
-            padding: 12px;
+        #the-chosen-page .qtd-counter-btn {
+            width: 44px;
+            height: 44px;
             border-radius: 12px;
+            background: linear-gradient(135deg, rgba(0, 183, 217, 0.2), rgba(122, 43, 226, 0.3));
+            border: 1px solid rgba(0, 183, 217, 0.4);
+            color: #ffffff;
+            font-size: 1.4rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
             transition: all 0.2s ease;
             font-family: inherit;
+            line-height: 1;
         }
 
-        #the-chosen-page .qtd-btn:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-
-        #the-chosen-page .qtd-btn.active {
+        #the-chosen-page .qtd-counter-btn:hover:not(:disabled) {
             background: linear-gradient(135deg, var(--cor-azul), var(--cor-roxo));
-            border-color: transparent;
-            box-shadow: 0 4px 16px rgba(0, 183, 217, 0.4);
-            transform: translateY(-2px);
+            transform: scale(1.05);
+            box-shadow: 0 4px 14px rgba(0, 183, 217, 0.4);
+        }
+
+        #the-chosen-page .qtd-counter-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            border-color: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+            transform: none;
+            box-shadow: none;
+        }
+
+        #the-chosen-page .qtd-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+
+        #the-chosen-page .qtd-numero {
+            font-size: 1.9rem;
+            font-weight: 900;
+            color: #ffffff;
+            line-height: 1;
+            font-family: inherit;
+        }
+
+        #the-chosen-page .qtd-label {
+            font-size: 0.76rem;
+            color: var(--cor-texto-mutado);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+            font-weight: 600;
         }
 
         /* Container de Nomes Dinâmicos */
@@ -666,12 +704,13 @@
                         Quantos ingressos você precisa?
                         <small>(Máximo de 5 por reserva)</small>
                     </label>
-                    <div class="qtd-selector-grid" id="qtdButtonsGrid">
-                        <button type="button" class="qtd-btn active" data-qtd="1">1</button>
-                        <button type="button" class="qtd-btn" data-qtd="2">2</button>
-                        <button type="button" class="qtd-btn" data-qtd="3">3</button>
-                        <button type="button" class="qtd-btn" data-qtd="4">4</button>
-                        <button type="button" class="qtd-btn" data-qtd="5">5</button>
+                    <div class="qtd-counter-wrapper">
+                        <button type="button" class="qtd-counter-btn" id="btnQtdMenos" aria-label="Diminuir ingressos" disabled>−</button>
+                        <div class="qtd-display">
+                            <span class="qtd-numero" id="qtdNumeroDisplay">1</span>
+                            <span class="qtd-label" id="qtdLabelTexto">ingresso</span>
+                        </div>
+                        <button type="button" class="qtd-counter-btn" id="btnQtdMais" aria-label="Aumentar ingressos">+</button>
                     </div>
                 </div>
 
@@ -784,17 +823,29 @@
         }
         renderCamposParticipantes(1);
 
-        // Seletor de Quantidade
-        const qtdButtons = document.querySelectorAll('.qtd-btn');
-        qtdButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const qtd = parseInt(btn.getAttribute('data-qtd'), 10);
-                qtdButtons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                quantidadeSelecionada = qtd;
-                renderCamposParticipantes(qtd);
+        // Seletor de Quantidade (+ e - até 5)
+        const btnQtdMenos = document.getElementById('btnQtdMenos');
+        const btnQtdMais = document.getElementById('btnQtdMais');
+        const qtdNumeroDisplay = document.getElementById('qtdNumeroDisplay');
+        const qtdLabelTexto = document.getElementById('qtdLabelTexto');
+
+        function atualizarContador(novoValor) {
+            quantidadeSelecionada = Math.max(1, Math.min(5, novoValor));
+            qtdNumeroDisplay.textContent = quantidadeSelecionada;
+            qtdLabelTexto.textContent = quantidadeSelecionada === 1 ? 'ingresso' : 'ingressos';
+            btnQtdMenos.disabled = (quantidadeSelecionada <= 1);
+            btnQtdMais.disabled = (quantidadeSelecionada >= 5);
+            renderCamposParticipantes(quantidadeSelecionada);
+        }
+
+        if (btnQtdMenos && btnQtdMais) {
+            btnQtdMenos.addEventListener('click', () => {
+                atualizarContador(quantidadeSelecionada - 1);
             });
-        });
+            btnQtdMais.addEventListener('click', () => {
+                atualizarContador(quantidadeSelecionada + 1);
+            });
+        }
 
         // Consulta de Status em Tempo Real (Sem expor números de vagas)
         async function atualizarVagas() {

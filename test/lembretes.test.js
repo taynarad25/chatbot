@@ -23,6 +23,9 @@ const {
   formatarJidWhatsApp,
   buscarLembreteEnviado,
   registrarLembreteEnviado,
+  obterUltimaExecucaoRotina,
+  registrarExecucaoRotina,
+  iniciarAgendadorLembretes,
   processarLembretesEventos,
   processarLembretesDivulgacaoMultimidia,
   processarEnvioAgendaSecretarias,
@@ -1313,6 +1316,41 @@ test("processarLembretesItensADefinir: para eventos com mais de 1 dia o lembrete
   assert.equal(msgs2.length, 0);
 
   removeLider(TEL_LIDER);
+});
+
+test("obterUltimaExecucaoRotina e registrarExecucaoRotina: persiste data de rotina e evita reexecução no restart", async () => {
+  const nomeRotina = "rotina_diaria_lembretes";
+  const diaHoje = new Date().toISOString().slice(0, 10);
+
+  // Antes de registrar
+  const antes = obterUltimaExecucaoRotina(nomeRotina);
+  
+  // Registra hoje
+  const ok = registrarExecucaoRotina(nomeRotina, diaHoje);
+  assert.equal(ok, true);
+
+  const depois = obterUltimaExecucaoRotina(nomeRotina);
+  assert.equal(depois, diaHoje);
+
+  // Inicia agendador e verifica que checarExecutar pula execução se já rodou hoje
+  let rotinasChamadas = 0;
+  const agendador = iniciarAgendadorLembretes({
+    client: {
+      sendMessage: async () => {
+        rotinasChamadas++;
+      },
+    },
+    buscarEventos: async () => [],
+    horaExecucao: 8,
+  });
+
+  // Limpa timers para não manter o processo preso
+  clearTimeout(agendador.timeoutInicial);
+  clearInterval(agendador.timer);
+
+  // Tenta chamar checarExecutar sem forçar (deve pular)
+  await agendador.checarExecutar(false);
+  assert.equal(rotinasChamadas, 0, "Não deve reexecutar rotina se já rodou hoje");
 });
 
 

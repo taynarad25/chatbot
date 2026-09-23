@@ -105,6 +105,12 @@ db.exec(`
     atualizadoEm TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS rotinas_executadas (
+    nome TEXT PRIMARY KEY,
+    ultimaData TEXT NOT NULL,
+    executadoEm TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_descricoes_evento ON descricoes_eventos(evento);
 `);
 

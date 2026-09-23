@@ -80,7 +80,8 @@ test("tabela de pendentes indisponível: líder recebe um aviso claro, não fica
   await enviar(handleMessage, NUMERO_LIDER, "Igreja");
   await enviar(handleMessage, NUMERO_LIDER, "7"); // Rede de Homens
   await enviar(handleMessage, NUMERO_LIDER, "12"); // Dezembro
-  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Evento de 1 dia
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por disponibilidade / dia da semana
   await enviar(handleMessage, NUMERO_LIDER, "3"); // Quarta-feira
   await enviar(handleMessage, NUMERO_LIDER, "19:30");
   const finalResp = await enviar(handleMessage, NUMERO_LIDER, "21:00");

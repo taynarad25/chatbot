@@ -291,7 +291,8 @@ test("Concorrência Pastoral: evento com conflito pastoral vai pro pastor no pri
   await harness.enviar(NUMERO_LIDER, "igreja");
   await harness.enviar(NUMERO_LIDER, "1"); // Rede de Jovens (único departamento do líder)
   await harness.enviar(NUMERO_LIDER, "11"); // Novembro
-  await harness.enviar(NUMERO_LIDER, "1"); // Data específica
+  await harness.enviar(NUMERO_LIDER, "1"); // Evento de 1 dia
+  await harness.enviar(NUMERO_LIDER, "1"); // Já tenho uma data específica
   await harness.enviar(NUMERO_LIDER, "20"); // Dia 20
   await harness.enviar(NUMERO_LIDER, "19:00"); // Inicio
   const [resFinal] = await harness.enviar(NUMERO_LIDER, "21:00"); // Fim

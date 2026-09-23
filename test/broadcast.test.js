@@ -23,10 +23,12 @@ function restaurarEstadoBanco() {
 
 test.beforeEach(() => {
   restaurarEstadoBanco();
+  BROADCAST_CONFIG.ativo = true;
 });
 
 test.afterEach(() => {
   restaurarEstadoBanco();
+  BROADCAST_CONFIG.ativo = false;
 });
 
 test("broadcast: formatarJidWhatsApp e mascararTelefone", () => {
@@ -351,4 +353,38 @@ test("broadcast integrado: resposta de aprovação com citação no grupo contin
   // O retorno de aprovação não é o objeto de broadcast { total, enviados... }
   assert.ok(!res || res.modoTeste === undefined, "Não deveria disparar broadcast para resposta de aprovação");
   assert.equal(diretasEnviadas.length, 0, "Nenhuma mensagem direta de broadcast deve ter sido enviada");
+});
+
+test("broadcast: quando desativado, mensagens no grupo da secretaria NÃO são enviadas para Gabriela Diniz", async () => {
+  BROADCAST_CONFIG.ativo = false;
+  atualizarCacheGrupo(NOME_GRUPO_SECRETARIA, JID_GRUPO_SECRETARIA);
+
+  const diretasEnviadas = [];
+  const clientMock = {
+    sendMessage: async (to, content) => {
+      diretasEnviadas.push({ to, content });
+    },
+  };
+
+  const msgMock = {
+    from: JID_GRUPO_SECRETARIA,
+    body: "Mensagem interna da secretaria",
+    hasMedia: false,
+    hasQuotedMsg: false,
+    fromMe: false,
+  };
+
+  const handleMessage = createMessageHandler({
+    client: clientMock,
+    calendar: { events: {} },
+    agendasParaLer: [],
+    lideres: [],
+    etapas: {},
+    buscarEventos: async () => [],
+    listLideres: () => [{ nome: "Gabriela Diniz", telefone: "5511999990001" }],
+  });
+
+  const res = await handleMessage(msgMock);
+  assert.equal(res, undefined);
+  assert.equal(diretasEnviadas.length, 0, "Nenhuma mensagem deve ser transmitida para Gabriela Diniz");
 });

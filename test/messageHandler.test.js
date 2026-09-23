@@ -212,6 +212,7 @@ async function iniciarAgendamentoDataEspecifica(handleMessage, {
   await enviar(handleMessage, NUMERO_LIDER, local);
   const respRede = await enviar(handleMessage, NUMERO_LIDER, String(rede));
   await enviar(handleMessage, NUMERO_LIDER, String(mes));
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   const respModo = await enviar(handleMessage, NUMERO_LIDER, "1");
   const respDia = dia !== undefined ? await enviar(handleMessage, NUMERO_LIDER, String(dia), extraOpts) : undefined;
   return { respRede, respModo, respDia };
@@ -236,6 +237,7 @@ async function solicitarAgendamentoSemana(handleMessage, {
   await enviar(handleMessage, NUMERO_LIDER, local);
   await enviar(handleMessage, NUMERO_LIDER, String(rede));
   await enviar(handleMessage, NUMERO_LIDER, String(mes));
+  await enviar(handleMessage, NUMERO_LIDER, "1");
   await enviar(handleMessage, NUMERO_LIDER, "2");
   await enviar(handleMessage, NUMERO_LIDER, String(diaSemana));
   await enviar(handleMessage, NUMERO_LIDER, inicio);
@@ -955,7 +957,8 @@ test("opção 7 (líder): rejeita DIA TODO e exige horário de início específi
   await enviar(handleMessage, NUMERO_LIDER, "Sítio da Família Silva"); // local
   await enviar(handleMessage, NUMERO_LIDER, "1"); // Evangelismo
   await enviar(handleMessage, NUMERO_LIDER, "11"); // Novembro
-  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por dia da semana/horário
+  await enviar(handleMessage, NUMERO_LIDER, "1"); // Evento de 1 dia
+  await enviar(handleMessage, NUMERO_LIDER, "2"); // busca por disponibilidade / dia da semana
   await enviar(handleMessage, NUMERO_LIDER, "8"); // Vários dias / evento longo
   const respRejeicao = await enviar(handleMessage, NUMERO_LIDER, "DIA TODO");
   assert.match(respRejeicao[respRejeicao.length - 1], /horário de início é obrigatório/i);

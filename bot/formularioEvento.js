@@ -567,6 +567,41 @@ async function processarRespostaFormulario({
       docUrl: linkDoc,
     });
 
+    // Gera a descrição definitiva enriquecida com os dados detalhados do formulário
+    try {
+      const { gerarDescricaoEvento, salvarDescricaoEvento } = require("./descricaoEvento");
+      const horariosEvento = payload.horarios || [{
+        data: payload.data,
+        inicio: payload.horario_inicio || (payload.horario_inicio_termino ? payload.horario_inicio_termino.split("às")[0].trim() : "19:00"),
+        fim: payload.horario_termino || (payload.horario_inicio_termino && payload.horario_inicio_termino.includes("às") ? payload.horario_inicio_termino.split("às")[1].trim() : "21:00")
+      }];
+
+      const descEnriquecida = gerarDescricaoEvento({
+        evento: payload.nome_evento,
+        tipoDuracao: payload.tipoDuracao || (Array.isArray(payload.horarios) && payload.horarios.length > 1 ? "multiplo" : "unico"),
+        horarios: horariosEvento,
+        departamento: payload.departamento,
+        local: payload.local,
+        tema: payload.tema,
+        preletor: payload.preletor,
+        louvor: payload.louvor,
+        publico: payload.publico || payload.publico_alvo,
+        observacoes: payload.observacoes
+      });
+
+      salvarDescricaoEvento({
+        evento: payload.nome_evento,
+        departamento: payload.departamento,
+        local: payload.local,
+        tipoDuracao: payload.tipoDuracao || (Array.isArray(payload.horarios) && payload.horarios.length > 1 ? "multiplo" : "unico"),
+        horarios: horariosEvento,
+        descricao: descEnriquecida
+      });
+      console.log(`[Formulário] Descrição enriquecida gerada e salva com sucesso para '${payload.nome_evento}'.`);
+    } catch (errDesc) {
+      console.warn("[Formulário] Aviso ao gerar descrição enriquecida:", errDesc.message);
+    }
+
     // Se o líder informou horários extras de preparação/decoração/limpeza, grava na agenda do departamento do evento
     const textoExtra = (payload.horario_total || "").trim();
     const precisaExtra = textoExtra && !/^(não|nao|nenhum|nenhuma|nada|zero)$/i.test(textoExtra);
