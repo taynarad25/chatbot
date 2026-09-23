@@ -1818,7 +1818,7 @@ function renderIndexHtml() {
                 '<option value="pendente" ' + (item.statusConfirmacao === 'pendente' ? 'selected' : '') + '>Pendente ⏳</option>' +
                 '<option value="cancelado" ' + (item.statusConfirmacao === 'cancelado' ? 'selected' : '') + '>Cancelar ❌</option>' +
               '</select>' +
-              '<button data-id="' + item.id + '" data-nome="' + (item.titular || '').replace(/"/g, '&quot;') + '" onclick="excluirTheChosenInscricao(this.dataset.id, this.dataset.nome)" title="Excluir inscrição permanentemente" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background=\'rgba(239, 68, 68, 0.35)\'" onmouseout="this.style.background=\'rgba(239, 68, 68, 0.15)\'">' +
+              '<button data-id="' + item.id + '" data-nome="' + (item.titular || '').replace(/"/g, '&quot;') + '" onclick="excluirTheChosenInscricao(this.dataset.id, this.dataset.nome)" title="Excluir inscrição permanentemente" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">' +
                 '🗑️' +
               '</button>' +
             '</div>' +
@@ -1847,7 +1847,7 @@ function renderIndexHtml() {
 
     async function excluirTheChosenInscricao(id, nome) {
       if (!id) return;
-      const confirmou = confirm('Tem certeza que deseja EXCLUIR permanentemente a inscrição de "' + (nome || 'Participante') + '"?\nAs vagas ocupadas serão liberadas imediatamente.');
+      const confirmou = confirm('Tem certeza que deseja EXCLUIR permanentemente a inscrição de "' + (nome || 'Participante') + '"?\\nAs vagas ocupadas serão liberadas imediatamente.');
       if (!confirmou) return;
 
       try {
@@ -1869,7 +1869,7 @@ function renderIndexHtml() {
     }
 
     async function limparInscricoesDeTeste() {
-      const confirmou = confirm('Deseja realmente remover todas as inscrições identificadas como TESTE?\nEsta ação limpará registros de testes e liberará as vagas no painel.');
+      const confirmou = confirm('Deseja realmente remover todas as inscrições identificadas como TESTE?\\nEsta ação limpará registros de testes e liberará as vagas no painel.');
       if (!confirmou) return;
 
       try {
