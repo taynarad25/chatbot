@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscrição: Pré-estreia The Chosen - Temporada 6 | Comunidade Cristã Curados</title>
+    <meta name="description" content="Garanta seu ingresso gratuito para a pré-estreia exclusiva de The Chosen - Temporada 6 na Comunidade Cristã Curados. Vagas limitadas!">
+    
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3">
+    <link rel="icon" type="image/png" href="/images/logo.png?v=3">
+    <link rel="shortcut icon" type="image/png" href="/images/logo.png?v=3">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* ==========================================================================
+           ISOLAMENTO DE ESTILOS DA PÁGINA THE CHOSEN (#the-chosen-page)
+           ========================================================================== */
+        #the-chosen-page {
+            --cor-roxo: #7A2BE2;
+            --cor-rosa: #D63384;
+            --cor-laranja: #FF6A00;
+            --cor-azul: #00B7D9;
+
+            --cor-dourado: #e5b869;
+            --cor-fundo: #0d0d12;
+            --cor-card: #15151e;
+            --cor-card-hover: #1c1c28;
+            --cor-borda: rgba(255, 255, 255, 0.1);
+            --cor-texto: #f3f4f6;
+            --cor-texto-mutado: #9ca3af;
+
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        #the-chosen-page *,
+        #the-chosen-page *::before,
+        #the-chosen-page *::after {
+            box-sizing: border-box;
+        }
+
+        /* Barra Superior Minimalista */
+        #the-chosen-page .top-bar {
+            background: rgba(13, 13, 18, 0.92);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--cor-borda);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        #the-chosen-page .top-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #ffffff;
+        }
+
+        #the-chosen-page .top-brand img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        #the-chosen-page .top-brand-text {
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: var(--cor-azul);
+        }
+
+        #the-chosen-page .top-tag {
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 999px;
+            background: rgba(214, 51, 132, 0.16);
+            color: #ff70b5;
+            border: 1px solid rgba(214, 51, 132, 0.35);
+        }
+
+        /* Banner Hero Responsivo */
+        #the-chosen-page .hero-banner-container {
+            width: 100%;
+            background-color: #0b0b0e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid rgba(229, 184, 105, 0.25);
+        }
+
+        #the-chosen-page .hero-picture {
+            width: 100%;
+            max-width: 1100px;
+            display: block;
+            line-height: 0;
+            margin: 0 auto;
+        }
+
+        #the-chosen-page .hero-banner-img {
+            width: 100%;
+            height: auto;
+            max-height: 75vh;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* Container Principal */
+        #the-chosen-page .main-content {
+            max-width: 760px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 36px 20px 80px;
+            flex: 1;
+        }
+
+        /* Header de Informações */
+        #the-chosen-page .event-info-card {
+            background: linear-gradient(145deg, #181824, #12121a);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 20px;
+            padding: 28px 24px;
+            margin-bottom: 28px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #the-chosen-page .event-info-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cor-azul), var(--cor-roxo), var(--cor-rosa), var(--cor-laranja));
+        }
+
+        #the-chosen-page .event-title-h1 {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(1.6rem, 4.5vw, 2.2rem);
+            color: #ffffff;
+            margin: 0 0 10px;
+            letter-spacing: 1px;
+            line-height: 1.25;
+            text-align: center;
+        }
+
+        #the-chosen-page .event-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-top: 20px;
+        }
+
+        #the-chosen-page .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+
+        #the-chosen-page .meta-icon {
+            font-size: 1.4rem;
+            line-height: 1;
+        }
+
+        #the-chosen-page .meta-text-wrap {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #the-chosen-page .meta-label {
+            font-size: 0.72rem;
+            color: var(--cor-texto-mutado);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+        }
+
+        #the-chosen-page .meta-val {
+            font-size: 0.94rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        /* Contador de Vagas em Tempo Real */
+        #the-chosen-page .vagas-meter-box {
+            background: linear-gradient(135deg, rgba(122, 43, 226, 0.15), rgba(0, 183, 217, 0.12));
+            border: 1px solid rgba(0, 183, 217, 0.35);
+            border-radius: 18px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #the-chosen-page .vagas-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        #the-chosen-page .vagas-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        #the-chosen-page .vagas-counter-badge {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--cor-azul);
+            background: rgba(0, 183, 217, 0.15);
+            padding: 4px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(0, 183, 217, 0.4);
+        }
+
+        #the-chosen-page .vagas-progress-bg {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #the-chosen-page .vagas-progress-bar {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, var(--cor-azul), var(--cor-roxo), var(--cor-rosa));
+            border-radius: 999px;
+            transition: width 0.5s ease-out;
+        }
+
+        #the-chosen-page .vagas-status-text {
+            font-size: 0.8rem;
+            color: var(--cor-texto-mutado);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Card de Regra de Crianças de Colo */
+        #the-chosen-page .kids-rule-alert {
+            background: rgba(255, 106, 0, 0.12);
+            border: 1px solid rgba(255, 106, 0, 0.35);
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 28px;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+
+        #the-chosen-page .kids-rule-icon {
+            font-size: 1.8rem;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        #the-chosen-page .kids-rule-body h4 {
+            margin: 0 0 4px;
+            font-size: 0.95rem;
+            color: #ffba82;
+            font-weight: 700;
+        }
+
+        #the-chosen-page .kids-rule-body p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #e5e7eb;
+            line-height: 1.5;
+        }
+
+        /* Formulário de Inscrição */
+        #the-chosen-page .form-card {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 22px;
+            padding: 32px 26px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        #the-chosen-page .form-section-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin: 0 0 20px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #the-chosen-page .form-group {
+            margin-bottom: 22px;
+        }
+
+        #the-chosen-page .form-label {
+            display: block;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #e5e7eb;
+            margin-bottom: 8px;
+        }
+
+        #the-chosen-page .form-label small {
+            font-size: 0.78rem;
+            color: var(--cor-texto-mutado);
+            font-weight: normal;
+        }
+
+        /* Seletor de Quantidade Dinâmico */
+        #the-chosen-page .qtd-selector-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        #the-chosen-page .qtd-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            font-size: 1.1rem;
+            font-weight: 800;
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        #the-chosen-page .qtd-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        #the-chosen-page .qtd-btn.active {
+            background: linear-gradient(135deg, var(--cor-azul), var(--cor-roxo));
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(0, 183, 217, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* Container de Nomes Dinâmicos */
+        #the-chosen-page .participantes-container {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        #the-chosen-page .input-text {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: #ffffff;
+            padding: 14px 16px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        #the-chosen-page .input-text:focus {
+            border-color: var(--cor-azul);
+            background: rgba(0, 183, 217, 0.06);
+            box-shadow: 0 0 16px rgba(0, 183, 217, 0.25);
+        }
+
+        #the-chosen-page .input-text::placeholder {
+            color: #6b7280;
+        }
+
+        /* Botão de Submissão */
+        #the-chosen-page .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--cor-azul), var(--cor-roxo), var(--cor-rosa));
+            color: #ffffff;
+            font-size: 1.05rem;
+            font-weight: 800;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(122, 43, 226, 0.35);
+            transition: all 0.25s ease;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        #the-chosen-page .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(214, 51, 132, 0.45);
+        }
+
+        #the-chosen-page .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Mensagens de Feedback */
+        #the-chosen-page .msg-feedback {
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            margin-top: 18px;
+            display: none;
+        }
+        #the-chosen-page .msg-feedback.erro {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+
+        /* Tela de Sucesso / Voucher */
+        #the-chosen-page .sucesso-card {
+            background: linear-gradient(145deg, #181824, #12121a);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            border-radius: 24px;
+            padding: 36px 26px;
+            text-align: center;
+            display: none;
+            box-shadow: 0 16px 44px rgba(0, 0, 0, 0.6);
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        #the-chosen-page .sucesso-badge-check {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(34, 197, 94, 0.15);
+            border: 2px solid #22c55e;
+            color: #22c55e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            margin: 0 auto 18px;
+        }
+
+        #the-chosen-page .ticket-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px dashed rgba(229, 184, 105, 0.4);
+            border-radius: 16px;
+            padding: 22px;
+            margin: 22px 0;
+            text-align: left;
+        }
+
+        #the-chosen-page .ticket-code {
+            font-family: monospace;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--cor-dourado);
+            letter-spacing: 2px;
+            text-align: center;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        #the-chosen-page .ticket-list {
+            margin: 12px 0 0;
+            padding-left: 20px;
+            color: #e5e7eb;
+            font-size: 0.95rem;
+        }
+
+        #the-chosen-page .ticket-list li {
+            margin-bottom: 4px;
+        }
+
+        /* Esgotado */
+        #the-chosen-page .esgotado-card {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 20px;
+            padding: 32px 24px;
+            text-align: center;
+            display: none;
+        }
+
+        #the-chosen-page .footer-bar {
+            text-align: center;
+            padding: 24px 20px;
+            border-top: 1px solid var(--cor-borda);
+            font-size: 0.82rem;
+            color: #6b7280;
+            background: #09090d;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @media (max-width: 600px) {
+            #the-chosen-page .form-card {
+                padding: 24px 18px;
+            }
+            #the-chosen-page .qtd-selector-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 6px;
+            }
+            #the-chosen-page .qtd-btn {
+                padding: 10px 4px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body id="the-chosen-page">
+
+    <!-- Topo da Página -->
+    <header class="top-bar">
+        <a href="/home" class="top-brand" title="Voltar ao site oficial">
+            <img src="/logo.png" alt="Logo Curados">
+            <span class="top-brand-text">CURADOS</span>
+        </a>
+        <span class="top-tag">Pré-estreia Exclusiva</span>
+    </header>
+
+    <!-- Banner Hero Responsivo (Desktop e Celular) -->
+    <div class="hero-banner-container">
+        <picture class="hero-picture">
+            <source media="(max-width: 768px)" srcset="/images/the-chosen-mobile.jpg">
+            <img src="/images/the-chosen-desktop.jpg" alt="Pré-estreia Exclusiva The Chosen Temporada 6 - Comunidade Cristã Curados" class="hero-banner-img">
+        </picture>
+    </div>
+
+    <!-- Conteúdo Principal de Inscrição -->
+    <main class="main-content">
+
+        <!-- Card de Informações do Evento -->
+        <div class="event-info-card">
+            <h1 class="event-title-h1">Pré-estreia The Chosen</h1>
+            <p style="text-align:center; color: var(--cor-texto-mutado); margin: 0; font-size: 0.95rem;">
+                Temporada 6 • Episódio 1 • Assista em primeira mão na tela grande!
+            </p>
+
+            <div class="event-meta-grid">
+                <div class="meta-item">
+                    <span class="meta-icon">📅</span>
+                    <div class="meta-text-wrap">
+                        <span class="meta-label">Data</span>
+                        <span class="meta-val">03/10 (Sexta)</span>
+                    </div>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">⏰</span>
+                    <div class="meta-text-wrap">
+                        <span class="meta-label">Horário</span>
+                        <span class="meta-val">19:00</span>
+                    </div>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">📍</span>
+                    <div class="meta-text-wrap">
+                        <span class="meta-label">Local</span>
+                        <span class="meta-val">Comunidade Cristã Curados</span>
+                    </div>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">🎟️</span>
+                    <div class="meta-text-wrap">
+                        <span class="meta-label">Entrada</span>
+                        <span class="meta-val" style="color: #4ade80;">100% Gratuita</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contador Dinâmico de Vagas -->
+        <div class="vagas-meter-box" id="boxVagas">
+            <div class="vagas-header">
+                <div class="vagas-title">
+                    <span>🔥 Ingressos Disponíveis:</span>
+                </div>
+                <div class="vagas-counter-badge" id="vagasRestantesBadge">Carregando...</div>
+            </div>
+            <div class="vagas-progress-bg">
+                <div class="vagas-progress-bar" id="vagasProgressBar" style="width: 100%;"></div>
+            </div>
+            <div class="vagas-status-text">
+                <span id="vagasPreenchidasTxt">0 inscritos</span>
+                <span>Capacidade: 75 vagas</span>
+            </div>
+        </div>
+
+        <!-- Box de Regra de Crianças de Colo -->
+        <div class="kids-rule-alert">
+            <span class="kids-rule-icon">👶</span>
+            <div class="kids-rule-body">
+                <h4>Aviso Importante: Crianças de Colo</h4>
+                <p>Crianças de colo <strong>não contam como ingresso/vaga</strong>. Não é necessário emitir ingresso para bebês ou crianças de colo que não ocuparão assento individual.</p>
+            </div>
+        </div>
+
+        <!-- Card de Vagas Esgotadas (oculto por padrão) -->
+        <div class="esgotado-card" id="cardEsgotado">
+            <h2 style="color: #ef4444; margin: 0 0 10px; font-size: 1.6rem;">🎟️ Vagas Esgotadas!</h2>
+            <p style="color: #d1d5db; margin: 0 0 16px;">
+                Atingimos o limite de 75 lugares para esta sessão. Caso surjam desistências, avisaremos em nossas redes e grupos!
+            </p>
+            <a href="https://wa.me/5511942685501?text=Ol%C3%A1%2C%20gostaria%20de%20saber%20se%20h%C3%A1%20fila%20de%20espera%20para%20o%20The%20Chosen" target="_blank" rel="noopener noreferrer" style="display:inline-block; background: #25D366; color: #fff; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 700;">
+                Falar com a Secretaria no WhatsApp
+            </a>
+        </div>
+
+        <!-- Formulário de Inscrição -->
+        <div class="form-card" id="cardFormulario">
+            <h2 class="form-section-title">
+                <span>📝 Faça sua Reserva Gratuita</span>
+            </h2>
+
+            <form id="formInscricao">
+                <!-- Seletor de Ingressos -->
+                <div class="form-group">
+                    <label class="form-label">
+                        Quantos ingressos você precisa?
+                        <small>(Máximo de 5 por reserva)</small>
+                    </label>
+                    <div class="qtd-selector-grid" id="qtdButtonsGrid">
+                        <button type="button" class="qtd-btn active" data-qtd="1">1</button>
+                        <button type="button" class="qtd-btn" data-qtd="2">2</button>
+                        <button type="button" class="qtd-btn" data-qtd="3">3</button>
+                        <button type="button" class="qtd-btn" data-qtd="4">4</button>
+                        <button type="button" class="qtd-btn" data-qtd="5">5</button>
+                    </div>
+                </div>
+
+                <!-- Campos Gerados Dinamicamente para Nome dos Participantes -->
+                <div class="form-group">
+                    <label class="form-label">Nome Completo dos Participantes:</label>
+                    <div class="participantes-container" id="participantesInputs">
+                        <!-- Gerado via JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Dados de Contato Obrigatórios -->
+                <div class="form-group">
+                    <label class="form-label" for="inputTelefone">Telefone / WhatsApp para contato e confirmação *</label>
+                    <input type="tel" id="inputTelefone" class="input-text" placeholder="+55 (11) 99999-9999" maxlength="19" required autocomplete="tel">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="inputEmail">E-mail para receber o comprovante *</label>
+                    <input type="email" id="inputEmail" class="input-text" placeholder="seuemail@exemplo.com" required autocomplete="email">
+                </div>
+
+                <div id="msgErro" class="msg-feedback erro"></div>
+
+                <button type="submit" class="submit-btn" id="btnSubmit">
+                    <span>Garantir Meus Ingressos Gratuitos</span>
+                    <span>➔</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Tela de Sucesso / Voucher -->
+        <div class="sucesso-card" id="cardSucesso">
+            <div class="sucesso-badge-check">✓</div>
+            <h2 style="color: #22c55e; margin: 0 0 8px; font-size: 1.7rem;">Inscrição Confirmada!</h2>
+            <p style="color: var(--cor-texto-mutado); margin: 0;">Sua vaga para a Pré-estreia de The Chosen está garantida com sucesso.</p>
+
+            <div class="ticket-box">
+                <span style="font-size: 0.78rem; text-transform: uppercase; color: var(--cor-texto-mutado); display: block; text-align: center; font-weight: 700;">Código da sua Reserva</span>
+                <span class="ticket-code" id="voucherCodigo">TC-XXXXXX</span>
+                
+                <div style="font-size: 0.88rem; color: #fff; margin-bottom: 6px;">
+                    <strong>Evento:</strong> Pré-estreia The Chosen (Temporada 6 - Ep. 1)
+                </div>
+                <div style="font-size: 0.88rem; color: #fff; margin-bottom: 6px;">
+                    <strong>Data & Horário:</strong> 03 de Outubro às 19:00
+                </div>
+                <div style="font-size: 0.88rem; color: #fff; margin-bottom: 12px;">
+                    <strong>Local:</strong> Comunidade Cristã Curados
+                </div>
+
+                <div style="font-size: 0.88rem; color: var(--cor-dourado); font-weight: 700; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
+                    Participantes Confirmados (<span id="voucherQtd">0</span> vaga(s)):
+                </div>
+                <ul class="ticket-list" id="voucherParticipantes"></ul>
+            </div>
+
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 20px;">
+                <button type="button" onclick="window.print()" style="background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 12px 22px; border-radius: 12px; font-weight: 700; cursor: pointer;">
+                    🖨️ Imprimir / Salvar PDF
+                </button>
+                <a id="btnZapCompartilhar" href="#" target="_blank" rel="noopener noreferrer" style="background: #25D366; color: #fff; text-decoration: none; padding: 12px 22px; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+                    💬 Salvar no WhatsApp
+                </a>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Rodapé -->
+    <footer class="footer-bar">
+        &copy; 2026 Comunidade Cristã Curados • R. Benedicto de Abreu Júnior, 40 - Jardim Nova Itapevi, Itapevi - SP
+    </footer>
+
+    <!-- Lógica de Frontend -->
+    <script>
+        let vagasRestantes = 75;
+        let quantidadeSelecionada = 1;
+
+        // Máscara de Telefone Brasileira
+        const inputTelefone = document.getElementById('inputTelefone');
+        inputTelefone.addEventListener('input', (e) => {
+            let v = e.target.value.replace(/\D/g, '');
+            if (v.length > 11) v = v.slice(0, 11);
+            if (v.length <= 10) {
+                v = v.replace(/^(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+            } else {
+                v = v.replace(/^(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+            }
+            e.target.value = v.trim().replace(/-$/, '');
+        });
+
+        // Atualização Dinâmica dos Campos de Participantes
+        const participantesInputs = document.getElementById('participantesInputs');
+        function renderCamposParticipantes(qtd) {
+            participantesInputs.innerHTML = '';
+            for (let i = 1; i <= qtd; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'input-text';
+                input.required = true;
+                input.minLength = 3;
+                input.name = `participante_${i}`;
+                input.placeholder = i === 1 
+                    ? '1. Nome Completo do Titular (Seu Nome) *' 
+                    : `${i}. Nome Completo do Acompanhante ${i} *`;
+                participantesInputs.appendChild(input);
+            }
+        }
+        renderCamposParticipantes(1);
+
+        // Seletor de Quantidade
+        const qtdButtons = document.querySelectorAll('.qtd-btn');
+        qtdButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const qtd = parseInt(btn.getAttribute('data-qtd'), 10);
+                if (qtd > vagasRestantes) {
+                    alert(`Restam apenas ${vagasRestantes} vaga(s) disponível(is).`);
+                    return;
+                }
+                qtdButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                quantidadeSelecionada = qtd;
+                renderCamposParticipantes(qtd);
+            });
+        });
+
+        // Consulta de Vagas em Tempo Real
+        async function atualizarVagas() {
+            try {
+                const res = await fetch('/the-chosen/api/vagas');
+                if (!res.ok) return;
+                const data = await res.json();
+                vagasRestantes = data.restantes;
+
+                const badge = document.getElementById('vagasRestantesBadge');
+                const bar = document.getElementById('vagasProgressBar');
+                const txt = document.getElementById('vagasPreenchidasTxt');
+
+                badge.textContent = `${data.restantes} restante(s)`;
+                txt.textContent = `${data.preenchidas} participante(s) já inscritos`;
+
+                const pct = Math.max(0, Math.min(100, (data.restantes / data.total) * 100));
+                bar.style.width = `${pct}%`;
+
+                // Bloqueio se esgotado
+                if (data.esgotado || data.restantes <= 0) {
+                    document.getElementById('cardFormulario').style.display = 'none';
+                    document.getElementById('cardEsgotado').style.display = 'block';
+                    badge.textContent = 'Esgotado';
+                    badge.style.color = '#ef4444';
+                    badge.style.borderColor = '#ef4444';
+                }
+
+                // Ajustar botões de quantidade caso restem menos de 5
+                qtdButtons.forEach(btn => {
+                    const q = parseInt(btn.getAttribute('data-qtd'), 10);
+                    if (q > data.restantes) {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.3';
+                        btn.style.cursor = 'not-allowed';
+                    } else {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
+                    }
+                });
+
+                if (quantidadeSelecionada > data.restantes && data.restantes > 0) {
+                    quantidadeSelecionada = data.restantes;
+                    renderCamposParticipantes(data.restantes);
+                    qtdButtons.forEach(b => b.classList.toggle('active', parseInt(b.getAttribute('data-qtd'), 10) === data.restantes));
+                }
+            } catch (err) {
+                console.error('Erro ao atualizar vagas:', err);
+            }
+        }
+        atualizarVagas();
+        setInterval(atualizarVagas, 15000); // Atualiza a cada 15s
+
+        // Envio do Formulário
+        const formInscricao = document.getElementById('formInscricao');
+        const msgErro = document.getElementById('msgErro');
+        const btnSubmit = document.getElementById('btnSubmit');
+
+        formInscricao.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            msgErro.style.display = 'none';
+            msgErro.textContent = '';
+
+            const inputs = participantesInputs.querySelectorAll('input');
+            const participantes = Array.from(inputs).map(inp => inp.value.trim());
+
+            if (participantes.some(p => p.length < 3)) {
+                msgErro.textContent = 'Por favor, preencha o nome completo de todos os participantes.';
+                msgErro.style.display = 'block';
+                return;
+            }
+
+            const telefone = inputTelefone.value;
+            const email = document.getElementById('inputEmail').value.trim();
+
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span>Processando reserva...</span>';
+
+            try {
+                const res = await fetch('/the-chosen/api/inscrever', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        quantidade: quantidadeSelecionada,
+                        participantes,
+                        telefone,
+                        email
+                    })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok || !data.ok) {
+                    msgErro.textContent = data.message || 'Não foi possível concluir a inscrição. Tente novamente.';
+                    msgErro.style.display = 'block';
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<span>Garantir Meus Ingressos Gratuitos</span><span>➔</span>';
+                    atualizarVagas();
+                    return;
+                }
+
+                // Sucesso: Renderizar Voucher
+                document.getElementById('cardFormulario').style.display = 'none';
+                document.getElementById('boxVagas').style.display = 'none';
+                
+                const cardSucesso = document.getElementById('cardSucesso');
+                cardSucesso.style.display = 'block';
+                document.getElementById('voucherCodigo').textContent = data.inscricao.codigo;
+                document.getElementById('voucherQtd').textContent = data.inscricao.quantidade;
+
+                const ul = document.getElementById('voucherParticipantes');
+                ul.innerHTML = '';
+                data.inscricao.participantes.forEach(nome => {
+                    const li = document.createElement('li');
+                    li.textContent = nome;
+                    ul.appendChild(li);
+                });
+
+                // Link para WhatsApp com os dados do ingresso
+                const msgZap = encodeURIComponent(
+                    `*Comprovante de Inscrição - The Chosen Temporada 6*\n\n` +
+                    `Código: ${data.inscricao.codigo}\n` +
+                    `Data: 03/10 às 19:00\n` +
+                    `Local: Comunidade Cristã Curados\n` +
+                    `Participantes (${data.inscricao.quantidade}):\n` +
+                    data.inscricao.participantes.map(p => `- ${p}`).join('\n')
+                );
+                document.getElementById('btnZapCompartilhar').href = `https://api.whatsapp.com/send?text=${msgZap}`;
+
+                cardSucesso.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (err) {
+                console.error(err);
+                msgErro.textContent = 'Erro ao conectar ao servidor. Verifique sua conexão e tente novamente.';
+                msgErro.style.display = 'block';
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<span>Garantir Meus Ingressos Gratuitos</span><span>➔</span>';
+            }
+        });
+    </script>
+</body>
+</html>

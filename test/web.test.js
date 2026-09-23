@@ -153,6 +153,48 @@ test("GET /lideranca e /nossa-lideranca: serve a página dedicada à liderança 
   }
 });
 
+test("GET /the-chosen: serve a página de inscrição de The Chosen isolada com status 200 e banners responsivos", async () => {
+  for (const url of [`${baseUrl}/the-chosen`, `${baseUrl}/the-chosen/`, `${baseUrl}/thechosen`]) {
+    const res = await fetch(url);
+    assert.equal(res.status, 200, `deve retornar 200 para ${url}`);
+    assert.match(res.headers.get("content-type"), /text\/html/);
+    const html = await res.text();
+    assert.match(html, /Pré-estreia The Chosen/i);
+    assert.match(html, /the-chosen-desktop\.jpg/);
+    assert.match(html, /the-chosen-mobile\.jpg/);
+    assert.match(html, /Capacidade: 75 vagas/);
+    assert.match(html, /Crianças de colo/i);
+    assert.doesNotMatch(html, /href="\/secretaria"/, "link da secretaria não deve estar exposto");
+  }
+});
+
+test("API /the-chosen: consulta de vagas e realização de inscrição", async () => {
+  // 1. Consulta vagas
+  const resVagas = await fetch(`${baseUrl}/the-chosen/api/vagas`);
+  assert.equal(resVagas.status, 200);
+  const jsonVagas = await resVagas.json();
+  assert.equal(jsonVagas.total, 75);
+  assert.ok(jsonVagas.restantes >= 0);
+
+  // 2. Inscrição com sucesso
+  const resInscrever = await fetch(`${baseUrl}/the-chosen/api/inscrever`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quantidade: 2,
+      participantes: ["Gabriel Teste", "Acompanhante Teste"],
+      telefone: "11942685501",
+      email: "teste@curados.com"
+    })
+  });
+
+  assert.equal(resInscrever.status, 200);
+  const jsonInscricao = await resInscrever.json();
+  assert.equal(jsonInscricao.ok, true);
+  assert.ok(jsonInscricao.inscricao.codigo.startsWith("TC-"));
+  assert.equal(jsonInscricao.inscricao.quantidade, 2);
+});
+
 
 test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404 e com Cache-Control no-cache", async () => {
   const res = await fetch(`${baseUrl}/favicon.ico`);

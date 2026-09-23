@@ -8,6 +8,7 @@ const { validatePassword, hashPassword, createSession, isAuthenticated, getSessi
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 const { createRateLimiter } = require("./web/rateLimiter");
 const { getClientIp } = require("./web/clientIp");
+const theChosen = require("./web/the_chosen");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
 const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
@@ -28,6 +29,9 @@ const MINISTERIOS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "mini
 const LIDERANCA_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "lideranca.html"))
   ? path.join(__dirname, "public", "lideranca.html")
   : path.join(__dirname, "web", "public", "lideranca.html");
+const THE_CHOSEN_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "the-chosen.html"))
+  ? path.join(__dirname, "public", "the-chosen.html")
+  : path.join(__dirname, "web", "public", "the-chosen.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -268,6 +272,63 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           });
           return res.end(content);
         }
+      }
+
+      // Rota /the-chosen (e variações como /thechosen): Inscrição exclusiva para a Pré-estreia The Chosen
+      if (req.method === 'GET' && (
+        pathname === '/the-chosen' || pathname === '/the-chosen/' || pathname === '/the-chosen.html' ||
+        pathname === '/thechosen' || pathname === '/thechosen/' || pathname === '/thechosen.html'
+      )) {
+        if (theChosen.estaExpirado()) {
+          // Conforme solicitado: no dia 04/10 a página é desativada
+          res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Evento Encerrado</title></head><body style="background:#0d0d12;color:#fff;font-family:sans-serif;text-align:center;padding:80px 20px;"><h1>Evento Encerrado</h1><p>A Pré-estreia de The Chosen ocorreu em 03/10/2026 e esta página foi encerrada.</p><p><a href="/" style="color:#00B7D9;">Voltar para a página inicial</a></p></body></html>');
+        }
+
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "the-chosen.html"))
+          ? path.join(__dirname, "public", "the-chosen.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "the-chosen.html")) ? path.join(__dirname, "web", "public", "the-chosen.html") : THE_CHOSEN_HTML_FILE);
+        if (fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // API: Consulta de vagas em tempo real
+      if (req.method === 'GET' && pathname === '/the-chosen/api/vagas') {
+        return sendJson(res, 200, theChosen.obterStatusVagas());
+      }
+
+      // API: Processamento de inscrição
+      if (req.method === 'POST' && pathname === '/the-chosen/api/inscrever') {
+        try {
+          const body = await parseRequestBody(req);
+          const resultado = theChosen.realizarInscricao(body);
+          if (resultado.ok) {
+            return sendJson(res, 200, resultado);
+          } else {
+            const status = resultado.code === 'ESGOTADO' || resultado.code === 'VAGAS_INSUFICIENTES' ? 409 : 400;
+            return sendJson(res, status, resultado);
+          }
+        } catch (err) {
+          console.error('[The Chosen] Erro ao processar inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro interno ao processar inscrição.' });
+        }
+      }
+
+      // API: Listagem de inscritos para a administração/secretaria
+      if (req.method === 'GET' && pathname === '/the-chosen/api/inscritos') {
+        const sessionId = getSessionId(req);
+        if (!isAuthenticated(sessionId)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        return sendJson(res, 200, { ok: true, inscricoes: theChosen.listarInscricoes() });
       }
 
       if (req.method === 'GET' && pathname === '/secretaria/login') {
