@@ -162,14 +162,29 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
         return res.end();
       }
 
-      // Servir imagens estáticas (logo, favicon sob /images/)
-      if (req.method === 'GET' && (pathname === '/images/logo.png' || pathname === '/images/favicon.png' || pathname === '/public/images/logo.png')) {
+      // Servir imagens estáticas (logo, favicon, ícones de ministérios sob /images/)
+      if (req.method === 'GET' && (pathname.startsWith('/images/') || pathname.startsWith('/public/images/'))) {
         const cleanPath = pathname.replace(/^\/public/, '');
-        const imgPath = path.join(__dirname, 'public', cleanPath);
-        const webImgPath = path.join(__dirname, 'web', 'public', cleanPath);
-        const fileToRead = fs.existsSync(imgPath) ? imgPath : (fs.existsSync(webImgPath) ? webImgPath : null);
+        const safePath = path.normalize(cleanPath).replace(/^(\.\.[\/\\])+/, '');
+        const imgPath = path.join(__dirname, 'public', safePath);
+        const webImgPath = path.join(__dirname, 'web', 'public', safePath);
+        const fileToRead = (fs.existsSync(imgPath) && fs.statSync(imgPath).isFile())
+          ? imgPath
+          : ((fs.existsSync(webImgPath) && fs.statSync(webImgPath).isFile()) ? webImgPath : null);
         if (fileToRead) {
-          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0' });
+          const ext = path.extname(fileToRead).toLowerCase();
+          const mimeTypes = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.svg': 'image/svg+xml',
+            '.webp': 'image/webp',
+            '.ico': 'image/x-icon'
+          };
+          res.writeHead(200, {
+            'Content-Type': mimeTypes[ext] || 'image/png',
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0'
+          });
           return res.end(fs.readFileSync(fileToRead));
         }
       }

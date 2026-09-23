@@ -1169,16 +1169,16 @@ function renderIndexHtml() {
               <div class="deptos-container" style="margin-bottom: 14px;">
                 <span class="cargos-title" style="display:block; font-size: 0.85rem; color: #a1a1aa; margin-bottom: 6px;">Departamentos / Ministérios:</span>
                 <div class="deptos-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; max-height: 160px; overflow-y: auto; padding: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;">
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Evangelismo" /> Evangelismo</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Epifania" /> Epifania</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Intercessão" /> Intercessão</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Projeto Social Seeds" /> Projeto Social Seeds</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Ruach" /> Rede Ruach</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Casais" /> Rede de Casais</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Homens" /> Rede de Homens</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Mulheres" /> Rede de Mulheres</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Kids" /> Rede Kids</label>
-                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Departamento de Artes" /> Departamento de Artes</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Kids" /> <img src="/images/icon-kids.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Rede Kids</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede Ruach" /> <img src="/images/icon-ruach.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Rede Ruach</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Casais" /> <img src="/images/icon-casais.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Rede de Casais</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Homens" /> <img src="/images/icon-homens.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Rede de Homens</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Rede de Mulheres" /> <img src="/images/icon-mulheres.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Rede de Mulheres</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Epifania" /> <img src="/images/icon-epifania.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Epifania</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Departamento de Artes" /> <img src="/images/icon-artes.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Departamento de Artes</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Evangelismo" /> <img src="/images/icon-evangelismo.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Evangelismo</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Intercessão" /> <img src="/images/icon-intercessao.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Intercessão</label>
+                  <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Projeto Social Seeds" /> <img src="/images/icon-seeds.png" alt="" style="width: 16px; height: 16px; object-fit: contain;" /> Projeto Social Seeds</label>
                   <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Diaconia" /> Diaconia</label>
                   <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Relacionamentos" /> Relacionamentos</label>
                   <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #e4e4e7;"><input type="checkbox" name="departamentos" value="Eventos Externos" /> Eventos Externos</label>
@@ -1557,10 +1557,36 @@ function renderIndexHtml() {
           vazio.textContent = 'Nenhum ministério vinculado';
           tagsDeptos.appendChild(vazio);
         } else {
+          const ICONES_MAP = {
+            'Rede Kids': '/images/icon-kids.png',
+            'Rede Ruach': '/images/icon-ruach.png',
+            'Rede de Casais': '/images/icon-casais.png',
+            'Rede de Homens': '/images/icon-homens.png',
+            'Rede de Mulheres': '/images/icon-mulheres.png',
+            'Epifania': '/images/icon-epifania.png',
+            'Departamento de Artes': '/images/icon-artes.png',
+            'Evangelismo': '/images/icon-evangelismo.png',
+            'Intercessão': '/images/icon-intercessao.png',
+            'Projeto Social Seeds': '/images/icon-seeds.png'
+          };
           deptosList.forEach(depto => {
             const badgeDepto = document.createElement('span');
             badgeDepto.className = 'badge badge-depto';
-            badgeDepto.textContent = depto;
+            badgeDepto.style.display = 'inline-flex';
+            badgeDepto.style.alignItems = 'center';
+            badgeDepto.style.gap = '5px';
+            const iconUrl = ICONES_MAP[depto];
+            if (iconUrl) {
+              const img = document.createElement('img');
+              img.src = iconUrl;
+              img.alt = '';
+              img.style.width = '14px';
+              img.style.height = '14px';
+              img.style.objectFit = 'contain';
+              badgeDepto.appendChild(img);
+            }
+            const txt = document.createTextNode(depto);
+            badgeDepto.appendChild(txt);
             tagsDeptos.appendChild(badgeDepto);
           });
         }
