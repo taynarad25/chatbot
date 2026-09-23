@@ -137,6 +137,21 @@ test("GET /ministerios e /ministérios: serve a página dedicada aos ministério
   }
 });
 
+test("GET /lideranca e /nossa-lideranca: serve a página dedicada à liderança com 200 e seções completas", async () => {
+  for (const url of [`${baseUrl}/lideranca`, `${baseUrl}/lideranca/`, `${baseUrl}/nossa-lideranca`, `${baseUrl}/lideran%C3%A7a`]) {
+    const res = await fetch(url);
+    assert.equal(res.status, 200, `deve retornar 200 para ${url}`);
+    assert.match(res.headers.get("content-type"), /text\/html/);
+    const html = await res.text();
+    assert.match(html, /Nossa Liderança/i);
+    assert.match(html, /Pastores/);
+    assert.match(html, /Diretoria & Coordenação/);
+    assert.match(html, /Líderes de Ministérios & Redes/);
+    assert.match(html, /avatar-wrapper/);
+    assert.match(html, /avatar-ring/);
+    assert.doesNotMatch(html, /href="\/secretaria"/, "link da secretaria não deve estar exposto na página pública");
+  }
+});
 
 
 test("GET /favicon.ico: serve o ícone (PNG), sem cair no 404 e com Cache-Control no-cache", async () => {
@@ -182,8 +197,8 @@ test("GET /home: retorna a página institucional da Comunidade Cristã Curados c
   const html = await res.text();
   assert.match(html, /COMUNIDADE CRISTÃ/);
   assert.match(html, /CURADOS/);
-  assert.match(html, /<img\s+src="(\/)?logo\.png"/);
-  assert.match(html, /logo-img-anim/);
+  assert.match(html, /banner-desktop\.jpg/);
+  assert.match(html, /banner-mobile\.png/);
 });
 
 test("GET / (raiz): retorna a página institucional da Comunidade Cristã Curados por padrão com status 200", async () => {
@@ -193,7 +208,7 @@ test("GET / (raiz): retorna a página institucional da Comunidade Cristã Curado
   const html = await res.text();
   assert.match(html, /COMUNIDADE CRISTÃ/);
   assert.match(html, /CURADOS/);
-  assert.match(html, /logo-wrapper/);
+  assert.match(html, /hero-banner-picture/);
 });
 
 test("GET /logo.png: serve a imagem oficial do logotipo (PNG) com status 200", async () => {

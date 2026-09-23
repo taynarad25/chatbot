@@ -25,6 +25,9 @@ const HOME_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "home.html")
 const MINISTERIOS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "ministerios.html"))
   ? path.join(__dirname, "public", "ministerios.html")
   : path.join(__dirname, "web", "public", "ministerios.html");
+const LIDERANCA_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "lideranca.html"))
+  ? path.join(__dirname, "public", "lideranca.html")
+  : path.join(__dirname, "web", "public", "lideranca.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -235,6 +238,28 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
       )) {
         if (fs.existsSync(MINISTERIOS_HTML_FILE)) {
           const content = fs.readFileSync(MINISTERIOS_HTML_FILE, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // Rota /lideranca (e variações como /nossa-lideranca, /liderança): Página dedicada à Liderança da Comunidade Cristã Curados
+      if (req.method === 'GET' && (
+        pathname === '/lideranca' || pathname === '/lideranca/' || pathname === '/lideranca.html' ||
+        pathname === '/nossa-lideranca' || pathname === '/nossa-lideranca/' || pathname === '/nossa-lideranca.html' ||
+        decodedPathname === '/liderança' || decodedPathname === '/liderança/' || decodedPathname === '/liderança.html' ||
+        decodedPathname === '/nossa-liderança' || decodedPathname === '/nossa-liderança/' || decodedPathname === '/nossa-liderança.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "lideranca.html"))
+          ? path.join(__dirname, "public", "lideranca.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "lideranca.html")) ? path.join(__dirname, "web", "public", "lideranca.html") : LIDERANCA_HTML_FILE);
+        if (fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
           res.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
             'X-Content-Type-Options': 'nosniff',
