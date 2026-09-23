@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const DATA_FILE = process.env.THE_CHOSEN_DATA_PATH || path.join(__dirname, '..', 'the_chosen_inscricoes.json');
-const LIMITE_VAGAS = 75;
+const LIMITE_VAGAS = 50;
 const DATA_EXPIRACAO = new Date('2026-10-04T00:00:00-03:00');
 
 function carregarInscricoes() {
@@ -82,7 +82,7 @@ function realizarInscricao({ quantidade, participantes, telefone, email }, dataR
   const emailLimpo = String(email || '').trim().toLowerCase();
   const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!regexEmail.test(emailLimpo)) {
-    return { ok: false, code: 'EMAIL_INVALIDO', message: 'Informe um e-mail válido para receber a confirmação.' };
+    return { ok: false, code: 'EMAIL_INVALIDO', message: 'Informe um e-mail válido para contato.' };
   }
 
   // Trava de concorrência e estoque
@@ -112,6 +112,11 @@ function realizarInscricao({ quantidade, participantes, telefone, email }, dataR
     email: emailLimpo,
     evento: 'Pré-estreia The Chosen - Temporada 6',
     dataEvento: '03/10/2026 19:00',
+    statusConfirmacao: 'pendente', // 'pendente' | 'confirmado' | 'cancelado'
+    confirmadoEm: null,
+    lembrete3DiasEnviado: false,
+    lembreteDiaEventoEnviado: false,
+    whatsappConfirmacaoEnviado: false,
     criadoEm: new Date().toISOString()
   };
 
@@ -134,6 +139,232 @@ function listarInscricoes() {
   return carregarInscricoes();
 }
 
+function normalizarTelefone(tel) {
+  let limpo = String(tel || '').replace(/\D/g, '');
+  if (limpo.startsWith('55') && limpo.length >= 12) {
+    limpo = limpo.slice(2);
+  }
+  return limpo;
+}
+
+function buscarInscricaoPorTelefoneOuCodigo(termo) {
+  if (!termo) return null;
+  const inscricoes = carregarInscricoes();
+  const termoLimpo = String(termo).trim().toUpperCase();
+  const telBusca = normalizarTelefone(termo);
+
+  // Busca por código exato (ex: TC-XXXXXX)
+  let achou = inscricoes.find(i => i.codigo && i.codigo.toUpperCase() === termoLimpo);
+  if (achou) return achou;
+
+  // Busca por ID
+  achou = inscricoes.find(i => i.id === termo);
+  if (achou) return achou;
+
+  // Busca por telefone (comparando últimos 8 ou 9 dígitos para tolerar DDD e 9 extra)
+  if (telBusca.length >= 8) {
+    achou = inscricoes.find(i => {
+      const iTel = normalizarTelefone(i.telefone);
+      return iTel.endsWith(telBusca) || telBusca.endsWith(iTel);
+    });
+  }
+
+  return achou || null;
+}
+
+function confirmarPresenca(termo, status = 'confirmado') {
+  const inscricoes = carregarInscricoes();
+  const termoLimpo = String(termo || '').trim().toUpperCase();
+  const telBusca = normalizarTelefone(termo);
+
+  let idx = inscricoes.findIndex(i => i.codigo && i.codigo.toUpperCase() === termoLimpo);
+  if (idx === -1) {
+    idx = inscricoes.findIndex(i => i.id === termo);
+  }
+  if (idx === -1 && telBusca.length >= 8) {
+    idx = inscricoes.findIndex(i => {
+      const iTel = normalizarTelefone(i.telefone);
+      return iTel.endsWith(telBusca) || telBusca.endsWith(iTel);
+    });
+  }
+
+  if (idx === -1) {
+    return { ok: false, message: 'Inscrição não encontrada para confirmação.' };
+  }
+
+  inscricoes[idx].statusConfirmacao = status; // 'confirmado' | 'cancelado' | 'pendente'
+  inscricoes[idx].confirmadoEm = new Date().toISOString();
+  salvarInscricoes(inscricoes);
+
+  return { ok: true, inscricao: inscricoes[idx] };
+}
+
+function obterEstatisticasConfirmacao() {
+  const inscricoes = carregarInscricoes();
+  let totalInscricoes = inscricoes.length;
+  let totalIngressos = 0;
+  let confirmados = 0;
+  let ingressosConfirmados = 0;
+  let cancelados = 0;
+  let ingressosCancelados = 0;
+  let pendentes = 0;
+  let ingressosPendentes = 0;
+
+  for (const i of inscricoes) {
+    const qtd = Number(i.quantidade) || 1;
+    totalIngressos += qtd;
+    if (i.statusConfirmacao === 'confirmado') {
+      confirmados++;
+      ingressosConfirmados += qtd;
+    } else if (i.statusConfirmacao === 'cancelado') {
+      cancelados++;
+      ingressosCancelados += qtd;
+    } else {
+      pendentes++;
+      ingressosPendentes += qtd;
+    }
+  }
+
+  return {
+    limite: LIMITE_VAGAS,
+    totalInscricoes,
+    totalIngressos,
+    restantes: Math.max(0, LIMITE_VAGAS - totalIngressos),
+    confirmados,
+    ingressosConfirmados,
+    cancelados,
+    ingressosCancelados,
+    pendentes,
+    ingressosPendentes
+  };
+}
+
+function renderTheChosenPdfHtml() {
+  const inscricoes = carregarInscricoes();
+  const stats = obterEstatisticasConfirmacao();
+  
+  const linhasTabela = inscricoes.map((i, idx) => {
+    const participantes = (i.participantes || [i.titular]).join(', ');
+    const statusLabel = i.statusConfirmacao === 'confirmado' ? '✅ Confirmado' : (i.statusConfirmacao === 'cancelado' ? '❌ Cancelado' : '⏳ Pendente');
+    const telFormatado = i.telefone ? i.telefone.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') : '-';
+
+    return `
+      <tr>
+        <td style="text-align:center; width: 40px;"><div style="width: 18px; height: 18px; border: 2px solid #333; margin: 0 auto; border-radius: 3px;"></div></td>
+        <td style="font-family: monospace; font-weight: bold; font-size: 0.85rem;">${i.codigo || '-'}</td>
+        <td><strong>${i.titular || '-'}</strong></td>
+        <td style="text-align: center; font-weight: bold;">${i.quantidade || 1}</td>
+        <td style="font-size: 0.85rem;">${participantes}</td>
+        <td style="font-size: 0.85rem;">${telFormatado}</td>
+        <td style="font-size: 0.82rem; text-align: center;">${statusLabel}</td>
+        <td style="border-bottom: 1px solid #ddd; width: 100px;"></td>
+      </tr>
+    `;
+  }).join('');
+
+  return `<!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <title>Lista de Presença - Pré-estreia The Chosen</title>
+    <style>
+      @page { size: A4; margin: 1.2cm; }
+      body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #111; margin: 0; padding: 20px; font-size: 11pt; }
+      .no-print {
+        background: #1e1e24; color: #fff; padding: 14px 20px; border-radius: 8px; margin-bottom: 24px;
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .no-print button {
+        background: #00bcd4; color: #fff; border: none; padding: 10px 20px; border-radius: 6px;
+        font-weight: bold; font-size: 14px; cursor: pointer;
+      }
+      @media print {
+        .no-print { display: none !important; }
+        body { padding: 0; }
+      }
+      .header { border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 18px; }
+      .header h1 { margin: 0 0 4px; font-size: 1.4rem; letter-spacing: 1px; text-transform: uppercase; }
+      .header h2 { margin: 0 0 6px; font-size: 1.1rem; color: #444; font-weight: 600; }
+      .header-meta { font-size: 0.88rem; color: #555; }
+      .summary-cards { display: flex; gap: 15px; margin-bottom: 18px; }
+      .summary-box { flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px 12px; text-align: center; }
+      .summary-box .val { font-size: 1.3rem; font-weight: bold; margin-bottom: 2px; }
+      .summary-box .lbl { font-size: 0.75rem; text-transform: uppercase; color: #666; font-weight: 600; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }
+      th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: middle; }
+      th { background-color: #f3f4f6; font-weight: bold; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.5px; }
+      tr:nth-child(even) { background-color: #fafafa; }
+      .footer-note { margin-top: 24px; font-size: 8pt; color: #777; text-align: center; border-top: 1px solid #eee; padding-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="no-print">
+      <div>
+        <strong>📄 Visualização de Impressão / PDF</strong>
+        <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.85;">Clique no botão ao lado ou pressione Ctrl+P para salvar como PDF ou imprimir a folha de presença.</p>
+      </div>
+      <button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+    </div>
+
+    <div class="header">
+      <h1>Comunidade Cristã Curados • Secretaria</h1>
+      <h2>Lista Oficial de Portaria & Presença • Pré-estreia The Chosen (Temporada 6)</h2>
+      <div class="header-meta">
+        <strong>Data do Evento:</strong> Sábado, 03/10/2026 às 19:00 &nbsp;|&nbsp; 
+        <strong>Local:</strong> Auditório Principal &nbsp;|&nbsp; 
+        <strong>Capacidade:</strong> 50 vagas &nbsp;|&nbsp;
+        <strong>Gerado em:</strong> ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+
+    <div class="summary-cards">
+      <div class="summary-box">
+        <div class="val">${stats.totalInscricoes}</div>
+        <div class="lbl">Inscrições</div>
+      </div>
+      <div class="summary-box">
+        <div class="val" style="color: #0284c7;">${stats.totalIngressos} / ${stats.limite}</div>
+        <div class="lbl">Ingressos Reservados</div>
+      </div>
+      <div class="summary-box">
+        <div class="val" style="color: #16a34a;">${stats.ingressosConfirmados}</div>
+        <div class="lbl">Confirmados</div>
+      </div>
+      <div class="summary-box">
+        <div class="val" style="color: #ea580c;">${stats.ingressosPendentes}</div>
+        <div class="lbl">Pendentes</div>
+      </div>
+      <div class="summary-box">
+        <div class="val" style="color: #dc2626;">${stats.ingressosCancelados}</div>
+        <div class="lbl">Cancelados</div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align: center;">Visto</th>
+          <th>Código</th>
+          <th>Titular</th>
+          <th style="text-align: center;">Qtd</th>
+          <th>Participantes</th>
+          <th>Telefone</th>
+          <th style="text-align: center;">Status</th>
+          <th>Assinatura / Portaria</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${linhasTabela || '<tr><td colspan="8" style="text-align:center; padding: 20px;">Nenhuma inscrição realizada até o momento.</td></tr>'}
+      </tbody>
+    </table>
+
+    <div class="footer-note">
+      Comunidade Cristã Curados • R. Benedicto de Abreu Júnior, 40 - Jardim Nova Itapevi, Itapevi - SP • Documento Interno de Gestão
+    </div>
+  </body>
+  </html>`;
+}
+
 module.exports = {
   LIMITE_VAGAS,
   DATA_EXPIRACAO,
@@ -141,5 +372,10 @@ module.exports = {
   obterStatusVagas,
   realizarInscricao,
   listarInscricoes,
-  carregarInscricoes
+  carregarInscricoes,
+  salvarInscricoes,
+  buscarInscricaoPorTelefoneOuCodigo,
+  confirmarPresenca,
+  obterEstatisticasConfirmacao,
+  renderTheChosenPdfHtml
 };

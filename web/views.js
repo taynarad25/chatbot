@@ -650,6 +650,85 @@ function renderIndexHtml() {
       margin-bottom: 1.2rem;
       letter-spacing: -0.3px;
     }
+    .evento-card-item {
+      background: linear-gradient(135deg, rgba(123, 44, 191, 0.14), rgba(0, 188, 212, 0.10));
+      border: 1px solid rgba(0, 188, 212, 0.35);
+      border-radius: 18px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+    .evento-metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin-top: 1rem;
+    }
+    .evento-metric-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 10px 14px;
+      text-align: center;
+    }
+    .evento-metric-val {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+    }
+    .evento-metric-lbl {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--cor-texto-mutado);
+      margin-top: 2px;
+    }
+    .evento-toolbar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 1.2rem;
+    }
+    .evento-search-input {
+      flex: 1;
+      min-width: 240px;
+      padding: 0.75rem 1rem;
+      background: #1e1e26;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+    .evento-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .evento-table th {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--cor-texto-mutado);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--cor-borda);
+    }
+    .evento-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      vertical-align: middle;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+    .status-confirmado { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .status-pendente { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+    .status-cancelado { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
     .message-box {
       padding: 12px 16px;
       margin-bottom: 1rem;
@@ -1101,6 +1180,7 @@ function renderIndexHtml() {
 
     <div class="tabs">
       <button class="tab-btn active" onclick="openTab(event, 'tab-whatsapp')">WhatsApp</button>
+      <button class="tab-btn" id="btn-tab-eventos" onclick="openTab(event, 'tab-eventos')">Eventos</button>
       <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">Perfil de Acesso</button>
       <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">Usuários & Cargos</button>
       <button class="tab-btn" id="btn-tab-logs" style="display:none;" onclick="openTab(event, 'tab-logs')">Logs</button>
@@ -1115,6 +1195,100 @@ function renderIndexHtml() {
         <button id="cancelQr" style="display:none">Cancelar QR Code</button>
         <button class="danger" id="disconnect" style="display:none">Desconectar WhatsApp</button>
         <button id="resetSession" style="display:none; background: rgba(234, 88, 12, 0.25); color: #fdba74; border: 1px solid rgba(234, 88, 12, 0.5);">Resetar Conexão / Limpar Cache</button>
+      </div>
+    </div>
+
+    <!-- Aba de Gestão de Eventos -->
+    <div id="tab-eventos" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3 class="section-title-tab" style="margin-bottom: 4px;">Gestão de Eventos</h3>
+          <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">Acompanhamento de inscrições, confirmações de presença e relatórios para portaria.</p>
+        </div>
+      </div>
+
+      <!-- Card do Evento The Chosen -->
+      <div class="evento-card-item">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(0, 188, 212, 0.15); color: var(--cor-ciano); border: 1px solid rgba(0, 188, 212, 0.35); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
+              🎬 Pré-estreia Exclusiva
+            </div>
+            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Pré-estreia The Chosen - Temporada 6 (Ep. 1)</h4>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
+              🗓️ <strong>03/10/2026 às 19:00</strong> &nbsp;•&nbsp; 📍 <strong>Auditório Principal</strong> (Capacidade: 50 vagas)
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button onclick="window.open('/the-chosen/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #0284c7, #00bcd4); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0, 188, 212, 0.3);">
+              📄 Exportar como PDF
+            </button>
+            <button onclick="fetchTheChosenInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+              🔄 Atualizar
+            </button>
+          </div>
+        </div>
+
+        <div class="evento-metric-grid" id="theChosenMetrics">
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="tcTotalInscricoes">-</div>
+            <div class="evento-metric-lbl">Inscrições</div>
+          </div>
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="tcTotalIngressos" style="color: var(--cor-ciano);">-</div>
+            <div class="evento-metric-lbl">Vagas Ocupadas (de 50)</div>
+          </div>
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="tcVagasRestantes" style="color: #4ade80;">-</div>
+            <div class="evento-metric-lbl">Vagas Restantes</div>
+          </div>
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="tcConfirmados" style="color: #22c55e;">-</div>
+            <div class="evento-metric-lbl">Confirmados</div>
+          </div>
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="tcPendentes" style="color: #facc15;">-</div>
+            <div class="evento-metric-lbl">Aguardando</div>
+          </div>
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="tcCancelados" style="color: #f87171;">-</div>
+            <div class="evento-metric-lbl">Cancelados</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros e Busca -->
+      <div class="evento-toolbar">
+        <input type="text" id="tcSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, titular, telefone ou código (TC-)..." oninput="filtrarTheChosenInscricoes()" />
+        <select id="tcStatusFilter" onchange="filtrarTheChosenInscricoes()" style="padding: 0.75rem 1rem; background: #1e1e26; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; color: #fff; font-size: 0.88rem;">
+          <option value="todos">Todos os status</option>
+          <option value="confirmado">Apenas Confirmados</option>
+          <option value="pendente">Apenas Pendentes</option>
+          <option value="cancelado">Apenas Cancelados</option>
+        </select>
+      </div>
+
+      <!-- Tabela de Inscritos -->
+      <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto;">
+        <table class="evento-table">
+          <thead>
+            <tr>
+              <th style="width: 100px;">Código</th>
+              <th>Titular</th>
+              <th style="text-align: center; width: 60px;">Qtd</th>
+              <th>Participantes</th>
+              <th>WhatsApp / Contato</th>
+              <th>E-mail</th>
+              <th style="width: 130px; text-align: center;">Presença</th>
+              <th style="width: 110px; text-align: center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tcTbodyInscritos">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando inscritos...</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -1219,8 +1393,125 @@ function renderIndexHtml() {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(name).classList.add('active');
       evt.currentTarget.classList.add('active');
+      if(name === 'tab-eventos') fetchTheChosenInscricoes();
       if(name === 'tab-admin') fetchUsers();
       if(name === 'tab-lideres') fetchLideres();
+    }
+
+    let tcInscricoesCache = [];
+
+    async function fetchTheChosenInscricoes() {
+      try {
+        const res = await fetch('/the-chosen/api/inscritos');
+        if (res.status === 401) { window.location.href = '/secretaria/login'; return; }
+        if (!res.ok) return;
+        const data = await res.json();
+        tcInscricoesCache = data.inscricoes || [];
+        
+        const stats = data.estatisticas || {};
+        const elInscricoes = document.getElementById('tcTotalInscricoes');
+        const elIngressos = document.getElementById('tcTotalIngressos');
+        const elRestantes = document.getElementById('tcVagasRestantes');
+        const elConfirmados = document.getElementById('tcConfirmados');
+        const elPendentes = document.getElementById('tcPendentes');
+        const elCancelados = document.getElementById('tcCancelados');
+
+        if (elInscricoes) elInscricoes.textContent = stats.totalInscricoes || tcInscricoesCache.length;
+        if (elIngressos) elIngressos.textContent = (stats.totalIngressos || 0) + ' / ' + (stats.limite || 50);
+        if (elRestantes) elRestantes.textContent = stats.restantes !== undefined ? stats.restantes : Math.max(0, 50 - (stats.totalIngressos || 0));
+        if (elConfirmados) elConfirmados.textContent = (stats.ingressosConfirmados || 0) + ' (' + (stats.confirmados || 0) + ')';
+        if (elPendentes) elPendentes.textContent = (stats.ingressosPendentes || 0) + ' (' + (stats.pendentes || 0) + ')';
+        if (elCancelados) elCancelados.textContent = (stats.ingressosCancelados || 0) + ' (' + (stats.cancelados || 0) + ')';
+
+        filtrarTheChosenInscricoes();
+      } catch (err) {
+        console.error('Erro ao buscar inscritos do The Chosen:', err);
+      }
+    }
+
+    function filtrarTheChosenInscricoes() {
+      const termo = (document.getElementById('tcSearchInput')?.value || '').toLowerCase().trim();
+      const statusFiltro = document.getElementById('tcStatusFilter')?.value || 'todos';
+
+      const filtrados = tcInscricoesCache.filter(item => {
+        const matchStatus = statusFiltro === 'todos' || item.statusConfirmacao === statusFiltro;
+        if (!matchStatus) return false;
+        if (!termo) return true;
+
+        const participantesStr = (item.participantes || []).join(' ').toLowerCase();
+        const titularStr = (item.titular || '').toLowerCase();
+        const telStr = (item.telefone || '').toLowerCase();
+        const codStr = (item.codigo || '').toLowerCase();
+        const emailStr = (item.email || '').toLowerCase();
+
+        return participantesStr.includes(termo) || titularStr.includes(termo) || telStr.includes(termo) || codStr.includes(termo) || emailStr.includes(termo);
+      });
+
+      renderTheChosenTable(filtrados);
+    }
+
+    function renderTheChosenTable(lista) {
+      const tbody = document.getElementById('tcTbodyInscritos');
+      if (!tbody) return;
+
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2.5rem;">Nenhuma inscrição encontrada para os critérios selecionados.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map(item => {
+        const nomesParticipantes = (item.participantes || [item.titular])
+          .map(n => '<span style="display:inline-block; background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:6px; margin:2px; font-size:0.8rem; border:1px solid rgba(255,255,255,0.08);">' + n + '</span>')
+          .join('');
+        
+        let statusBadge = '';
+        if (item.statusConfirmacao === 'confirmado') {
+          statusBadge = '<span class="status-badge status-confirmado">✅ Confirmado</span>';
+        } else if (item.statusConfirmacao === 'cancelado') {
+          statusBadge = '<span class="status-badge status-cancelado">❌ Cancelado</span>';
+        } else {
+          statusBadge = '<span class="status-badge status-pendente">⏳ Pendente</span>';
+        }
+
+        const zapTel = (item.telefone || '').replace(/\D/g, '');
+        const zapLink = zapTel ? ('https://wa.me/55' + zapTel) : '#';
+
+        return '<tr>' +
+          '<td style="font-family: monospace; font-weight: 700; color: var(--cor-ciano); font-size: 0.88rem;">' + (item.codigo || '-') + '</td>' +
+          '<td><strong style="color: #fff;">' + (item.titular || '-') + '</strong></td>' +
+          '<td style="text-align: center; font-weight: 800; font-size: 1rem; color: #fff;">' + (item.quantidade || 1) + '</td>' +
+          '<td>' + nomesParticipantes + '</td>' +
+          '<td><a href="' + zapLink + '" target="_blank" style="color: #4ade80; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">💬 ' + (item.telefone || '-') + '</a></td>' +
+          '<td style="color: var(--cor-texto-mutado); font-size: 0.82rem;">' + (item.email || '-') + '</td>' +
+          '<td style="text-align: center;">' + statusBadge + '</td>' +
+          '<td style="text-align: center;">' +
+            '<select onchange="alterarStatusPresenca(\'' + item.id + '\', this.value)" style="padding: 5px 8px; background: #22222a; color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 0.78rem; cursor: pointer;">' +
+              '<option value="">Alterar...</option>' +
+              '<option value="confirmado" ' + (item.statusConfirmacao === 'confirmado' ? 'selected' : '') + '>Confirmado ✅</option>' +
+              '<option value="pendente" ' + (item.statusConfirmacao === 'pendente' ? 'selected' : '') + '>Pendente ⏳</option>' +
+              '<option value="cancelado" ' + (item.statusConfirmacao === 'cancelado' ? 'selected' : '') + '>Cancelar ❌</option>' +
+            '</select>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    async function alterarStatusPresenca(id, novoStatus) {
+      if (!novoStatus) return;
+      try {
+        const res = await fetch('/the-chosen/api/confirmar-presenca', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, status: novoStatus })
+        });
+        if (res.ok) {
+          fetchTheChosenInscricoes();
+        } else {
+          alert('Erro ao atualizar status de presença.');
+        }
+      } catch (err) {
+        console.error('Erro ao alterar status:', err);
+      }
     }
 
     async function refresh() {

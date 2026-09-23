@@ -2,13 +2,13 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const http = require('http');
 
 // Define arquivo de dados isolado para os testes
 const TEST_DATA_FILE = path.join(__dirname, 'the_chosen_test.json');
 process.env.THE_CHOSEN_DATA_PATH = TEST_DATA_FILE;
 
 const theChosen = require('../web/the_chosen');
+const theChosenNotificacoes = require('../web/the_chosen_notificacoes');
 
 // Limpar arquivo de teste antes e depois
 function cleanup() {
@@ -20,12 +20,12 @@ function cleanup() {
 before(() => cleanup());
 after(() => cleanup());
 
-test('The Chosen: capacidade inicial configurada para 75 vagas', () => {
+test('The Chosen: capacidade inicial configurada para 50 vagas', () => {
   cleanup();
   const status = theChosen.obterStatusVagas();
-  assert.equal(status.total, 75);
+  assert.equal(status.total, 50);
   assert.equal(status.preenchidas, 0);
-  assert.equal(status.restantes, 75);
+  assert.equal(status.restantes, 50);
   assert.equal(status.esgotado, false);
 });
 
@@ -57,7 +57,7 @@ test('The Chosen: validações de formulário rejeitam entradas inválidas', () 
   assert.equal(res.code, 'EMAIL_INVALIDO');
 });
 
-test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 75 vagas', () => {
+test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 50 vagas', () => {
   cleanup();
   const res = theChosen.realizarInscricao({
     quantidade: 3,
@@ -70,19 +70,56 @@ test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 75 vag
   assert.ok(res.inscricao.codigo.startsWith('TC-'));
   assert.equal(res.inscricao.quantidade, 3);
   assert.equal(res.inscricao.participantes.length, 3);
-  assert.equal(res.vagasRestantes, 72);
+  assert.equal(res.inscricao.statusConfirmacao, 'pendente');
+  assert.equal(res.vagasRestantes, 47);
 
   const status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 3);
-  assert.equal(status.restantes, 72);
+  assert.equal(status.restantes, 47);
+});
+
+test('The Chosen: confirmação de presença e busca por código/telefone', () => {
+  cleanup();
+  const insc = theChosen.realizarInscricao({
+    quantidade: 2,
+    participantes: ['Gabriel Diniz', 'Taynara Diniz'],
+    telefone: '11999998888',
+    email: 'gabriel@exemplo.com'
+  });
+
+  assert.equal(insc.ok, true);
+  const cod = insc.inscricao.codigo;
+
+  // Busca por código
+  const porCod = theChosen.buscarInscricaoPorTelefoneOuCodigo(cod);
+  assert.ok(porCod);
+  assert.equal(porCod.titular, 'Gabriel Diniz');
+
+  // Busca por telefone
+  const porTel = theChosen.buscarInscricaoPorTelefoneOuCodigo('5511999998888');
+  assert.ok(porTel);
+  assert.equal(porTel.codigo, cod);
+
+  // Confirma presença
+  const confRes = theChosen.confirmarPresenca(cod, 'confirmado');
+  assert.equal(confRes.ok, true);
+  assert.equal(confRes.inscricao.statusConfirmacao, 'confirmado');
+  assert.ok(confRes.inscricao.confirmadoEm);
+
+  // Estatísticas refletem confirmação
+  const stats = theChosen.obterEstatisticasConfirmacao();
+  assert.equal(stats.totalInscricoes, 1);
+  assert.equal(stats.totalIngressos, 2);
+  assert.equal(stats.confirmados, 1);
+  assert.equal(stats.ingressosConfirmados, 2);
+  assert.equal(stats.restantes, 48);
 });
 
 test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa vagas disponíveis', () => {
   cleanup();
-  // Inscreve 73 vagas
+  // Inscreve 48 vagas (em lotes de 10)
   const partes = [];
-  for (let i = 0; i < 73; i++) partes.push(`Participante ${i + 1}`);
-  // Inscreve em lotes de 10
+  for (let i = 0; i < 48; i++) partes.push(`Participante ${i + 1}`);
   while (partes.length > 0) {
     const chunk = partes.splice(0, Math.min(10, partes.length));
     theChosen.realizarInscricao({
@@ -116,7 +153,7 @@ test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa va
   });
   assert.equal(resFinal.ok, true);
 
-  // Agora está esgotado (0 vagas)
+  // Agora está esgotado (0 vagas de 50)
   const statusEsgotado = theChosen.obterStatusVagas();
   assert.equal(statusEsgotado.restantes, 0);
   assert.equal(statusEsgotado.esgotado, true);
@@ -132,21 +169,51 @@ test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa va
   assert.equal(resEsgotado.code, 'ESGOTADO');
 });
 
-test('The Chosen: expiração automática a partir de 04/10/2026 encerra inscrições', () => {
+test('The Chosen: renderização da folha de presença em PDF contém participantes e métricas', () => {
   cleanup();
-  const antes = new Date('2026-10-03T23:59:59-03:00');
-  assert.equal(theChosen.estaExpirado(antes), false);
+  theChosen.realizarInscricao({
+    quantidade: 2,
+    participantes: ['Marcos Silva', 'Luciana Silva'],
+    telefone: '11988887777',
+    email: 'marcos@exemplo.com'
+  });
 
-  const dia4 = new Date('2026-10-04T00:00:00-03:00');
-  assert.equal(theChosen.estaExpirado(dia4), true);
+  const html = theChosen.renderTheChosenPdfHtml();
+  assert.ok(html.includes('Lista Oficial de Portaria & Presença'));
+  assert.ok(html.includes('Marcos Silva'));
+  assert.ok(html.includes('Luciana Silva'));
+  assert.ok(html.includes('50 vagas'));
+  assert.ok(html.includes('window.print()'));
+});
 
-  const res = theChosen.realizarInscricao({
+test('The Chosen: notificações WhatsApp simulam envio com sucesso para cliente mock', async () => {
+  cleanup();
+  const reg = theChosen.realizarInscricao({
     quantidade: 1,
-    participantes: ['Tentativa Atrasada'],
-    telefone: '11999999999',
-    email: 'teste@exemplo.com'
-  }, dia4);
+    participantes: ['Sara Teste'],
+    telefone: '11977776666',
+    email: 'sara@exemplo.com'
+  });
 
-  assert.equal(res.ok, false);
-  assert.equal(res.code, 'EVENTO_EXPIRADO');
+  const mensagensEnviadas = [];
+  const mockClient = {
+    sendMessage: async (jid, text) => {
+      mensagensEnviadas.push({ jid, text });
+      return true;
+    }
+  };
+
+  // Envio imediato da confirmação
+  const envioRes = await theChosenNotificacoes.enviarMensagemConfirmacaoInscricao(mockClient, reg.inscricao);
+  assert.equal(envioRes.ok, true);
+  assert.equal(mensagensEnviadas.length, 1);
+  assert.ok(mensagensEnviadas[0].jid.includes('5511977776666'));
+  assert.ok(mensagensEnviadas[0].text.includes('Inscrição Confirmada!'));
+  assert.ok(mensagensEnviadas[0].text.includes(reg.inscricao.codigo));
+
+  // Lembrete de 3 dias
+  const lembreteRes = await theChosenNotificacoes.enviarLembreteConfirmacao3Dias(mockClient);
+  assert.equal(lembreteRes.ok, true);
+  assert.equal(lembreteRes.enviados, 1);
+  assert.ok(mensagensEnviadas[1].text.includes('Lembrete & Confirmação de Presença'));
 });

@@ -694,7 +694,7 @@ function getStatus() {
   };
 }
 
-startWebServer({ getStatus, startClient, cancelQr, disconnectClient });
+startWebServer({ getStatus, startClient, cancelQr, disconnectClient, getClient: () => client });
 
 // Só inicia automaticamente se o bot não foi explicitamente desconectado antes de
 // desligar (ver disconnectClient). Assim, um restart/redeploy com o WhatsApp já

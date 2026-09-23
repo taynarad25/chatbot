@@ -609,20 +609,18 @@
             </div>
         </div>
 
-        <!-- Contador Dinâmico de Vagas -->
+        <!-- Status de Inscrição (Sem expor números de vagas) -->
         <div class="vagas-meter-box" id="boxVagas">
             <div class="vagas-header">
                 <div class="vagas-title">
-                    <span>🔥 Ingressos Disponíveis:</span>
+                    <span>🎬 ENTRADA GRATUITA • SESSÃO EXCLUSIVA</span>
                 </div>
-                <div class="vagas-counter-badge" id="vagasRestantesBadge">Carregando...</div>
-            </div>
-            <div class="vagas-progress-bg">
-                <div class="vagas-progress-bar" id="vagasProgressBar" style="width: 100%;"></div>
+                <div class="vagas-counter-badge" id="vagasStatusBadge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border-color: rgba(34, 197, 94, 0.35); font-size: 0.95rem;">
+                    ● Inscrições Abertas
+                </div>
             </div>
             <div class="vagas-status-text">
-                <span id="vagasPreenchidasTxt">0 inscritos</span>
-                <span>Capacidade: 75 vagas</span>
+                <span>Vagas limitadas por ordem de inscrição • Confirmação instantânea via WhatsApp</span>
             </div>
         </div>
 
@@ -637,9 +635,9 @@
 
         <!-- Card de Vagas Esgotadas (oculto por padrão) -->
         <div class="esgotado-card" id="cardEsgotado">
-            <h2 style="color: #ef4444; margin: 0 0 10px; font-size: 1.6rem;">🎟️ Vagas Esgotadas!</h2>
+            <h2 style="color: #ef4444; margin: 0 0 10px; font-size: 1.6rem;">🎟️ Inscrições Esgotadas!</h2>
             <p style="color: #d1d5db; margin: 0 0 16px;">
-                Atingimos o limite de 75 lugares para esta sessão. Caso surjam desistências, avisaremos em nossas redes e grupos!
+                Atingimos a capacidade máxima de lugares para esta pré-estreia exclusiva. Caso surjam desistências, avisaremos em nossas redes e grupos oficiais!
             </p>
             <a href="https://wa.me/5511942685501?text=Ol%C3%A1%2C%20gostaria%20de%20saber%20se%20h%C3%A1%20fila%20de%20espera%20para%20o%20The%20Chosen" target="_blank" rel="noopener noreferrer" style="display:inline-block; background: #25D366; color: #fff; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 700;">
                 Falar com a Secretaria no WhatsApp
@@ -678,12 +676,12 @@
 
                 <!-- Dados de Contato Obrigatórios -->
                 <div class="form-group">
-                    <label class="form-label" for="inputTelefone">Telefone / WhatsApp para contato e confirmação *</label>
+                    <label class="form-label" for="inputTelefone">Telefone / WhatsApp *</label>
                     <input type="tel" id="inputTelefone" class="input-text" placeholder="+55 (11) 99999-9999" maxlength="19" required autocomplete="tel">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="inputEmail">E-mail para receber o comprovante *</label>
+                    <label class="form-label" for="inputEmail">E-mail *</label>
                     <input type="email" id="inputEmail" class="input-text" placeholder="seuemail@exemplo.com" required autocomplete="email">
                 </div>
 
@@ -701,6 +699,7 @@
             <div class="sucesso-badge-check">✓</div>
             <h2 style="color: #22c55e; margin: 0 0 8px; font-size: 1.7rem;">Inscrição Confirmada!</h2>
             <p style="color: var(--cor-texto-mutado); margin: 0;">Sua vaga para a Pré-estreia de The Chosen está garantida com sucesso.</p>
+            <p style="color: #4ade80; font-size: 0.92rem; margin: 6px 0 0; font-weight: 600;">📲 Enviamos a confirmação oficial e o código do seu voucher para o seu WhatsApp!</p>
 
             <div class="ticket-box">
                 <span style="font-size: 0.78rem; text-transform: uppercase; color: var(--cor-texto-mutado); display: block; text-align: center; font-weight: 700;">Código da sua Reserva</span>
@@ -781,10 +780,6 @@
         qtdButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const qtd = parseInt(btn.getAttribute('data-qtd'), 10);
-                if (qtd > vagasRestantes) {
-                    alert(`Restam apenas ${vagasRestantes} vaga(s) disponível(is).`);
-                    return;
-                }
                 qtdButtons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 quantidadeSelecionada = qtd;
@@ -792,54 +787,38 @@
             });
         });
 
-        // Consulta de Vagas em Tempo Real
+        // Consulta de Status em Tempo Real (Sem expor números de vagas)
         async function atualizarVagas() {
             try {
                 const res = await fetch('/the-chosen/api/vagas');
                 if (!res.ok) return;
                 const data = await res.json();
-                vagasRestantes = data.restantes;
+                const isEsgotado = data.esgotado || (data.restantes !== undefined && data.restantes <= 0);
 
-                const badge = document.getElementById('vagasRestantesBadge');
-                const bar = document.getElementById('vagasProgressBar');
-                const txt = document.getElementById('vagasPreenchidasTxt');
-
-                badge.textContent = `${data.restantes} restante(s)`;
-                txt.textContent = `${data.preenchidas} participante(s) já inscritos`;
-
-                const pct = Math.max(0, Math.min(100, (data.restantes / data.total) * 100));
-                bar.style.width = `${pct}%`;
+                const badge = document.getElementById('vagasStatusBadge');
 
                 // Bloqueio se esgotado
-                if (data.esgotado || data.restantes <= 0) {
+                if (isEsgotado) {
                     document.getElementById('cardFormulario').style.display = 'none';
                     document.getElementById('cardEsgotado').style.display = 'block';
-                    badge.textContent = 'Esgotado';
-                    badge.style.color = '#ef4444';
-                    badge.style.borderColor = '#ef4444';
-                }
-
-                // Ajustar botões de quantidade caso restem menos de 5
-                qtdButtons.forEach(btn => {
-                    const q = parseInt(btn.getAttribute('data-qtd'), 10);
-                    if (q > data.restantes) {
-                        btn.disabled = true;
-                        btn.style.opacity = '0.3';
-                        btn.style.cursor = 'not-allowed';
-                    } else {
-                        btn.disabled = false;
-                        btn.style.opacity = '1';
-                        btn.style.cursor = 'pointer';
+                    if (badge) {
+                        badge.textContent = '● Inscrições Esgotadas';
+                        badge.style.color = '#ef4444';
+                        badge.style.borderColor = '#ef4444';
+                        badge.style.background = 'rgba(239, 68, 68, 0.15)';
                     }
-                });
-
-                if (quantidadeSelecionada > data.restantes && data.restantes > 0) {
-                    quantidadeSelecionada = data.restantes;
-                    renderCamposParticipantes(data.restantes);
-                    qtdButtons.forEach(b => b.classList.toggle('active', parseInt(b.getAttribute('data-qtd'), 10) === data.restantes));
+                } else {
+                    document.getElementById('cardFormulario').style.display = 'block';
+                    document.getElementById('cardEsgotado').style.display = 'none';
+                    if (badge) {
+                        badge.textContent = '● Inscrições Abertas';
+                        badge.style.color = '#4ade80';
+                        badge.style.borderColor = 'rgba(34, 197, 94, 0.35)';
+                        badge.style.background = 'rgba(34, 197, 94, 0.15)';
+                    }
                 }
             } catch (err) {
-                console.error('Erro ao atualizar vagas:', err);
+                console.error('Erro ao verificar status das vagas:', err);
             }
         }
         atualizarVagas();

@@ -9,6 +9,7 @@ const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/
 const { createRateLimiter } = require("./web/rateLimiter");
 const { getClientIp } = require("./web/clientIp");
 const theChosen = require("./web/the_chosen");
+const theChosenNotificacoes = require("./web/the_chosen_notificacoes");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
 const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
@@ -124,7 +125,7 @@ async function parseRequestBody(req) {
   });
 }
 
-function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, port = 3000 }) {
+function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, getClient = () => null, port = 3000 }) {
   const server = http.createServer(async (req, res) => {
     const start = Date.now();
     const ip = getClientIp(req);
@@ -311,6 +312,16 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
           const body = await parseRequestBody(req);
           const resultado = theChosen.realizarInscricao(body);
           if (resultado.ok) {
+            // Disparo não-bloqueante de confirmação oficial no WhatsApp do participante
+            try {
+              const botClient = typeof getClient === 'function' ? getClient() : null;
+              if (botClient) {
+                theChosenNotificacoes.enviarMensagemConfirmacaoInscricao(botClient, resultado.inscricao)
+                  .catch(errZap => console.error('[The Chosen] Erro no envio WhatsApp:', errZap.message));
+              }
+            } catch (errDisparo) {
+              console.error('[The Chosen] Erro ao obter cliente WhatsApp:', errDisparo.message);
+            }
             return sendJson(res, 200, resultado);
           } else {
             const status = resultado.code === 'ESGOTADO' || resultado.code === 'VAGAS_INSUFICIENTES' ? 409 : 400;
@@ -324,11 +335,39 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, po
 
       // API: Listagem de inscritos para a administração/secretaria
       if (req.method === 'GET' && pathname === '/the-chosen/api/inscritos') {
-        const sessionId = getSessionId(req);
-        if (!isAuthenticated(sessionId)) {
+        if (!isAuthenticated(req)) {
           return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
         }
-        return sendJson(res, 200, { ok: true, inscricoes: theChosen.listarInscricoes() });
+        return sendJson(res, 200, { 
+          ok: true, 
+          inscricoes: theChosen.listarInscricoes(),
+          estatisticas: theChosen.obterEstatisticasConfirmacao()
+        });
+      }
+
+      // Rota: Folha de Presença / Relatório Oficial em PDF (Protegido por login)
+      if (req.method === 'GET' && (pathname === '/the-chosen/api/relatorio-pdf' || pathname === '/the-chosen/relatorio-pdf')) {
+        if (!isAuthenticated(req)) {
+          res.writeHead(302, { Location: '/secretaria/login?message=Faça login para acessar o relatório.' });
+          return res.end();
+        }
+        return sendHtml(res, theChosen.renderTheChosenPdfHtml());
+      }
+
+      // API: Alterar status de confirmação de presença (Secretaria / Presença)
+      if (req.method === 'POST' && pathname === '/the-chosen/api/confirmar-presenca') {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          const body = await parseRequestBody(req);
+          const termo = body.id || body.codigo || body.telefone;
+          const status = body.status || 'confirmado'; // 'confirmado' | 'cancelado' | 'pendente'
+          const resultado = theChosen.confirmarPresenca(termo, status);
+          return sendJson(res, resultado.ok ? 200 : 404, resultado);
+        } catch (err) {
+          return sendJson(res, 500, { ok: false, message: 'Erro ao registrar status de confirmação.' });
+        }
       }
 
       if (req.method === 'GET' && pathname === '/secretaria/login') {

@@ -1169,6 +1169,14 @@ function iniciarAgendadorLembretes({
         buscarEventos,
         agendasParaLer,
       });
+
+      // 8. Lembretes e relatórios do The Chosen (30/09, 01/10 e 03/10)
+      try {
+        const { processarRotinaTheChosen } = require("../web/the_chosen_notificacoes");
+        await processarRotinaTheChosen({ client });
+      } catch (errTC) {
+        console.error("[Agendador Lembretes] Erro na rotina The Chosen:", errTC.message);
+      }
     } catch (err) {
       console.error("[Agendador Lembretes] Erro no processamento:", err);
     } finally {

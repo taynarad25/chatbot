@@ -162,7 +162,8 @@ test("GET /the-chosen: serve a página de inscrição de The Chosen isolada com 
     assert.match(html, /Pré-estreia The Chosen/i);
     assert.match(html, /the-chosen-desktop\.jpg/);
     assert.match(html, /the-chosen-mobile\.jpg/);
-    assert.match(html, /Capacidade: 75 vagas/);
+    assert.match(html, /Inscrições Abertas/i);
+    assert.doesNotMatch(html, /Capacidade: \d+ vagas/i, "quantidade de vagas não deve estar exposta publicamente");
     assert.match(html, /Crianças de colo/i);
     assert.doesNotMatch(html, /href="\/secretaria"/, "link da secretaria não deve estar exposto");
   }
@@ -173,7 +174,7 @@ test("API /the-chosen: consulta de vagas e realização de inscrição", async (
   const resVagas = await fetch(`${baseUrl}/the-chosen/api/vagas`);
   assert.equal(resVagas.status, 200);
   const jsonVagas = await resVagas.json();
-  assert.equal(jsonVagas.total, 75);
+  assert.equal(jsonVagas.total, 50);
   assert.ok(jsonVagas.restantes >= 0);
 
   // 2. Inscrição com sucesso
@@ -193,6 +194,21 @@ test("API /the-chosen: consulta de vagas e realização de inscrição", async (
   assert.equal(jsonInscricao.ok, true);
   assert.ok(jsonInscricao.inscricao.codigo.startsWith("TC-"));
   assert.equal(jsonInscricao.inscricao.quantidade, 2);
+});
+
+test("API /the-chosen: relatório PDF e confirmação de presença exigem autenticação", async () => {
+  // Sem autenticação: relatorio-pdf redireciona para login
+  const resPdfAnonimo = await fetch(`${baseUrl}/the-chosen/api/relatorio-pdf`, { redirect: 'manual' });
+  assert.equal(resPdfAnonimo.status, 302);
+  assert.match(resPdfAnonimo.headers.get('location'), /\/secretaria\/login/);
+
+  // Sem autenticação: confirmar-presenca retorna 401
+  const resConfAnonimo = await fetch(`${baseUrl}/the-chosen/api/confirmar-presenca`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: 'invalido', status: 'confirmado' })
+  });
+  assert.equal(resConfAnonimo.status, 401);
 });
 
 

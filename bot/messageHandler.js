@@ -1800,6 +1800,29 @@ function createMessageHandler({
 
       console.log(`[Mensagem Recebida] De: ${identificarUsuario(contato, numero, isLider, usuario)} | Texto: "${msg.body}"`);
 
+      // Interceptação de confirmação de presença: The Chosen
+      try {
+        const { buscarInscricaoPorTelefoneOuCodigo, confirmarPresenca } = require("../web/the_chosen");
+        const inscricaoTC = buscarInscricaoPorTelefoneOuCodigo(numero);
+        if (inscricaoTC && (inscricaoTC.lembrete3DiasEnviado || inscricaoTC.lembreteDiaEventoEnviado || (msg.body && msg.body.includes("TC-")))) {
+          const tL = texto.trim().toLowerCase();
+          const ehConfirmacao = tL === "1" || tL === "sim" || tL === "confirmo" || tL === "confirmar" || tL === "estarei presente" || tL === "vamos sim" || tL === "confirmado";
+          const ehCancelamento = tL === "2" || tL === "não" || tL === "nao" || tL === "cancelar" || tL === "não vou" || tL === "nao vou" || tL === "infelizmente não";
+
+          if (ehConfirmacao) {
+            confirmarPresenca(inscricaoTC.id, "confirmado");
+            console.log(`[The Chosen] Presença confirmada via WhatsApp por ${inscricaoTC.titular} (${inscricaoTC.codigo})`);
+            return msg.reply(`✅ *Presença Confirmada!* 🙌🍿\n\nQue alegria, *${inscricaoTC.titular}*! Sua presença e de seus acompanhantes na Pré-estreia de The Chosen está oficialmente confirmada para sábado, *03/10 às 19:00*!\n\nLembre-se de apresentar seu código na portaria: *${inscricaoTC.codigo}*.\n\nNos vemos lá! Deus abençoe! 🙏`);
+          } else if (ehCancelamento) {
+            confirmarPresenca(inscricaoTC.id, "cancelado");
+            console.log(`[The Chosen] Inscrição cancelada via WhatsApp por ${inscricaoTC.titular} (${inscricaoTC.codigo})`);
+            return msg.reply(`Entendido, *${inscricaoTC.titular}*! Registramos o cancelamento da sua reserva e suas vagas serão disponibilizadas para outros irmãos.\n\nMuito obrigado por nos avisar com antecedência. Que Deus abençoe ricamente sua vida! 🙏`);
+          }
+        }
+      } catch (errTC) {
+        console.error("[The Chosen] Erro ao processar resposta do participante:", errTC.message);
+      }
+
       // Intercepta resposta do Pastor à consulta de concorrência com o Salão (no privado)
       let codigoPastor = null;
       if (msg.hasQuotedMsg) {
