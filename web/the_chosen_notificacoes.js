@@ -32,7 +32,8 @@ Olá, *${inscricao.titular}*! Sua inscrição foi confirmada com sucesso.
 📅 *Data:* Sábado, 03/10/2026
 ⏰ *Horário:* 19:00
 
-🎟️ *Entrada:* No dia do evento, basta apresentar o seu nome (*${inscricao.titular}*) na recepção.
+🎟️ *Entrada:* No dia do evento, basta apresentar o seu nome na recepção.
+🍿 *Aviso:* Chegue cedo para garantir um bom lugar e não perder nada!
 
 Te esperamos lá! 🙏`;
 

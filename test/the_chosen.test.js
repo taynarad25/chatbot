@@ -215,6 +215,8 @@ test('The Chosen: notificações WhatsApp simulam envio com sucesso para cliente
   assert.ok(mensagensEnviadas[0].jid.includes('5511977776666'));
   assert.ok(mensagensEnviadas[0].text.includes(reg.inscricao.titular));
   assert.ok(mensagensEnviadas[0].text.includes('apresentar o seu nome'));
+  assert.ok(mensagensEnviadas[0].text.includes('Chegue cedo'));
+  assert.ok(!mensagensEnviadas[0].text.includes(`(${reg.inscricao.titular})`));
 
   // Lembrete de 3 dias
   const lembreteRes = await theChosenNotificacoes.enviarLembreteConfirmacao3Dias(mockClient);
