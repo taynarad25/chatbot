@@ -9,6 +9,7 @@ const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/
 const { createRateLimiter } = require("./web/rateLimiter");
 const { getClientIp } = require("./web/clientIp");
 const theChosen = require("./web/the_chosen");
+const theChosenSheets = require("./web/the_chosen_sheets");
 const theChosenNotificacoes = require("./web/the_chosen_notificacoes");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 
@@ -398,6 +399,11 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             termo = body.id || body.codigo || body.telefone;
           }
           const resultado = theChosen.excluirInscricao(termo);
+          if (resultado.ok && resultado.inscricao && typeof theChosenSheets.excluirInscricaoPlanilha === 'function') {
+            await theChosenSheets.excluirInscricaoPlanilha(resultado.inscricao).catch(err => {
+              console.error('[Web] Erro ao sincronizar exclusão com a planilha:', err.message);
+            });
+          }
           return sendJson(res, resultado.ok ? 200 : 404, resultado);
         } catch (err) {
           console.error('[The Chosen] Erro ao excluir inscrição:', err.message);
@@ -412,6 +418,11 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
         try {
           const resultado = theChosen.limparInscricoesTeste();
+          if (resultado.ok && Array.isArray(resultado.removidasInscricoes) && typeof theChosenSheets.excluirInscricaoPlanilha === 'function') {
+            for (const item of resultado.removidasInscricoes) {
+              await theChosenSheets.excluirInscricaoPlanilha(item).catch(() => {});
+            }
+          }
           return sendJson(res, 200, resultado);
         } catch (err) {
           console.error('[The Chosen] Erro ao limpar inscrições de teste:', err.message);

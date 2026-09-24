@@ -85,17 +85,18 @@ console.warn = (...args) => logger(originalWarn, ...args);
 
 // Captura de erros que fariam o processo morrer sem logar
 process.on('unhandledRejection', (reason, promise) => {
-  const isTargetClose =
+  const msg = typeof reason?.message === 'string' ? reason.message : '';
+  const isPuppeteerLifecycle =
     reason?.name === 'TargetCloseError' ||
-    (typeof reason?.message === 'string' && (
-      reason.message.includes('Target closed') ||
-      reason.message.includes('Session closed') ||
-      reason.message.includes('Protocol error') ||
-      reason.message.includes('Execution context was destroyed')
-    ));
+    msg.includes('Target closed') ||
+    msg.includes('Session closed') ||
+    msg.includes('Protocol error') ||
+    msg.includes('Execution context was destroyed') ||
+    msg.includes('detached Frame') ||
+    msg.includes('frame was detached');
 
-  if (isTargetClose) {
-    console.warn('[Puppeteer] Sessão do navegador finalizada durante operação assíncrona.');
+  if (isPuppeteerLifecycle) {
+    console.warn('[Puppeteer] Operação descartada: frame ou sessão do navegador reiniciada.');
     return;
   }
 

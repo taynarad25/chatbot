@@ -581,23 +581,40 @@ function excluirInscricao(termo) {
   const [removida] = inscricoes.splice(idx, 1);
   salvarInscricoes(inscricoes);
 
+  // Sincroniza exclusão na planilha (Google Sheets / Apps Script)
+  if (theChosenSheets && typeof theChosenSheets.excluirInscricaoPlanilha === 'function') {
+    theChosenSheets.excluirInscricaoPlanilha(removida).catch(err => {
+      console.error('[The Chosen] Erro ao sincronizar exclusão com Google Sheets:', err.message);
+    });
+  }
+
   return { ok: true, message: 'Inscrição excluída com sucesso!', inscricao: removida };
 }
 
 function limparInscricoesTeste() {
   let inscricoes = carregarInscricoes();
   const antes = inscricoes.length;
+  const removidasInscricoes = [];
   inscricoes = inscricoes.filter(i => {
     const tit = String(i.titular || '').toLowerCase();
     const mail = String(i.email || '').toLowerCase();
     const parts = (i.participantes || []).join(' ').toLowerCase();
     const isTeste = tit.includes('teste') || mail.includes('teste') || parts.includes('teste');
+    if (isTeste) removidasInscricoes.push(i);
     return !isTeste;
   });
 
   const removidas = antes - inscricoes.length;
   salvarInscricoes(inscricoes);
-  return { ok: true, removidas, totalAtual: inscricoes.length };
+
+  // Sincroniza exclusão das inscrições de teste na planilha
+  if (theChosenSheets && typeof theChosenSheets.excluirInscricaoPlanilha === 'function') {
+    for (const item of removidasInscricoes) {
+      theChosenSheets.excluirInscricaoPlanilha(item).catch(() => {});
+    }
+  }
+
+  return { ok: true, removidas, totalAtual: inscricoes.length, removidasInscricoes };
 }
 
 function obterEstatisticasConfirmacao() {

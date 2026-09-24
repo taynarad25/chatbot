@@ -544,3 +544,85 @@ test('Google Sheets: enviarParaGoogleAppsScript formata payload JSON e lida com 
     global.fetch = originalFetch;
   }
 });
+
+test('Google Sheets: excluirInscricaoPlanilha envia payload de exclusão para Google Apps Script', async () => {
+  const originalFetch = global.fetch;
+  let payloadExclusao = null;
+
+  global.fetch = async (url, options) => {
+    payloadExclusao = JSON.parse(options.body);
+    return {
+      status: 200,
+      ok: true,
+      text: async () => '{"status":"success","action":"excluir"}'
+    };
+  };
+
+  try {
+    process.env.APPS_SCRIPT_URL = 'https://script.google.com/macros/s/fake/exec';
+    const res = await theChosenSheets.excluirInscricaoPlanilha({
+      codigo: 'TC-EXCLUIR1',
+      titular: 'Carlos Deletar',
+      telefone: '11988887777',
+      email: 'carlos@teste.com',
+      quantidade: 2
+    });
+
+    assert.equal(res.ok, true);
+    assert.ok(payloadExclusao);
+    assert.equal(payloadExclusao.action, 'excluir');
+    assert.equal(payloadExclusao.codigo, 'TC-EXCLUIR1');
+    assert.equal(payloadExclusao.nome, 'Carlos Deletar');
+    assert.equal(payloadExclusao.quantidade, 2);
+  } finally {
+    global.fetch = originalFetch;
+    delete process.env.APPS_SCRIPT_URL;
+  }
+});
+
+test('Google Sheets: excluirInscricaoPlanilha remove linha via Sheets API batchUpdate deleteDimension', async () => {
+  cleanup();
+  let batchUpdateParams = null;
+  const linhasMock = [
+    ['Nome Completo', 'Telefone', 'E-mail', 'Quantidade de Ingressos', 'Data/Hora', 'Código', 'Participantes'],
+    ['Marcos Inicial', '11911112222', 'marcos@teste.com', 2, '24/09/2026 10:00:00', 'TC-KEEP1', 'Marcos Inicial, Outro'],
+    ['Maria Para Excluir', '11933334444', 'maria@teste.com', 3, '24/09/2026 10:05:00', 'TC-REMOVE2', 'Maria Para Excluir']
+  ];
+
+  const mockSheets = {
+    spreadsheets: {
+      get: async () => ({
+        data: {
+          sheets: [{ properties: { title: 'Inscrições', sheetId: 10101 } }]
+        }
+      }),
+      values: {
+        get: async () => ({
+          data: { values: linhasMock }
+        })
+      },
+      batchUpdate: async ({ spreadsheetId, requestBody }) => {
+        batchUpdateParams = requestBody;
+        return { data: {} };
+      }
+    }
+  };
+
+  theChosenSheets.setSheetsClientForTest(mockSheets);
+  theChosenSheets.setSpreadsheetIdForTest('test-sheet-id-del');
+
+  const res = await theChosenSheets.excluirInscricaoPlanilha({
+    codigo: 'TC-REMOVE2',
+    titular: 'Maria Para Excluir',
+    quantidade: 3
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.deletedRow, 3); // Linha 3 (índice 2)
+  assert.ok(batchUpdateParams);
+  const deleteReq = batchUpdateParams.requests[0].deleteDimension;
+  assert.equal(deleteReq.range.sheetId, 10101);
+  assert.equal(deleteReq.range.startIndex, 2);
+  assert.equal(deleteReq.range.endIndex, 3);
+});
+

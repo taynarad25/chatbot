@@ -191,10 +191,52 @@ async function garantirCabecalhoPlanilha(sheets, spreadsheetId, tabName) {
 const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyALepWcOCGBl53BIMqOpSqpiRE035aNyjKDv50A4r42JSYw62ZBcqf6zY76ZxRoC4/exec';
 
 function getAppsScriptUrl() {
-  return process.env.APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL;
+  if (process.env.APPS_SCRIPT_URL !== undefined) {
+    return process.env.APPS_SCRIPT_URL;
+  }
+  return DEFAULT_APPS_SCRIPT_URL;
 }
 
 let apiDisabledWarningLogged = false;
+
+/**
+ * Solicita a exclusão de uma inscrição na planilha via Google Apps Script (Web App).
+ */
+async function excluirDoGoogleAppsScript(inscricao) {
+  const url = getAppsScriptUrl();
+  if (!url) return { ok: false, error: 'URL do Apps Script não configurada' };
+
+  const item = typeof inscricao === 'string' ? { codigo: inscricao } : inscricao;
+  const codigo = String(item.codigo || '').trim();
+  const titular = item.titular || (Array.isArray(item.participantes) && item.participantes[0]) || item.nome || '';
+  const quantidade = Number(item.quantidade) || 1;
+  const telefone = item.telefone ? String(item.telefone) : '';
+  const email = item.email || '';
+
+  const payload = {
+    action: 'excluir',
+    codigo,
+    nome: titular,
+    telefone,
+    email,
+    quantidade
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      redirect: 'follow',
+    });
+
+    console.log(`[Google Apps Script] Exclusão da inscrição ${codigo} (${titular}) enviada para a planilha via Apps Script (Status: ${res.status}).`);
+    return { ok: true, status: res.status };
+  } catch (asErr) {
+    console.error(`[Google Apps Script] Erro ao enviar exclusão de ${codigo} para o Web App:`, asErr.message);
+    return { ok: false, error: asErr.message };
+  }
+}
 
 /**
  * Envia uma inscrição para o Google Sheets via Google Apps Script (Web App).
@@ -310,7 +352,8 @@ async function adicionarInscricaoPlanilha(inscricao) {
 
   // 1. Envio prioritário e direto via Google Apps Script (Web App)
   let appsScriptResult = null;
-  if (!process.env.THE_CHOSEN_DATA_PATH && process.env.NODE_ENV !== 'test') {
+  const urlAppsScript = getAppsScriptUrl();
+  if (urlAppsScript) {
     try {
       appsScriptResult = await enviarParaGoogleAppsScript(inscricao);
     } catch (asErr) {
@@ -415,6 +458,125 @@ async function adicionarInscricaoPlanilha(inscricao) {
   }
 }
 
+/**
+ * Exclui uma inscrição da planilha do Google Sheets (via Apps Script e/ou Sheets API v4).
+ */
+async function excluirInscricaoPlanilha(inscricao) {
+  if (!inscricao) return { ok: false, error: 'Inscrição não informada.' };
+
+  const item = typeof inscricao === 'string' ? { codigo: inscricao } : inscricao;
+  const codigo = String(item.codigo || '').trim();
+  const titular = item.titular || (Array.isArray(item.participantes) && item.participantes[0]) || item.nome || '';
+  const quantidade = Number(item.quantidade) || 1;
+  const telefone = item.telefone ? String(item.telefone) : '';
+  const email = item.email || '';
+
+  let appsScriptResult = null;
+
+  // 1. Notifica e exclui via Google Apps Script (Web App)
+  const urlAppsScript = getAppsScriptUrl();
+  if (urlAppsScript) {
+    appsScriptResult = await excluirDoGoogleAppsScript(item);
+  }
+
+  // Atualiza cache decrementando vagas
+  if (cacheTotalIngressos !== null && quantidade > 0) {
+    cacheTotalIngressos = Math.max(0, cacheTotalIngressos - quantidade);
+    cacheExpiracao = Date.now() + CACHE_TTL_MS;
+  }
+
+  // 2. Se cliente Google Sheets API v4 estiver disponível, localiza a linha e exclui
+  const sheets = getSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+  const tabName = getTabName();
+
+  if (!sheets || !spreadsheetId) {
+    if (process.env.THE_CHOSEN_DATA_PATH || process.env.NODE_ENV === 'test') {
+      return { ok: true, mocked: true, appsScript: !!appsScriptResult?.ok };
+    }
+    return { ok: appsScriptResult?.ok || true, appsScript: !!appsScriptResult?.ok };
+  }
+
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${tabName}!A:G`,
+    });
+
+    const rows = res.data.values || [];
+    let rowToDeleteIndex = -1;
+
+    const codUpper = codigo.toUpperCase();
+    const telLimpo = telefone.replace(/\D/g, '');
+    const titLower = titular.toLowerCase().trim();
+
+    for (let i = rows.length - 1; i >= 1; i--) {
+      const row = rows[i] || [];
+      const rowTexto = row.join(' ');
+      const rowUpper = rowTexto.toUpperCase();
+
+      // Checa por código
+      if (codUpper && (rowUpper.includes(codUpper) || (row[5] && String(row[5]).toUpperCase().includes(codUpper)))) {
+        rowToDeleteIndex = i;
+        break;
+      }
+      // Checa por telefone
+      const rowTelLimpo = rowTexto.replace(/\D/g, '');
+      if (telLimpo.length >= 8 && rowTelLimpo.includes(telLimpo)) {
+        rowToDeleteIndex = i;
+        break;
+      }
+      // Checa por nome
+      if (titLower && row[0] && String(row[0]).toLowerCase().trim() === titLower) {
+        rowToDeleteIndex = i;
+        break;
+      }
+    }
+
+    if (rowToDeleteIndex !== -1) {
+      let sheetId = 0;
+      try {
+        const meta = await sheets.spreadsheets.get({ spreadsheetId });
+        const foundSheet = meta.data.sheets?.find(s => s.properties?.title === tabName);
+        if (foundSheet && typeof foundSheet.properties?.sheetId === 'number') {
+          sheetId = foundSheet.properties.sheetId;
+        }
+      } catch (metaErr) {
+        console.warn('[Google Sheets] Aviso ao buscar ID numérico da aba:', metaErr.message);
+      }
+
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId,
+                  dimension: 'ROWS',
+                  startIndex: rowToDeleteIndex,
+                  endIndex: rowToDeleteIndex + 1,
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      console.log(`[Google Sheets] Inscrição ${codigo} (${titular}) removida da linha ${rowToDeleteIndex + 1} da planilha via API v4.`);
+      return { ok: true, deletedRow: rowToDeleteIndex + 1, appsScript: !!appsScriptResult?.ok };
+    }
+
+    return { ok: true, notFoundInSheet: true, appsScript: !!appsScriptResult?.ok };
+  } catch (err) {
+    if (err.message && (err.message.includes('disabled') || err.message.includes('has not been used'))) {
+      return { ok: appsScriptResult?.ok || true, appsScript: !!appsScriptResult?.ok };
+    }
+    console.error(`[Google Sheets] Falha ao excluir linha da planilha para ${codigo}:`, err.message);
+    return { ok: appsScriptResult?.ok || false, error: err.message };
+  }
+}
+
 function setSheetsClientForTest(client) {
   customSheetsClient = client;
 }
@@ -441,10 +603,13 @@ module.exports = {
   getSheetsClient,
   getAppsScriptUrl,
   enviarParaGoogleAppsScript,
+  excluirDoGoogleAppsScript,
   obterTotalIngressosPlanilha,
   adicionarInscricaoPlanilha,
+  excluirInscricaoPlanilha,
   setSheetsClientForTest,
   setSpreadsheetIdForTest,
   limparCacheParaTestes,
   CABECALHOS_PADRAO
 };
+
