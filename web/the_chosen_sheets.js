@@ -8,29 +8,92 @@ const ROOT_DIR = path.join(__dirname, '..');
 let customSheetsClient = null;
 let customSpreadsheetId = null;
 
+let cachedSheetsClient = null;
+let lastUsedCredentialsPath = null;
+let lastCredentialsWarnTime = 0;
+
 // Cache em memória para o total de ingressos preenchidos na planilha,
 // evitando esgotar a cota da API do Google Sheets a cada requisição de status.
 let cacheTotalIngressos = null;
 let cacheExpiracao = 0;
 const CACHE_TTL_MS = 10000; // 10 segundos
+const CACHE_ERROR_TTL_MS = 30000; // 30 segundos de backoff em caso de erro para não sobrecarregar API
+
+function isRealFile(filePath) {
+  try {
+    return !!filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isRealDir(filePath) {
+  try {
+    return !!filePath && fs.existsSync(filePath) && fs.statSync(filePath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function inspectDirectoryForJson(dirPath) {
+  try {
+    if (!isRealDir(dirPath)) return null;
+    const priorityNames = ['credentials.json', 'credenciais-google.json'];
+    for (const name of priorityNames) {
+      const full = path.join(dirPath, name);
+      if (isRealFile(full)) return full;
+    }
+    const entries = fs.readdirSync(dirPath);
+    for (const file of entries) {
+      if (file.endsWith('.json')) {
+        const full = path.join(dirPath, file);
+        if (isRealFile(full)) return full;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function resolveCandidatePath(cand) {
+  if (!cand || typeof cand !== 'string') return null;
+  const resolved = path.isAbsolute(cand) ? cand : path.resolve(ROOT_DIR, cand);
+  if (isRealFile(resolved)) {
+    return resolved;
+  }
+  if (isRealDir(resolved)) {
+    console.warn(`[Google Sheets] Aviso: O caminho de credenciais '${resolved}' é um diretório e não um arquivo JSON.`);
+    const nested = inspectDirectoryForJson(resolved);
+    if (nested) {
+      console.log(`[Google Sheets] Arquivo de credenciais detectado dentro da pasta: '${nested}'`);
+      return nested;
+    }
+  }
+  return null;
+}
 
 function getCredentialsPath() {
-  const envPath = process.env.GOOGLE_SHEETS_CREDENTIALS_PATH;
-  if (envPath && fs.existsSync(envPath)) {
-    return envPath;
+  // 1. Variável de ambiente explícita
+  if (process.env.GOOGLE_SHEETS_CREDENTIALS_PATH) {
+    const candidate = resolveCandidatePath(process.env.GOOGLE_SHEETS_CREDENTIALS_PATH);
+    if (candidate) return candidate;
   }
+
+  // 2. Padrões na raiz do projeto (apenas arquivos reais, nunca diretórios)
   const defaultCredentials = path.join(ROOT_DIR, 'credentials.json');
-  if (fs.existsSync(defaultCredentials)) {
-    return defaultCredentials;
-  }
+  const defaultValid = resolveCandidatePath(defaultCredentials);
+  if (defaultValid) return defaultValid;
+
   const legacyCredentials = path.join(ROOT_DIR, 'credenciais-google.json');
-  if (fs.existsSync(legacyCredentials)) {
-    return legacyCredentials;
+  const legacyValid = resolveCandidatePath(legacyCredentials);
+  if (legacyValid) return legacyValid;
+
+  // 3. GOOGLE_APPLICATION_CREDENTIALS
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    const gApp = resolveCandidatePath(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    if (gApp) return gApp;
   }
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
-    return process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  }
-  return defaultCredentials;
+
+  return null;
 }
 
 function getSpreadsheetId() {
@@ -49,10 +112,20 @@ function getSheetsClient() {
   if (process.env.THE_CHOSEN_DATA_PATH || process.env.NODE_ENV === 'test') {
     return null;
   }
+
   const keyFile = getCredentialsPath();
-  if (!fs.existsSync(keyFile)) {
-    console.warn(`[Google Sheets] Arquivo de credenciais não encontrado em '${keyFile}'.`);
+  if (!keyFile) {
+    const agora = Date.now();
+    if (agora - lastCredentialsWarnTime > 60000) {
+      console.warn('[Google Sheets] Nenhum arquivo de credenciais válido (.json) encontrado. Verifique se o caminho aponta para um arquivo ou se foi montado como pasta pelo Docker.');
+      lastCredentialsWarnTime = agora;
+    }
     return null;
+  }
+
+  // Reutiliza cliente em cache se o caminho de credenciais não tiver mudado
+  if (cachedSheetsClient && lastUsedCredentialsPath === keyFile) {
+    return cachedSheetsClient;
   }
 
   try {
@@ -60,9 +133,12 @@ function getSheetsClient() {
       keyFile,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
-    return google.sheets({ version: 'v4', auth });
+    cachedSheetsClient = google.sheets({ version: 'v4', auth });
+    lastUsedCredentialsPath = keyFile;
+    return cachedSheetsClient;
   } catch (err) {
     console.error('[Google Sheets] Erro ao inicializar cliente autenticado:', err.message);
+    cachedSheetsClient = null;
     return null;
   }
 }
@@ -126,6 +202,7 @@ async function obterTotalIngressosPlanilha(forceRefresh = false) {
   const tabName = getTabName();
 
   if (!sheets || !spreadsheetId) {
+    cacheExpiracao = agora + CACHE_ERROR_TTL_MS;
     return null;
   }
 
@@ -168,6 +245,7 @@ async function obterTotalIngressosPlanilha(forceRefresh = false) {
     return total;
   } catch (err) {
     console.error('[Google Sheets] Erro ao consultar linhas da planilha:', err.message);
+    cacheExpiracao = agora + CACHE_ERROR_TTL_MS;
     return null;
   }
 }
@@ -180,25 +258,32 @@ async function adicionarInscricaoPlanilha(inscricao) {
   const spreadsheetId = getSpreadsheetId();
   let tabName = getTabName();
 
+  const codigo = inscricao.codigo || '';
+  const titular = inscricao.titular || (inscricao.participantes && inscricao.participantes[0]) || '';
+  const quantidade = Number(inscricao.quantidade) || 1;
+
   if (!sheets) {
     if (process.env.THE_CHOSEN_DATA_PATH || process.env.NODE_ENV === 'test') {
       return { ok: true, mocked: true };
     }
-    throw new Error('Cliente do Google Sheets não disponível (verifique credentials.json).');
+    console.warn(`[Google Sheets] Inscrição ${codigo} (${titular}) mantida no banco local, mas não adicionada à planilha: cliente Google Sheets não disponível (verifique o arquivo de credenciais).`);
+    return { ok: false, error: 'Cliente do Google Sheets não disponível.' };
   }
   if (!spreadsheetId) {
-    throw new Error('ID da planilha do Google Sheets não configurado (GOOGLE_SHEETS_SPREADSHEET_ID).');
+    console.warn(`[Google Sheets] Inscrição ${codigo} mantida no banco local: ID da planilha não configurado.`);
+    return { ok: false, error: 'ID da planilha não configurado.' };
   }
 
-  // Garante que o cabeçalho exista
-  tabName = await garantirCabecalhoPlanilha(sheets, spreadsheetId, tabName);
+  // Garante que o cabeçalho exista de forma tolerante a falhas
+  try {
+    tabName = await garantirCabecalhoPlanilha(sheets, spreadsheetId, tabName);
+  } catch (hdrErr) {
+    console.warn('[Google Sheets] Aviso ao validar cabeçalho antes de adicionar linha:', hdrErr.message);
+  }
 
-  const titular = inscricao.titular || (inscricao.participantes && inscricao.participantes[0]) || '';
   const telefone = inscricao.telefone ? String(inscricao.telefone).replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') : '';
   const email = inscricao.email || '';
-  const quantidade = Number(inscricao.quantidade) || 1;
   const dataHora = moment().tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
-  const codigo = inscricao.codigo || '';
   const participantes = Array.isArray(inscricao.participantes)
     ? inscricao.participantes.join(', ')
     : String(inscricao.participantes || '');
@@ -237,7 +322,7 @@ async function adicionarInscricaoPlanilha(inscricao) {
     return { ok: true, updatedRange: res.data.updates?.updatedRange };
   } catch (err) {
     console.error(`[Google Sheets] Falha ao adicionar linha na planilha para ${codigo}:`, err.message);
-    throw err;
+    return { ok: false, error: err.message };
   }
 }
 
@@ -254,6 +339,9 @@ function limparCacheParaTestes() {
   cacheExpiracao = 0;
   customSheetsClient = null;
   customSpreadsheetId = null;
+  cachedSheetsClient = null;
+  lastUsedCredentialsPath = null;
+  lastCredentialsWarnTime = 0;
 }
 
 module.exports = {

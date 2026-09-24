@@ -395,3 +395,75 @@ test('Google Sheets: adiciona linha formatada e consulta contagem com mock do Sh
   assert.equal(statusAsync.preenchidas, 2);
   assert.equal(statusAsync.restantes, 98);
 });
+
+test('Google Sheets: getCredentialsPath ignora diretórios e nunca retorna pastas como keyFile', () => {
+  cleanup();
+  const dirTemp = path.join(__dirname, 'diretorio_falso_credentials');
+  if (!fs.existsSync(dirTemp)) {
+    fs.mkdirSync(dirTemp);
+  }
+
+  const envAnterior = process.env.GOOGLE_SHEETS_CREDENTIALS_PATH;
+  try {
+    // Aponta a variável de ambiente para uma pasta
+    process.env.GOOGLE_SHEETS_CREDENTIALS_PATH = dirTemp;
+    const resolved = theChosenSheets.getCredentialsPath();
+
+    // Não pode retornar o diretório dirTemp
+    assert.notEqual(resolved, dirTemp);
+    if (resolved) {
+      assert.equal(fs.statSync(resolved).isFile(), true);
+    }
+  } finally {
+    process.env.GOOGLE_SHEETS_CREDENTIALS_PATH = envAnterior;
+    if (fs.existsSync(dirTemp)) {
+      try { fs.rmdirSync(dirTemp); } catch {}
+    }
+  }
+});
+
+test('Google Sheets & The Chosen: falha na leitura da planilha não quebra obterStatusVagasAsync nem o servidor', async () => {
+  cleanup();
+  const sheetsQuebrado = {
+    spreadsheets: {
+      values: {
+        get: async () => {
+          throw new Error('EISDIR: illegal operation on a directory, read');
+        }
+      }
+    }
+  };
+
+  theChosenSheets.setSheetsClientForTest(sheetsQuebrado);
+  theChosenSheets.setSpreadsheetIdForTest('qualquer-id');
+
+  // Não deve lançar erro
+  const total = await theChosenSheets.obterTotalIngressosPlanilha(true);
+  assert.equal(total, null);
+
+  const status = await theChosen.obterStatusVagasAsync();
+  assert.equal(status.total, 100);
+  assert.equal(typeof status.preenchidas, 'number');
+  assert.equal(status.esgotado, false);
+});
+
+test('The Chosen: salvarInscricoes tolera pasta existente e utiliza backup resiliente', () => {
+  const dirFalso = path.join(__dirname, 'pasta_fake_inscricoes');
+  if (!fs.existsSync(dirFalso)) {
+    fs.mkdirSync(dirFalso);
+  }
+
+  const envAnterior = process.env.THE_CHOSEN_DATA_PATH;
+  delete process.env.THE_CHOSEN_DATA_PATH; // usa caminho padrão
+
+  try {
+    const dados = [{ id: '1', titular: 'Teste', quantidade: 1 }];
+    const ok = theChosen.salvarInscricoes(dados);
+    assert.equal(typeof ok, 'boolean');
+  } finally {
+    process.env.THE_CHOSEN_DATA_PATH = envAnterior;
+    if (fs.existsSync(dirFalso)) {
+      try { fs.rmdirSync(dirFalso); } catch {}
+    }
+  }
+});

@@ -40,7 +40,7 @@ function normalizarDataParaIso(dataStr) {
       const d = String(dt.getDate()).padStart(2, "0");
       return `${y}-${m}-${d}`;
     }
-  } catch {}
+  } catch { }
   return "";
 }
 
@@ -86,7 +86,7 @@ function extrairDatasEvento(ev) {
   try {
     const { buscarDescricaoEvento } = require("./descricaoEvento");
     descObj = buscarDescricaoEvento(titulo) || (tituloBase !== titulo ? buscarDescricaoEvento(tituloBase) : null);
-  } catch {}
+  } catch { }
 
   if (descObj) {
     if (descObj.tipoDuracao === "consecutivo") {
@@ -129,14 +129,14 @@ function extrairDatasEvento(ev) {
         } else if (form.payload) {
           let p = form.payload;
           if (typeof p === "string") {
-            try { p = JSON.parse(p); } catch {}
+            try { p = JSON.parse(p); } catch { }
           }
           if (p?.tipoDuracao === "consecutivo" || p?.tipoDuracao === "multiplo") {
             ehMultiplosDias = true;
           }
         }
       }
-    } catch {}
+    } catch { }
   }
 
   if (ehMultiplosDias && primeiroDia && ultimoDia && primeiroDia !== ultimoDia) {
@@ -294,7 +294,7 @@ function montarMensagemLembrete({
 
   if (docUrl) {
     msg +=
-      `\n📄 *Formulário de Agendamento Preenchido:*\n` +
+      `\n📄 *Formulário de Agendamento Preenchido!*\n` +
       `Você pode conferir as informações enviadas acessando o link:\n${docUrl}\n`;
   }
 
@@ -593,7 +593,7 @@ async function processarLembretesEventos({
                 departamento: "Atendimento Pastoral",
               });
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
 
@@ -611,7 +611,7 @@ async function processarLembretesEventos({
               });
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
 
@@ -774,7 +774,7 @@ async function processarLembretesDivulgacaoMultimidia({
     let payload = {};
     try {
       payload = JSON.parse(row.payload || "{}");
-    } catch {}
+    } catch { }
 
     const liderUser = row.solicitanteId ? obterUsuarioPorTelefone(row.solicitanteId) : null;
     const nomeLider = liderUser?.nome || payload.nome_lider || payload.nomeSolicitante || "";
@@ -1237,7 +1237,7 @@ async function processarLembretesItensADefinir({
     if (typeof form.payload === "string") {
       try {
         payload = JSON.parse(form.payload);
-      } catch {}
+      } catch { }
     } else if (typeof form.payload === "object" && form.payload !== null) {
       payload = form.payload;
     }

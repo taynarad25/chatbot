@@ -302,12 +302,17 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
       }
 
-      // API: Consulta de vagas em tempo real (sincronizada com Google Sheets)
+      // API: Consulta de vagas em tempo real (sincronizada com Google Sheets de forma segura)
       if (req.method === 'GET' && pathname === '/the-chosen/api/vagas') {
-        const statusVagas = typeof theChosen.obterStatusVagasAsync === 'function'
-          ? await theChosen.obterStatusVagasAsync()
-          : theChosen.obterStatusVagas();
-        return sendJson(res, 200, statusVagas);
+        try {
+          const statusVagas = typeof theChosen.obterStatusVagasAsync === 'function'
+            ? await theChosen.obterStatusVagasAsync()
+            : theChosen.obterStatusVagas();
+          return sendJson(res, 200, statusVagas);
+        } catch (errVagas) {
+          console.error('[Web] Erro ao consultar vagas The Chosen:', errVagas.message);
+          return sendJson(res, 200, theChosen.obterStatusVagas());
+        }
       }
 
       // API: Processamento de inscrição (/the-chosen/api/inscrever e /the-chosen)

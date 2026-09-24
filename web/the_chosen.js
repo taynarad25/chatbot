@@ -20,6 +20,46 @@ function getDataFile() {
   return process.env.THE_CHOSEN_DATA_PATH || path.join(__dirname, '..', 'the_chosen_inscricoes.json');
 }
 
+function getFallbackDataFile() {
+  return path.join(__dirname, '..', 'temp', 'the_chosen_inscricoes.backup.json');
+}
+
+function isRealFile(filePath) {
+  try {
+    return !!filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isRealDir(filePath) {
+  try {
+    return !!filePath && fs.existsSync(filePath) && fs.statSync(filePath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function tentarRemoverDiretorioInvalido(dirPath) {
+  try {
+    if (isRealDir(dirPath)) {
+      console.warn(`[The Chosen] Aviso: '${dirPath}' foi criado como diretório em vez de arquivo. Tentando remover...`);
+      const files = fs.readdirSync(dirPath);
+      if (files.length === 0) {
+        fs.rmdirSync(dirPath);
+        console.log(`[The Chosen] Diretório vazio '${dirPath}' removido com sucesso.`);
+        return true;
+      }
+      fs.rmSync(dirPath, { recursive: true, force: true });
+      console.log(`[The Chosen] Diretório '${dirPath}' removido com sucesso.`);
+      return true;
+    }
+  } catch (err) {
+    console.warn(`[The Chosen] Não foi possível remover o diretório '${dirPath}' (${err.message}). Pode ser um volume Docker montado pelo host.`);
+  }
+  return false;
+}
+
 const LIMITE_VAGAS = parseInt(process.env.THE_CHOSEN_LIMITE_VAGAS || '100', 10);
 const DATA_EXPIRACAO = new Date('2026-10-04T00:00:00-03:00');
 
@@ -140,7 +180,7 @@ function carregarInscricoes() {
 
   if (process.env.THE_CHOSEN_DATA_PATH) {
     try {
-      if (fs.existsSync(dataFile)) {
+      if (isRealFile(dataFile)) {
         const raw = fs.readFileSync(dataFile, 'utf8');
         const data = JSON.parse(raw);
         if (Array.isArray(data)) return data;
@@ -151,6 +191,11 @@ function carregarInscricoes() {
     return [];
   }
 
+  // Se o caminho principal for acidentalmente um diretório, tenta remover se possível
+  if (isRealDir(dataFile)) {
+    tentarRemoverDiretorioInvalido(dataFile);
+  }
+
   if (db) {
     try {
       const doBanco = carregarInscricoesDoBanco(db);
@@ -158,13 +203,21 @@ function carregarInscricoes() {
         return doBanco;
       }
 
-      if (fs.existsSync(dataFile)) {
-        const raw = fs.readFileSync(dataFile, 'utf8');
-        const data = JSON.parse(raw);
-        if (Array.isArray(data) && data.length > 0) {
-          console.log(`[The Chosen] Migrando ${data.length} inscrições do arquivo JSON para o banco SQLite...`);
-          salvarInscricoesNoBanco(data, db);
-          return data;
+      // Migração inicial: se o banco estiver vazio, tenta ler o arquivo principal ou backup em temp/
+      const candFiles = [dataFile, getFallbackDataFile()];
+      for (const cand of candFiles) {
+        if (isRealFile(cand)) {
+          try {
+            const raw = fs.readFileSync(cand, 'utf8');
+            const data = JSON.parse(raw);
+            if (Array.isArray(data) && data.length > 0) {
+              console.log(`[The Chosen] Migrando ${data.length} inscrições do arquivo JSON (${cand}) para o banco SQLite...`);
+              salvarInscricoesNoBanco(data, db);
+              return data;
+            }
+          } catch (migrErr) {
+            console.warn(`[The Chosen] Falha ao processar arquivo '${cand}' para migração:`, migrErr.message);
+          }
         }
       }
       return [];
@@ -173,14 +226,18 @@ function carregarInscricoes() {
     }
   }
 
-  try {
-    if (fs.existsSync(dataFile)) {
-      const raw = fs.readFileSync(dataFile, 'utf8');
-      const data = JSON.parse(raw);
-      if (Array.isArray(data)) return data;
+  // Fallback caso db não esteja disponível: tenta ler o JSON principal ou o alternativo
+  const candFiles = [dataFile, getFallbackDataFile()];
+  for (const cand of candFiles) {
+    if (isRealFile(cand)) {
+      try {
+        const raw = fs.readFileSync(cand, 'utf8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) return data;
+      } catch (err) {
+        console.error(`[The Chosen] Erro ao ler arquivo de inscrições (${cand}):`, err.message);
+      }
     }
-  } catch (err) {
-    console.error('[The Chosen] Erro ao ler arquivo de inscrições:', err.message);
   }
   return [];
 }
@@ -205,10 +262,32 @@ function salvarInscricoes(inscricoes) {
 
   let salvoArquivo = false;
   try {
-    fs.writeFileSync(dataFile, JSON.stringify(inscricoes, null, 2), 'utf8');
+    if (isRealDir(dataFile)) {
+      tentarRemoverDiretorioInvalido(dataFile);
+    }
+
+    if (isRealDir(dataFile)) {
+      throw Object.assign(new Error(`O caminho '${dataFile}' é um diretório montado pelo Docker.`), { code: 'EISDIR' });
+    }
+
+    fs.writeFileSync(dataFile, JSON.stringify(inscricoes, null, 2), { encoding: 'utf8', mode: 0o666 });
     salvoArquivo = true;
   } catch (err) {
     console.error('[The Chosen] Erro ao sincronizar arquivo JSON de inscrições:', err.message);
+
+    // Se houver erro de permissão (EACCES) ou diretório (EISDIR/EPERM/EBUSY),
+    // salva no diretório temp com permissões totais para o usuário node
+    if (err.code === 'EACCES' || err.code === 'EISDIR' || err.code === 'EPERM' || err.code === 'EBUSY') {
+      try {
+        const fallbackPath = getFallbackDataFile();
+        fs.mkdirSync(path.dirname(fallbackPath), { recursive: true });
+        fs.writeFileSync(fallbackPath, JSON.stringify(inscricoes, null, 2), { encoding: 'utf8', mode: 0o666 });
+        salvoArquivo = true;
+        console.log(`[The Chosen] Inscrições sincronizadas no arquivo de backup alternativo: ${fallbackPath}`);
+      } catch (fallbackErr) {
+        console.error('[The Chosen] Falha também ao sincronizar no arquivo alternativo:', fallbackErr.message);
+      }
+    }
   }
 
   return salvoBanco || salvoArquivo;
