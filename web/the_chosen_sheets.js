@@ -188,6 +188,49 @@ async function garantirCabecalhoPlanilha(sheets, spreadsheetId, tabName) {
   return tabName;
 }
 
+const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyALepWcOCGBl53BIMqOpSqpiRE035aNyjKDv50A4r42JSYw62ZBcqf6zY76ZxRoC4/exec';
+
+function getAppsScriptUrl() {
+  return process.env.APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL;
+}
+
+let apiDisabledWarningLogged = false;
+
+/**
+ * Envia uma inscrição para o Google Sheets via Google Apps Script (Web App).
+ */
+async function enviarParaGoogleAppsScript(inscricao) {
+  const url = getAppsScriptUrl();
+  if (!url) return { ok: false, error: 'URL do Apps Script não configurada' };
+
+  const titular = inscricao.titular || (Array.isArray(inscricao.participantes) && inscricao.participantes[0]) || inscricao.nome || '';
+  const dataHora = inscricao.dataHora || moment().tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
+  const payload = {
+    dataHora,
+    codigo: inscricao.codigo || '',
+    nome: titular,
+    telefone: inscricao.telefone ? String(inscricao.telefone) : '',
+    email: inscricao.email || '',
+    quantidade: Number(inscricao.quantidade) || 1,
+    situacao: inscricao.situacao || 'Confirmado'
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      redirect: 'follow',
+    });
+
+    console.log(`[Google Apps Script] Inscrição ${payload.codigo} (${payload.nome}) sincronizada com sucesso na planilha via Apps Script (Status: ${res.status}).`);
+    return { ok: true, status: res.status };
+  } catch (err) {
+    console.error(`[Google Apps Script] Erro ao sincronizar inscrição ${payload.codigo} com a planilha:`, err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 /**
  * Consulta a planilha diretamente para calcular o total de ingressos preenchidos.
  */
@@ -244,7 +287,14 @@ async function obterTotalIngressosPlanilha(forceRefresh = false) {
     cacheExpiracao = agora + CACHE_TTL_MS;
     return total;
   } catch (err) {
-    console.error('[Google Sheets] Erro ao consultar linhas da planilha:', err.message);
+    if (err.message && (err.message.includes('disabled') || err.message.includes('has not been used'))) {
+      if (!apiDisabledWarningLogged) {
+        console.warn('[Google Sheets] Google Sheets API v4 desativada no GCP. As contagens de vagas serão gerenciadas pelo banco local SQLite e novas inscrições sincronizadas via Google Apps Script.');
+        apiDisabledWarningLogged = true;
+      }
+    } else {
+      console.error('[Google Sheets] Erro ao consultar linhas da planilha:', err.message);
+    }
     cacheExpiracao = agora + CACHE_ERROR_TTL_MS;
     return null;
   }
@@ -254,24 +304,53 @@ async function obterTotalIngressosPlanilha(forceRefresh = false) {
  * Adiciona uma inscrição com sucesso como uma nova linha na planilha do Google Sheets.
  */
 async function adicionarInscricaoPlanilha(inscricao) {
+  const codigo = inscricao.codigo || '';
+  const titular = inscricao.titular || (Array.isArray(inscricao.participantes) && inscricao.participantes[0]) || inscricao.nome || '';
+  const quantidade = Number(inscricao.quantidade) || 1;
+
+  // 1. Envio prioritário e direto via Google Apps Script (Web App)
+  let appsScriptResult = null;
+  if (!process.env.THE_CHOSEN_DATA_PATH && process.env.NODE_ENV !== 'test') {
+    try {
+      appsScriptResult = await enviarParaGoogleAppsScript(inscricao);
+    } catch (asErr) {
+      console.error('[Google Apps Script] Falha ao enviar inscrição para o Web App:', asErr.message);
+    }
+  }
+
+  // Atualiza cache de ingressos se sincronizado com sucesso
+  if (appsScriptResult && appsScriptResult.ok) {
+    if (cacheTotalIngressos !== null) {
+      cacheTotalIngressos += quantidade;
+      cacheExpiracao = Date.now() + CACHE_TTL_MS;
+    } else {
+      cacheTotalIngressos = quantidade;
+      cacheExpiracao = Date.now() + CACHE_TTL_MS;
+    }
+  }
+
+  // 2. Tenta também via Google Sheets API v4 (se configurado ou em testes)
   const sheets = getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
   let tabName = getTabName();
-
-  const codigo = inscricao.codigo || '';
-  const titular = inscricao.titular || (inscricao.participantes && inscricao.participantes[0]) || '';
-  const quantidade = Number(inscricao.quantidade) || 1;
 
   if (!sheets) {
     if (process.env.THE_CHOSEN_DATA_PATH || process.env.NODE_ENV === 'test') {
       return { ok: true, mocked: true };
     }
-    console.warn(`[Google Sheets] Inscrição ${codigo} (${titular}) mantida no banco local, mas não adicionada à planilha: cliente Google Sheets não disponível (verifique o arquivo de credenciais).`);
-    return { ok: false, error: 'Cliente do Google Sheets não disponível.' };
+    if (appsScriptResult && appsScriptResult.ok) {
+      return { ok: true, appsScript: true };
+    }
+    console.warn(`[Google Sheets] Inscrição ${codigo} (${titular}) mantida no banco local: credenciais v4 não disponíveis.`);
+    return { ok: appsScriptResult?.ok || false, error: 'Cliente Sheets API não disponível.' };
   }
+
   if (!spreadsheetId) {
+    if (appsScriptResult && appsScriptResult.ok) {
+      return { ok: true, appsScript: true };
+    }
     console.warn(`[Google Sheets] Inscrição ${codigo} mantida no banco local: ID da planilha não configurado.`);
-    return { ok: false, error: 'ID da planilha não configurado.' };
+    return { ok: appsScriptResult?.ok || false, error: 'ID da planilha não configurado.' };
   }
 
   // Garante que o cabeçalho exista de forma tolerante a falhas
@@ -309,7 +388,6 @@ async function adicionarInscricaoPlanilha(inscricao) {
       },
     });
 
-    // Atualiza imediatamente o cache de ingressos preenchidos
     if (cacheTotalIngressos !== null) {
       cacheTotalIngressos += quantidade;
       cacheExpiracao = Date.now() + CACHE_TTL_MS;
@@ -318,10 +396,21 @@ async function adicionarInscricaoPlanilha(inscricao) {
       cacheExpiracao = Date.now() + CACHE_TTL_MS;
     }
 
-    console.log(`[Google Sheets] Inscrição ${codigo} (${titular}, ${quantidade} ingressos) salva com sucesso na planilha.`);
-    return { ok: true, updatedRange: res.data.updates?.updatedRange };
+    console.log(`[Google Sheets] Inscrição ${codigo} (${titular}, ${quantidade} ingressos) salva com sucesso na planilha via API v4.`);
+    return { ok: true, updatedRange: res.data.updates?.updatedRange, appsScript: appsScriptResult?.ok || false };
   } catch (err) {
-    console.error(`[Google Sheets] Falha ao adicionar linha na planilha para ${codigo}:`, err.message);
+    if (err.message && (err.message.includes('disabled') || err.message.includes('has not been used'))) {
+      if (!apiDisabledWarningLogged) {
+        console.warn('[Google Sheets] Google Sheets API v4 desativada no GCP. Inscrições sendo enviadas pelo Google Apps Script Web App.');
+        apiDisabledWarningLogged = true;
+      }
+    } else {
+      console.error(`[Google Sheets] Falha ao adicionar linha na planilha para ${codigo}:`, err.message);
+    }
+
+    if (appsScriptResult && appsScriptResult.ok) {
+      return { ok: true, appsScript: true };
+    }
     return { ok: false, error: err.message };
   }
 }
@@ -342,6 +431,7 @@ function limparCacheParaTestes() {
   cachedSheetsClient = null;
   lastUsedCredentialsPath = null;
   lastCredentialsWarnTime = 0;
+  apiDisabledWarningLogged = false;
 }
 
 module.exports = {
@@ -349,6 +439,8 @@ module.exports = {
   getSpreadsheetId,
   getTabName,
   getSheetsClient,
+  getAppsScriptUrl,
+  enviarParaGoogleAppsScript,
   obterTotalIngressosPlanilha,
   adicionarInscricaoPlanilha,
   setSheetsClientForTest,

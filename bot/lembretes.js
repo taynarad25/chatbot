@@ -298,7 +298,7 @@ function montarMensagemLembrete({
       `Você pode conferir as informações enviadas acessando o link:\n${docUrl}\n`;
   }
 
-  msg += `\n_Que Deus abençoe ricamente a realização deste evento!_ 🙏✨`;
+  msg += `\n_Que Deus abençoe!_ 🙏✨`;
   return msg;
 }
 

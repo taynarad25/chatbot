@@ -93,6 +93,48 @@ function formatarInscricaoDoBanco(row) {
   };
 }
 
+function normalizarInscricao(item) {
+  if (!item || typeof item !== 'object') return null;
+  const id = String(item.id || crypto.randomUUID());
+  const codigo = String(item.codigo || `TC-${crypto.randomBytes(3).toString('hex').toUpperCase()}`);
+  const quantidade = Number(item.quantidade) || 1;
+  let participantes = [];
+  if (Array.isArray(item.participantes)) {
+    participantes = item.participantes.map(p => String(p || '').trim()).filter(Boolean);
+  } else if (typeof item.participantes === 'string') {
+    try {
+      const parsed = JSON.parse(item.participantes);
+      participantes = Array.isArray(parsed) ? parsed.map(p => String(p || '').trim()).filter(Boolean) : [item.participantes];
+    } catch {
+      participantes = [item.participantes];
+    }
+  }
+  const titular = String(item.titular || (participantes.length > 0 ? participantes[0] : 'Participante'));
+  if (participantes.length === 0) {
+    participantes = [titular];
+  }
+
+  return {
+    id,
+    codigo,
+    quantidade,
+    participantes,
+    titular,
+    telefone: String(item.telefone || ''),
+    email: String(item.email || ''),
+    evento: String(item.evento || 'Pré-estreia The Chosen - Temporada 6'),
+    dataEvento: String(item.dataEvento || '03/10/2026 19:00'),
+    statusConfirmacao: String(item.statusConfirmacao || 'pendente'),
+    confirmadoEm: item.confirmadoEm ? String(item.confirmadoEm) : null,
+    lembrete3DiasEnviado: Boolean(item.lembrete3DiasEnviado),
+    dataLembrete3Dias: item.dataLembrete3Dias ? String(item.dataLembrete3Dias) : null,
+    lembreteDiaEventoEnviado: Boolean(item.lembreteDiaEventoEnviado),
+    dataLembreteDiaEvento: item.dataLembreteDiaEvento ? String(item.dataLembreteDiaEvento) : null,
+    whatsappConfirmacaoEnviado: Boolean(item.whatsappConfirmacaoEnviado),
+    criadoEm: String(item.criadoEm || new Date().toISOString())
+  };
+}
+
 function carregarInscricoesDoBanco(banco = db) {
   if (!banco) return [];
   try {
@@ -107,6 +149,8 @@ function carregarInscricoesDoBanco(banco = db) {
 function salvarInscricoesNoBanco(inscricoes, banco = db) {
   if (!banco) return false;
   try {
+    const normalizadas = (inscricoes || []).map(normalizarInscricao).filter(Boolean);
+
     const upsertStmt = banco.prepare(`
       INSERT INTO the_chosen_inscricoes (
         id, codigo, quantidade, participantes, titular, telefone, email, evento, dataEvento,
@@ -134,7 +178,7 @@ function salvarInscricoesNoBanco(inscricoes, banco = db) {
 
     banco.exec('BEGIN');
     try {
-      const ids = (inscricoes || []).map(i => i.id).filter(Boolean);
+      const ids = normalizadas.map(i => i.id);
       if (ids.length === 0) {
         banco.exec('DELETE FROM the_chosen_inscricoes');
       } else {
@@ -142,25 +186,25 @@ function salvarInscricoesNoBanco(inscricoes, banco = db) {
         banco.prepare(`DELETE FROM the_chosen_inscricoes WHERE id NOT IN (${placeholders})`).run(...ids);
       }
 
-      for (const item of (inscricoes || [])) {
+      for (const item of normalizadas) {
         upsertStmt.run(
           item.id,
           item.codigo,
-          Number(item.quantidade) || 1,
-          JSON.stringify(item.participantes || []),
-          item.titular || '',
-          item.telefone || '',
-          item.email || '',
-          item.evento || 'Pré-estreia The Chosen - Temporada 6',
-          item.dataEvento || '03/10/2026 19:00',
-          item.statusConfirmacao || 'pendente',
-          item.confirmadoEm || null,
+          item.quantidade,
+          JSON.stringify(item.participantes),
+          item.titular,
+          item.telefone,
+          item.email,
+          item.evento,
+          item.dataEvento,
+          item.statusConfirmacao,
+          item.confirmadoEm,
           item.lembrete3DiasEnviado ? 1 : 0,
-          item.dataLembrete3Dias || null,
+          item.dataLembrete3Dias,
           item.lembreteDiaEventoEnviado ? 1 : 0,
-          item.dataLembreteDiaEvento || null,
+          item.dataLembreteDiaEvento,
           item.whatsappConfirmacaoEnviado ? 1 : 0,
-          item.criadoEm || new Date().toISOString()
+          item.criadoEm
         );
       }
       banco.exec('COMMIT');
@@ -183,7 +227,7 @@ function carregarInscricoes() {
       if (isRealFile(dataFile)) {
         const raw = fs.readFileSync(dataFile, 'utf8');
         const data = JSON.parse(raw);
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data)) return data.map(normalizarInscricao).filter(Boolean);
       }
     } catch (err) {
       console.error('[The Chosen] Erro ao ler arquivo de teste:', err.message);
@@ -211,9 +255,12 @@ function carregarInscricoes() {
             const raw = fs.readFileSync(cand, 'utf8');
             const data = JSON.parse(raw);
             if (Array.isArray(data) && data.length > 0) {
-              console.log(`[The Chosen] Migrando ${data.length} inscrições do arquivo JSON (${cand}) para o banco SQLite...`);
-              salvarInscricoesNoBanco(data, db);
-              return data;
+              const normalizados = data.map(normalizarInscricao).filter(Boolean);
+              if (normalizados.length > 0) {
+                console.log(`[The Chosen] Migrando ${normalizados.length} inscrições do arquivo JSON (${cand}) para o banco SQLite...`);
+                salvarInscricoesNoBanco(normalizados, db);
+                return normalizados;
+              }
             }
           } catch (migrErr) {
             console.warn(`[The Chosen] Falha ao processar arquivo '${cand}' para migração:`, migrErr.message);
@@ -233,7 +280,7 @@ function carregarInscricoes() {
       try {
         const raw = fs.readFileSync(cand, 'utf8');
         const data = JSON.parse(raw);
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data)) return data.map(normalizarInscricao).filter(Boolean);
       } catch (err) {
         console.error(`[The Chosen] Erro ao ler arquivo de inscrições (${cand}):`, err.message);
       }
@@ -244,10 +291,11 @@ function carregarInscricoes() {
 
 function salvarInscricoes(inscricoes) {
   const dataFile = getDataFile();
+  const normalizadas = (inscricoes || []).map(normalizarInscricao).filter(Boolean);
 
   if (process.env.THE_CHOSEN_DATA_PATH) {
     try {
-      fs.writeFileSync(dataFile, JSON.stringify(inscricoes, null, 2), 'utf8');
+      fs.writeFileSync(dataFile, JSON.stringify(normalizadas, null, 2), 'utf8');
       return true;
     } catch (err) {
       console.error('[The Chosen] Erro ao salvar arquivo de teste:', err.message);
@@ -257,7 +305,7 @@ function salvarInscricoes(inscricoes) {
 
   let salvoBanco = false;
   if (db) {
-    salvoBanco = salvarInscricoesNoBanco(inscricoes, db);
+    salvoBanco = salvarInscricoesNoBanco(normalizadas, db);
   }
 
   let salvoArquivo = false;
@@ -270,7 +318,7 @@ function salvarInscricoes(inscricoes) {
       throw Object.assign(new Error(`O caminho '${dataFile}' é um diretório montado pelo Docker.`), { code: 'EISDIR' });
     }
 
-    fs.writeFileSync(dataFile, JSON.stringify(inscricoes, null, 2), { encoding: 'utf8', mode: 0o666 });
+    fs.writeFileSync(dataFile, JSON.stringify(normalizadas, null, 2), { encoding: 'utf8', mode: 0o666 });
     salvoArquivo = true;
   } catch (err) {
     console.error('[The Chosen] Erro ao sincronizar arquivo JSON de inscrições:', err.message);
@@ -281,7 +329,7 @@ function salvarInscricoes(inscricoes) {
       try {
         const fallbackPath = getFallbackDataFile();
         fs.mkdirSync(path.dirname(fallbackPath), { recursive: true });
-        fs.writeFileSync(fallbackPath, JSON.stringify(inscricoes, null, 2), { encoding: 'utf8', mode: 0o666 });
+        fs.writeFileSync(fallbackPath, JSON.stringify(normalizadas, null, 2), { encoding: 'utf8', mode: 0o666 });
         salvoArquivo = true;
         console.log(`[The Chosen] Inscrições sincronizadas no arquivo de backup alternativo: ${fallbackPath}`);
       } catch (fallbackErr) {

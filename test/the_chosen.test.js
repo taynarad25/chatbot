@@ -212,7 +212,7 @@ test('The Chosen: notificações WhatsApp simulam envio com sucesso para cliente
   assert.equal(mensagensEnviadas.length, 1);
   assert.ok(mensagensEnviadas[0].jid.includes('5511977776666'));
   assert.ok(mensagensEnviadas[0].text.includes(reg.inscricao.titular));
-  assert.ok(mensagensEnviadas[0].text.includes('pipoca e suco'));
+  assert.ok(mensagensEnviadas[0].text.includes('apresentar o seu nome'));
 
   // Lembrete de 3 dias
   const lembreteRes = await theChosenNotificacoes.enviarLembreteConfirmacao3Dias(mockClient);
@@ -465,5 +465,80 @@ test('The Chosen: salvarInscricoes tolera pasta existente e utiliza backup resil
     if (fs.existsSync(dirFalso)) {
       try { fs.rmdirSync(dirFalso); } catch {}
     }
+  }
+});
+
+test('The Chosen: persistência no SQLite tolera e normaliza registros sem codigo ou id sem falhar em parameter 2', () => {
+  cleanup();
+  const { DatabaseSync } = require('node:sqlite');
+  const dbMemoria = new DatabaseSync(':memory:');
+  dbMemoria.exec(`
+    CREATE TABLE IF NOT EXISTS the_chosen_inscricoes (
+      id TEXT PRIMARY KEY,
+      codigo TEXT UNIQUE NOT NULL,
+      quantidade INTEGER NOT NULL DEFAULT 1,
+      participantes TEXT NOT NULL,
+      titular TEXT NOT NULL,
+      telefone TEXT NOT NULL,
+      email TEXT NOT NULL,
+      evento TEXT NOT NULL,
+      dataEvento TEXT NOT NULL,
+      statusConfirmacao TEXT NOT NULL DEFAULT 'pendente',
+      confirmadoEm TEXT,
+      lembrete3DiasEnviado INTEGER DEFAULT 0,
+      dataLembrete3Dias TEXT,
+      lembreteDiaEventoEnviado INTEGER DEFAULT 0,
+      dataLembreteDiaEvento TEXT,
+      whatsappConfirmacaoEnviado INTEGER DEFAULT 0,
+      criadoEm TEXT NOT NULL
+    )
+  `);
+
+  // Registro propositalmente incompleto (sem id, sem codigo, sem dataLembrete, etc.)
+  const dadosIncompletos = [
+    { titular: 'Gabriela Silva', telefone: '11942685501', quantidade: 2 }
+  ];
+
+  const salvou = theChosen.salvarInscricoesNoBanco(dadosIncompletos, dbMemoria);
+  assert.equal(salvou, true);
+
+  const lidos = theChosen.carregarInscricoesDoBanco(dbMemoria);
+  assert.equal(lidos.length, 1);
+  assert.equal(lidos[0].titular, 'Gabriela Silva');
+  assert.ok(lidos[0].codigo.startsWith('TC-'));
+  assert.equal(lidos[0].quantidade, 2);
+});
+
+test('Google Sheets: enviarParaGoogleAppsScript formata payload JSON e lida com sucesso e erro', async () => {
+  const originalFetch = global.fetch;
+  let payloadEnviado = null;
+
+  global.fetch = async (url, options) => {
+    payloadEnviado = JSON.parse(options.body);
+    return {
+      status: 200,
+      ok: true,
+      text: async () => 'OK'
+    };
+  };
+
+  try {
+    const res = await theChosenSheets.enviarParaGoogleAppsScript({
+      codigo: 'TC-TESTAPP',
+      titular: 'João Teste',
+      telefone: '11999998888',
+      email: 'joao@teste.com',
+      quantidade: 3,
+      situacao: 'Confirmado'
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(payloadEnviado.codigo, 'TC-TESTAPP');
+    assert.equal(payloadEnviado.nome, 'João Teste');
+    assert.equal(payloadEnviado.quantidade, 3);
+    assert.equal(payloadEnviado.situacao, 'Confirmado');
+    assert.ok(payloadEnviado.dataHora);
+  } finally {
+    global.fetch = originalFetch;
   }
 });

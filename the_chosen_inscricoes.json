@@ -1,7 +1,23 @@
 [
   {
     "id": "1",
+    "codigo": "TC-799594",
+    "quantidade": 1,
+    "participantes": [
+      "Teste"
+    ],
     "titular": "Teste",
-    "quantidade": 1
+    "telefone": "",
+    "email": "",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "pendente",
+    "confirmadoEm": null,
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": false,
+    "criadoEm": "2026-09-24T14:45:08.701Z"
   }
 ]

@@ -25,26 +25,16 @@ async function enviarMensagemConfirmacaoInscricao(client, inscricao) {
     .join('\n');
 
   const texto = 
-`🎬 *Inscrição Confirmada! Pré-estreia The Chosen - Temporada 6* ✨
+`🎬 *Inscrição Confirmada - The Chosen*
 
-Olá, *${inscricao.titular}*! Sua inscrição para a Pré-estreia exclusiva de The Chosen (Episódio 1) foi confirmada com sucesso!
+Olá, *${inscricao.titular}*! Sua inscrição foi confirmada com sucesso.
 
-👥 *Quantidade de Ingressos:* ${inscricao.quantidade}
-📝 *Participantes:*
-${nomesFormatados}
-
-📅 *Data:* Sábado, 03 de Outubro de 2026
+📅 *Data:* Sábado, 03/10/2026
 ⏰ *Horário:* 19:00
-📍 *Local:* Comunidade Cristã Curados
-📌 *Endereço:* Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi
 
-⏰ *Importante:* Chegue cedo para garantir um bom lugar e não perder nada!
-🍿 *Especial:* Teremos pipoca e suco à vontade para você e sua família!
+🎟️ *Entrada:* No dia do evento, basta apresentar o seu nome (*${inscricao.titular}*) na recepção.
 
-👶 *Lembrete:* Crianças de colo não precisam de ingresso e não ocupam assento individual.
-Ao chegar na recepção/portaria, basta informar o seu nome completo (*${inscricao.titular}*). Não é necessário código!
-
-Estamos preparando uma noite memorável e abençoada para você e sua família! Te esperamos lá! 🙏`;
+Te esperamos lá! 🙏`;
 
   try {
     await client.sendMessage(jid, texto);
