@@ -176,7 +176,7 @@ test("API /the-chosen: consulta de vagas e realização de inscrição", async (
   const resVagas = await fetch(`${baseUrl}/the-chosen/api/vagas`);
   assert.equal(resVagas.status, 200);
   const jsonVagas = await resVagas.json();
-  assert.equal(jsonVagas.total, 100);
+  assert.equal(jsonVagas.total, 50);
   assert.ok(jsonVagas.restantes >= 0);
 
   // 2. Inscrição com sucesso
@@ -648,12 +648,12 @@ test("rota desconhecida fora de /secretaria: 404 direto, sem exigir login (livre
   assert.equal(res.status, 404, "só o que está sob /secretaria é protegido por login; o resto do site fica livre");
 });
 
-test("The Chosen HTTP API: GET /the-chosen/api/vagas retorna status das 100 vagas", async () => {
+test("The Chosen HTTP API: GET /the-chosen/api/vagas retorna status das 50 vagas", async () => {
   const res = await fetch(`${baseUrl}/the-chosen/api/vagas`);
   assert.equal(res.status, 200);
   const data = await res.json();
-  assert.equal(data.total, 100);
-  assert.ok(data.restantes <= 100);
+  assert.equal(data.total, 50);
+  assert.ok(data.restantes <= 50);
   assert.equal(typeof data.esgotado, "boolean");
 });
 

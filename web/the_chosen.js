@@ -60,7 +60,7 @@ function tentarRemoverDiretorioInvalido(dirPath) {
   return false;
 }
 
-const LIMITE_VAGAS = parseInt(process.env.THE_CHOSEN_LIMITE_VAGAS || '100', 10);
+const LIMITE_VAGAS = parseInt(process.env.THE_CHOSEN_LIMITE_VAGAS || '50', 10);
 const DATA_EXPIRACAO = new Date('2026-10-04T00:00:00-03:00');
 
 function formatarInscricaoDoBanco(row) {

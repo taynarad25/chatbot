@@ -1229,7 +1229,7 @@ function renderIndexHtml() {
             </div>
             <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Pré-estreia The Chosen - Temporada 6 (Ep. 1)</h4>
             <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
-              🗓️ <strong>03/10/2026 às 19:00</strong> &nbsp;•&nbsp; 📍 <strong>Auditório Principal</strong> (Capacidade: 100 vagas)
+              🗓️ <strong>03/10/2026 às 19:00</strong> &nbsp;•&nbsp; 📍 <strong>Auditório Principal</strong> (Capacidade: 50 vagas)
             </p>
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">

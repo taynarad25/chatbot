@@ -6,7 +6,9 @@ const path = require('path');
 // Define arquivo de dados isolado para os testes
 const TEST_DATA_FILE = path.join(__dirname, 'the_chosen_test.json');
 process.env.THE_CHOSEN_DATA_PATH = TEST_DATA_FILE;
-process.env.THE_CHOSEN_LIMITE_VAGAS = '100';
+process.env.THE_CHOSEN_LIMITE_VAGAS = '50';
+delete process.env.APPS_SCRIPT_URL; // Desativa envio real durante testes em lote
+
 
 const theChosen = require('../web/the_chosen');
 const theChosenSheets = require('../web/the_chosen_sheets');
@@ -23,12 +25,12 @@ function cleanup() {
 before(() => cleanup());
 after(() => cleanup());
 
-test('The Chosen: capacidade inicial configurada para 100 vagas', () => {
+test('The Chosen: capacidade inicial configurada para 50 vagas', () => {
   cleanup();
   const status = theChosen.obterStatusVagas();
-  assert.equal(status.total, 100);
+  assert.equal(status.total, 50);
   assert.equal(status.preenchidas, 0);
-  assert.equal(status.restantes, 100);
+  assert.equal(status.restantes, 50);
   assert.equal(status.esgotado, false);
 });
 
@@ -60,7 +62,7 @@ test('The Chosen: validações de formulário rejeitam entradas inválidas', asy
   assert.equal(res.code, 'EMAIL_INVALIDO');
 });
 
-test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 100 vagas', async () => {
+test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 50 vagas', async () => {
   cleanup();
   const res = await theChosen.realizarInscricao({
     quantidade: 3,
@@ -74,11 +76,11 @@ test('The Chosen: realiza inscrição com sucesso e decrementa estoque de 100 va
   assert.equal(res.inscricao.quantidade, 3);
   assert.equal(res.inscricao.participantes.length, 3);
   assert.equal(res.inscricao.statusConfirmacao, 'pendente');
-  assert.equal(res.vagasRestantes, 97);
+  assert.equal(res.vagasRestantes, 47);
 
   const status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 3);
-  assert.equal(status.restantes, 97);
+  assert.equal(status.restantes, 47);
 });
 
 test('The Chosen: confirmação de presença e busca por código/telefone', async () => {
@@ -115,14 +117,14 @@ test('The Chosen: confirmação de presença e busca por código/telefone', asyn
   assert.equal(stats.totalIngressos, 2);
   assert.equal(stats.confirmados, 1);
   assert.equal(stats.ingressosConfirmados, 2);
-  assert.equal(stats.restantes, 98);
+  assert.equal(stats.restantes, 48);
 });
 
-test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa vagas disponíveis (100 vagas)', async () => {
+test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa vagas disponíveis (50 vagas)', async () => {
   cleanup();
-  // Inscreve 98 vagas (em lotes de 10)
+  // Inscreve 48 vagas (em lotes de 10)
   const partes = [];
-  for (let i = 0; i < 98; i++) partes.push(`Participante ${i + 1}`);
+  for (let i = 0; i < 48; i++) partes.push(`Participante ${i + 1}`);
   while (partes.length > 0) {
     const chunk = partes.splice(0, Math.min(10, partes.length));
     await theChosen.realizarInscricao({
@@ -156,7 +158,7 @@ test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa va
   });
   assert.equal(resFinal.ok, true);
 
-  // Agora está esgotado (0 vagas de 100)
+  // Agora está esgotado (0 vagas de 50)
   const statusEsgotado = theChosen.obterStatusVagas();
   assert.equal(statusEsgotado.restantes, 0);
   assert.equal(statusEsgotado.esgotado, true);
@@ -172,7 +174,7 @@ test('The Chosen: rejeita inscrição quando quantidade solicitada ultrapassa va
   assert.equal(resEsgotado.code, 'ESGOTADO');
 });
 
-test('The Chosen: renderização da folha de presença em PDF contém participantes e métricas de 100 vagas', async () => {
+test('The Chosen: renderização da folha de presença em PDF contém participantes e métricas de 50 vagas', async () => {
   cleanup();
   await theChosen.realizarInscricao({
     quantidade: 2,
@@ -185,7 +187,7 @@ test('The Chosen: renderização da folha de presença em PDF contém participan
   assert.ok(html.includes('Lista Oficial de Portaria & Presença'));
   assert.ok(html.includes('Marcos Silva'));
   assert.ok(html.includes('Luciana Silva'));
-  assert.ok(html.includes('100 vagas'));
+  assert.ok(html.includes('50 vagas'));
   assert.ok(html.includes('window.print()'));
 });
 
@@ -315,7 +317,7 @@ test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e l
 
   let status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 5);
-  assert.equal(status.restantes, 95);
+  assert.equal(status.restantes, 45);
 
   // 1. Exclui individualmente a inscrição 2
   const resExcluir = theChosen.excluirInscricao(ins2.inscricao.id);
@@ -324,7 +326,7 @@ test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e l
 
   status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 2);
-  assert.equal(status.restantes, 98);
+  assert.equal(status.restantes, 48);
 
   // 2. Limpa inscrições de teste (remove ins1 que tem 'teste' no nome/email)
   const resLimpar = theChosen.limparInscricoesTeste();
@@ -333,7 +335,7 @@ test('The Chosen: excluirInscricao e limparInscricoesTeste removem registros e l
 
   status = theChosen.obterStatusVagas();
   assert.equal(status.preenchidas, 0);
-  assert.equal(status.restantes, 100);
+  assert.equal(status.restantes, 50);
 });
 
 test('Google Sheets: adiciona linha formatada e consulta contagem com mock do Sheets API', async () => {
@@ -391,9 +393,9 @@ test('Google Sheets: adiciona linha formatada e consulta contagem com mock do Sh
 
   // 4. Status de vagas reflete a contagem da planilha
   const statusAsync = await theChosen.obterStatusVagasAsync();
-  assert.equal(statusAsync.total, 100);
+  assert.equal(statusAsync.total, 50);
   assert.equal(statusAsync.preenchidas, 2);
-  assert.equal(statusAsync.restantes, 98);
+  assert.equal(statusAsync.restantes, 48);
 });
 
 test('Google Sheets: getCredentialsPath ignora diretórios e nunca retorna pastas como keyFile', () => {
@@ -442,7 +444,7 @@ test('Google Sheets & The Chosen: falha na leitura da planilha não quebra obter
   assert.equal(total, null);
 
   const status = await theChosen.obterStatusVagasAsync();
-  assert.equal(status.total, 100);
+  assert.equal(status.total, 50);
   assert.equal(typeof status.preenchidas, 'number');
   assert.equal(status.esgotado, false);
 });
@@ -454,7 +456,7 @@ test('The Chosen: salvarInscricoes tolera pasta existente e utiliza backup resil
   }
 
   const envAnterior = process.env.THE_CHOSEN_DATA_PATH;
-  delete process.env.THE_CHOSEN_DATA_PATH; // usa caminho padrão
+  process.env.THE_CHOSEN_DATA_PATH = dirFalso; // força caminho de arquivo para uma pasta
 
   try {
     const dados = [{ id: '1', titular: 'Teste', quantidade: 1 }];
