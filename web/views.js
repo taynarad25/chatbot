@@ -1233,6 +1233,9 @@ function renderIndexHtml() {
             </p>
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button onclick="sincronizarComPlanilha()" id="btnSyncPlanilha" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
+              🔄 Puxar da Planilha
+            </button>
             <button onclick="window.open('/the-chosen/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #0284c7, #00bcd4); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0, 188, 212, 0.3);">
               📄 Exportar como PDF
             </button>
@@ -1886,6 +1889,32 @@ function renderIndexHtml() {
         }
       } catch (err) {
         console.error('Erro ao limpar testes:', err);
+      }
+    }
+
+    async function sincronizarComPlanilha() {
+      const btn = document.getElementById('btnSyncPlanilha');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Sincronizando...';
+      }
+      try {
+        const res = await fetch('/the-chosen/api/sincronizar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          alert('✅ Sincronização concluída com sucesso!\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
+          await fetchTheChosenInscricoes();
+        } else {
+          alert('⚠️ Aviso ao sincronizar: ' + (data.error || data.message || 'Verifique a configuração do Apps Script'));
+        }
+      } catch (err) {
+        alert('Erro ao sincronizar com a planilha: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText || '🔄 Puxar da Planilha';
+        }
       }
     }
 

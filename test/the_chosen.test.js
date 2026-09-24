@@ -626,3 +626,83 @@ test('Google Sheets: excluirInscricaoPlanilha remove linha via Sheets API batchU
   assert.equal(deleteReq.range.endIndex, 3);
 });
 
+test('Google Sheets: puxarInscricoesDoGoogleAppsScript lê resposta do doGet e formata lista', async () => {
+  const originalFetch = global.fetch;
+
+  global.fetch = async (url, options) => {
+    return {
+      status: 200,
+      ok: true,
+      text: async () => JSON.stringify({
+        status: 'success',
+        total: 2,
+        inscricoes: [
+          { codigo: 'TC-NUVEM1', nome: 'Pastor Carlos', telefone: '11999990001', quantidade: 2, situacao: 'Confirmado' },
+          { codigo: 'TC-NUVEM2', nome: 'Missionária Ana', telefone: '11999990002', quantidade: 1, situacao: 'Pendente' }
+        ]
+      })
+    };
+  };
+
+  try {
+    process.env.APPS_SCRIPT_URL = 'https://script.google.com/macros/s/mock-sync/exec';
+    const res = await theChosenSheets.puxarInscricoesDoGoogleAppsScript();
+    assert.equal(res.ok, true);
+    assert.equal(res.inscricoes.length, 2);
+    assert.equal(res.inscricoes[0].codigo, 'TC-NUVEM1');
+    assert.equal(res.inscricoes[0].nome, 'Pastor Carlos');
+    assert.equal(res.inscricoes[1].codigo, 'TC-NUVEM2');
+  } finally {
+    global.fetch = originalFetch;
+    process.env.APPS_SCRIPT_URL = '';
+  }
+});
+
+test('The Chosen: sincronizarInscricoesComNuvem repopula banco de dados e backup local após restart', async () => {
+  cleanup();
+  const originalFetch = global.fetch;
+
+  global.fetch = async (url, options) => {
+    return {
+      status: 200,
+      ok: true,
+      text: async () => JSON.stringify({
+        status: 'success',
+        inscricoes: [
+          { codigo: 'TC-RESTORE1', nome: 'Família Oliveira', telefone: '11988881234', quantidade: 3, situacao: 'Confirmado' },
+          { codigo: 'TC-RESTORE2', nome: 'Irmão Lucas', telefone: '11977771234', quantidade: 1, situacao: 'Confirmado' }
+        ]
+      })
+    };
+  };
+
+  try {
+    process.env.APPS_SCRIPT_URL = 'https://script.google.com/macros/s/mock-sync/exec';
+
+    // Banco de dados começa vazio (simulando restart do Docker)
+    assert.equal(theChosen.carregarInscricoes().length, 0);
+
+    const resSync = await theChosen.sincronizarInscricoesComNuvem();
+    assert.equal(resSync.ok, true);
+    assert.equal(resSync.total, 2);
+
+    // Banco de dados agora está preenchido
+    const restaurados = theChosen.carregarInscricoes();
+    assert.equal(restaurados.length, 2);
+    assert.equal(restaurados[0].codigo, 'TC-RESTORE1');
+    assert.equal(restaurados[0].titular, 'Família Oliveira');
+    assert.equal(restaurados[0].quantidade, 3);
+    assert.equal(restaurados[1].codigo, 'TC-RESTORE2');
+
+    // Contador de vagas reflete as 4 vagas recuperadas da planilha (50 - 4 = 46)
+    const status = theChosen.obterStatusVagas();
+    assert.equal(status.total, 50);
+    assert.equal(status.preenchidas, 4);
+    assert.equal(status.restantes, 46);
+  } finally {
+    global.fetch = originalFetch;
+    process.env.APPS_SCRIPT_URL = '';
+  }
+});
+
+

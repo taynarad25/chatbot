@@ -239,6 +239,43 @@ async function excluirDoGoogleAppsScript(inscricao) {
 }
 
 /**
+ * Busca todas as inscrições cadastradas na planilha via Google Apps Script Web App (doGet).
+ */
+async function puxarInscricoesDoGoogleAppsScript() {
+  const url = getAppsScriptUrl();
+  if (!url) return { ok: false, error: 'URL do Apps Script não configurada.', inscricoes: [] };
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      redirect: 'follow',
+    });
+
+    if (!res.ok) {
+      console.warn(`[Google Apps Script] Falha ao consultar inscrições (HTTP ${res.status}).`);
+      return { ok: false, error: `HTTP ${res.status}`, inscricoes: [] };
+    }
+
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.warn('[Google Apps Script] Resposta do doGet não é JSON válido (verifique se doGet foi publicado no Apps Script).');
+      return { ok: false, error: 'Resposta não é JSON', inscricoes: [] };
+    }
+
+    const lista = Array.isArray(data) ? data : (Array.isArray(data.inscricoes) ? data.inscricoes : []);
+    console.log(`[Google Apps Script] ${lista.length} inscrições carregadas com sucesso da planilha via doGet.`);
+    return { ok: true, inscricoes: lista };
+  } catch (err) {
+    console.error('[Google Apps Script] Erro de rede ao buscar inscrições da planilha:', err.message);
+    return { ok: false, error: err.message, inscricoes: [] };
+  }
+}
+
+/**
  * Envia uma inscrição para o Google Sheets via Google Apps Script (Web App).
  */
 async function enviarParaGoogleAppsScript(inscricao) {
@@ -604,6 +641,7 @@ module.exports = {
   getAppsScriptUrl,
   enviarParaGoogleAppsScript,
   excluirDoGoogleAppsScript,
+  puxarInscricoesDoGoogleAppsScript,
   obterTotalIngressosPlanilha,
   adicionarInscricaoPlanilha,
   excluirInscricaoPlanilha,

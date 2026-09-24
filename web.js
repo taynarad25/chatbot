@@ -352,11 +352,37 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         if (!isAuthenticated(req)) {
           return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
         }
+
+        // Se solicitado via ?sync=1 ou se o banco local estiver vazio, puxa da planilha
+        const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const shouldSync = parsedUrl.searchParams.get('sync') === '1' || theChosen.listarInscricoes().length === 0;
+        if (shouldSync && typeof theChosen.sincronizarInscricoesComNuvem === 'function') {
+          await theChosen.sincronizarInscricoesComNuvem().catch(err => {
+            console.warn('[Web] Aviso ao sincronizar com Google Sheets em /the-chosen/api/inscritos:', err.message);
+          });
+        }
+
         return sendJson(res, 200, { 
           ok: true, 
           inscricoes: theChosen.listarInscricoes(),
           estatisticas: theChosen.obterEstatisticasConfirmacao()
         });
+      }
+
+      // API: Sincronização manual com a planilha do Google (Secretaria)
+      if (req.method === 'POST' && pathname === '/the-chosen/api/sincronizar') {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          const resultado = typeof theChosen.sincronizarInscricoesComNuvem === 'function'
+            ? await theChosen.sincronizarInscricoesComNuvem()
+            : { ok: false, message: 'Função de sincronização não disponível.' };
+          return sendJson(res, resultado.ok ? 200 : 500, resultado);
+        } catch (err) {
+          console.error('[Web] Erro ao sincronizar com Google Sheets:', err.message);
+          return sendJson(res, 500, { ok: false, message: err.message });
+        }
       }
 
       // Rota: Folha de Presença / Relatório Oficial em PDF (Protegido por login)
@@ -768,6 +794,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
   server.listen(port, '0.0.0.0', () => {
     console.log(`✅ Site de controle rodando em http://0.0.0.0:${server.address().port}`);
+
+    // Sincroniza dados da planilha ao iniciar o servidor
+    if (typeof theChosen.sincronizarInscricoesComNuvem === 'function' && !process.env.THE_CHOSEN_DATA_PATH) {
+      theChosen.sincronizarInscricoesComNuvem().catch(err => {
+        console.warn('[Web] Aviso na sincronização inicial com a planilha Google:', err.message);
+      });
+    }
   });
 
   return server;

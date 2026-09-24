@@ -363,7 +363,16 @@ function obterStatusVagas(dataReferencia = new Date()) {
 }
 
 async function obterStatusVagasAsync(dataReferencia = new Date()) {
-  const inscricoes = carregarInscricoes();
+  let inscricoes = carregarInscricoes();
+
+  // Se estiver zerado (ex: reinicialização do Docker), tenta puxar automaticamente da nuvem
+  if (inscricoes.length === 0 && !process.env.THE_CHOSEN_DATA_PATH) {
+    try {
+      await sincronizarInscricoesComNuvem();
+      inscricoes = carregarInscricoes();
+    } catch {}
+  }
+
   let preenchidas = inscricoes.reduce((acc, curr) => acc + (Number(curr.quantidade) || 0), 0);
   if (theChosenSheets) {
     try {
@@ -617,6 +626,102 @@ function limparInscricoesTeste() {
   return { ok: true, removidas, totalAtual: inscricoes.length, removidasInscricoes };
 }
 
+/**
+ * Sincroniza as inscrições locais (SQLite/JSON) com a planilha do Google Apps Script.
+ * Puxa os dados da nuvem e popula o SQLite e o backup local.
+ */
+async function sincronizarInscricoesComNuvem() {
+  if (!theChosenSheets || typeof theChosenSheets.puxarInscricoesDoGoogleAppsScript !== 'function') {
+    return { ok: false, message: 'Módulo theChosenSheets não disponível.' };
+  }
+
+  try {
+    const res = await theChosenSheets.puxarInscricoesDoGoogleAppsScript();
+    if (!res.ok || !Array.isArray(res.inscricoes)) {
+      return { ok: false, error: res.error || 'Falha ao buscar dados do Google Apps Script', total: 0 };
+    }
+
+    if (res.inscricoes.length === 0) {
+      return { ok: true, total: 0, inscricoes: [] };
+    }
+
+    // Carrega inscrições locais existentes para preservar metadados locais
+    const locais = carregarInscricoes();
+    const mapaLocais = new Map();
+    for (const item of locais) {
+      if (item.codigo) mapaLocais.set(item.codigo.toUpperCase(), item);
+      if (item.id) mapaLocais.set(item.id, item);
+    }
+
+    const unificados = [];
+    const codigosVistos = new Set();
+
+    for (const nuvem of res.inscricoes) {
+      const codNuvem = String(nuvem.codigo || '').trim().toUpperCase();
+      const local = codNuvem ? mapaLocais.get(codNuvem) : null;
+
+      let participantes = [];
+      if (Array.isArray(nuvem.participantes) && nuvem.participantes.length > 0) {
+        participantes = nuvem.participantes;
+      } else if (typeof nuvem.participantes === 'string' && nuvem.participantes.trim()) {
+        participantes = nuvem.participantes.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (local && Array.isArray(local.participantes)) {
+        participantes = local.participantes;
+      } else {
+        participantes = [nuvem.nome || nuvem.titular || 'Participante'];
+      }
+
+      const quantidade = Number(nuvem.quantidade) || (local ? local.quantidade : participantes.length) || 1;
+      const titular = nuvem.nome || nuvem.titular || (local ? local.titular : participantes[0]) || 'Participante';
+      const telefone = nuvem.telefone || (local ? local.telefone : '');
+      const email = nuvem.email || (local ? local.email : '');
+      const dataHora = nuvem.dataHora || (local ? local.criadoEm : new Date().toISOString());
+
+      let statusConfirmacao = local ? local.statusConfirmacao : 'pendente';
+      const sit = String(nuvem.situacao || nuvem.statusConfirmacao || '').toLowerCase();
+      if (sit.includes('confirm')) statusConfirmacao = 'confirmado';
+      else if (sit.includes('canc')) statusConfirmacao = 'cancelado';
+
+      const itemMesclado = normalizarInscricao({
+        id: local ? local.id : (nuvem.id || `tc-sheet-${codNuvem ? codNuvem.toLowerCase() : crypto.randomUUID().slice(0, 8)}`),
+        codigo: codNuvem || (local ? local.codigo : `TC-${crypto.randomBytes(3).toString('hex').toUpperCase()}`),
+        quantidade,
+        participantes,
+        titular,
+        telefone,
+        email,
+        evento: 'Pré-estreia The Chosen - Temporada 6',
+        dataEvento: '03/10/2026 19:00',
+        statusConfirmacao,
+        confirmadoEm: local ? local.confirmadoEm : (statusConfirmacao === 'confirmado' ? dataHora : null),
+        lembrete3DiasEnviado: local ? local.lembrete3DiasEnviado : false,
+        dataLembrete3Dias: local ? local.dataLembrete3Dias : null,
+        lembreteDiaEventoEnviado: local ? local.lembreteDiaEventoEnviado : false,
+        dataLembreteDiaEvento: local ? local.dataLembreteDiaEvento : null,
+        whatsappConfirmacaoEnviado: local ? local.whatsappConfirmacaoEnviado : true,
+        criadoEm: dataHora
+      });
+
+      if (itemMesclado && itemMesclado.codigo) {
+        if (!codigosVistos.has(itemMesclado.codigo)) {
+          codigosVistos.add(itemMesclado.codigo);
+          unificados.push(itemMesclado);
+        }
+      }
+    }
+
+    if (unificados.length > 0) {
+      salvarInscricoes(unificados);
+      console.log(`[The Chosen] Sincronização concluída com a planilha: ${unificados.length} inscrições salvas no SQLite e backup local.`);
+    }
+
+    return { ok: true, total: unificados.length, inscricoes: unificados };
+  } catch (err) {
+    console.error('[The Chosen] Erro ao sincronizar inscrições com a nuvem:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 function obterEstatisticasConfirmacao() {
   const inscricoes = carregarInscricoes();
   let totalInscricoes = inscricoes.length;
@@ -800,6 +905,7 @@ module.exports = {
   confirmarPresenca,
   excluirInscricao,
   limparInscricoesTeste,
+  sincronizarInscricoesComNuvem,
   obterEstatisticasConfirmacao,
   renderTheChosenPdfHtml
 };
