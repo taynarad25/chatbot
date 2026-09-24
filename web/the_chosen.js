@@ -97,7 +97,6 @@ function normalizarInscricao(item) {
   if (!item || typeof item !== 'object') return null;
   const id = String(item.id || crypto.randomUUID());
   const codigo = String(item.codigo || `TC-${crypto.randomBytes(3).toString('hex').toUpperCase()}`);
-  const quantidade = Number(item.quantidade) || 1;
   let participantes = [];
   if (Array.isArray(item.participantes)) {
     participantes = item.participantes.map(p => String(p || '').trim()).filter(Boolean);
@@ -108,6 +107,11 @@ function normalizarInscricao(item) {
     } catch {
       participantes = [item.participantes];
     }
+  }
+
+  let quantidade = Number(item.quantidade);
+  if (isNaN(quantidade) || quantidade < 1 || quantidade > 10) {
+    quantidade = (Array.isArray(participantes) && participantes.length > 0 && participantes.length <= 10) ? participantes.length : 1;
   }
   const titular = String(item.titular || (participantes.length > 0 ? participantes[0] : 'Participante'));
   if (participantes.length === 0) {
@@ -626,11 +630,23 @@ function limparInscricoesTeste() {
   return { ok: true, removidas, totalAtual: inscricoes.length, removidasInscricoes };
 }
 
+let sincronizacaoEmAndamento = null;
+
 /**
  * Sincroniza as inscrições locais (SQLite/JSON) com a planilha do Google Apps Script.
  * Puxa os dados da nuvem e popula o SQLite e o backup local.
  */
 async function sincronizarInscricoesComNuvem() {
+  if (sincronizacaoEmAndamento) {
+    return sincronizacaoEmAndamento;
+  }
+  sincronizacaoEmAndamento = executarSincronizacaoComNuvem().finally(() => {
+    sincronizacaoEmAndamento = null;
+  });
+  return sincronizacaoEmAndamento;
+}
+
+async function executarSincronizacaoComNuvem() {
   if (!theChosenSheets || typeof theChosenSheets.puxarInscricoesDoGoogleAppsScript !== 'function') {
     return { ok: false, message: 'Módulo theChosenSheets não disponível.' };
   }
@@ -671,7 +687,11 @@ async function sincronizarInscricoesComNuvem() {
         participantes = [nuvem.nome || nuvem.titular || 'Participante'];
       }
 
-      const quantidade = Number(nuvem.quantidade) || (local ? local.quantidade : participantes.length) || 1;
+      let qtdNuvem = Number(nuvem.quantidade);
+      if (isNaN(qtdNuvem) || qtdNuvem < 1 || qtdNuvem > 10) {
+        qtdNuvem = (local && local.quantidade <= 10) ? local.quantidade : (participantes.length || 1);
+      }
+      const quantidade = qtdNuvem;
       const titular = nuvem.nome || nuvem.titular || (local ? local.titular : participantes[0]) || 'Participante';
       const telefone = nuvem.telefone || (local ? local.telefone : '');
       const email = nuvem.email || (local ? local.email : '');

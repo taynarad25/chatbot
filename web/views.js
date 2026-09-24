@@ -1903,7 +1903,7 @@ function renderIndexHtml() {
         const res = await fetch('/the-chosen/api/sincronizar', { method: 'POST' });
         const data = await res.json();
         if (res.ok && data.ok) {
-          alert('✅ Sincronização concluída com sucesso!\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
+          alert('✅ Sincronização concluída com sucesso!\\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
           await fetchTheChosenInscricoes();
         } else {
           alert('⚠️ Aviso ao sincronizar: ' + (data.error || data.message || 'Verifique a configuração do Apps Script'));
@@ -1922,8 +1922,8 @@ function renderIndexHtml() {
       try {
         const res = await fetch('/secretaria/status');
 
-        // Se o servidor retornar 401, a sessão expirou ou o servidor reiniciou (limpando a memória)
-        if (res.status === 401) {
+        // Se o servidor retornar 401 ou redirecionar para login, a sessão expirou
+        if (res.status === 401 || (res.redirected && res.url && res.url.includes('/secretaria/login'))) {
           window.location.href = '/secretaria/login?message=Sessão expirada ou servidor reiniciado.';
           return;
         }
@@ -1931,7 +1931,10 @@ function renderIndexHtml() {
         const json = await res.json();
 
         const userRes = await fetch('/secretaria/api/user-info');
-        if (userRes.status === 401) { window.location.href = '/secretaria/login'; return; }
+        if (userRes.status === 401 || (userRes.redirected && userRes.url && userRes.url.includes('/secretaria/login'))) {
+          window.location.href = '/secretaria/login';
+          return;
+        }
         if (!userRes.ok) return;
         const userJson = await userRes.json();
         const isAdmin = Boolean(userJson && userJson.ok && userJson.user && userJson.user.role === 'admin');
@@ -2513,7 +2516,10 @@ function renderIndexHtml() {
       }
     };
 
-    setInterval(refresh, 5000); refresh();
+    setInterval(refresh, 5000);
+    refresh();
+    fetchEventosCadastrados();
+    fetchTheChosenInscricoes();
   </script>
 </body></html>`;
 }

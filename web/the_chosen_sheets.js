@@ -54,6 +54,8 @@ function inspectDirectoryForJson(dirPath) {
   return null;
 }
 
+const warnedDirectories = new Set();
+
 function resolveCandidatePath(cand) {
   if (!cand || typeof cand !== 'string') return null;
   const resolved = path.isAbsolute(cand) ? cand : path.resolve(ROOT_DIR, cand);
@@ -61,10 +63,16 @@ function resolveCandidatePath(cand) {
     return resolved;
   }
   if (isRealDir(resolved)) {
-    console.warn(`[Google Sheets] Aviso: O caminho de credenciais '${resolved}' é um diretório e não um arquivo JSON.`);
+    if (!warnedDirectories.has(resolved)) {
+      console.warn(`[Google Sheets] Aviso: O caminho de credenciais '${resolved}' é um diretório e não um arquivo JSON.`);
+      warnedDirectories.add(resolved);
+    }
     const nested = inspectDirectoryForJson(resolved);
     if (nested) {
-      console.log(`[Google Sheets] Arquivo de credenciais detectado dentro da pasta: '${nested}'`);
+      if (!warnedDirectories.has(nested)) {
+        console.log(`[Google Sheets] Arquivo de credenciais detectado dentro da pasta: '${nested}'`);
+        warnedDirectories.add(nested);
+      }
       return nested;
     }
   }
@@ -72,25 +80,38 @@ function resolveCandidatePath(cand) {
 }
 
 function getCredentialsPath() {
+  const tried = new Set();
+
   // 1. Variável de ambiente explícita
   if (process.env.GOOGLE_SHEETS_CREDENTIALS_PATH) {
     const candidate = resolveCandidatePath(process.env.GOOGLE_SHEETS_CREDENTIALS_PATH);
     if (candidate) return candidate;
+    tried.add(path.resolve(ROOT_DIR, process.env.GOOGLE_SHEETS_CREDENTIALS_PATH));
   }
 
   // 2. Padrões na raiz do projeto (apenas arquivos reais, nunca diretórios)
   const defaultCredentials = path.join(ROOT_DIR, 'credentials.json');
-  const defaultValid = resolveCandidatePath(defaultCredentials);
-  if (defaultValid) return defaultValid;
+  if (!tried.has(defaultCredentials)) {
+    const defaultValid = resolveCandidatePath(defaultCredentials);
+    if (defaultValid) return defaultValid;
+    tried.add(defaultCredentials);
+  }
 
   const legacyCredentials = path.join(ROOT_DIR, 'credenciais-google.json');
-  const legacyValid = resolveCandidatePath(legacyCredentials);
-  if (legacyValid) return legacyValid;
+  if (!tried.has(legacyCredentials)) {
+    const legacyValid = resolveCandidatePath(legacyCredentials);
+    if (legacyValid) return legacyValid;
+    tried.add(legacyCredentials);
+  }
 
   // 3. GOOGLE_APPLICATION_CREDENTIALS
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    const gApp = resolveCandidatePath(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-    if (gApp) return gApp;
+    const gAppPath = path.resolve(ROOT_DIR, process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    if (!tried.has(gAppPath)) {
+      const gApp = resolveCandidatePath(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+      if (gApp) return gApp;
+      tried.add(gAppPath);
+    }
   }
 
   return null;
@@ -250,6 +271,7 @@ async function puxarInscricoesDoGoogleAppsScript() {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       redirect: 'follow',
+      signal: AbortSignal.timeout(10000)
     });
 
     if (!res.ok) {
@@ -631,6 +653,7 @@ function limparCacheParaTestes() {
   lastUsedCredentialsPath = null;
   lastCredentialsWarnTime = 0;
   apiDisabledWarningLogged = false;
+  warnedDirectories.clear();
 }
 
 module.exports = {
