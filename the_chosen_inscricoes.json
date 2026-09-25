@@ -1,1 +1,254 @@
-[]
+[
+  {
+    "id": "tc-sheet-tc-fd454b",
+    "codigo": "TC-FD454B",
+    "quantidade": 1,
+    "participantes": [
+      "Gabriela Diniz do Nascimento"
+    ],
+    "titular": "Gabriela Diniz do Nascimento",
+    "telefone": "11942685501",
+    "email": "gabrieladiniz286@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 12:44:58",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 12:44:58"
+  },
+  {
+    "id": "tc-sheet-tc-296a46",
+    "codigo": "TC-296A46",
+    "quantidade": 1,
+    "participantes": [
+      "Isabelly Victoria de Oliveira Lacerda"
+    ],
+    "titular": "Isabelly Victoria de Oliveira Lacerda",
+    "telefone": "11970498716",
+    "email": "isaoliveiralacerda@bol.com.br",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 13:34:19",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 13:34:19"
+  },
+  {
+    "id": "tc-sheet-tc-9e1f15",
+    "codigo": "TC-9E1F15",
+    "quantidade": 2,
+    "participantes": [
+      "Maria Fabiana de Oliveira Lacerda"
+    ],
+    "titular": "Maria Fabiana de Oliveira Lacerda",
+    "telefone": "11959067177",
+    "email": "fabianaoliveira.faster@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 14:03:53",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 14:03:53"
+  },
+  {
+    "id": "tc-sheet-tc-fffc3f",
+    "codigo": "TC-FFFC3F",
+    "quantidade": 2,
+    "participantes": [
+      "Gislaine Davi bezerra de Souza"
+    ],
+    "titular": "Gislaine Davi bezerra de Souza",
+    "telefone": "11985526434",
+    "email": "gisdavirik@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 14:04:48",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 14:04:48"
+  },
+  {
+    "id": "tc-sheet-tc-5f209f",
+    "codigo": "TC-5F209F",
+    "quantidade": 1,
+    "participantes": [
+      "Larissa Luana dos Santos"
+    ],
+    "titular": "Larissa Luana dos Santos",
+    "telefone": "11951617993",
+    "email": "laryssaluana87@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 14:08:20",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 14:08:20"
+  },
+  {
+    "id": "tc-sheet-tc-ad0b3f",
+    "codigo": "TC-AD0B3F",
+    "quantidade": 2,
+    "participantes": [
+      "Julia Galdino Santos da Silva"
+    ],
+    "titular": "Julia Galdino Santos da Silva",
+    "telefone": "11930006027",
+    "email": "juliaj295@icloud.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 14:10:24",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 14:10:24"
+  },
+  {
+    "id": "tc-sheet-tc-a631f8",
+    "codigo": "TC-A631F8",
+    "quantidade": 4,
+    "participantes": [
+      "Tainá Pereira da Silva"
+    ],
+    "titular": "Tainá Pereira da Silva",
+    "telefone": "11994088631",
+    "email": "silva_taina55@hotmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 14:13:53",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 14:13:53"
+  },
+  {
+    "id": "tc-sheet-tc-d07cce",
+    "codigo": "TC-D07CCE",
+    "quantidade": 2,
+    "participantes": [
+      "Ellen Sousa Ferraz Lima"
+    ],
+    "titular": "Ellen Sousa Ferraz Lima",
+    "telefone": "11974019368",
+    "email": "eferraz.sfl@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 14:46:43",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 14:46:43"
+  },
+  {
+    "id": "tc-sheet-tc-63677d",
+    "codigo": "TC-63677D",
+    "quantidade": 3,
+    "participantes": [
+      "cintia Mota Lopes de Oliveira"
+    ],
+    "titular": "cintia Mota Lopes de Oliveira",
+    "telefone": "1169536715",
+    "email": "cintiaapostolica@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 16:18:00",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 16:18:00"
+  },
+  {
+    "id": "tc-sheet-tc-1847b6",
+    "codigo": "TC-1847B6",
+    "quantidade": 3,
+    "participantes": [
+      "Ana Vitória Alves Bazilio"
+    ],
+    "titular": "Ana Vitória Alves Bazilio",
+    "telefone": "11984523844",
+    "email": "abasilio962@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 18:55:21",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 18:55:21"
+  },
+  {
+    "id": "tc-sheet-tc-c67e60",
+    "codigo": "TC-C67E60",
+    "quantidade": 1,
+    "participantes": [
+      "Ideilton Nascimento"
+    ],
+    "titular": "Ideilton Nascimento",
+    "telefone": "11997832279",
+    "email": "ide.nascimento@hotmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "24/09/2026 21:00:53",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "24/09/2026 21:00:53"
+  },
+  {
+    "id": "tc-sheet-tc-0046fd",
+    "codigo": "TC-0046FD",
+    "quantidade": 3,
+    "participantes": [
+      "RAFAEL OLIVIERA"
+    ],
+    "titular": "RAFAEL OLIVIERA",
+    "telefone": "11980836279",
+    "email": "glaucia.assunsalles@yahoo.com.br",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "25/09/2026 11:57:40",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "25/09/2026 11:57:40"
+  }
+]

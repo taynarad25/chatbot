@@ -638,6 +638,101 @@
             text-align: center;
         }
 
+        /* Grid Especial para a Equipe Pastoral (4 colunas harmoniosas) */
+        #lideranca-page #secao-pastores .lider-grid {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+
+        /* Bloco de Ministérios Estilo Modelo de Referência (Laranja Vibrante com Barra Branca) */
+        #lideranca-page .card-ministerios-box {
+            width: 100%;
+            margin-top: 18px;
+            background: linear-gradient(145deg, #FF6A00 0%, #FF8500 100%);
+            border-radius: 16px;
+            padding: 16px 16px 18px;
+            box-shadow: 0 8px 24px rgba(255, 106, 0, 0.28);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+            position: relative;
+            overflow: hidden;
+            box-sizing: border-box;
+            flex-grow: 1;
+        }
+
+        #lideranca-page .card-ministerios-box::after {
+            content: '';
+            position: absolute;
+            top: -25px;
+            right: -25px;
+            width: 90px;
+            height: 90px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        #lideranca-page .min-badge-container {
+            width: 100%;
+            margin-bottom: 14px;
+        }
+
+        #lideranca-page .min-badge {
+            background: #ffffff;
+            color: #FF6A00;
+            font-weight: 800;
+            font-size: 0.88rem;
+            letter-spacing: -0.2px;
+            padding: 4px 14px;
+            border-radius: 4px;
+            display: inline-block;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        }
+
+        #lideranca-page .min-lista {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+
+        #lideranca-page .min-item {
+            display: flex;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        #lideranca-page .min-bar {
+            width: 3.5px;
+            background-color: #ffffff;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        #lideranca-page .min-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #lideranca-page .min-nome {
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.25;
+            letter-spacing: -0.2px;
+        }
+
+        #lideranca-page .min-funcao {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.95);
+            line-height: 1.3;
+            margin-top: 1px;
+        }
+
         /* Banner CTA de Contato / Pastoral */
         #lideranca-page .cta-pastoral {
             margin-top: 40px;
@@ -911,55 +1006,165 @@
             </div>
 
             <div class="lider-grid">
-                <!-- Pastor Sênior -->
+                <!-- Pastor 1: Maurício Lopes -->
                 <div class="card-lider card-pastor">
                     <div class="avatar-wrapper">
                         <div class="avatar-ring"></div>
-                        <div class="avatar-placeholder">
-                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                        </div>
+                        <img src="/images/pastor-mauricio-lopes.jpg" alt="Pastor Maurício Lopes" class="avatar-img" />
                     </div>
                     <div class="lider-nome-row">
-                        <span class="card-dot dot-azul"></span>
-                        <h3 class="lider-nome">Pr. Maurício</h3>
+                        <span class="card-dot dot-laranja"></span>
+                        <h3 class="lider-nome">Maurício Lopes</h3>
                     </div>
-                    <div class="lider-cargo">Pastor Presidente & Sênior</div>
-                    <span class="lider-depto-tag">Pastoral Sênior</span>
-                    <p class="lider-bio">Visão ministerial, pregação da Palavra e governo espiritual da Comunidade Cristã Curados.</p>
+                    <div class="lider-cargo">Pastor</div>
+
+                    <div class="card-ministerios-box">
+                        <div class="min-badge-container">
+                            <span class="min-badge">Ministérios</span>
+                        </div>
+                        <div class="min-lista">
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Rede de homens</div>
+                                    <div class="min-funcao">Líder</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Ministério de Artes</div>
+                                    <div class="min-funcao">Líder: Dança</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Pastora Sênior -->
+                <!-- Pastora 2: Cíntia Lopes -->
                 <div class="card-lider card-pastor">
                     <div class="avatar-wrapper">
                         <div class="avatar-ring"></div>
-                        <div class="avatar-placeholder">
-                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                        </div>
+                        <img src="/images/pastora-cintia-lopes.jpg" alt="Pastora Cíntia Lopes" class="avatar-img" />
                     </div>
                     <div class="lider-nome-row">
-                        <span class="card-dot dot-rosa"></span>
-                        <h3 class="lider-nome">Pra. Fernanda</h3>
+                        <span class="card-dot dot-laranja"></span>
+                        <h3 class="lider-nome">Cíntia Lopes</h3>
                     </div>
-                    <div class="lider-cargo">Pastora Presidente & Intercessão</div>
-                    <span class="lider-depto-tag"><img src="/images/icon-intercessao.png" alt=""> Intercessão & Acolhimento</span>
-                    <p class="lider-bio">Pastoreio compassivo, cobertura de oração, aconselhamento e edificação das famílias.</p>
+                    <div class="lider-cargo">Pastora</div>
+
+                    <div class="card-ministerios-box">
+                        <div class="min-badge-container">
+                            <span class="min-badge">Ministérios</span>
+                        </div>
+                        <div class="min-lista">
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Rede de jovens</div>
+                                    <div class="min-funcao">Líder</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Ministério de Artes</div>
+                                    <div class="min-funcao">Líder: Teatro</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Rede Kids</div>
+                                    <div class="min-funcao">Coordenadora</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Pastor Auxiliar / Jovens -->
+                <!-- Pastor 3: Idel Nascimento -->
                 <div class="card-lider card-pastor">
                     <div class="avatar-wrapper">
                         <div class="avatar-ring"></div>
-                        <div class="avatar-placeholder">
-                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                        </div>
+                        <img src="/images/pastor-idel-nascimento.jpg" alt="Pastor Idel Nascimento" class="avatar-img" />
                     </div>
                     <div class="lider-nome-row">
-                        <span class="card-dot dot-azul"></span>
-                        <h3 class="lider-nome">Pastoral Auxiliar</h3>
+                        <span class="card-dot dot-laranja"></span>
+                        <h3 class="lider-nome">Idel Nascimento</h3>
                     </div>
-                    <div class="lider-cargo">Pastor Auxiliar & Família</div>
-                    <span class="lider-depto-tag">Discipulado</span>
-                    <p class="lider-bio">Acompanhamento de novos convertidos, células e integração comunitária.</p>
+                    <div class="lider-cargo">Pastor</div>
+
+                    <div class="card-ministerios-box">
+                        <div class="min-badge-container">
+                            <span class="min-badge">Ministérios</span>
+                        </div>
+                        <div class="min-lista">
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Conexão Família</div>
+                                    <div class="min-funcao">Líder</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Escola M7.24</div>
+                                    <div class="min-funcao">Líder</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-funcao" style="margin-top:0; margin-bottom:2px;">Membro do</div>
+                                    <div class="min-nome">Presbitério</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pastora 4: Fernanda Nascimento -->
+                <div class="card-lider card-pastor">
+                    <div class="avatar-wrapper">
+                        <div class="avatar-ring"></div>
+                        <img src="/images/pastora-fernanda-nascimento.jpg" alt="Pastora Fernanda Nascimento" class="avatar-img" />
+                    </div>
+                    <div class="lider-nome-row">
+                        <span class="card-dot dot-laranja"></span>
+                        <h3 class="lider-nome">Fernanda Nascimento</h3>
+                    </div>
+                    <div class="lider-cargo">Pastora</div>
+
+                    <div class="card-ministerios-box">
+                        <div class="min-badge-container">
+                            <span class="min-badge">Ministérios</span>
+                        </div>
+                        <div class="min-lista">
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Conexão Família</div>
+                                    <div class="min-funcao">Líder</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Min. de intercessão</div>
+                                    <div class="min-funcao">Líder</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-funcao" style="margin-top:0; margin-bottom:2px;">Membra do</div>
+                                    <div class="min-nome">Presbitério</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>

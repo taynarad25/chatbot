@@ -553,7 +553,25 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       // API: Informações do Usuário Logado
       if (req.method === 'GET' && pathname === '/secretaria/api/user-info') {
         const session = getSession(req);
-        return sendJson(res, 200, { ok: true, user: session });
+        if (!session) return sendJson(res, 401, { ok: false, message: 'Não autorizado' });
+
+        const pastoralMap = {
+          'mauricio': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
+          'pr.mauricio': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
+          'mauriciolopes': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
+          'cintia': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
+          'pra.cintia': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
+          'cintialopes': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
+          'idel': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
+          'pr.idel': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
+          'idelnascimento': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
+          'fernanda': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
+          'pra.fernanda': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
+          'fernandanascimento': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
+        };
+        const u = session.username?.toLowerCase() || '';
+        const pastoral = pastoralMap[u] || null;
+        return sendJson(res, 200, { ok: true, user: { ...session, pastoral } });
       }
 
       // API: Listar Eventos Cadastrados
