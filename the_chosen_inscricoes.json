@@ -565,5 +565,257 @@
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
     "criadoEm": "26/09/2026 19:58:56"
+  },
+  {
+    "id": "tc-sheet-tc-18767a",
+    "codigo": "TC-18767A",
+    "quantidade": 3,
+    "participantes": [
+      "Ana Paula Silva"
+    ],
+    "titular": "Ana Paula Silva",
+    "telefone": "5511942685501",
+    "email": "anapaula@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:22",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:22"
+  },
+  {
+    "id": "tc-sheet-tc-2ed5fe",
+    "codigo": "TC-2ED5FE",
+    "quantidade": 2,
+    "participantes": [
+      "Gabriel Diniz"
+    ],
+    "titular": "Gabriel Diniz",
+    "telefone": "11999998888",
+    "email": "gabriel@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:26",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:26"
+  },
+  {
+    "id": "tc-sheet-tc-920a94",
+    "codigo": "TC-920A94",
+    "quantidade": 10,
+    "participantes": [
+      "Participante 1"
+    ],
+    "titular": "Participante 1",
+    "telefone": "11999999999",
+    "email": "teste@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:28",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:28"
+  },
+  {
+    "id": "tc-sheet-tc-335d68",
+    "codigo": "TC-335D68",
+    "quantidade": 10,
+    "participantes": [
+      "Participante 11"
+    ],
+    "titular": "Participante 11",
+    "telefone": "11999999999",
+    "email": "teste@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:31",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:31"
+  },
+  {
+    "id": "tc-sheet-tc-f9206b",
+    "codigo": "TC-F9206B",
+    "quantidade": 10,
+    "participantes": [
+      "Participante 21"
+    ],
+    "titular": "Participante 21",
+    "telefone": "11999999999",
+    "email": "teste@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:33",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:33"
+  },
+  {
+    "id": "tc-sheet-tc-b70d34",
+    "codigo": "TC-B70D34",
+    "quantidade": 10,
+    "participantes": [
+      "Participante 31"
+    ],
+    "titular": "Participante 31",
+    "telefone": "11999999999",
+    "email": "teste@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:35",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:35"
+  },
+  {
+    "id": "tc-sheet-tc-14de87",
+    "codigo": "TC-14DE87",
+    "quantidade": 8,
+    "participantes": [
+      "Participante 41"
+    ],
+    "titular": "Participante 41",
+    "telefone": "11999999999",
+    "email": "teste@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:37",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:37"
+  },
+  {
+    "id": "tc-sheet-tc-89925c",
+    "codigo": "TC-89925C",
+    "quantidade": 2,
+    "participantes": [
+      "P1 Final"
+    ],
+    "titular": "P1 Final",
+    "telefone": "11999999999",
+    "email": "teste@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:39",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:39"
+  },
+  {
+    "id": "tc-sheet-tc-e9b201",
+    "codigo": "TC-E9B201",
+    "quantidade": 2,
+    "participantes": [
+      "Marcos Silva"
+    ],
+    "titular": "Marcos Silva",
+    "telefone": "11988887777",
+    "email": "marcos@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:41",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:41"
+  },
+  {
+    "id": "tc-sheet-tc-5651fa",
+    "codigo": "TC-5651FA",
+    "quantidade": 1,
+    "participantes": [
+      "Sara Teste"
+    ],
+    "titular": "Sara Teste",
+    "telefone": "11977776666",
+    "email": "sara@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:44",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:44"
+  },
+  {
+    "id": "tc-sheet-tc-a0c4b2",
+    "codigo": "TC-A0C4B2",
+    "quantidade": 1,
+    "participantes": [
+      "Mariana Web Teste"
+    ],
+    "titular": "Mariana Web Teste",
+    "telefone": "11988889999",
+    "email": "mariana.web@teste.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:41:49",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:41:49"
+  },
+  {
+    "id": "tc-sheet-tc-862b37",
+    "codigo": "TC-862B37",
+    "quantidade": 1,
+    "participantes": [
+      "Mariana Web Teste"
+    ],
+    "titular": "Mariana Web Teste",
+    "telefone": "11988889999",
+    "email": "mariana.web@teste.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 15:44:16",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 15:44:16"
   }
 ]
