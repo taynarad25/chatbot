@@ -188,110 +188,7 @@ function renderLoginHtml(message = "") {
       text-decoration: underline;
     }
 
-    /* Acesso Rápido e Fotos Pastorais no Login */
-    .pastoral-chips {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-bottom: 1.4rem;
-      background: rgba(255, 255, 255, 0.03);
-      padding: 12px 10px;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-    }
-    .pastoral-chips-title {
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #9ca3af;
-      font-weight: 700;
-      text-align: center;
-    }
-    .pastoral-chips-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-    }
-    .pastor-chip-btn {
-      background: #202028;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 6px 3px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      color: #e5e7eb;
-      font-family: inherit;
-    }
-    .pastor-chip-btn:hover, .pastor-chip-btn.active {
-      background: rgba(255, 106, 0, 0.16);
-      border-color: #FF6A00;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 14px rgba(255, 106, 0, 0.25);
-    }
-    .pastor-chip-img {
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid rgba(255, 255, 255, 0.15);
-      transition: all 0.25s ease;
-    }
-    .pastor-chip-btn:hover .pastor-chip-img, .pastor-chip-btn.active .pastor-chip-img {
-      border-color: #FF6A00;
-      transform: scale(1.06);
-    }
-    .pastor-chip-label {
-      font-size: 0.65rem;
-      font-weight: 700;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      overflow: hidden;
-      max-width: 100%;
-    }
 
-    .pastoral-preview-box {
-      display: none;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 1.2rem;
-      padding: 10px 14px;
-      background: linear-gradient(135deg, rgba(255, 106, 0, 0.14), rgba(0, 188, 212, 0.08));
-      border: 1px solid rgba(255, 106, 0, 0.4);
-      border-radius: 14px;
-      animation: fadeInPreview 0.25s ease;
-    }
-    @keyframes fadeInPreview {
-      from { opacity: 0; transform: translateY(-3px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .pastoral-preview-avatar {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid #FF6A00;
-      box-shadow: 0 0 14px rgba(255, 106, 0, 0.4);
-      flex-shrink: 0;
-    }
-    .pastoral-preview-text {
-      display: flex;
-      flex-direction: column;
-      text-align: left;
-    }
-    .pastoral-preview-greeting {
-      font-size: 0.74rem;
-      color: #fb923c;
-      font-weight: 600;
-    }
-    .pastoral-preview-name {
-      font-size: 0.95rem;
-      font-weight: 800;
-      color: #ffffff;
-    }
   </style>
 </head>
 <body>
@@ -302,37 +199,7 @@ function renderLoginHtml(message = "") {
       <p class="brand-subtitle">Secretaria & Gestão Pastoral</p>
     </div>
 
-    <!-- Acesso Rápido Pastoral com Fotos -->
-    <div class="pastoral-chips">
-      <span class="pastoral-chips-title">Acesso Rápido Pastoral</span>
-      <div class="pastoral-chips-grid">
-        <button type="button" class="pastor-chip-btn" data-pastor="mauricio" onclick="selecionarPastor('mauricio')">
-          <img src="/images/pastor-mauricio-lopes.jpg" alt="Pr. Maurício" class="pastor-chip-img" />
-          <span class="pastor-chip-label">Maurício</span>
-        </button>
-        <button type="button" class="pastor-chip-btn" data-pastor="cintia" onclick="selecionarPastor('cintia')">
-          <img src="/images/pastora-cintia-lopes.jpg" alt="Pra. Cíntia" class="pastor-chip-img" />
-          <span class="pastor-chip-label">Cíntia</span>
-        </button>
-        <button type="button" class="pastor-chip-btn" data-pastor="idel" onclick="selecionarPastor('idel')">
-          <img src="/images/pastor-idel-nascimento.jpg" alt="Pr. Idel" class="pastor-chip-img" />
-          <span class="pastor-chip-label">Idel</span>
-        </button>
-        <button type="button" class="pastor-chip-btn" data-pastor="fernanda" onclick="selecionarPastor('fernanda')">
-          <img src="/images/pastora-fernanda-nascimento.jpg" alt="Pra. Fernanda" class="pastor-chip-img" />
-          <span class="pastor-chip-label">Fernanda</span>
-        </button>
-      </div>
-    </div>
 
-    <!-- Preview da Foto Pastoral do Usuário Reconhecido -->
-    <div id="pastoralPreviewBox" class="pastoral-preview-box">
-      <img id="pastoralPreviewAvatar" src="" alt="Foto Pastoral" class="pastoral-preview-avatar" />
-      <div class="pastoral-preview-text">
-        <span id="pastoralPreviewGreeting" class="pastoral-preview-greeting">Graça e Paz!</span>
-        <span id="pastoralPreviewName" class="pastoral-preview-name"></span>
-      </div>
-    </div>
 
     <div id="loginMessage" class="error">${message}</div>
     <form id="loginForm">
@@ -368,51 +235,7 @@ function renderLoginHtml(message = "") {
       loginMessageEl.className = 'success';
     }
 
-    const pastoresMap = {
-      mauricio: { user: 'mauricio', nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg' },
-      cintia: { user: 'cintia', nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg' },
-      idel: { user: 'idel', nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg' },
-      fernanda: { user: 'fernanda', nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg' },
-    };
 
-    function selecionarPastor(key) {
-      const p = pastoresMap[key];
-      if (!p) return;
-      const uInput = document.getElementById('loginUsername');
-      uInput.value = p.user;
-      atualizarPreviewPastoral(p.user);
-      document.querySelectorAll('.pastor-chip-btn').forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-pastor') === key);
-      });
-      document.getElementById('password').focus();
-    }
-
-    function atualizarPreviewPastoral(valor) {
-      const v = String(valor || '').toLowerCase().trim();
-      const preview = document.getElementById('pastoralPreviewBox');
-      const avatar = document.getElementById('pastoralPreviewAvatar');
-      const greeting = document.getElementById('pastoralPreviewGreeting');
-      const name = document.getElementById('pastoralPreviewName');
-
-      let match = null;
-      if (v.includes('mau')) match = pastoresMap.mauricio;
-      else if (v.includes('cin')) match = pastoresMap.cintia;
-      else if (v.includes('ide')) match = pastoresMap.idel;
-      else if (v.includes('fer')) match = pastoresMap.fernanda;
-
-      if (match) {
-        avatar.src = match.foto;
-        greeting.textContent = 'Graça e Paz!';
-        name.textContent = match.nome;
-        preview.style.display = 'flex';
-      } else {
-        preview.style.display = 'none';
-      }
-    }
-
-    document.getElementById('loginUsername').addEventListener('input', (e) => {
-      atualizarPreviewPastoral(e.target.value);
-    });
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
