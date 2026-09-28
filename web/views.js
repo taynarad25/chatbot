@@ -1867,7 +1867,7 @@ function renderIndexHtml() {
         const nomesParticipantes = parts.map((n, idx) => {
           const isTitular = idx === 0;
           return '<span style="display:inline-flex; align-items:center; gap:4px; background:' + (isTitular ? 'rgba(0, 183, 217, 0.16)' : 'rgba(255,255,255,0.06)') + '; color:' + (isTitular ? '#38bdf8' : '#e2e8f0') + '; padding:2px 8px; border-radius:6px; margin:2px; font-size:0.8rem; border:1px solid ' + (isTitular ? 'rgba(0, 183, 217, 0.35)' : 'rgba(255,255,255,0.08)') + ';">' + (idx + 1) + '. ' + n + '</span>';
-        }).join('') + '<button type="button" title="Editar participantes / acompanhantes" onclick="editarParticipantesModal(\'' + item.id + '\')" style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 6px; color: #fbbf24; cursor: pointer; padding: 2px 6px; font-size: 0.78rem; margin-left: 4px; vertical-align: middle;">✏️</button>';
+        }).join('') + '<button type="button" title="Editar participantes / acompanhantes" data-id="' + item.id + '" onclick="editarParticipantesModal(this.dataset.id)" style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 6px; color: #fbbf24; cursor: pointer; padding: 2px 6px; font-size: 0.78rem; margin-left: 4px; vertical-align: middle;">✏️</button>';
         
         let statusBadge = '';
         if (item.statusConfirmacao === 'confirmado') {
@@ -1907,7 +1907,7 @@ function renderIndexHtml() {
     }
 
     async function editarParticipantesModal(id) {
-      const item = (theChosenInscricoesCache || []).find(i => String(i.id) === String(id) || String(i.codigo) === String(id));
+      const item = (tcInscricoesCache || []).find(i => String(i.id) === String(id) || String(i.codigo) === String(id));
       if (!item) return;
 
       let parts = Array.isArray(item.participantes) && item.participantes.length > 0 ? [...item.participantes] : [item.titular || 'Participante'];
@@ -1918,7 +1918,7 @@ function renderIndexHtml() {
       }
 
       const textoAtual = parts.join(', ');
-      const novoTexto = prompt('Editar participantes de ' + titularNome + ' (' + qtdItem + ' ingresso(s)):\nSepare os nomes por vírgula:', textoAtual);
+      const novoTexto = prompt('Editar participantes de ' + titularNome + ' (' + qtdItem + ' ingresso(s)):\\nSepare os nomes por vírgula:', textoAtual);
       if (novoTexto === null) return;
 
       const novosNomes = novoTexto.split(',').map(s => s.trim()).filter(Boolean);
@@ -2033,6 +2033,45 @@ function renderIndexHtml() {
       }
     }
 
+    let userIsAdmin = false;
+    let userInfoChecked = false;
+
+    async function checkUserInfo() {
+      if (userInfoChecked) return;
+      try {
+        const userRes = await fetch('/secretaria/api/user-info');
+        if (userRes.status === 401 || (userRes.redirected && userRes.url && userRes.url.includes('/secretaria/login'))) {
+          window.location.href = '/secretaria/login';
+          return;
+        }
+        if (!userRes.ok) return;
+        const userJson = await userRes.json();
+        userIsAdmin = Boolean(userJson && userJson.ok && userJson.user && userJson.user.role === 'admin');
+        const tabAdmin = document.getElementById('btn-tab-admin');
+        const tabLideres = document.getElementById('btn-tab-lideres');
+        const tabLogs = document.getElementById('btn-tab-logs');
+        if (tabAdmin) tabAdmin.style.display = userIsAdmin ? 'block' : 'none';
+        if (tabLideres) tabLideres.style.display = userIsAdmin ? 'block' : 'none';
+        if (tabLogs) tabLogs.style.display = userIsAdmin ? 'block' : 'none';
+
+        const userBadgeEl = document.getElementById('headerUserBadge');
+        if (userBadgeEl) {
+          if (userJson.user && userJson.user.pastoral) {
+            const avatar = document.getElementById('headerUserAvatar');
+            const name = document.getElementById('headerUserName');
+            if (avatar) avatar.src = userJson.user.pastoral.foto || '/images/logo.png';
+            if (name) name.textContent = userJson.user.pastoral.nome || '';
+            userBadgeEl.style.display = 'flex';
+          } else {
+            userBadgeEl.style.display = 'none';
+          }
+        }
+        userInfoChecked = true;
+      } catch (e) {
+        console.warn('Erro ao carregar informações do usuário:', e);
+      }
+    }
+
     async function refresh() {
       try {
         const res = await fetch('/secretaria/status');
@@ -2042,85 +2081,87 @@ function renderIndexHtml() {
           window.location.href = '/secretaria/login?message=Sessão expirada ou servidor reiniciado.';
           return;
         }
-        if (!res.ok) return;
-        const json = await res.json();
-
-        const userRes = await fetch('/secretaria/api/user-info');
-        if (userRes.status === 401 || (userRes.redirected && userRes.url && userRes.url.includes('/secretaria/login'))) {
-          window.location.href = '/secretaria/login';
+        if (!res.ok) {
+          const statusEl = document.getElementById('status');
+          if (statusEl && statusEl.textContent.trim() === 'Carregando...') {
+            statusEl.innerHTML = '<strong>Status:</strong> Conectando ao servidor... 🔄';
+          }
           return;
         }
-        if (!userRes.ok) return;
-        const userJson = await userRes.json();
-        const isAdmin = Boolean(userJson && userJson.ok && userJson.user && userJson.user.role === 'admin');
-        document.getElementById('btn-tab-admin').style.display = isAdmin ? 'block' : 'none';
-        document.getElementById('btn-tab-lideres').style.display = isAdmin ? 'block' : 'none';
-        document.getElementById('btn-tab-logs').style.display = isAdmin ? 'block' : 'none';
+        const json = await res.json();
 
-        const userBadgeEl = document.getElementById('headerUserBadge');
-        if (userBadgeEl) {
-          if (userJson.user && userJson.user.pastoral) {
-            document.getElementById('headerUserAvatar').src = userJson.user.pastoral.foto;
-            document.getElementById('headerUserName').textContent = userJson.user.pastoral.nome;
-            userBadgeEl.style.display = 'flex';
+        // Lógica de Status detalhada
+        let statusText = 'Desconectado';
+        if (json.connected) {
+          statusText = 'Conectado ✅';
+        } else if (json.authenticated) {
+          const perc = (json.loadingPercent !== undefined && json.loadingPercent !== null) ? ' (' + json.loadingPercent + '%)' : '';
+          const msg = json.loadingMessage ? ' - ' + json.loadingMessage : '';
+          statusText = 'Autenticado! Sincronizando dados com o WhatsApp... 🔄' + perc + msg;
+        } else if (json.canceling) {
+          statusText = 'Cancelando... 🛑';
+        } else if (json.hasQr) {
+          statusText = 'QR Code Gerado! Aguardando leitura no celular... 📱';
+        } else if (json.generatingQr) {
+          statusText = 'Gerando QR Code... ⚙️';
+        } else if (json.initializing) {
+          statusText = 'Inicializando navegador... ⏳';
+        }
+
+        const statusEl = document.getElementById('status');
+        if (statusEl) {
+          statusEl.innerHTML = '<strong>Status:</strong> ' + statusText;
+        }
+        
+        const qrEl = document.getElementById('qr');
+        if (qrEl) {
+          if (json.hasQr && !json.authenticated && !json.connected) {
+            qrEl.innerHTML = '<img src="'+json.qrDataUrl+'" alt="QR Code WhatsApp" />';
+          } else if (json.authenticated && !json.connected) {
+            qrEl.innerHTML = '<div style="padding: 24px; text-align: center; color: #38bdf8; background: rgba(56, 189, 248, 0.08); border-radius: 12px; border: 1px dashed rgba(56, 189, 248, 0.3); margin-top: 15px;"><span style="font-size: 2.2rem;">📲</span><br/><strong style="font-size: 1.05rem; display: block; margin: 8px 0; color: #f3f4f6;">QR Code escaneado com sucesso!</strong>Sincronizando mensagens e conversas com o WhatsApp... Aguarde um instante.</div>';
           } else {
-            userBadgeEl.style.display = 'none';
+            qrEl.innerHTML = '';
           }
         }
 
-      const actionMessageEl = document.getElementById('actionMessage');
-      actionMessageEl.style.display = 'none'; // Hide previous action messages
+        // Regra de exibição dos botões
+        const isWorking = json.initializing || json.generatingQr || json.hasQr || json.canceling || json.authenticated;
+        const btnDisconnect = document.getElementById('disconnect');
+        const btnCancelQr = document.getElementById('cancelQr');
+        const btnRequestQr = document.getElementById('requestQr');
+        const resetBtn = document.getElementById('resetSession');
 
-      // Lógica de Status detalhada
-      let statusText = 'Desconectado';
-      if (json.connected) {
-        statusText = 'Conectado ✅';
-      } else if (json.authenticated) {
-        const perc = (json.loadingPercent !== undefined && json.loadingPercent !== null) ? ' (' + json.loadingPercent + '%)' : '';
-        const msg = json.loadingMessage ? ' - ' + json.loadingMessage : '';
-        statusText = 'Autenticado! Sincronizando dados com o WhatsApp... 🔄' + perc + msg;
-      } else if (json.canceling) {
-        statusText = 'Cancelando... 🛑';
-      } else if (json.hasQr) {
-        statusText = 'QR Code Gerado! Aguardando leitura no celular... 📱';
-      } else if (json.generatingQr) {
-        statusText = 'Gerando QR Code... ⚙️';
-      } else if (json.initializing) {
-        statusText = 'Inicializando navegador... ⏳';
-      }
+        if (btnDisconnect) btnDisconnect.style.display = json.connected ? 'inline-block' : 'none';
+        if (btnCancelQr) btnCancelQr.style.display = isWorking && !json.connected ? 'inline-block' : 'none';
+        if (btnRequestQr) btnRequestQr.style.display = !json.connected && !isWorking ? 'inline-block' : 'none';
+        if (resetBtn) resetBtn.style.display = !json.connected && !isWorking ? 'inline-block' : 'none';
 
-      document.getElementById('status').innerHTML = '<strong>Status:</strong> ' + statusText;
-      
-      if (json.hasQr && !json.authenticated && !json.connected) {
-        document.getElementById('qr').innerHTML = '<img src="'+json.qrDataUrl+'" alt="QR Code WhatsApp" />';
-      } else if (json.authenticated && !json.connected) {
-        document.getElementById('qr').innerHTML = '<div style="padding: 24px; text-align: center; color: #38bdf8; background: rgba(56, 189, 248, 0.08); border-radius: 12px; border: 1px dashed rgba(56, 189, 248, 0.3); margin-top: 15px;"><span style="font-size: 2.2rem;">📲</span><br/><strong style="font-size: 1.05rem; display: block; margin: 8px 0; color: #f3f4f6;">QR Code escaneado com sucesso!</strong>Sincronizando mensagens e conversas com o WhatsApp... Aguarde um instante.</div>';
-      } else {
-        document.getElementById('qr').innerHTML = '';
-      }
+        const actionMessageEl = document.getElementById('actionMessage');
+        if (actionMessageEl && !actionMessageEl.textContent) {
+          actionMessageEl.style.display = 'none';
+        }
 
-      // Regra de exibição dos botões
-      const isWorking = json.initializing || json.generatingQr || json.hasQr || json.canceling || json.authenticated;
-      document.getElementById('disconnect').style.display = json.connected ? 'inline-block' : 'none';
-      document.getElementById('cancelQr').style.display = isWorking && !json.connected ? 'inline-block' : 'none';
-      document.getElementById('requestQr').style.display = !json.connected && !isWorking ? 'inline-block' : 'none';
-      const resetBtn = document.getElementById('resetSession');
-      if (resetBtn) resetBtn.style.display = !json.connected && !isWorking ? 'inline-block' : 'none';
+        // Carrega info do usuário paralelamente
+        checkUserInfo();
 
-      if (isAdmin) {
-        fetch('/secretaria/api/logs')
-          .then(r => r.ok ? r.json() : Promise.reject('Erro no servidor'))
-          .then(json => {
-            const cont = document.getElementById('logsContainer');
-            if (json.ok) {
-              cont.textContent = json.logs;
-              cont.scrollTop = cont.scrollHeight;
-            }
-          })
-          .catch(err => console.warn('Erro ao buscar logs (sessão pode ter expirado)'));
-      }
+        if (userIsAdmin) {
+          fetch('/secretaria/api/logs')
+            .then(r => r.ok ? r.json() : Promise.reject('Erro no servidor'))
+            .then(logJson => {
+              const cont = document.getElementById('logsContainer');
+              if (cont && logJson.ok) {
+                cont.textContent = logJson.logs;
+                cont.scrollTop = cont.scrollHeight;
+              }
+            })
+            .catch(err => console.warn('Erro ao buscar logs'));
+        }
       } catch (err) {
-        console.log('Aguardando reconexão com o servidor...');
+        console.log('Aguardando reconexão com o servidor...', err);
+        const statusEl = document.getElementById('status');
+        if (statusEl && statusEl.textContent.trim() === 'Carregando...') {
+          statusEl.innerHTML = '<strong>Status:</strong> Conectando ao servidor... 🔄';
+        }
       }
     }
 

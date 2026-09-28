@@ -786,8 +786,20 @@
         }
 
         #lideranca-page #secao-diretoria .lider-grid {
-            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-            gap: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 26px;
+        }
+
+        #lideranca-page #secao-diretoria .card-diretor {
+            flex: 0 1 260px;
+            width: 260px;
+            max-width: 100%;
+        }
+
+        #lideranca-page #secao-diretoria .card-jeferson {
+            margin: 0 auto;
         }
 
         /* Banner CTA de Contato / Pastoral */
@@ -1251,52 +1263,7 @@
             </div>
 
             <div class="lider-grid">
-                <!-- Diretor 1: Jeferson Carlos -->
-                <div class="card-lider card-diretor">
-                    <div class="avatar-wrapper">
-                        <div class="avatar-ring"></div>
-                        <img src="/images/diretor-jeferson-carlos.jpg" alt="Jeferson Carlos" class="avatar-img" />
-                    </div>
-                    <div class="lider-nome-row">
-                        <span class="card-dot dot-roxo"></span>
-                        <h3 class="lider-nome">Jeferson Carlos</h3>
-                    </div>
-                    <div class="lider-cargo">Auxiliar</div>
-
-                    <div class="card-ministerios-box">
-                        <div class="min-badge-container">
-                            <span class="min-badge">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                                Ministérios
-                            </span>
-                        </div>
-                        <div class="min-lista">
-                            <div class="min-item">
-                                <span class="min-bar"></span>
-                                <div class="min-info">
-                                    <div class="min-nome">Rede de Homens</div>
-                                    <div class="min-funcao">Facilitador</div>
-                                </div>
-                            </div>
-                            <div class="min-item">
-                                <span class="min-bar"></span>
-                                <div class="min-info">
-                                    <div class="min-nome">Intercessão</div>
-                                    <div class="min-funcao">Membro</div>
-                                </div>
-                            </div>
-                            <div class="min-item">
-                                <span class="min-bar"></span>
-                                <div class="min-info">
-                                    <div class="min-nome">Diaconia</div>
-                                    <div class="min-funcao">Membro</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Diretor 2: Rafael Oliveira -->
+                <!-- Diretor 1: Rafael Oliveira -->
                 <div class="card-lider card-diretor">
                     <div class="avatar-wrapper">
                         <div class="avatar-ring"></div>
@@ -1334,7 +1301,7 @@
                     </div>
                 </div>
 
-                <!-- Diretora 3: Larissa Luana -->
+                <!-- Diretora 2: Larissa Luana -->
                 <div class="card-lider card-diretor">
                     <div class="avatar-wrapper">
                         <div class="avatar-ring"></div>
@@ -1372,7 +1339,7 @@
                     </div>
                 </div>
 
-                <!-- Diretora 4: Isabelly Lacerda -->
+                <!-- Diretora 3: Isabelly Lacerda -->
                 <div class="card-lider card-diretor">
                     <div class="avatar-wrapper">
                         <div class="avatar-ring"></div>
@@ -1410,7 +1377,7 @@
                     </div>
                 </div>
 
-                <!-- Diretora 5: Gabriela Diniz -->
+                <!-- Diretora 4: Gabriela Diniz -->
                 <div class="card-lider card-diretor">
                     <div class="avatar-wrapper">
                         <div class="avatar-ring"></div>
@@ -1442,6 +1409,51 @@
                                 <div class="min-info">
                                     <div class="min-nome">Ministério de Artes</div>
                                     <div class="min-funcao">Líder</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Diretor 5: Jeferson Carlos (Último e Centralizado) -->
+                <div class="card-lider card-diretor card-jeferson">
+                    <div class="avatar-wrapper">
+                        <div class="avatar-ring"></div>
+                        <img src="/images/diretor-jeferson-carlos.jpg" alt="Jeferson Carlos" class="avatar-img" />
+                    </div>
+                    <div class="lider-nome-row">
+                        <span class="card-dot dot-roxo"></span>
+                        <h3 class="lider-nome">Jeferson Carlos</h3>
+                    </div>
+                    <div class="lider-cargo">Auxiliar</div>
+
+                    <div class="card-ministerios-box">
+                        <div class="min-badge-container">
+                            <span class="min-badge">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                Ministérios
+                            </span>
+                        </div>
+                        <div class="min-lista">
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Rede de Homens</div>
+                                    <div class="min-funcao">Facilitador</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Intercessão</div>
+                                    <div class="min-funcao">Membro</div>
+                                </div>
+                            </div>
+                            <div class="min-item">
+                                <span class="min-bar"></span>
+                                <div class="min-info">
+                                    <div class="min-nome">Diaconia</div>
+                                    <div class="min-funcao">Membro</div>
                                 </div>
                             </div>
                         </div>
