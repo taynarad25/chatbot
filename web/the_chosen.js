@@ -72,12 +72,31 @@ function formatarInscricaoDoBanco(row) {
     participantes = [row.titular];
   }
 
+  const quantidade = Number(row.quantidade) || 1;
+  const titular = row.titular || (participantes.length > 0 ? participantes[0] : 'Participante');
+
+  participantes = (participantes || []).map(p => String(p || '').trim()).filter(Boolean);
+  participantes = participantes.flatMap(p => {
+    if (typeof p === 'string' && (p.includes(',') || p.includes(';'))) {
+      return p.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+    }
+    return p;
+  });
+
+  if (participantes.length === 0) {
+    participantes = [titular];
+  }
+  while (participantes.length < quantidade) {
+    const idx = participantes.length + 1;
+    participantes.push(`Acompanhante ${idx} (${titular})`);
+  }
+
   return {
     id: row.id,
     codigo: row.codigo,
-    quantidade: Number(row.quantidade) || 1,
+    quantidade,
     participantes,
-    titular: row.titular,
+    titular,
     telefone: row.telefone,
     email: row.email,
     evento: row.evento,
@@ -109,6 +128,13 @@ function normalizarInscricao(item) {
     }
   }
 
+  participantes = participantes.flatMap(p => {
+    if (typeof p === 'string' && (p.includes(',') || p.includes(';'))) {
+      return p.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+    }
+    return p;
+  });
+
   let quantidade = Number(item.quantidade);
   if (isNaN(quantidade) || quantidade < 1 || quantidade > 10) {
     quantidade = (Array.isArray(participantes) && participantes.length > 0 && participantes.length <= 10) ? participantes.length : 1;
@@ -116,6 +142,10 @@ function normalizarInscricao(item) {
   const titular = String(item.titular || (participantes.length > 0 ? participantes[0] : 'Participante'));
   if (participantes.length === 0) {
     participantes = [titular];
+  }
+  while (participantes.length < quantidade) {
+    const idx = participantes.length + 1;
+    participantes.push(`Acompanhante ${idx} (${titular})`);
   }
 
   return {
@@ -908,6 +938,36 @@ function renderTheChosenPdfHtml() {
   </html>`;
 }
 
+function editarParticipantesInscricao(idOuCodigo, novosParticipantes) {
+  if (!idOuCodigo || !Array.isArray(novosParticipantes)) {
+    return { ok: false, message: 'Dados inválidos.' };
+  }
+  const limpos = novosParticipantes.map(p => String(p || '').trim()).filter(Boolean);
+  if (limpos.length === 0) {
+    return { ok: false, message: 'Ao menos um participante deve ser informado.' };
+  }
+
+  const inscricoes = carregarInscricoes();
+  const idStr = String(idOuCodigo).trim().toUpperCase();
+  const index = inscricoes.findIndex(i => (i.id && String(i.id).toUpperCase() === idStr) || (i.codigo && String(i.codigo).toUpperCase() === idStr));
+
+  if (index === -1) {
+    return { ok: false, message: 'Inscrição não encontrada.' };
+  }
+
+  const inscricao = inscricoes[index];
+  inscricao.participantes = limpos;
+  inscricao.quantidade = limpos.length;
+  inscricao.titular = limpos[0];
+
+  const ok = salvarInscricoes(inscricoes);
+  if (ok && theChosenSheets && typeof theChosenSheets.enviarParaGoogleAppsScript === 'function') {
+    theChosenSheets.enviarParaGoogleAppsScript(inscricao).catch(() => {});
+  }
+
+  return { ok: true, message: 'Participantes atualizados com sucesso.', inscricao };
+}
+
 module.exports = {
   LIMITE_VAGAS,
   DATA_EXPIRACAO,
@@ -927,7 +987,8 @@ module.exports = {
   limparInscricoesTeste,
   sincronizarInscricoesComNuvem,
   obterEstatisticasConfirmacao,
-  renderTheChosenPdfHtml
+  renderTheChosenPdfHtml,
+  editarParticipantesInscricao
 };
 
 

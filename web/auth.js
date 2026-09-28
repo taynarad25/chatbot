@@ -1,9 +1,10 @@
 const crypto = require("crypto");
 const { promisify } = require("util");
 const pbkdf2 = promisify(crypto.pbkdf2);
+const db = require("../db");
 
 const COOKIE_NAME = "whatsapp_control_session";
-const SESSION_TTL = 1000 * 60 * 120; // 2 horas de sessão
+const SESSION_TTL = 1000 * 60 * 60 * 24 * 30; // 30 dias de sessão persistente
 const sessions = {};
 
 async function validatePassword(password, salt, hash) {
@@ -29,7 +30,28 @@ async function hashPassword(password) {
 
 function createSession(username, role, status = 'active') {
   const token = crypto.randomBytes(32).toString("hex");
-  sessions[token] = { username, role, status, createdAt: Date.now() };
+  const now = Date.now();
+  const expiresAt = now + SESSION_TTL;
+  const sessionData = { username, role, status, createdAt: now, expiresAt };
+  sessions[token] = sessionData;
+
+  try {
+    if (db) {
+      db.prepare(`
+        INSERT INTO sessions (id, username, role, status, createdAt, expiresAt)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          username = excluded.username,
+          role = excluded.role,
+          status = excluded.status,
+          createdAt = excluded.createdAt,
+          expiresAt = excluded.expiresAt
+      `).run(token, username, role, status, now, expiresAt);
+    }
+  } catch (err) {
+    console.error("[Auth] Erro ao persistir sessão no banco:", err.message);
+  }
+
   return token;
 }
 
@@ -49,14 +71,38 @@ function getSession(req) {
   const sessionId = getSessionId(req);
 
   if (!sessionId) return null;
-  const session = sessions[sessionId];
+
+  let session = sessions[sessionId];
+
+  if (!session && db) {
+    try {
+      const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId);
+      if (row) {
+        session = {
+          username: row.username,
+          role: row.role,
+          status: row.status,
+          createdAt: Number(row.createdAt),
+          expiresAt: Number(row.expiresAt)
+        };
+        sessions[sessionId] = session;
+      }
+    } catch (err) {
+      console.error("[Auth] Erro ao recuperar sessão do banco:", err.message);
+    }
+  }
+
   if (!session) return null;
 
-  if (Date.now() - session.createdAt > SESSION_TTL) {
+  const now = Date.now();
+  if (now > (session.expiresAt || (session.createdAt + SESSION_TTL))) {
     delete sessions[sessionId];
+    try {
+      if (db) db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
+    } catch {}
     return null;
   }
-  session.createdAt = Date.now();
+
   return { ...session, id: sessionId };
 }
 
@@ -73,12 +119,18 @@ function isAdmin(req) {
 
 function setSessionCookie(res, token) {
   const expires = new Date(Date.now() + SESSION_TTL).toUTCString();
-  res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Expires=${expires}; SameSite=Strict`);
+  const maxAgeSec = Math.floor(SESSION_TTL / 1000);
+  res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Expires=${expires}; Max-Age=${maxAgeSec}; SameSite=Strict`);
 }
 
 function clearSessionCookie(res, sessionId) {
-  if (sessionId) delete sessions[sessionId];
-  res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`);
+  if (sessionId) {
+    delete sessions[sessionId];
+    try {
+      if (db) db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
+    } catch {}
+  }
+  res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; SameSite=Strict`);
 }
 
 module.exports = { validatePassword, hashPassword, createSession, getSession, getSessionId, isAuthenticated, isAdmin, setSessionCookie, clearSessionCookie, sessions };

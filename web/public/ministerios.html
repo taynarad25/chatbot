@@ -1299,103 +1299,15 @@
         <div class="navbar-actions">
             <nav>
                 <ul class="navbar-nav">
-                    <li><a href="/home">Início</a></li>
-                    <li><a href="/home#cultos">Cultos</a></li>
-                                <!-- Dropdown Elegante de Ministérios -->
-            <li class="nav-item-dropdown" id="nav-dropdown-ministerios">
-                <a href="/ministerios" class="nav-dropdown-toggle" id="nav-min-toggle" aria-haspopup="true" aria-expanded="false">
-                    Ministérios
-                    <svg class="dropdown-arrow-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                </a>
-                <div class="nav-dropdown-panel" aria-label="Menu de Ministérios">
-                    <div class="dropdown-menu-header">
-                        <span class="dropdown-label">Ministérios & Redes</span>
-                        <a href="/ministerios" class="dropdown-link-all">Ver página completa →</a>
-                    </div>
-                    <div class="dropdown-menu-grid">
-                        <a href="/ministerios#kids" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-roxo"><img src="/images/icon-kids.png" alt="Rede Kids" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Rede Kids</div>
-                                <div class="dropdown-card-desc">Ministério Infantil</div>
-                            </div>
+                    <li><a href="/quemsomos">Quem Somos</a></li>
+                    <li><a href="/ministerios" class="active">Ministérios</a></li>
+                    <li><a href="/lideranca">Liderança</a></li>
+                    <li><a href="/home#onde-estamos">Localização</a></li>
+                    <li>
+                        <a href="/home" class="btn-nav-home" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--cor-roxo), var(--cor-azul)); color:#ffffff !important; padding:8px 18px; border-radius:999px; font-weight:700; font-size:0.85rem; box-shadow:0 4px 14px rgba(122, 43, 226, 0.4); text-decoration:none;">
+                            <span>🏠</span> Voltar para o Home
                         </a>
-                        <a href="/ministerios#ruach" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-azul"><img src="/images/icon-ruach.png" alt="Rede Ruach" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Rede Ruach</div>
-                                <div class="dropdown-card-desc">Jovens & Adolescentes</div>
-                            </div>
-                        </a>
-                        <a href="/ministerios#casais" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-roxo"><img src="/images/icon-casais.png" alt="Rede de Casais" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Rede de Casais</div>
-                                <div class="dropdown-card-desc">Famílias & Alianças</div>
-                            </div>
-                        </a>
-                        <a href="/ministerios#homens" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-azul"><img src="/images/icon-homens.png" alt="Rede de Homens" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Rede de Homens</div>
-                                <div class="dropdown-card-desc">Edificação Masculina</div>
-                            </div>
-                        </a>
-                        <a href="/ministerios#mulheres" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-rosa"><img src="/images/icon-mulheres.png" alt="Rede de Mulheres" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Rede de Mulheres</div>
-                                <div class="dropdown-card-desc">Mulheres Virtuosas</div>
-                            </div>
-                        </a>
-                        <a href="/ministerios#epifania" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-laranja"><img src="/images/icon-epifania.png" alt="Epifania" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Epifania</div>
-                                <div class="dropdown-card-desc">Louvor & Adoração</div>
-                            </div>
-                        </a>
-                        <a href="/ministerios#artes" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-laranja"><img src="/images/icon-artes.png" alt="Ministério de Artes" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Ministério de Artes</div>
-                                <div class="dropdown-card-desc">Teatro, Dança, Coral e Pintura</div>
-                            </div>
-                        </a>
-                        <a href="/ministerios#evangelismo" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-laranja"><img src="/images/icon-evangelismo.png" alt="Evangelismo" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Evangelismo</div>
-                                <div class="dropdown-card-desc">Missões & Proclamação</div>
-                            </div>
-                        </a>
-                        <a href="/ministerios#intercessao" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-rosa"><img src="/images/icon-intercessao.png" alt="Intercessão" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Intercessão</div>
-                                <div class="dropdown-card-desc">Oração & Clamor</div>
-                            </div>
-                        </a>
-                        <a href="/ministerios#seeds" class="dropdown-card">
-                            <span class="dropdown-card-icon icon-laranja"><img src="/images/icon-seeds.png" alt="Social Seeds" width="24" height="24" style="width:24px;height:24px;object-fit:contain;display:block;" /></span>
-                            <div class="dropdown-card-content">
-                                <div class="dropdown-card-title">Social Seeds</div>
-                                <div class="dropdown-card-desc">Ação Social Comunitária</div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="dropdown-menu-footer">
-                        <a href="/ministerios#integracao" class="dropdown-footer-link">
-                            <span class="dropdown-footer-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-                            <span><strong>Quero Fazer a Integração</strong> • Conheça de perto e faça parte da igreja</span>
-                            <span class="dropdown-footer-badge">Participar</span>
-                        </a>
-                    </div>
-                </div>
-            </li>
-                    <li><a href="/lideranca">Nossa Liderança</a></li>
-                    <li><a href="/home#como-chegar">Localização</a></li>
-                    <li><a href="/home#atendimento">Atendimento</a></li>
+                    </li>
                 </ul>
             </nav>
 

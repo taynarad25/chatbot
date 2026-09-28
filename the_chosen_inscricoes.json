@@ -46,7 +46,8 @@
     "codigo": "TC-9E1F15",
     "quantidade": 2,
     "participantes": [
-      "Maria Fabiana de Oliveira Lacerda"
+      "Maria Fabiana de Oliveira Lacerda",
+      "Acompanhante 2 (Maria Fabiana de Oliveira Lacerda)"
     ],
     "titular": "Maria Fabiana de Oliveira Lacerda",
     "telefone": "11959067177",
@@ -67,7 +68,8 @@
     "codigo": "TC-FFFC3F",
     "quantidade": 2,
     "participantes": [
-      "Gislaine Davi bezerra de Souza"
+      "Gislaine Davi bezerra de Souza",
+      "Acompanhante 2 (Gislaine Davi bezerra de Souza)"
     ],
     "titular": "Gislaine Davi bezerra de Souza",
     "telefone": "11985526434",
@@ -109,7 +111,8 @@
     "codigo": "TC-AD0B3F",
     "quantidade": 2,
     "participantes": [
-      "Julia Galdino Santos da Silva"
+      "Julia Galdino Santos da Silva",
+      "Acompanhante 2 (Julia Galdino Santos da Silva)"
     ],
     "titular": "Julia Galdino Santos da Silva",
     "telefone": "11930006027",
@@ -130,7 +133,10 @@
     "codigo": "TC-A631F8",
     "quantidade": 4,
     "participantes": [
-      "Tainá Pereira da Silva"
+      "Tainá Pereira da Silva",
+      "Acompanhante 2 (Tainá Pereira da Silva)",
+      "Acompanhante 3 (Tainá Pereira da Silva)",
+      "Acompanhante 4 (Tainá Pereira da Silva)"
     ],
     "titular": "Tainá Pereira da Silva",
     "telefone": "11994088631",
@@ -151,7 +157,8 @@
     "codigo": "TC-D07CCE",
     "quantidade": 2,
     "participantes": [
-      "Ellen Sousa Ferraz Lima"
+      "Ellen Sousa Ferraz Lima",
+      "Acompanhante 2 (Ellen Sousa Ferraz Lima)"
     ],
     "titular": "Ellen Sousa Ferraz Lima",
     "telefone": "11974019368",
@@ -172,7 +179,9 @@
     "codigo": "TC-63677D",
     "quantidade": 3,
     "participantes": [
-      "cintia Mota Lopes de Oliveira"
+      "cintia Mota Lopes de Oliveira",
+      "Acompanhante 2 (cintia Mota Lopes de Oliveira)",
+      "Acompanhante 3 (cintia Mota Lopes de Oliveira)"
     ],
     "titular": "cintia Mota Lopes de Oliveira",
     "telefone": "1169536715",
@@ -193,7 +202,9 @@
     "codigo": "TC-1847B6",
     "quantidade": 3,
     "participantes": [
-      "Ana Vitória Alves Bazilio"
+      "Ana Vitória Alves Bazilio",
+      "Acompanhante 2 (Ana Vitória Alves Bazilio)",
+      "Acompanhante 3 (Ana Vitória Alves Bazilio)"
     ],
     "titular": "Ana Vitória Alves Bazilio",
     "telefone": "11984523844",
@@ -235,7 +246,9 @@
     "codigo": "TC-0046FD",
     "quantidade": 3,
     "participantes": [
-      "RAFAEL OLIVIERA"
+      "RAFAEL OLIVIERA",
+      "Acompanhante 2 (RAFAEL OLIVIERA)",
+      "Acompanhante 3 (RAFAEL OLIVIERA)"
     ],
     "titular": "RAFAEL OLIVIERA",
     "telefone": "11980836279",
@@ -250,300 +263,6 @@
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
     "criadoEm": "25/09/2026 11:57:40"
-  },
-  {
-    "id": "tc-sheet-tc-0b79d7",
-    "codigo": "TC-0B79D7",
-    "quantidade": 3,
-    "participantes": [
-      "Ana Paula Silva"
-    ],
-    "titular": "Ana Paula Silva",
-    "telefone": "5511942685501",
-    "email": "anapaula@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:06",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:06"
-  },
-  {
-    "id": "tc-sheet-tc-bd77ae",
-    "codigo": "TC-BD77AE",
-    "quantidade": 2,
-    "participantes": [
-      "Gabriel Diniz"
-    ],
-    "titular": "Gabriel Diniz",
-    "telefone": "11999998888",
-    "email": "gabriel@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:10",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:10"
-  },
-  {
-    "id": "tc-sheet-tc-243e6e",
-    "codigo": "TC-243E6E",
-    "quantidade": 10,
-    "participantes": [
-      "Participante 1"
-    ],
-    "titular": "Participante 1",
-    "telefone": "11999999999",
-    "email": "teste@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:13",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:13"
-  },
-  {
-    "id": "tc-sheet-tc-722145",
-    "codigo": "TC-722145",
-    "quantidade": 10,
-    "participantes": [
-      "Participante 11"
-    ],
-    "titular": "Participante 11",
-    "telefone": "11999999999",
-    "email": "teste@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:15",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:15"
-  },
-  {
-    "id": "tc-sheet-tc-b23226",
-    "codigo": "TC-B23226",
-    "quantidade": 10,
-    "participantes": [
-      "Participante 21"
-    ],
-    "titular": "Participante 21",
-    "telefone": "11999999999",
-    "email": "teste@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:17",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:17"
-  },
-  {
-    "id": "tc-sheet-tc-342b66",
-    "codigo": "TC-342B66",
-    "quantidade": 10,
-    "participantes": [
-      "Participante 31"
-    ],
-    "titular": "Participante 31",
-    "telefone": "11999999999",
-    "email": "teste@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:19",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:19"
-  },
-  {
-    "id": "tc-sheet-tc-b80a3d",
-    "codigo": "TC-B80A3D",
-    "quantidade": 8,
-    "participantes": [
-      "Participante 41"
-    ],
-    "titular": "Participante 41",
-    "telefone": "11999999999",
-    "email": "teste@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:21",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:21"
-  },
-  {
-    "id": "tc-sheet-tc-1f0115",
-    "codigo": "TC-1F0115",
-    "quantidade": 2,
-    "participantes": [
-      "P1 Final"
-    ],
-    "titular": "P1 Final",
-    "telefone": "11999999999",
-    "email": "teste@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:23",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:23"
-  },
-  {
-    "id": "tc-sheet-tc-503fcd",
-    "codigo": "TC-503FCD",
-    "quantidade": 2,
-    "participantes": [
-      "Marcos Silva"
-    ],
-    "titular": "Marcos Silva",
-    "telefone": "11988887777",
-    "email": "marcos@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:24",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:24"
-  },
-  {
-    "id": "tc-sheet-tc-734319",
-    "codigo": "TC-734319",
-    "quantidade": 1,
-    "participantes": [
-      "Sara Teste"
-    ],
-    "titular": "Sara Teste",
-    "telefone": "11977776666",
-    "email": "sara@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:28",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:28"
-  },
-  {
-    "id": "tc-sheet-tc-29a1e7",
-    "codigo": "TC-29A1E7",
-    "quantidade": 1,
-    "participantes": [
-      "Mariana Web Teste"
-    ],
-    "titular": "Mariana Web Teste",
-    "telefone": "11988889999",
-    "email": "mariana.web@teste.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:34",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:34"
-  },
-  {
-    "id": "tc-sheet-tc-testsheet",
-    "codigo": "TC-TESTSHEET",
-    "quantidade": 2,
-    "participantes": [
-      "Renata Alencar"
-    ],
-    "titular": "Renata Alencar",
-    "telefone": "11987654321",
-    "email": "renata@exemplo.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:19:34",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:19:34"
-  },
-  {
-    "id": "tc-sheet-tc-a52598",
-    "codigo": "TC-A52598",
-    "quantidade": 1,
-    "participantes": [
-      "Mariana Web Teste"
-    ],
-    "titular": "Mariana Web Teste",
-    "telefone": "11988889999",
-    "email": "mariana.web@teste.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:22:37",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:22:37"
-  },
-  {
-    "id": "tc-sheet-tc-acd7a7",
-    "codigo": "TC-ACD7A7",
-    "quantidade": 1,
-    "participantes": [
-      "Mariana Web Teste"
-    ],
-    "titular": "Mariana Web Teste",
-    "telefone": "11988889999",
-    "email": "mariana.web@teste.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "25/09/2026 12:28:56",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "25/09/2026 12:28:56"
   },
   {
     "id": "tc-sheet-tc-2897aa",
@@ -567,11 +286,77 @@
     "criadoEm": "26/09/2026 19:58:56"
   },
   {
-    "id": "tc-sheet-tc-18767a",
-    "codigo": "TC-18767A",
+    "id": "tc-sheet-tc-5ef0e0",
+    "codigo": "TC-5EF0E0",
+    "quantidade": 1,
+    "participantes": [
+      "Jeferson Carlos do Nascimento"
+    ],
+    "titular": "Jeferson Carlos do Nascimento",
+    "telefone": "11946798919",
+    "email": "jcnomais2013@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 18:55:33",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 18:55:33"
+  },
+  {
+    "id": "tc-sheet-tc-297d97",
+    "codigo": "TC-297D97",
+    "quantidade": 1,
+    "participantes": [
+      "Rita Gabriela Henrique de Souza"
+    ],
+    "titular": "Rita Gabriela Henrique de Souza",
+    "telefone": "11995824388",
+    "email": "henriquelaura945@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "27/09/2026 18:55:37",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "27/09/2026 18:55:37"
+  },
+  {
+    "id": "tc-sheet-tc-f611b2",
+    "codigo": "TC-F611B2",
+    "quantidade": 2,
+    "participantes": [
+      "Dhamaris",
+      "Acompanhante 2 (Dhamaris)"
+    ],
+    "titular": "Dhamaris",
+    "telefone": "11978376170",
+    "email": "dhatamanini@gmail.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "28/09/2026 10:10:54",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "28/09/2026 10:10:54"
+  },
+  {
+    "id": "tc-sheet-tc-b22b4b",
+    "codigo": "TC-B22B4B",
     "quantidade": 3,
     "participantes": [
-      "Ana Paula Silva"
+      "Ana Paula Silva",
+      "Acompanhante 2 (Ana Paula Silva)",
+      "Acompanhante 3 (Ana Paula Silva)"
     ],
     "titular": "Ana Paula Silva",
     "telefone": "5511942685501",
@@ -579,20 +364,21 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:22",
+    "confirmadoEm": "28/09/2026 15:37:08",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:22"
+    "criadoEm": "28/09/2026 15:37:08"
   },
   {
-    "id": "tc-sheet-tc-2ed5fe",
-    "codigo": "TC-2ED5FE",
+    "id": "tc-sheet-tc-851904",
+    "codigo": "TC-851904",
     "quantidade": 2,
     "participantes": [
-      "Gabriel Diniz"
+      "Gabriel Diniz",
+      "Acompanhante 2 (Gabriel Diniz)"
     ],
     "titular": "Gabriel Diniz",
     "telefone": "11999998888",
@@ -600,20 +386,29 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:26",
+    "confirmadoEm": "28/09/2026 15:37:12",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:26"
+    "criadoEm": "28/09/2026 15:37:12"
   },
   {
-    "id": "tc-sheet-tc-920a94",
-    "codigo": "TC-920A94",
+    "id": "tc-sheet-tc-531650",
+    "codigo": "TC-531650",
     "quantidade": 10,
     "participantes": [
-      "Participante 1"
+      "Participante 1",
+      "Acompanhante 2 (Participante 1)",
+      "Acompanhante 3 (Participante 1)",
+      "Acompanhante 4 (Participante 1)",
+      "Acompanhante 5 (Participante 1)",
+      "Acompanhante 6 (Participante 1)",
+      "Acompanhante 7 (Participante 1)",
+      "Acompanhante 8 (Participante 1)",
+      "Acompanhante 9 (Participante 1)",
+      "Acompanhante 10 (Participante 1)"
     ],
     "titular": "Participante 1",
     "telefone": "11999999999",
@@ -621,20 +416,29 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:28",
+    "confirmadoEm": "28/09/2026 15:37:15",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:28"
+    "criadoEm": "28/09/2026 15:37:15"
   },
   {
-    "id": "tc-sheet-tc-335d68",
-    "codigo": "TC-335D68",
+    "id": "tc-sheet-tc-a24ed8",
+    "codigo": "TC-A24ED8",
     "quantidade": 10,
     "participantes": [
-      "Participante 11"
+      "Participante 11",
+      "Acompanhante 2 (Participante 11)",
+      "Acompanhante 3 (Participante 11)",
+      "Acompanhante 4 (Participante 11)",
+      "Acompanhante 5 (Participante 11)",
+      "Acompanhante 6 (Participante 11)",
+      "Acompanhante 7 (Participante 11)",
+      "Acompanhante 8 (Participante 11)",
+      "Acompanhante 9 (Participante 11)",
+      "Acompanhante 10 (Participante 11)"
     ],
     "titular": "Participante 11",
     "telefone": "11999999999",
@@ -642,20 +446,29 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:31",
+    "confirmadoEm": "28/09/2026 15:37:17",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:31"
+    "criadoEm": "28/09/2026 15:37:17"
   },
   {
-    "id": "tc-sheet-tc-f9206b",
-    "codigo": "TC-F9206B",
+    "id": "tc-sheet-tc-b5e42d",
+    "codigo": "TC-B5E42D",
     "quantidade": 10,
     "participantes": [
-      "Participante 21"
+      "Participante 21",
+      "Acompanhante 2 (Participante 21)",
+      "Acompanhante 3 (Participante 21)",
+      "Acompanhante 4 (Participante 21)",
+      "Acompanhante 5 (Participante 21)",
+      "Acompanhante 6 (Participante 21)",
+      "Acompanhante 7 (Participante 21)",
+      "Acompanhante 8 (Participante 21)",
+      "Acompanhante 9 (Participante 21)",
+      "Acompanhante 10 (Participante 21)"
     ],
     "titular": "Participante 21",
     "telefone": "11999999999",
@@ -663,20 +476,29 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:33",
+    "confirmadoEm": "28/09/2026 15:37:18",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:33"
+    "criadoEm": "28/09/2026 15:37:18"
   },
   {
-    "id": "tc-sheet-tc-b70d34",
-    "codigo": "TC-B70D34",
+    "id": "tc-sheet-tc-b33514",
+    "codigo": "TC-B33514",
     "quantidade": 10,
     "participantes": [
-      "Participante 31"
+      "Participante 31",
+      "Acompanhante 2 (Participante 31)",
+      "Acompanhante 3 (Participante 31)",
+      "Acompanhante 4 (Participante 31)",
+      "Acompanhante 5 (Participante 31)",
+      "Acompanhante 6 (Participante 31)",
+      "Acompanhante 7 (Participante 31)",
+      "Acompanhante 8 (Participante 31)",
+      "Acompanhante 9 (Participante 31)",
+      "Acompanhante 10 (Participante 31)"
     ],
     "titular": "Participante 31",
     "telefone": "11999999999",
@@ -684,20 +506,27 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:35",
+    "confirmadoEm": "28/09/2026 15:37:21",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:35"
+    "criadoEm": "28/09/2026 15:37:21"
   },
   {
-    "id": "tc-sheet-tc-14de87",
-    "codigo": "TC-14DE87",
+    "id": "tc-sheet-tc-3f459e",
+    "codigo": "TC-3F459E",
     "quantidade": 8,
     "participantes": [
-      "Participante 41"
+      "Participante 41",
+      "Acompanhante 2 (Participante 41)",
+      "Acompanhante 3 (Participante 41)",
+      "Acompanhante 4 (Participante 41)",
+      "Acompanhante 5 (Participante 41)",
+      "Acompanhante 6 (Participante 41)",
+      "Acompanhante 7 (Participante 41)",
+      "Acompanhante 8 (Participante 41)"
     ],
     "titular": "Participante 41",
     "telefone": "11999999999",
@@ -705,20 +534,21 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:37",
+    "confirmadoEm": "28/09/2026 15:37:22",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:37"
+    "criadoEm": "28/09/2026 15:37:22"
   },
   {
-    "id": "tc-sheet-tc-89925c",
-    "codigo": "TC-89925C",
+    "id": "tc-sheet-tc-fae9ec",
+    "codigo": "TC-FAE9EC",
     "quantidade": 2,
     "participantes": [
-      "P1 Final"
+      "P1 Final",
+      "Acompanhante 2 (P1 Final)"
     ],
     "titular": "P1 Final",
     "telefone": "11999999999",
@@ -726,20 +556,21 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:39",
+    "confirmadoEm": "28/09/2026 15:37:24",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:39"
+    "criadoEm": "28/09/2026 15:37:24"
   },
   {
-    "id": "tc-sheet-tc-e9b201",
-    "codigo": "TC-E9B201",
+    "id": "tc-sheet-tc-cc573a",
+    "codigo": "TC-CC573A",
     "quantidade": 2,
     "participantes": [
-      "Marcos Silva"
+      "Marcos Silva",
+      "Acompanhante 2 (Marcos Silva)"
     ],
     "titular": "Marcos Silva",
     "telefone": "11988887777",
@@ -747,17 +578,17 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:41",
+    "confirmadoEm": "28/09/2026 15:37:27",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:41"
+    "criadoEm": "28/09/2026 15:37:27"
   },
   {
-    "id": "tc-sheet-tc-5651fa",
-    "codigo": "TC-5651FA",
+    "id": "tc-sheet-tc-7c073d",
+    "codigo": "TC-7C073D",
     "quantidade": 1,
     "participantes": [
       "Sara Teste"
@@ -768,17 +599,39 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:44",
+    "confirmadoEm": "28/09/2026 15:37:29",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:44"
+    "criadoEm": "28/09/2026 15:37:29"
   },
   {
-    "id": "tc-sheet-tc-a0c4b2",
-    "codigo": "TC-A0C4B2",
+    "id": "tc-sheet-tc-testsheet",
+    "codigo": "TC-TESTSHEET",
+    "quantidade": 2,
+    "participantes": [
+      "Renata Alencar",
+      "Acompanhante 2 (Renata Alencar)"
+    ],
+    "titular": "Renata Alencar",
+    "telefone": "11987654321",
+    "email": "renata@exemplo.com",
+    "evento": "Pré-estreia The Chosen - Temporada 6",
+    "dataEvento": "03/10/2026 19:00",
+    "statusConfirmacao": "confirmado",
+    "confirmadoEm": "28/09/2026 15:37:37",
+    "lembrete3DiasEnviado": false,
+    "dataLembrete3Dias": null,
+    "lembreteDiaEventoEnviado": false,
+    "dataLembreteDiaEvento": null,
+    "whatsappConfirmacaoEnviado": true,
+    "criadoEm": "28/09/2026 15:37:37"
+  },
+  {
+    "id": "tc-sheet-tc-14822f",
+    "codigo": "TC-14822F",
     "quantidade": 1,
     "participantes": [
       "Mariana Web Teste"
@@ -789,33 +642,12 @@
     "evento": "Pré-estreia The Chosen - Temporada 6",
     "dataEvento": "03/10/2026 19:00",
     "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:41:49",
+    "confirmadoEm": "28/09/2026 15:38:05",
     "lembrete3DiasEnviado": false,
     "dataLembrete3Dias": null,
     "lembreteDiaEventoEnviado": false,
     "dataLembreteDiaEvento": null,
     "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:41:49"
-  },
-  {
-    "id": "tc-sheet-tc-862b37",
-    "codigo": "TC-862B37",
-    "quantidade": 1,
-    "participantes": [
-      "Mariana Web Teste"
-    ],
-    "titular": "Mariana Web Teste",
-    "telefone": "11988889999",
-    "email": "mariana.web@teste.com",
-    "evento": "Pré-estreia The Chosen - Temporada 6",
-    "dataEvento": "03/10/2026 19:00",
-    "statusConfirmacao": "confirmado",
-    "confirmadoEm": "27/09/2026 15:44:16",
-    "lembrete3DiasEnviado": false,
-    "dataLembrete3Dias": null,
-    "lembreteDiaEventoEnviado": false,
-    "dataLembreteDiaEvento": null,
-    "whatsappConfirmacaoEnviado": true,
-    "criadoEm": "27/09/2026 15:44:16"
+    "criadoEm": "28/09/2026 15:38:05"
   }
 ]

@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quem Somos • Comunidade Cristã Curados</title>
+    <meta name="description" content="Conheça a história, missão, visão, valores e colunas da Comunidade Cristã Curados em Itapevi - SP. Uma igreja que expressa a Deus através das artes.">
+    
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3">
+    <link rel="icon" type="image/png" href="/images/logo.png?v=3">
+    <link rel="shortcut icon" type="image/png" href="/images/logo.png?v=3">
+    <link rel="apple-touch-icon" href="/favicon-192x192.png?v=3">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        #quemsomos-page {
+            scroll-behavior: smooth;
+            --cor-roxo: #7A2BE2;
+            --cor-roxo-brilho: rgba(122, 43, 226, 0.22);
+            --cor-rosa: #D63384;
+            --cor-rosa-brilho: rgba(214, 51, 132, 0.22);
+            --cor-laranja: #FF6A00;
+            --cor-laranja-brilho: rgba(255, 106, 0, 0.22);
+            --cor-azul: #00B7D9;
+            --cor-azul-brilho: rgba(0, 183, 217, 0.22);
+
+            --cor-escuro: #121214;
+            --cor-escuro-suave: #18181e;
+            --cor-card-dark: #1f1f26;
+            --cor-claro: #f8f9fa;
+            --cor-texto: #2d3748;
+            --cor-texto-mutado: #718096;
+
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+            background-color: #0c0c10;
+            color: #f3f4f6;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        #quemsomos-page *,
+        #quemsomos-page *::before,
+        #quemsomos-page *::after {
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Navbar Superior */
+        #quemsomos-page .navbar-curados {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(18, 18, 22, 0.94);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #quemsomos-page .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #ffffff;
+        }
+
+        #quemsomos-page .navbar-brand img {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+        }
+
+        #quemsomos-page .navbar-brand span {
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: var(--cor-azul);
+        }
+
+        #quemsomos-page .navbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        #quemsomos-page .navbar-nav {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            gap: 14px;
+            align-items: center;
+        }
+
+        #quemsomos-page .navbar-nav a {
+            color: #d1d5db;
+            text-decoration: none;
+            font-size: 0.92rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            padding: 6px 12px;
+            border-radius: 8px;
+        }
+
+        #quemsomos-page .navbar-nav a:hover,
+        #quemsomos-page .navbar-nav a.active {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        #quemsomos-page .btn-nav-home {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, var(--cor-roxo), var(--cor-azul));
+            color: #ffffff !important;
+            padding: 9px 20px !important;
+            border-radius: 999px !important;
+            font-weight: 700 !important;
+            font-size: 0.88rem !important;
+            box-shadow: 0 4px 16px rgba(122, 43, 226, 0.45);
+            text-decoration: none;
+            transition: all 0.25s ease;
+        }
+
+        #quemsomos-page .btn-nav-home:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 183, 217, 0.55);
+            filter: brightness(1.1);
+        }
+
+        /* Hero */
+        #quemsomos-page .hero-section {
+            background: radial-gradient(circle at 50% 20%, rgba(122, 43, 226, 0.25), transparent 70%), #0c0c10;
+            padding: 80px 24px 60px;
+            text-align: center;
+            position: relative;
+        }
+
+        #quemsomos-page .hero-badge {
+            display: inline-block;
+            background: rgba(0, 183, 217, 0.16);
+            color: #38bdf8;
+            border: 1px solid rgba(0, 183, 217, 0.35);
+            padding: 6px 16px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        #quemsomos-page .hero-title {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0 0 16px;
+            line-height: 1.2;
+        }
+
+        #quemsomos-page .hero-subtitle {
+            max-width: 780px;
+            margin: 0 auto;
+            color: #cbd5e1;
+            font-size: 1.15rem;
+            line-height: 1.7;
+        }
+
+        #quemsomos-page .container {
+            max-width: 1140px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Seções */
+        #quemsomos-page .section {
+            padding: 70px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        #quemsomos-page .section-header {
+            text-align: center;
+            margin-bottom: 46px;
+        }
+
+        #quemsomos-page .section-tag {
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        #quemsomos-page .tag-roxo { background: rgba(122, 43, 226, 0.2); color: #c084fc; border: 1px solid rgba(122, 43, 226, 0.4); }
+        #quemsomos-page .tag-azul { background: rgba(0, 183, 217, 0.2); color: #38bdf8; border: 1px solid rgba(0, 183, 217, 0.4); }
+        #quemsomos-page .tag-rosa { background: rgba(214, 51, 132, 0.2); color: #f472b6; border: 1px solid rgba(214, 51, 132, 0.4); }
+        #quemsomos-page .tag-laranja { background: rgba(255, 106, 0, 0.2); color: #fb923c; border: 1px solid rgba(255, 106, 0, 0.4); }
+
+        #quemsomos-page .section-title {
+            font-size: 2.1rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0 0 12px;
+        }
+
+        #quemsomos-page .section-desc {
+            color: #94a3b8;
+            max-width: 680px;
+            margin: 0 auto;
+            font-size: 1rem;
+        }
+
+        /* Frase Principal Chamado */
+        #quemsomos-page .frase-chamado {
+            background: linear-gradient(135deg, rgba(122, 43, 226, 0.15), rgba(0, 183, 217, 0.15));
+            border: 1px solid rgba(122, 43, 226, 0.35);
+            border-radius: 20px;
+            padding: 36px 28px;
+            text-align: center;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        #quemsomos-page .frase-chamado h3 {
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        #quemsomos-page .frase-chamado .gradiente {
+            background: linear-gradient(135deg, #a855f7, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Grid Missão, Visão e Valores */
+        #quemsomos-page .mvv-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 26px;
+            margin-top: 24px;
+        }
+
+        #quemsomos-page .mvv-card {
+            background: #14141c;
+            border-radius: 20px;
+            padding: 34px 26px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #quemsomos-page .mvv-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+
+        #quemsomos-page .mvv-card.missao::before { background: linear-gradient(90deg, var(--cor-roxo), #a855f7); }
+        #quemsomos-page .mvv-card.visao::before { background: linear-gradient(90deg, var(--cor-azul), #38bdf8); }
+        #quemsomos-page .mvv-card.valores::before { background: linear-gradient(90deg, var(--cor-laranja), var(--cor-rosa)); }
+
+        #quemsomos-page .mvv-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+        }
+
+        #quemsomos-page .mvv-icon {
+            font-size: 2.2rem;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+
+        #quemsomos-page .mvv-titulo {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0 0 14px;
+        }
+
+        #quemsomos-page .mvv-texto {
+            color: #cbd5e1;
+            font-size: 0.98rem;
+            line-height: 1.7;
+            margin: 0 0 16px;
+            flex-grow: 1;
+        }
+
+        #quemsomos-page .mvv-versiculo {
+            background: rgba(255, 255, 255, 0.04);
+            border-left: 3px solid var(--cor-azul);
+            padding: 8px 12px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: #38bdf8;
+            margin-top: 8px;
+        }
+
+        #quemsomos-page .valores-lista {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0 0;
+        }
+
+        #quemsomos-page .valores-lista li {
+            position: relative;
+            padding-left: 24px;
+            margin-bottom: 10px;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        #quemsomos-page .valores-lista li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #f97316;
+            font-weight: 800;
+        }
+
+        /* 4 Colunas */
+        #quemsomos-page .colunas-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        #quemsomos-page .coluna-card {
+            background: #14141c;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            padding: 28px 22px;
+            transition: all 0.25s ease;
+            position: relative;
+        }
+
+        #quemsomos-page .coluna-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        #quemsomos-page .coluna-num {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        #quemsomos-page .coluna-1 .coluna-num { color: #c084fc; }
+        #quemsomos-page .coluna-2 .coluna-num { color: #38bdf8; }
+        #quemsomos-page .coluna-3 .coluna-num { color: #f472b6; }
+        #quemsomos-page .coluna-4 .coluna-num { color: #fb923c; }
+
+        #quemsomos-page .coluna-titulo {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0 0 10px;
+        }
+
+        #quemsomos-page .coluna-subtitulo {
+            font-size: 0.92rem;
+            font-style: italic;
+            color: #38bdf8;
+            margin: 0 0 12px;
+            font-weight: 600;
+        }
+
+        #quemsomos-page .coluna-texto {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* 3 Cartões de Essência (Amar, Cuidar, Servir) */
+        #quemsomos-page .essencia-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 22px;
+        }
+
+        #quemsomos-page .essencia-card {
+            background: #14141c;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            padding: 28px 24px;
+            text-align: left;
+        }
+
+        #quemsomos-page .essencia-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+
+        #quemsomos-page .essencia-card.prioridade .essencia-badge { background: rgba(122, 43, 226, 0.2); color: #c084fc; }
+        #quemsomos-page .essencia-card.proposito .essencia-badge { background: rgba(0, 183, 217, 0.2); color: #38bdf8; }
+        #quemsomos-page .essencia-card.paixao .essencia-badge { background: rgba(255, 106, 0, 0.2); color: #fb923c; }
+
+        #quemsomos-page .essencia-titulo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0 0 10px;
+        }
+
+        #quemsomos-page .essencia-desc {
+            font-size: 0.92rem;
+            color: #94a3b8;
+            line-height: 1.65;
+            margin: 0;
+        }
+
+        /* Atalhos para Liderança e Ministérios */
+        #quemsomos-page .atalhos-section {
+            background: #0f0f15;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 70px 0 90px;
+        }
+
+        #quemsomos-page .atalhos-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 26px;
+        }
+
+        #quemsomos-page .atalho-card {
+            background: linear-gradient(135deg, rgba(28, 28, 38, 0.9), rgba(18, 18, 24, 0.95));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 22px;
+            padding: 34px 28px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            text-decoration: none;
+            transition: all 0.25s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        #quemsomos-page .atalho-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--cor-azul);
+            box-shadow: 0 16px 40px rgba(0, 183, 217, 0.25);
+        }
+
+        #quemsomos-page .atalho-icon-box {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #quemsomos-page .atalho-info h3 {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0 0 6px;
+        }
+
+        #quemsomos-page .atalho-info p {
+            font-size: 0.92rem;
+            color: #94a3b8;
+            margin: 0 0 12px;
+            line-height: 1.5;
+        }
+
+        #quemsomos-page .atalho-btn-text {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--cor-azul);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #quemsomos-page .footer-bar {
+            text-align: center;
+            padding: 26px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 0.85rem;
+            color: #64748b;
+            background: #09090d;
+        }
+
+        @media (max-width: 900px) {
+            #quemsomos-page .mvv-grid,
+            #quemsomos-page .colunas-grid,
+            #quemsomos-page .essencia-grid,
+            #quemsomos-page .atalhos-grid {
+                grid-template-columns: 1fr;
+            }
+            #quemsomos-page .hero-title {
+                font-size: 2.1rem;
+            }
+            #quemsomos-page .navbar-nav li:not(:last-child) {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body id="quemsomos-page">
+
+    <!-- Navbar Superior -->
+    <header class="navbar-curados">
+        <a href="/home" class="navbar-brand" title="Voltar para a página inicial">
+            <img src="/logo.png" alt="Logo Curados">
+            <span>CURADOS</span>
+        </a>
+
+        <div class="navbar-actions">
+            <ul class="navbar-nav">
+                <li><a href="/home#onde-estamos">Localização</a></li>
+                <li><a href="/home#eventos">Eventos</a></li>
+                <li><a href="/lideranca">Liderança</a></li>
+                <li><a href="/ministerios">Ministérios</a></li>
+                <li>
+                    <a href="/home" class="btn-nav-home" title="Ir para a página principal">
+                        <span>🏠</span> Voltar para o Home
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <span class="hero-badge">Conheça Nossa História & Chamado</span>
+            <h1 class="hero-title">Quem Somos</h1>
+            <p class="hero-subtitle">
+                Uma família da fé acolhedora, vibrante e comprometida com a transformação integral de vidas em Itapevi e região.
+            </p>
+        </div>
+    </section>
+
+    <!-- Nosso Chamado & Essência -->
+    <section class="section">
+        <div class="container">
+            <!-- Frase Chamado -->
+            <div class="frase-chamado">
+                <span class="section-tag tag-azul">Nosso Chamado Singular</span>
+                <h3>"Somos uma igreja que <span class="gradiente">expressa a Deus através das artes</span>."</h3>
+            </div>
+
+            <!-- 3 Pilares da Essência -->
+            <div class="section-header" style="margin-top: 50px;">
+                <span class="section-tag tag-roxo">Pilares de Vida</span>
+                <h2 class="section-title">Nossa Essência</h2>
+                <p class="section-desc">O coração que pulsa em cada culto, célula, ministério e iniciativa da igreja.</p>
+            </div>
+
+            <div class="essencia-grid">
+                <div class="essencia-card prioridade">
+                    <span class="essencia-badge">Prioridade</span>
+                    <h3 class="essencia-titulo">Amar a Deus</h3>
+                    <p class="essencia-desc">
+                        Nosso primeiro e mais alto chamado. Tudo o que fazemos, cada louvor, serviço e expressão artística, nasce de uma devoção profunda e sincera ao Criador.
+                    </p>
+                </div>
+
+                <div class="essencia-card proposito">
+                    <span class="essencia-badge">Propósito</span>
+                    <h3 class="essencia-titulo">Cuidar da Família</h3>
+                    <p class="essencia-desc">
+                        A família é a base e o projeto sagrado de Deus. Investimos na formação de lares fortes, restaurados e edificados na rocha, acolhendo gerações inteiras.
+                    </p>
+                </div>
+
+                <div class="essencia-card paixao">
+                    <span class="essencia-badge">Paixão</span>
+                    <h3 class="essencia-titulo">Servir Pessoas</h3>
+                    <p class="essencia-desc">
+                        Amor prático traduzido em serviço. Nossa alegria está em estender as mãos, curar feridas, compartilhar graça e fazer a diferença na vida do nosso próximo.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Missão, Visão e Valores -->
+    <section class="section" style="background: #0f0f15;">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag tag-laranja">Nossa Bússola</span>
+                <h2 class="section-title">Missão, Visão & Valores</h2>
+                <p class="section-desc">Os princípios inegociáveis que norteiam cada decisão, ensino e passo do nosso ministério.</p>
+            </div>
+
+            <div class="mvv-grid">
+                <!-- Missão -->
+                <div class="mvv-card missao">
+                    <span class="mvv-icon">🎯</span>
+                    <h3 class="mvv-titulo">Missão</h3>
+                    <p class="mvv-texto">
+                        Advertir, ensinar e influenciar cada pessoa a ser parecida com Cristo, conhecendo-o e tornando conhecido.
+                    </p>
+                </div>
+
+                <!-- Visão -->
+                <div class="mvv-card visao">
+                    <span class="mvv-icon">👁️</span>
+                    <h3 class="mvv-titulo">Visão</h3>
+                    <p class="mvv-texto">
+                        Ser uma igreja acolhedora e relevante na comunidade, comprometida com os valores do reino de Deus e com a transformação integral do ser humano (social, emocional e espiritual).
+                    </p>
+                    <div class="mvv-versiculo">
+                        📖 Colossenses 1:28-29
+                    </div>
+                </div>
+
+                <!-- Valores -->
+                <div class="mvv-card valores">
+                    <span class="mvv-icon">💎</span>
+                    <h3 class="mvv-titulo">Valores</h3>
+                    <p class="mvv-texto" style="margin-bottom: 8px;">
+                        <strong>Cremos:</strong>
+                    </p>
+                    <ul class="valores-lista">
+                        <li>Nos princípios da palavra;</li>
+                        <li>No comprometimento com Deus e as pessoas;</li>
+                        <li>Na hospitalidade;</li>
+                        <li>Na honra e na fé.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4 Colunas -->
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag tag-rosa">Alicerce Congregacional</span>
+                <h2 class="section-title">Nossas Colunas</h2>
+                <p class="section-subtitle">Os 4 fundamentos práticos que sustentam a nossa caminhada como comunidade.</p>
+            </div>
+
+            <div class="colunas-grid">
+                <!-- 01 Acolher -->
+                <div class="coluna-card coluna-1">
+                    <span class="coluna-num">01</span>
+                    <h3 class="coluna-titulo">Acolher</h3>
+                    <p class="coluna-subtitulo">"Ainda há lugar na mesa para você."</p>
+                    <p class="coluna-texto">
+                        Recebemos a todos sem acepção, como Cristo nos acolheu. Aqui você é visto, honrado e abraçado com amor genuíno desde o primeiro instante.
+                    </p>
+                </div>
+
+                <!-- 02 Integrar -->
+                <div class="coluna-card coluna-2">
+                    <span class="coluna-num">02</span>
+                    <h3 class="coluna-titulo">Integrar</h3>
+                    <p class="coluna-subtitulo">"De visitantes à participantes."</p>
+                    <p class="coluna-texto">
+                        Caminhamos juntos em discipulado e comunhão. Acreditamos que cada vida floresce ao se conectar intimamente ao corpo de Cristo e aos irmãos.
+                    </p>
+                </div>
+
+                <!-- 03 Entregar -->
+                <div class="coluna-card coluna-3">
+                    <span class="coluna-num">03</span>
+                    <h3 class="coluna-titulo">Entregar</h3>
+                    <p class="coluna-subtitulo">"Totalmente entregues à Sua obra."</p>
+                    <p class="coluna-texto">
+                        Colocamos nossos dons, talentos e corações a serviço do Reino. Servir a Deus é a nossa maior expressão de honra, gratidão e louvor.
+                    </p>
+                </div>
+
+                <!-- 04 Pertencer -->
+                <div class="coluna-card coluna-4">
+                    <span class="coluna-num">04</span>
+                    <h3 class="coluna-titulo">Pertencer</h3>
+                    <p class="coluna-subtitulo">"Uma família para pertencer."</p>
+                    <p class="coluna-texto">
+                        Criamos raízes e laços inquebráveis de fraternidade. Aqui você encontra suporte espiritual, pastoreio zeloso e o calor acolhedor de um verdadeiro lar.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Atalhos Especiais para Liderança e Ministérios -->
+    <section class="atalhos-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag tag-azul">Dê o Próximo Passo</span>
+                <h2 class="section-title">Conecte-se com a Gente</h2>
+                <p class="section-desc">Conheça as pessoas à frente da igreja e os ministérios onde você e sua família podem florescer.</p>
+            </div>
+
+            <div class="atalhos-grid">
+                <!-- Atalho 1: Liderança -->
+                <a href="/lideranca" class="atalho-card">
+                    <div class="atalho-icon-box" style="border-color: rgba(122, 43, 226, 0.4); color: #c084fc;">
+                        👥
+                    </div>
+                    <div class="atalho-info">
+                        <h3>Nossa Liderança</h3>
+                        <p>Conheça os nossos pastores e diretores que dedicam suas vidas ao pastoreio e cuidado espiritual.</p>
+                        <span class="atalho-btn-text">Conhecer Pastores & Diretoria ➔</span>
+                    </div>
+                </a>
+
+                <!-- Atalho 2: Ministérios -->
+                <a href="/ministerios" class="atalho-card">
+                    <div class="atalho-icon-box" style="border-color: rgba(0, 183, 217, 0.4); color: #38bdf8;">
+                        🎨
+                    </div>
+                    <div class="atalho-info">
+                        <h3>Nossos Ministérios</h3>
+                        <p>Descubra a Rede Kids, Juventude Ruach, Casais, Louvor Epifania, Teatro & Artes, Social Seeds e mais.</p>
+                        <span class="atalho-btn-text">Explorar Todos os Ministérios ➔</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Rodapé -->
+    <footer class="footer-bar">
+        &copy; 2026 Comunidade Cristã Curados • R. Benedicto de Abreu Júnior, 40 - Jardim Nova Itapevi, Itapevi - SP
+    </footer>
+
+</body>
+</html>

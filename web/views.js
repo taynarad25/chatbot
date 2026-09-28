@@ -212,6 +212,11 @@ function renderLoginHtml(message = "") {
         <span id="togglePassword" class="toggle-password" title="Ver senha">👀</span>
       </div>
       
+      <div style="display:flex; align-items:center; gap:8px; margin: 12px 0 16px 0; font-size: 0.85rem; color: #a1a1aa;">
+        <input type="checkbox" id="rememberMe" name="rememberMe" checked style="width: auto; margin: 0; cursor: pointer;" />
+        <label for="rememberMe" style="cursor: pointer; user-select: none;">Permanecer conectado neste navegador</label>
+      </div>
+      
       <button type="submit">Acessar Painel</button>
       <div class="links">
         Primeiro acesso como líder? <a href="/secretaria/register">Concluir cadastro</a>
@@ -235,18 +240,32 @@ function renderLoginHtml(message = "") {
       loginMessageEl.className = 'success';
     }
 
-
+    const savedUser = localStorage.getItem('curados_secretaria_usuario');
+    if (savedUser) {
+      const userEl = document.getElementById('loginUsername');
+      if (userEl) {
+        userEl.value = savedUser;
+        passwordInput.focus();
+      }
+    }
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
       const res = await fetch('/secretaria/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.fromEntries(formData)),
+        body: JSON.stringify(data),
       });
       if (res.ok) {
         console.log('Login bem-sucedido.');
+        const rememberEl = document.getElementById('rememberMe');
+        if (rememberEl && rememberEl.checked) {
+          localStorage.setItem('curados_secretaria_usuario', data.username || '');
+        } else {
+          localStorage.removeItem('curados_secretaria_usuario');
+        }
         window.location.href = '/secretaria';
       } else {
         const json = await res.json();
@@ -1838,9 +1857,17 @@ function renderIndexHtml() {
       }
 
       tbody.innerHTML = lista.map(item => {
-        const nomesParticipantes = (item.participantes || [item.titular])
-          .map(n => '<span style="display:inline-block; background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:6px; margin:2px; font-size:0.8rem; border:1px solid rgba(255,255,255,0.08);">' + n + '</span>')
-          .join('');
+        let parts = Array.isArray(item.participantes) && item.participantes.length > 0 ? [...item.participantes] : [item.titular || 'Participante'];
+        const titularNome = item.titular || parts[0] || 'Participante';
+        const qtdItem = Number(item.quantidade) || parts.length || 1;
+        while (parts.length < qtdItem) {
+          parts.push('Acompanhante ' + (parts.length + 1) + ' (' + titularNome + ')');
+        }
+
+        const nomesParticipantes = parts.map((n, idx) => {
+          const isTitular = idx === 0;
+          return '<span style="display:inline-flex; align-items:center; gap:4px; background:' + (isTitular ? 'rgba(0, 183, 217, 0.16)' : 'rgba(255,255,255,0.06)') + '; color:' + (isTitular ? '#38bdf8' : '#e2e8f0') + '; padding:2px 8px; border-radius:6px; margin:2px; font-size:0.8rem; border:1px solid ' + (isTitular ? 'rgba(0, 183, 217, 0.35)' : 'rgba(255,255,255,0.08)') + ';">' + (idx + 1) + '. ' + n + '</span>';
+        }).join('') + '<button type="button" title="Editar participantes / acompanhantes" onclick="editarParticipantesModal(\'' + item.id + '\')" style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 6px; color: #fbbf24; cursor: pointer; padding: 2px 6px; font-size: 0.78rem; margin-left: 4px; vertical-align: middle;">✏️</button>';
         
         let statusBadge = '';
         if (item.statusConfirmacao === 'confirmado') {
@@ -1877,6 +1904,45 @@ function renderIndexHtml() {
           '</td>' +
         '</tr>';
       }).join('');
+    }
+
+    async function editarParticipantesModal(id) {
+      const item = (theChosenInscricoesCache || []).find(i => String(i.id) === String(id) || String(i.codigo) === String(id));
+      if (!item) return;
+
+      let parts = Array.isArray(item.participantes) && item.participantes.length > 0 ? [...item.participantes] : [item.titular || 'Participante'];
+      const titularNome = item.titular || parts[0] || 'Participante';
+      const qtdItem = Number(item.quantidade) || parts.length || 1;
+      while (parts.length < qtdItem) {
+        parts.push('Acompanhante ' + (parts.length + 1) + ' (' + titularNome + ')');
+      }
+
+      const textoAtual = parts.join(', ');
+      const novoTexto = prompt('Editar participantes de ' + titularNome + ' (' + qtdItem + ' ingresso(s)):\nSepare os nomes por vírgula:', textoAtual);
+      if (novoTexto === null) return;
+
+      const novosNomes = novoTexto.split(',').map(s => s.trim()).filter(Boolean);
+      if (novosNomes.length === 0) {
+        alert('Informe ao menos 1 participante.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/the-chosen/api/editar-participantes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id || item.codigo, participantes: novosNomes })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          fetchTheChosenInscricoes();
+        } else {
+          alert(data.message || 'Erro ao salvar participantes.');
+        }
+      } catch (err) {
+        console.error('Erro ao editar participantes:', err);
+        alert('Erro de conexão ao salvar participantes.');
+      }
     }
 
     async function alterarStatusPresenca(id, novoStatus) {

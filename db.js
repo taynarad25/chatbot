@@ -131,9 +131,19 @@ db.exec(`
     criadoEm TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    role TEXT NOT NULL,
+    status TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    expiresAt INTEGER NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_descricoes_evento ON descricoes_eventos(evento);
   CREATE INDEX IF NOT EXISTS idx_tc_telefone ON the_chosen_inscricoes(telefone);
   CREATE INDEX IF NOT EXISTS idx_tc_codigo ON the_chosen_inscricoes(codigo);
+  CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expiresAt);
 `);
 
 try {

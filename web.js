@@ -32,6 +32,9 @@ const MINISTERIOS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "mini
 const LIDERANCA_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "lideranca.html"))
   ? path.join(__dirname, "public", "lideranca.html")
   : path.join(__dirname, "web", "public", "lideranca.html");
+const QUEMSOMOS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "quemsomos.html"))
+  ? path.join(__dirname, "public", "quemsomos.html")
+  : path.join(__dirname, "web", "public", "quemsomos.html");
 const THE_CHOSEN_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "the-chosen.html"))
   ? path.join(__dirname, "public", "the-chosen.html")
   : path.join(__dirname, "web", "public", "the-chosen.html");
@@ -277,6 +280,26 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
       }
 
+      // Rota /quemsomos (e variações): Nossa Identidade, Missão, Visão e Valores
+      if (req.method === 'GET' && (
+        pathname === '/quemsomos' || pathname === '/quemsomos/' || pathname === '/quemsomos.html' ||
+        pathname === '/quem-somos' || pathname === '/quem-somos/' || pathname === '/quem-somos.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "quemsomos.html"))
+          ? path.join(__dirname, "public", "quemsomos.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "quemsomos.html")) ? path.join(__dirname, "web", "public", "quemsomos.html") : QUEMSOMOS_HTML_FILE);
+        if (fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
+          });
+          return res.end(content);
+        }
+      }
+
       // Rota /the-chosen (e variações como /thechosen): Inscrição exclusiva para a Pré-estreia The Chosen
       if (req.method === 'GET' && (
         pathname === '/the-chosen' || pathname === '/the-chosen/' || pathname === '/the-chosen.html' ||
@@ -407,6 +430,25 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           return sendJson(res, resultado.ok ? 200 : 404, resultado);
         } catch (err) {
           return sendJson(res, 500, { ok: false, message: 'Erro ao registrar status de confirmação.' });
+        }
+      }
+
+      // API: Editar nomes de participantes (Secretaria)
+      if (req.method === 'POST' && pathname === '/the-chosen/api/editar-participantes') {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          const body = await parseRequestBody(req);
+          const termo = body.id || body.codigo;
+          const participantes = body.participantes;
+          const resultado = typeof theChosen.editarParticipantesInscricao === 'function'
+            ? theChosen.editarParticipantesInscricao(termo, participantes)
+            : { ok: false, message: 'Função de edição não disponível.' };
+          return sendJson(res, resultado.ok ? 200 : 400, resultado);
+        } catch (err) {
+          console.error('[The Chosen] Erro ao editar participantes:', err.message);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao salvar participantes.' });
         }
       }
 
@@ -788,8 +830,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       }
       if (req.method === 'POST' && pathname === '/secretaria/logout') {
         const sessionId = getSessionId(req);
-        if (sessionId) delete sessions[sessionId];
-        clearSessionCookie(res);
+        clearSessionCookie(res, sessionId);
         return sendJson(res, 200, { ok: true });
       }
       // Rota não encontrada

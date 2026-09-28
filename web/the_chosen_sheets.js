@@ -306,6 +306,10 @@ async function enviarParaGoogleAppsScript(inscricao) {
 
   const titular = inscricao.titular || (Array.isArray(inscricao.participantes) && inscricao.participantes[0]) || inscricao.nome || '';
   const dataHora = inscricao.dataHora || moment().tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
+  const participantesFormatados = Array.isArray(inscricao.participantes)
+    ? inscricao.participantes.join(', ')
+    : String(inscricao.participantes || titular || '');
+
   const payload = {
     dataHora,
     codigo: inscricao.codigo || '',
@@ -313,7 +317,8 @@ async function enviarParaGoogleAppsScript(inscricao) {
     telefone: inscricao.telefone ? String(inscricao.telefone) : '',
     email: inscricao.email || '',
     quantidade: Number(inscricao.quantidade) || 1,
-    situacao: inscricao.situacao || 'Confirmado'
+    situacao: inscricao.situacao || 'Confirmado',
+    participantes: participantesFormatados
   };
 
   try {
