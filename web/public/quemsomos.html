@@ -395,52 +395,81 @@
             margin: 0;
         }
 
-        /* 4. Missão, Visão e Valores com Seletor Interativo */
-        #quemsomos-page .mvv-filtros {
+        /* 4. Missão, Visão e Valores com Navegação Interativa Moderna */
+        #quemsomos-page .mvv-filtros-wrapper {
             display: flex;
             justify-content: center;
-            gap: 10px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
+            margin-bottom: 36px;
+        }
+
+        #quemsomos-page .mvv-filtros {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            padding: 6px;
+            display: inline-flex;
+            gap: 6px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            max-width: 100%;
+            overflow-x: auto;
         }
 
         #quemsomos-page .mvv-filtro-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #cbd5e1;
-            padding: 8px 18px;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 10px 22px;
             border-radius: 999px;
-            font-size: 0.88rem;
+            font-size: 0.9rem;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.25s ease;
+            transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
         }
 
-        #quemsomos-page .mvv-filtro-btn:hover,
+        #quemsomos-page .mvv-filtro-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
         #quemsomos-page .mvv-filtro-btn.active {
             background: linear-gradient(135deg, var(--cor-roxo), var(--cor-azul));
             color: #ffffff;
-            border-color: transparent;
-            box-shadow: 0 4px 16px rgba(0, 183, 217, 0.35);
-            transform: translateY(-2px);
+            box-shadow: 0 4px 18px rgba(0, 183, 217, 0.4);
+            transform: translateY(-1px);
         }
 
         #quemsomos-page .mvv-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 26px;
+            gap: 28px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #quemsomos-page .mvv-grid.spotlight-active {
+            grid-template-columns: 1fr;
+            max-width: 860px;
+            margin: 0 auto;
         }
 
         #quemsomos-page .mvv-card {
-            background: #14141c;
-            border-radius: 22px;
-            padding: 36px 28px;
+            background: rgba(20, 20, 28, 0.85);
+            border-radius: 24px;
+            padding: 38px 30px;
             border: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             flex-direction: column;
             transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             position: relative;
             overflow: hidden;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            cursor: pointer;
         }
 
         #quemsomos-page .mvv-card::before {
@@ -450,32 +479,84 @@
             left: 0;
             right: 0;
             height: 4px;
+            transition: height 0.25s ease;
         }
 
-        #quemsomos-page .mvv-card.missao::before { background: linear-gradient(90deg, var(--cor-roxo), #a855f7); }
-        #quemsomos-page .mvv-card.visao::before { background: linear-gradient(90deg, var(--cor-azul), #38bdf8); }
-        #quemsomos-page .mvv-card.valores::before { background: linear-gradient(90deg, var(--cor-laranja), var(--cor-rosa)); }
+        #quemsomos-page .mvv-card.missao::before { background: linear-gradient(90deg, #7A2BE2, #c084fc); }
+        #quemsomos-page .mvv-card.visao::before { background: linear-gradient(90deg, #00B7D9, #38bdf8); }
+        #quemsomos-page .mvv-card.valores::before { background: linear-gradient(90deg, #FF6A00, #D63384); }
 
-        #quemsomos-page .mvv-card:hover,
-        #quemsomos-page .mvv-card.focado {
+        #quemsomos-page .mvv-card:hover {
             transform: translateY(-6px);
-            border-color: rgba(255, 255, 255, 0.25);
-            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55), 0 0 25px rgba(122, 43, 226, 0.15);
+            border-color: rgba(255, 255, 255, 0.22);
+            box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55), 0 0 28px rgba(0, 183, 217, 0.12);
         }
 
-        #quemsomos-page .mvv-card.esmaecido {
-            opacity: 0.45;
-            transform: scale(0.98);
+        #quemsomos-page .mvv-card.active-spotlight {
+            border-color: rgba(0, 183, 217, 0.45);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 35px rgba(122, 43, 226, 0.22);
+            transform: translateY(-2px);
         }
 
-        #quemsomos-page .mvv-icon {
-            font-size: 2.4rem;
-            margin-bottom: 16px;
-            display: inline-block;
+        #quemsomos-page .mvv-card.active-spotlight::before {
+            height: 6px;
         }
+
+        #quemsomos-page .mvv-card.is-hidden {
+            display: none !important;
+        }
+
+        #quemsomos-page .mvv-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+        }
+
+        #quemsomos-page .mvv-icon-badge {
+            width: 58px;
+            height: 58px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #quemsomos-page .mvv-card.missao .mvv-icon-badge {
+            background: radial-gradient(circle, rgba(122, 43, 226, 0.25) 0%, rgba(20, 20, 28, 0.6) 100%);
+            border-color: rgba(122, 43, 226, 0.35);
+        }
+
+        #quemsomos-page .mvv-card.visao .mvv-icon-badge {
+            background: radial-gradient(circle, rgba(0, 183, 217, 0.25) 0%, rgba(20, 20, 28, 0.6) 100%);
+            border-color: rgba(0, 183, 217, 0.35);
+        }
+
+        #quemsomos-page .mvv-card.valores .mvv-icon-badge {
+            background: radial-gradient(circle, rgba(255, 106, 0, 0.25) 0%, rgba(20, 20, 28, 0.6) 100%);
+            border-color: rgba(255, 106, 0, 0.35);
+        }
+
+        #quemsomos-page .mvv-badge {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        #quemsomos-page .mvv-card.missao .mvv-badge { color: #c084fc; border-color: rgba(192, 132, 252, 0.3); }
+        #quemsomos-page .mvv-card.visao .mvv-badge { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); }
+        #quemsomos-page .mvv-card.valores .mvv-badge { color: #fb923c; border-color: rgba(251, 146, 60, 0.3); }
 
         #quemsomos-page .mvv-titulo {
-            font-size: 1.55rem;
+            font-size: 1.65rem;
             font-weight: 800;
             color: #ffffff;
             margin: 0 0 14px;
@@ -484,44 +565,65 @@
 
         #quemsomos-page .mvv-texto {
             color: #cbd5e1;
-            font-size: 1rem;
+            font-size: 1.02rem;
             line-height: 1.7;
-            margin: 0 0 16px;
-            flex-grow: 1;
+            margin: 0 0 22px;
         }
 
-        #quemsomos-page .mvv-versiculo {
-            background: rgba(255, 255, 255, 0.04);
-            border-left: 3px solid var(--cor-azul);
+        #quemsomos-page .mvv-destaques-lista {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: auto;
+            padding-top: 18px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        #quemsomos-page .mvv-destaque-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
             padding: 10px 14px;
-            border-radius: 0 10px 10px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
             font-size: 0.88rem;
-            font-weight: 700;
-            color: #38bdf8;
-            margin-top: 10px;
-        }
-
-        #quemsomos-page .valores-lista {
-            list-style: none;
-            padding: 0;
-            margin: 10px 0 0;
-        }
-
-        #quemsomos-page .valores-lista li {
-            position: relative;
-            padding-left: 26px;
-            margin-bottom: 12px;
             color: #e2e8f0;
-            font-size: 0.98rem;
             line-height: 1.5;
+            transition: all 0.2s ease;
         }
 
-        #quemsomos-page .valores-lista li::before {
-            content: '✓';
-            position: absolute;
-            left: 0;
-            color: #f97316;
-            font-weight: 800;
+        #quemsomos-page .mvv-destaque-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        #quemsomos-page .mvv-destaque-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        #quemsomos-page .mvv-destaque-item strong {
+            color: #ffffff;
+        }
+
+        #quemsomos-page .mvv-card-footer {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--cor-azul);
+            gap: 4px;
+            opacity: 0.85;
+            transition: all 0.2s ease;
+        }
+
+        #quemsomos-page .mvv-card:hover .mvv-card-footer {
+            opacity: 1;
+            transform: translateX(4px);
         }
 
         /* 5. 4 Colunas com Interatividade Expansível ("Descubra na Prática") */
@@ -628,22 +730,10 @@
             display: block;
         }
 
-        #quemsomos-page .coluna-versiculo-box {
-            background: rgba(0, 0, 0, 0.35);
-            padding: 8px 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            color: #e2e8f0;
-            border-left: 2px solid var(--cor-azul);
-            font-style: italic;
-            font-size: 0.82rem;
-            line-height: 1.5;
-        }
-
         #quemsomos-page .coluna-pratica-box {
             color: #cbd5e1;
             line-height: 1.5;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         #quemsomos-page .coluna-link-acao {
@@ -653,110 +743,16 @@
             color: var(--cor-azul);
             font-weight: 700;
             text-decoration: none;
-            font-size: 0.8rem;
+            font-size: 0.82rem;
+            transition: all 0.2s ease;
         }
 
         #quemsomos-page .coluna-link-acao:hover {
-            text-decoration: underline;
-        }
-
-        /* 6. Widget Interativo: Palavra / Promessa Bíblica do Dia */
-        #quemsomos-page .widget-promessa-card {
-            background: radial-gradient(circle at 80% 20%, rgba(122, 43, 226, 0.22) 0%, rgba(20, 20, 28, 0.95) 100%);
-            border: 1px solid rgba(122, 43, 226, 0.35);
-            border-radius: 24px;
-            padding: 40px 32px;
-            text-align: center;
-            margin-top: 60px;
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
-            position: relative;
-            overflow: hidden;
-        }
-
-        #quemsomos-page .widget-promessa-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(234, 179, 8, 0.15);
-            color: #facc15;
-            border: 1px solid rgba(234, 179, 8, 0.35);
-            padding: 4px 14px;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 16px;
-        }
-
-        #quemsomos-page .widget-versiculo-texto {
-            font-size: 1.35rem;
-            font-weight: 700;
             color: #ffffff;
-            margin: 0 auto 12px;
-            max-width: 780px;
-            line-height: 1.5;
-            font-style: italic;
-            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: translateX(3px);
         }
 
-        #quemsomos-page .widget-versiculo-ref {
-            font-size: 1rem;
-            font-weight: 800;
-            color: var(--cor-azul);
-            margin-bottom: 24px;
-            display: block;
-        }
-
-        #quemsomos-page .widget-promessa-botoes {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        #quemsomos-page .btn-nova-promessa {
-            background: linear-gradient(135deg, var(--cor-roxo), #a855f7);
-            color: #ffffff;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 0.92rem;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 16px rgba(122, 43, 226, 0.4);
-            transition: all 0.2s ease;
-        }
-
-        #quemsomos-page .btn-nova-promessa:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(122, 43, 226, 0.6);
-            filter: brightness(1.1);
-        }
-
-        #quemsomos-page .btn-copiar-promessa {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            color: #ffffff;
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 0.92rem;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-        }
-
-        #quemsomos-page .btn-copiar-promessa:hover {
-            background: rgba(255, 255, 255, 0.16);
-        }
-
-        /* 7. Atalhos para Liderança e Ministérios */
+        /* 6. Atalhos para Liderança e Ministérios */
         #quemsomos-page .atalhos-section {
             background: #0f0f15;
             border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -953,52 +949,117 @@
             <div class="section-header">
                 <span class="section-tag tag-laranja">Nossa Bússola</span>
                 <h2 class="section-title">Missão, Visão & Valores</h2>
-                <p class="section-desc">Os princípios inegociáveis que norteiam cada decisão, ensino e passo do nosso ministério.</p>
+                <p class="section-desc">Os pilares e princípios que norteiam cada decisão, ensino e relacionamento do nosso ministério.</p>
             </div>
 
-            <!-- Seletor Interativo para Focar no Card Desejado -->
-            <div class="mvv-filtros">
-                <button type="button" class="mvv-filtro-btn active" onclick="filtrarMvv('todos', this)">✨ Ver Todos</button>
-                <button type="button" class="mvv-filtro-btn" onclick="filtrarMvv('missao', this)">🎯 Missão</button>
-                <button type="button" class="mvv-filtro-btn" onclick="filtrarMvv('visao', this)">👁️ Visão</button>
-                <button type="button" class="mvv-filtro-btn" onclick="filtrarMvv('valores', this)">💎 Valores</button>
+            <!-- Seletor Interativo Moderno com Segmented Control -->
+            <div class="mvv-filtros-wrapper">
+                <div class="mvv-filtros" role="tablist" aria-label="Navegação de Missão, Visão e Valores">
+                    <button type="button" class="mvv-filtro-btn active" id="btn-filtro-todos" onclick="selecionarMvv('todos', this)" role="tab" aria-selected="true">
+                        <span>✨</span> Ver Todos
+                    </button>
+                    <button type="button" class="mvv-filtro-btn" id="btn-filtro-missao" onclick="selecionarMvv('missao', this)" role="tab" aria-selected="false">
+                        <span>🎯</span> Missão
+                    </button>
+                    <button type="button" class="mvv-filtro-btn" id="btn-filtro-visao" onclick="selecionarMvv('visao', this)" role="tab" aria-selected="false">
+                        <span>👁️</span> Visão
+                    </button>
+                    <button type="button" class="mvv-filtro-btn" id="btn-filtro-valores" onclick="selecionarMvv('valores', this)" role="tab" aria-selected="false">
+                        <span>💎</span> Valores
+                    </button>
+                </div>
             </div>
 
-            <div class="mvv-grid">
-                <!-- Missão -->
-                <div class="mvv-card missao interactive-card" id="card-missao">
-                    <span class="mvv-icon">🎯</span>
+            <div class="mvv-grid" id="mvvGrid">
+                <!-- Card 1: Missão -->
+                <div class="mvv-card missao interactive-card" id="card-missao" onclick="focarCardDireto('missao')">
+                    <div class="mvv-card-header">
+                        <div class="mvv-icon-badge">🎯</div>
+                        <span class="mvv-badge">Propósito Central</span>
+                    </div>
                     <h3 class="mvv-titulo">Missão</h3>
                     <p class="mvv-texto">
                         Advertir, ensinar e influenciar cada pessoa a ser parecida com Cristo, conhecendo-o e tornando conhecido.
                     </p>
+                    <div class="mvv-destaques-lista">
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">🌟</span>
+                            <div><strong>Influência Positiva:</strong> Refletir o caráter de Cristo com verdade e integridade em cada ambiente.</div>
+                        </div>
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">📚</span>
+                            <div><strong>Ensino Bíblico:</strong> Promover crescimento espiritual com profundidade, clareza e aplicação prática.</div>
+                        </div>
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">🤝</span>
+                            <div><strong>Vida em Comunidade:</strong> Conectar pessoas em relacionamentos saudáveis e edificantes.</div>
+                        </div>
+                    </div>
+                    <div class="mvv-card-footer">
+                        <span class="mvv-footer-texto">Focar neste pilar ➔</span>
+                    </div>
                 </div>
 
-                <!-- Visão -->
-                <div class="mvv-card visao interactive-card" id="card-visao">
-                    <span class="mvv-icon">👁️</span>
+                <!-- Card 2: Visão -->
+                <div class="mvv-card visao interactive-card" id="card-visao" onclick="focarCardDireto('visao')">
+                    <div class="mvv-card-header">
+                        <div class="mvv-icon-badge">👁️</div>
+                        <span class="mvv-badge">Direção & Futuro</span>
+                    </div>
                     <h3 class="mvv-titulo">Visão</h3>
                     <p class="mvv-texto">
                         Ser uma igreja acolhedora e relevante na comunidade, comprometida com os valores do reino de Deus e com a transformação integral do ser humano (social, emocional e espiritual).
                     </p>
-                    <div class="mvv-versiculo">
-                        📖 Colossenses 1:28-29
+                    <div class="mvv-destaques-lista">
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">🏡</span>
+                            <div><strong>Acolhimento Comunitário:</strong> Espaço aberto e receptivo onde toda pessoa é ouvida e cuidada com amor.</div>
+                        </div>
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">🏙️</span>
+                            <div><strong>Relevância Social:</strong> Impacto real e compassivo na comunidade local e na cidade de Itapevi.</div>
+                        </div>
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">🌿</span>
+                            <div><strong>Transformação Integral:</strong> Desenvolvimento harmonioso do ser humano nas dimensões emocional, social e espiritual.</div>
+                        </div>
+                    </div>
+                    <div class="mvv-card-footer">
+                        <span class="mvv-footer-texto">Focar neste pilar ➔</span>
                     </div>
                 </div>
 
-                <!-- Valores -->
-                <div class="mvv-card valores interactive-card" id="card-valores">
-                    <span class="mvv-icon">💎</span>
+                <!-- Card 3: Valores -->
+                <div class="mvv-card valores interactive-card" id="card-valores" onclick="focarCardDireto('valores')">
+                    <div class="mvv-card-header">
+                        <div class="mvv-icon-badge">💎</div>
+                        <span class="mvv-badge">Pilares Inegociáveis</span>
+                    </div>
                     <h3 class="mvv-titulo">Valores</h3>
-                    <p class="mvv-texto" style="margin-bottom: 8px;">
-                        <strong>Cremos:</strong>
+                    <p class="mvv-texto">
+                        Princípios inegociáveis que norteiam nossas escolhas diárias, relacionamentos e ministério:
                     </p>
-                    <ul class="valores-lista">
-                        <li>Nos princípios da palavra;</li>
-                        <li>No comprometimento com Deus e as pessoas;</li>
-                        <li>Na hospitalidade;</li>
-                        <li>Na honra e na fé.</li>
-                    </ul>
+                    <div class="mvv-destaques-lista">
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">📜</span>
+                            <div><strong>Princípios da Palavra:</strong> Nossa base firme de verdade, sabedoria e instrução ética.</div>
+                        </div>
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">🤍</span>
+                            <div><strong>Comprometimento com Deus e Pessoas:</strong> Fidelidade ao propósito e amor genuíno ao próximo.</div>
+                        </div>
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">☕</span>
+                            <div><strong>Hospitalidade:</strong> Braços abertos, mesa farta e acolhimento caloroso a cada visitante.</div>
+                        </div>
+                        <div class="mvv-destaque-item">
+                            <span class="mvv-destaque-icon">🛡️</span>
+                            <div><strong>Honra e Fé:</strong> Respeito mútuo sincero e confiança convicta no mover de Deus.</div>
+                        </div>
+                    </div>
+                    <div class="mvv-card-footer">
+                        <span class="mvv-footer-texto">Focar neste pilar ➔</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1027,9 +1088,6 @@
                         <span class="arrow-coluna">▾</span>
                     </button>
                     <div class="coluna-painel-expandido">
-                        <div class="coluna-versiculo-box">
-                            "Vinde a mim, todos os que estais cansados e oprimidos, e eu vos aliviarei." — Mt 11:28
-                        </div>
                         <div class="coluna-pratica-box">
                             Equipe calorosa de boas-vindas todos os domingos às 18h e atendimento pastoral acolhedor.
                         </div>
@@ -1050,9 +1108,6 @@
                         <span class="arrow-coluna">▾</span>
                     </button>
                     <div class="coluna-painel-expandido">
-                        <div class="coluna-versiculo-box">
-                            "Dele todo o corpo, bem ajustado e unido pelo auxílio de todas as juntas, cresce e se edifica em amor." — Ef 4:16
-                        </div>
                         <div class="coluna-pratica-box">
                             Células nos lares, grupos de conexão e curso de integração para novos membros.
                         </div>
@@ -1073,9 +1128,6 @@
                         <span class="arrow-coluna">▾</span>
                     </button>
                     <div class="coluna-painel-expandido">
-                        <div class="coluna-versiculo-box">
-                            "Cada um exerça o dom que recebeu na edificação dos outros, como fiéis despenseiros." — 1Pe 4:10
-                        </div>
                         <div class="coluna-pratica-box">
                             Mais de 10 ministérios ativos (Artes, Louvor, Crianças, Jovens, Diaconia, Ação Social).
                         </div>
@@ -1096,32 +1148,11 @@
                         <span class="arrow-coluna">▾</span>
                     </button>
                     <div class="coluna-painel-expandido">
-                        <div class="coluna-versiculo-box">
-                            "Oh! Quão bom e quão suave é que os irmãos vivam em união!" — Sl 133:1
-                        </div>
                         <div class="coluna-pratica-box">
                             Pastoreio próximo, celebrações em família e amizades que caminham juntas pela vida.
                         </div>
                         <a href="/lideranca" class="coluna-link-acao">Conhecer a Liderança ➔</a>
                     </div>
-                </div>
-            </div>
-
-            <!-- Widget Interativo: Palavra do Dia para o Visitante -->
-            <div class="widget-promessa-card">
-                <span class="widget-promessa-badge">✨ Palavra Inspiradora para o Seu Coração</span>
-                <p class="widget-versiculo-texto" id="textoPromessa">
-                    "Porque sou eu que conheço os planos que tenho para vocês, diz o Senhor, planos de fazê-los prosperar e não de lhes causar dano, planos de dar-lhes esperança e um futuro."
-                </p>
-                <span class="widget-versiculo-ref" id="refPromessa">Jeremias 29:11</span>
-                
-                <div class="widget-promessa-botoes">
-                    <button type="button" class="btn-nova-promessa" onclick="sortearNovaPromessa()">
-                        <span>🎲</span> Sortear Nova Palavra
-                    </button>
-                    <button type="button" class="btn-copiar-promessa" id="btnCopiarPromessa" onclick="copiarPalavra()">
-                        <span>📋</span> Copiar Mensagem
-                    </button>
                 </div>
             </div>
         </div>
@@ -1187,91 +1218,61 @@
             }
         }
 
-        // 2. Filtro / Foco da Bússola (Missão, Visão e Valores)
-        function filtrarMvv(tipo, btn) {
-            document.querySelectorAll('.mvv-filtro-btn').forEach(b => b.classList.remove('active'));
-            if (btn) btn.classList.add('active');
+        // 2. Filtro e Interação Dinâmica de Missão, Visão e Valores
+        let filtroMvvAtual = 'todos';
 
+        function selecionarMvv(tipo, btn) {
+            filtroMvvAtual = tipo;
+            document.querySelectorAll('.mvv-filtro-btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
+            if (btn) {
+                btn.classList.add('active');
+                btn.setAttribute('aria-selected', 'true');
+            }
+
+            const grid = document.getElementById('mvvGrid');
             const cardMissao = document.getElementById('card-missao');
             const cardVisao = document.getElementById('card-visao');
             const cardValores = document.getElementById('card-valores');
+            const cards = [cardMissao, cardVisao, cardValores];
 
-            [cardMissao, cardVisao, cardValores].forEach(c => {
-                if (!c) return;
-                c.classList.remove('focado', 'esmaecido');
-            });
-
-            if (tipo === 'missao') {
-                cardMissao.classList.add('focado');
-                cardVisao.classList.add('esmaecido');
-                cardValores.classList.add('esmaecido');
-            } else if (tipo === 'visao') {
-                cardVisao.classList.add('focado');
-                cardMissao.classList.add('esmaecido');
-                cardValores.classList.add('esmaecido');
-            } else if (tipo === 'valores') {
-                cardValores.classList.add('focado');
-                cardMissao.classList.add('esmaecido');
-                cardVisao.classList.add('esmaecido');
+            if (tipo === 'todos') {
+                if (grid) grid.classList.remove('spotlight-active');
+                cards.forEach(c => {
+                    if (!c) return;
+                    c.classList.remove('is-hidden', 'active-spotlight');
+                    const footerTxt = c.querySelector('.mvv-footer-texto');
+                    if (footerTxt) footerTxt.textContent = 'Focar neste pilar ➔';
+                });
+            } else {
+                if (grid) grid.classList.add('spotlight-active');
+                cards.forEach(c => {
+                    if (!c) return;
+                    const ehAlvo = c.id === `card-${tipo}`;
+                    if (ehAlvo) {
+                        c.classList.remove('is-hidden');
+                        c.classList.add('active-spotlight');
+                        const footerTxt = c.querySelector('.mvv-footer-texto');
+                        if (footerTxt) footerTxt.textContent = '← Ver todos os pilares';
+                    } else {
+                        c.classList.add('is-hidden');
+                        c.classList.remove('active-spotlight');
+                    }
+                });
             }
         }
 
-        // 3. Widget Interativo de Promessas Bíblicas
-        const promessas = [
-            { texto: '"Porque sou eu que conheço os planos que tenho para vocês, diz o Senhor, planos de fazê-los prosperar e não de lhes causar dano, planos de dar-lhes esperança e um futuro."', ref: 'Jeremias 29:11' },
-            { texto: '"O Senhor é o meu pastor; de nada terei falta. Em verdes pastagens me faz repousar e me conduz a águas tranquilas."', ref: 'Salmos 23:1-2' },
-            { texto: '"Tudo posso naquele que me fortalece."', ref: 'Filipenses 4:13' },
-            { texto: '"Não temas, porque eu sou contigo; não te assombres, porque eu sou o teu Deus; eu te fortaleço, e te ajudo, e te sustento com a destra da minha justiça."', ref: 'Isaías 41:10' },
-            { texto: '"Sabemos que Deus age em todas as coisas para o bem daqueles que o amam, dos que foram chamados de acordo com o seu propósito."', ref: 'Romanos 8:28' },
-            { texto: '"O Senhor te abençoe e te guarde; o Senhor faça resplandecer o seu rosto sobre ti e te conceda a paz."', ref: 'Números 6:24-26' },
-            { texto: '"Venham a mim, todos os que estão cansados e sobrecarregados, e eu darei descanso a vocês."', ref: 'Mateus 11:28' },
-            { texto: '"Se Deus é por nós, quem será contra nós?"', ref: 'Romanos 8:31' }
-        ];
-
-        let promessaAtualIdx = 0;
-        function sortearNovaPromessa() {
-            let novoIdx = Math.floor(Math.random() * promessas.length);
-            if (novoIdx === promessaAtualIdx) {
-                novoIdx = (novoIdx + 1) % promessas.length;
+        function focarCardDireto(tipo) {
+            if (filtroMvvAtual === tipo) {
+                // Se já estiver focado neste card, reverte para 'todos'
+                const btnTodos = document.getElementById('btn-filtro-todos');
+                selecionarMvv('todos', btnTodos);
+                return;
             }
-            promessaAtualIdx = novoIdx;
-            const p = promessas[promessaAtualIdx];
-
-            const txtEl = document.getElementById('textoPromessa');
-            const refEl = document.getElementById('refPromessa');
-
-            if (txtEl && refEl) {
-                txtEl.style.opacity = '0';
-                txtEl.style.transform = 'translateY(6px)';
-                setTimeout(() => {
-                    txtEl.textContent = p.texto;
-                    refEl.textContent = p.ref;
-                    txtEl.style.opacity = '1';
-                    txtEl.style.transform = 'translateY(0)';
-                }, 200);
-            }
-        }
-
-        function copiarPalavra() {
-            const txtEl = document.getElementById('textoPromessa');
-            const refEl = document.getElementById('refPromessa');
-            const btn = document.getElementById('btnCopiarPromessa');
-            if (!txtEl || !refEl) return;
-
-            const mensagem = txtEl.textContent + ' — ' + refEl.textContent + ' (Comunidade Cristã Curados)';
-            navigator.clipboard.writeText(mensagem).then(() => {
-                if (btn) {
-                    const original = btn.innerHTML;
-                    btn.innerHTML = '<span>✓</span> Copiado com sucesso!';
-                    btn.style.color = '#86efac';
-                    setTimeout(() => {
-                        btn.innerHTML = original;
-                        btn.style.color = '#ffffff';
-                    }, 3000);
-                }
-            }).catch(() => {
-                alert(mensagem);
-            });
+            const btnAlvo = document.getElementById(`btn-filtro-${tipo}`);
+            selecionarMvv(tipo, btnAlvo);
         }
 
         // 4. Micro-Interação: 3D Tilt sutil nos cards

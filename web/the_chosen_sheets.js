@@ -171,20 +171,21 @@ const CABECALHOS_PADRAO = [
   'Quantidade de Ingressos',
   'Data/Hora',
   'Código',
-  'Participantes'
+  'Situação',
+  'Participantes Extras'
 ];
 
 async function garantirCabecalhoPlanilha(sheets, spreadsheetId, tabName) {
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${tabName}!A1:G1`,
+      range: `${tabName}!A1:H1`,
     });
     const rows = res.data.values;
     if (!rows || rows.length === 0 || !rows[0] || rows[0].length === 0) {
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${tabName}!A1:G1`,
+        range: `${tabName}!A1:H1`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: [CABECALHOS_PADRAO] },
       });
@@ -289,8 +290,77 @@ async function puxarInscricoesDoGoogleAppsScript() {
     }
 
     const lista = Array.isArray(data) ? data : (Array.isArray(data.inscricoes) ? data.inscricoes : []);
-    console.log(`[Google Apps Script] ${lista.length} inscrições carregadas com sucesso da planilha via doGet.`);
-    return { ok: true, inscricoes: lista };
+
+    // Normalização das inscrições lidas do Google Sheets (doGet)
+    // Junta o nome do titular com os nomes separados por ';' da coluna H
+    const normalizadas = lista.map(item => {
+      const titular = item.nome || item.titular || '';
+      const quantidade = Number(item.quantidade) || 1;
+
+      // Extrai os dados da Coluna H (participantes extras)
+      let extrasStr = '';
+      if (Array.isArray(item) && item.length >= 8) {
+        extrasStr = String(item[7] || '').trim();
+      } else {
+        const candidatos = [
+          item.participantesExtras,
+          item.extras,
+          item.acompanhantes,
+          item.colunaH,
+          item['coluna_h'],
+          item['coluna H'],
+          item['participantes_extras'],
+          item['Participantes Extras'],
+          item['Acompanhantes']
+        ];
+        for (const c of candidatos) {
+          if (typeof c === 'string' && c.trim()) {
+            extrasStr = c.trim();
+            break;
+          } else if (Array.isArray(c) && c.length > 0) {
+            extrasStr = c.join('; ');
+            break;
+          }
+        }
+      }
+
+      if (!extrasStr && typeof item.participantes === 'string' && item.participantes.includes(';')) {
+        extrasStr = item.participantes;
+      }
+
+      let participantes = [];
+      if (extrasStr) {
+        const extras = extrasStr.split(';').map(s => s.trim()).filter(Boolean);
+        if (extras.length > 0 && titular && extras[0].toLowerCase() === titular.toLowerCase()) {
+          participantes = extras;
+        } else if (titular) {
+          participantes = [titular, ...extras];
+        } else {
+          participantes = extras;
+        }
+      } else if (quantidade === 1) {
+        participantes = titular ? [titular] : ['Participante'];
+      } else if (Array.isArray(item.participantes) && item.participantes.length > 0) {
+        participantes = item.participantes.map(p => String(p || '').trim()).filter(Boolean);
+      } else if (typeof item.participantes === 'string' && item.participantes.trim()) {
+        participantes = item.participantes.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+      } else if (titular) {
+        participantes = [titular];
+      }
+
+      return {
+        ...item,
+        titular,
+        quantidade,
+        participantes,
+        participantesExtras: extrasStr,
+        extras: extrasStr,
+        colunaH: extrasStr
+      };
+    });
+
+    console.log(`[Google Apps Script] ${normalizadas.length} inscrições carregadas com sucesso da planilha via doGet.`);
+    return { ok: true, inscricoes: normalizadas };
   } catch (err) {
     console.error('[Google Apps Script] Erro de rede ao buscar inscrições da planilha:', err.message);
     return { ok: false, error: err.message, inscricoes: [] };
@@ -306,9 +376,28 @@ async function enviarParaGoogleAppsScript(inscricao) {
 
   const titular = inscricao.titular || (Array.isArray(inscricao.participantes) && inscricao.participantes[0]) || inscricao.nome || '';
   const dataHora = inscricao.dataHora || moment().tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
-  const participantesFormatados = Array.isArray(inscricao.participantes)
-    ? inscricao.participantes.join(', ')
-    : String(inscricao.participantes || titular || '');
+  const quantidade = Number(inscricao.quantidade) || 1;
+
+  let listaParticipantes = [];
+  if (Array.isArray(inscricao.participantes)) {
+    listaParticipantes = inscricao.participantes.map(p => String(p || '').trim()).filter(Boolean);
+  } else if (typeof inscricao.participantes === 'string' && inscricao.participantes.trim()) {
+    listaParticipantes = inscricao.participantes.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+  }
+  if (listaParticipantes.length === 0 && titular) {
+    listaParticipantes = [titular];
+  }
+
+  // Regra do Titular:
+  // Se a quantidade for 1 (apenas o titular), o campo de participantes extras deve ficar completamente em branco.
+  // Caso haja mais de 1 participante, os extras devem ser enviados na mesma célula, separados por ponto e vírgula (;).
+  let participantesExtras = '';
+  if (quantidade > 1) {
+    const extras = listaParticipantes.slice(1);
+    if (extras.length > 0) {
+      participantesExtras = extras.join('; ');
+    }
+  }
 
   const payload = {
     dataHora,
@@ -316,9 +405,13 @@ async function enviarParaGoogleAppsScript(inscricao) {
     nome: titular,
     telefone: inscricao.telefone ? String(inscricao.telefone) : '',
     email: inscricao.email || '',
-    quantidade: Number(inscricao.quantidade) || 1,
+    quantidade,
     situacao: inscricao.situacao || 'Confirmado',
-    participantes: participantesFormatados
+    participantes: listaParticipantes.join(', '),
+    participantesExtras,
+    extras: participantesExtras,
+    acompanhantes: participantesExtras,
+    colunaH: participantesExtras
   };
 
   try {
@@ -358,7 +451,7 @@ async function obterTotalIngressosPlanilha(forceRefresh = false) {
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${tabName}!A:G`,
+      range: `${tabName}!A:H`,
     });
 
     const rows = res.data.values || [];
@@ -470,9 +563,28 @@ async function adicionarInscricaoPlanilha(inscricao) {
   const telefone = inscricao.telefone ? String(inscricao.telefone).replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') : '';
   const email = inscricao.email || '';
   const dataHora = moment().tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
-  const participantes = Array.isArray(inscricao.participantes)
-    ? inscricao.participantes.join(', ')
-    : String(inscricao.participantes || '');
+  const situacao = inscricao.situacao || 'Confirmado';
+
+  let listaParticipantes = [];
+  if (Array.isArray(inscricao.participantes)) {
+    listaParticipantes = inscricao.participantes.map(p => String(p || '').trim()).filter(Boolean);
+  } else if (typeof inscricao.participantes === 'string' && inscricao.participantes.trim()) {
+    listaParticipantes = inscricao.participantes.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+  }
+  if (listaParticipantes.length === 0 && titular) {
+    listaParticipantes = [titular];
+  }
+
+  // Regra do Titular:
+  // Se quantidade for 1 (apenas titular), o campo de participantes extras deve ficar completamente em branco.
+  // Caso haja mais de 1 participante, os extras devem ficar na mesma célula, separados por ponto e vírgula (;).
+  let participantesExtras = '';
+  if (quantidade > 1) {
+    const extras = listaParticipantes.slice(1);
+    if (extras.length > 0) {
+      participantesExtras = extras.join('; ');
+    }
+  }
 
   const rowValues = [
     titular,
@@ -481,13 +593,14 @@ async function adicionarInscricaoPlanilha(inscricao) {
     quantidade,
     dataHora,
     codigo,
-    participantes
+    situacao,
+    participantesExtras // Coluna H
   ];
 
   try {
     const res = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${tabName}!A:G`,
+      range: `${tabName}!A:H`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: {
@@ -564,7 +677,7 @@ async function excluirInscricaoPlanilha(inscricao) {
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${tabName}!A:G`,
+      range: `${tabName}!A:H`,
     });
 
     const rows = res.data.values || [];

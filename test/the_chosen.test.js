@@ -7,7 +7,7 @@ const path = require('path');
 const TEST_DATA_FILE = path.join(__dirname, 'the_chosen_test.json');
 process.env.THE_CHOSEN_DATA_PATH = TEST_DATA_FILE;
 process.env.THE_CHOSEN_LIMITE_VAGAS = '50';
-delete process.env.APPS_SCRIPT_URL; // Desativa envio real durante testes em lote
+process.env.APPS_SCRIPT_URL = ''; // Desativa envio real durante testes em lote
 
 
 const theChosen = require('../web/the_chosen');
@@ -356,7 +356,7 @@ test('Google Sheets: adiciona linha formatada e consulta contagem com mock do Sh
         append: async ({ requestBody }) => {
           appendChamado = true;
           linhasMock.push(requestBody.values[0]);
-          return { data: { updates: { updatedRange: 'Inscrições!A2:G2' } } };
+          return { data: { updates: { updatedRange: 'Inscrições!A2:H2' } } };
         },
         update: async () => {
           return { data: {} };
@@ -388,6 +388,7 @@ test('Google Sheets: adiciona linha formatada e consulta contagem com mock do Sh
   assert.equal(linhasMock[1][0], 'Renata Alencar');
   assert.equal(linhasMock[1][3], 2);
   assert.equal(linhasMock[1][5], 'TC-TESTSHEET');
+  assert.equal(linhasMock[1][7], 'Marcos Alencar'); // Coluna H: participante extra
 
   // 3. Total atualizado na planilha
   const totalApos = await theChosenSheets.obterTotalIngressosPlanilha(true);
@@ -527,23 +528,47 @@ test('Google Sheets: enviarParaGoogleAppsScript formata payload JSON e lida com 
   };
 
   try {
-    const res = await theChosenSheets.enviarParaGoogleAppsScript({
+    process.env.APPS_SCRIPT_URL = 'https://script.google.com/macros/s/fake/exec';
+
+    // 1. Caso com mais de 1 participante: extras na Coluna H separados por ';'
+    const resMulti = await theChosenSheets.enviarParaGoogleAppsScript({
       codigo: 'TC-TESTAPP',
       titular: 'João Teste',
+      participantes: ['João Teste', 'Maria Teste', 'Pedro Teste'],
       telefone: '11999998888',
       email: 'joao@teste.com',
       quantidade: 3,
       situacao: 'Confirmado'
     });
 
-    assert.equal(res.ok, true);
+    assert.equal(resMulti.ok, true);
     assert.equal(payloadEnviado.codigo, 'TC-TESTAPP');
     assert.equal(payloadEnviado.nome, 'João Teste');
     assert.equal(payloadEnviado.quantidade, 3);
     assert.equal(payloadEnviado.situacao, 'Confirmado');
+    assert.equal(payloadEnviado.participantesExtras, 'Maria Teste; Pedro Teste');
+    assert.equal(payloadEnviado.extras, 'Maria Teste; Pedro Teste');
     assert.ok(payloadEnviado.dataHora);
+
+    // 2. Regra do Titular: se quantidade for 1 (apenas titular), campo de participantes extras deve ficar completamente em branco
+    const resSingle = await theChosenSheets.enviarParaGoogleAppsScript({
+      codigo: 'TC-SINGLE1',
+      titular: 'Ana Sozinha',
+      participantes: ['Ana Sozinha'],
+      telefone: '11988887777',
+      email: 'ana@teste.com',
+      quantidade: 1,
+      situacao: 'Confirmado'
+    });
+
+    assert.equal(resSingle.ok, true);
+    assert.equal(payloadEnviado.codigo, 'TC-SINGLE1');
+    assert.equal(payloadEnviado.quantidade, 1);
+    assert.equal(payloadEnviado.participantesExtras, '');
+    assert.equal(payloadEnviado.extras, '');
   } finally {
     global.fetch = originalFetch;
+    process.env.APPS_SCRIPT_URL = '';
   }
 });
 
@@ -578,7 +603,7 @@ test('Google Sheets: excluirInscricaoPlanilha envia payload de exclusão para Go
     assert.equal(payloadExclusao.quantidade, 2);
   } finally {
     global.fetch = originalFetch;
-    delete process.env.APPS_SCRIPT_URL;
+    process.env.APPS_SCRIPT_URL = '';
   }
 });
 
@@ -586,9 +611,9 @@ test('Google Sheets: excluirInscricaoPlanilha remove linha via Sheets API batchU
   cleanup();
   let batchUpdateParams = null;
   const linhasMock = [
-    ['Nome Completo', 'Telefone', 'E-mail', 'Quantidade de Ingressos', 'Data/Hora', 'Código', 'Participantes'],
-    ['Marcos Inicial', '11911112222', 'marcos@teste.com', 2, '24/09/2026 10:00:00', 'TC-KEEP1', 'Marcos Inicial, Outro'],
-    ['Maria Para Excluir', '11933334444', 'maria@teste.com', 3, '24/09/2026 10:05:00', 'TC-REMOVE2', 'Maria Para Excluir']
+    ['Nome Completo', 'Telefone', 'E-mail', 'Quantidade de Ingressos', 'Data/Hora', 'Código', 'Situação', 'Participantes Extras'],
+    ['Marcos Inicial', '11911112222', 'marcos@teste.com', 2, '24/09/2026 10:00:00', 'TC-KEEP1', 'Confirmado', 'Outro'],
+    ['Maria Para Excluir', '11933334444', 'maria@teste.com', 3, '24/09/2026 10:05:00', 'TC-REMOVE2', 'Confirmado', '']
   ];
 
   const mockSheets = {
@@ -628,7 +653,7 @@ test('Google Sheets: excluirInscricaoPlanilha remove linha via Sheets API batchU
   assert.equal(deleteReq.range.endIndex, 3);
 });
 
-test('Google Sheets: puxarInscricoesDoGoogleAppsScript lê resposta do doGet e formata lista', async () => {
+test('Google Sheets: puxarInscricoesDoGoogleAppsScript junta titular com nomes separados por ; da coluna H', async () => {
   const originalFetch = global.fetch;
 
   global.fetch = async (url, options) => {
@@ -639,8 +664,8 @@ test('Google Sheets: puxarInscricoesDoGoogleAppsScript lê resposta do doGet e f
         status: 'success',
         total: 2,
         inscricoes: [
-          { codigo: 'TC-NUVEM1', nome: 'Pastor Carlos', telefone: '11999990001', quantidade: 2, situacao: 'Confirmado' },
-          { codigo: 'TC-NUVEM2', nome: 'Missionária Ana', telefone: '11999990002', quantidade: 1, situacao: 'Pendente' }
+          { codigo: 'TC-NUVEM1', nome: 'Pastor Carlos', telefone: '11999990001', quantidade: 2, situacao: 'Confirmado', extras: 'Irmã Maria' },
+          { codigo: 'TC-NUVEM2', nome: 'Missionária Ana', telefone: '11999990002', quantidade: 1, situacao: 'Pendente', extras: '' }
         ]
       })
     };
@@ -653,14 +678,18 @@ test('Google Sheets: puxarInscricoesDoGoogleAppsScript lê resposta do doGet e f
     assert.equal(res.inscricoes.length, 2);
     assert.equal(res.inscricoes[0].codigo, 'TC-NUVEM1');
     assert.equal(res.inscricoes[0].nome, 'Pastor Carlos');
+    assert.deepEqual(res.inscricoes[0].participantes, ['Pastor Carlos', 'Irmã Maria']);
+
+    // Titular único: sem extras
     assert.equal(res.inscricoes[1].codigo, 'TC-NUVEM2');
+    assert.deepEqual(res.inscricoes[1].participantes, ['Missionária Ana']);
   } finally {
     global.fetch = originalFetch;
     process.env.APPS_SCRIPT_URL = '';
   }
 });
 
-test('The Chosen: sincronizarInscricoesComNuvem repopula banco de dados e backup local após restart', async () => {
+test('The Chosen: sincronizarInscricoesComNuvem junta titular com Coluna H e repopula banco de dados', async () => {
   cleanup();
   const originalFetch = global.fetch;
 
@@ -671,8 +700,8 @@ test('The Chosen: sincronizarInscricoesComNuvem repopula banco de dados e backup
       text: async () => JSON.stringify({
         status: 'success',
         inscricoes: [
-          { codigo: 'TC-RESTORE1', nome: 'Família Oliveira', telefone: '11988881234', quantidade: 3, situacao: 'Confirmado' },
-          { codigo: 'TC-RESTORE2', nome: 'Irmão Lucas', telefone: '11977771234', quantidade: 1, situacao: 'Confirmado' }
+          { codigo: 'TC-RESTORE1', nome: 'Família Oliveira', telefone: '11988881234', quantidade: 3, situacao: 'Confirmado', participantesExtras: 'Beatriz Oliveira; Caio Oliveira' },
+          { codigo: 'TC-RESTORE2', nome: 'Irmão Lucas', telefone: '11977771234', quantidade: 1, situacao: 'Confirmado', participantesExtras: '' }
         ]
       })
     };
@@ -694,7 +723,11 @@ test('The Chosen: sincronizarInscricoesComNuvem repopula banco de dados e backup
     assert.equal(restaurados[0].codigo, 'TC-RESTORE1');
     assert.equal(restaurados[0].titular, 'Família Oliveira');
     assert.equal(restaurados[0].quantidade, 3);
+    assert.deepEqual(restaurados[0].participantes, ['Família Oliveira', 'Beatriz Oliveira', 'Caio Oliveira']);
+
     assert.equal(restaurados[1].codigo, 'TC-RESTORE2');
+    assert.equal(restaurados[1].quantidade, 1);
+    assert.deepEqual(restaurados[1].participantes, ['Irmão Lucas']);
 
     // Contador de vagas reflete as 4 vagas recuperadas da planilha (50 - 4 = 46)
     const status = theChosen.obterStatusVagas();

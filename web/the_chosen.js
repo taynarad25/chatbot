@@ -706,23 +706,69 @@ async function executarSincronizacaoComNuvem() {
       const codNuvem = String(nuvem.codigo || '').trim().toUpperCase();
       const local = codNuvem ? mapaLocais.get(codNuvem) : null;
 
-      let participantes = [];
-      if (Array.isArray(nuvem.participantes) && nuvem.participantes.length > 0) {
-        participantes = nuvem.participantes;
-      } else if (typeof nuvem.participantes === 'string' && nuvem.participantes.trim()) {
-        participantes = nuvem.participantes.split(',').map(s => s.trim()).filter(Boolean);
-      } else if (local && Array.isArray(local.participantes)) {
-        participantes = local.participantes;
-      } else {
-        participantes = [nuvem.nome || nuvem.titular || 'Participante'];
-      }
+      const titular = nuvem.nome || nuvem.titular || (local ? local.titular : '') || 'Participante';
 
       let qtdNuvem = Number(nuvem.quantidade);
       if (isNaN(qtdNuvem) || qtdNuvem < 1 || qtdNuvem > 10) {
-        qtdNuvem = (local && local.quantidade <= 10) ? local.quantidade : (participantes.length || 1);
+        qtdNuvem = (local && local.quantidade <= 10) ? local.quantidade : 1;
       }
       const quantidade = qtdNuvem;
-      const titular = nuvem.nome || nuvem.titular || (local ? local.titular : participantes[0]) || 'Participante';
+
+      // Extrai participantes extras da Coluna H (separados por ';')
+      let extrasStr = '';
+      if (Array.isArray(nuvem) && nuvem.length >= 8) {
+        extrasStr = String(nuvem[7] || '').trim();
+      } else {
+        const candidatos = [
+          nuvem.participantesExtras,
+          nuvem.extras,
+          nuvem.acompanhantes,
+          nuvem.colunaH,
+          nuvem['coluna_h'],
+          nuvem['coluna H'],
+          nuvem['participantes_extras'],
+          nuvem['Participantes Extras'],
+          nuvem['Acompanhantes']
+        ];
+        for (const c of candidatos) {
+          if (typeof c === 'string' && c.trim()) {
+            extrasStr = c.trim();
+            break;
+          } else if (Array.isArray(c) && c.length > 0) {
+            extrasStr = c.join('; ');
+            break;
+          }
+        }
+      }
+
+      if (!extrasStr && typeof nuvem.participantes === 'string' && nuvem.participantes.includes(';')) {
+        extrasStr = nuvem.participantes;
+      }
+
+      let participantes = [];
+      if (extrasStr) {
+        // Junta o nome do titular com os nomes separados por ';' da coluna H
+        const extras = extrasStr.split(';').map(s => s.trim()).filter(Boolean);
+        if (extras.length > 0 && titular && extras[0].toLowerCase() === titular.toLowerCase()) {
+          participantes = extras;
+        } else if (titular) {
+          participantes = [titular, ...extras];
+        } else {
+          participantes = extras;
+        }
+      } else if (quantidade === 1) {
+        // Regra do Titular: se for 1, apenas o titular
+        participantes = [titular];
+      } else if (Array.isArray(nuvem.participantes) && nuvem.participantes.length > 0) {
+        participantes = nuvem.participantes;
+      } else if (typeof nuvem.participantes === 'string' && nuvem.participantes.trim()) {
+        participantes = nuvem.participantes.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+      } else if (local && Array.isArray(local.participantes)) {
+        participantes = local.participantes;
+      } else {
+        participantes = [titular];
+      }
+
       const telefone = nuvem.telefone || (local ? local.telefone : '');
       const email = nuvem.email || (local ? local.email : '');
       const dataHora = nuvem.dataHora || (local ? local.criadoEm : new Date().toISOString());
