@@ -140,10 +140,24 @@ db.exec(`
     expiresAt INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS lembretes_aguardando_resposta (
+    telefone TEXT PRIMARY KEY,
+    eventoId TEXT NOT NULL,
+    eventoNome TEXT NOT NULL,
+    tipoLembrete TEXT NOT NULL,
+    dataEvento TEXT,
+    horarioEvento TEXT,
+    departamento TEXT,
+    docUrl TEXT,
+    destinatarioNome TEXT,
+    criadoEm TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_descricoes_evento ON descricoes_eventos(evento);
   CREATE INDEX IF NOT EXISTS idx_tc_telefone ON the_chosen_inscricoes(telefone);
   CREATE INDEX IF NOT EXISTS idx_tc_codigo ON the_chosen_inscricoes(codigo);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expiresAt);
+  CREATE INDEX IF NOT EXISTS idx_lembretes_espera_tel ON lembretes_aguardando_resposta(telefone);
 `);
 
 try {

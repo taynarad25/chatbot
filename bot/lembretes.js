@@ -4,6 +4,12 @@ const { obterFormularioEvento } = require("./formularioEvento");
 const { notificarMultimidia, notificarSecretaria } = require("./secretaria");
 const { unificarEventosPreparacaoLimpeza, isEventoTheChosen, URL_THE_CHOSEN } = require("./agenda");
 const { obterUsuarioPorTelefone, obterLideresPorDepartamento } = require("../web/lideres");
+const {
+  verificarEnvioRemoto,
+  registrarEnvioRemoto,
+  obterPeriodoSemana,
+  URL_PLANILHA_LOGS_PADRAO,
+} = require("./logsEnvioSheet");
 
 function formatarDataBrasil(isoOrDateStr) {
   if (!isoOrDateStr) return "";
@@ -381,6 +387,78 @@ function registrarLembreteEnviado(eventoId, tipo, destinatario) {
   }
 }
 
+function registrarLembreteAguardandoResposta({
+  telefone,
+  eventoId = "",
+  eventoNome = "",
+  tipoLembrete = "evento",
+  dataEvento = "",
+  horarioEvento = "",
+  departamento = "",
+  docUrl = "",
+  destinatarioNome = "",
+} = {}) {
+  if (!telefone) return false;
+  try {
+    const telLimpo = String(telefone).replace(/\D/g, "");
+    const agora = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO lembretes_aguardando_resposta 
+        (telefone, eventoId, eventoNome, tipoLembrete, dataEvento, horarioEvento, departamento, docUrl, destinatarioNome, criadoEm)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(telefone) DO UPDATE SET
+        eventoId = excluded.eventoId,
+        eventoNome = excluded.eventoNome,
+        tipoLembrete = excluded.tipoLembrete,
+        dataEvento = excluded.dataEvento,
+        horarioEvento = excluded.horarioEvento,
+        departamento = excluded.departamento,
+        docUrl = excluded.docUrl,
+        destinatarioNome = excluded.destinatarioNome,
+        criadoEm = excluded.criadoEm
+    `).run(telLimpo, eventoId, eventoNome, tipoLembrete, dataEvento, horarioEvento, departamento, docUrl, destinatarioNome, agora);
+    return true;
+  } catch (err) {
+    console.error("[Lembretes] Erro ao registrar lembrete aguardando resposta:", err.message);
+    return false;
+  }
+}
+
+function buscarLembreteAguardandoResposta(telefone) {
+  if (!telefone) return null;
+  try {
+    const telLimpo = String(telefone).replace(/\D/g, "");
+    const row = db.prepare("SELECT * FROM lembretes_aguardando_resposta WHERE telefone = ?").get(telLimpo);
+    if (row) return row;
+
+    if (telLimpo.length >= 8) {
+      const sufixo = telLimpo.slice(-8);
+      const rows = db.prepare("SELECT * FROM lembretes_aguardando_resposta WHERE telefone LIKE '%' || ?").all(sufixo);
+      if (rows && rows.length > 0) return rows[0];
+    }
+    return null;
+  } catch (err) {
+    console.error("[Lembretes] Erro ao buscar lembrete aguardando resposta:", err.message);
+    return null;
+  }
+}
+
+function removerLembreteAguardandoResposta(telefone) {
+  if (!telefone) return false;
+  try {
+    const telLimpo = String(telefone).replace(/\D/g, "");
+    db.prepare("DELETE FROM lembretes_aguardando_resposta WHERE telefone = ?").run(telLimpo);
+    if (telLimpo.length >= 8) {
+      const sufixo = telLimpo.slice(-8);
+      db.prepare("DELETE FROM lembretes_aguardando_resposta WHERE telefone LIKE '%' || ?").run(sufixo);
+    }
+    return true;
+  } catch (err) {
+    console.error("[Lembretes] Erro ao remover lembrete aguardando resposta:", err.message);
+    return false;
+  }
+}
+
 function obterUltimaExecucaoRotina(nome) {
   try {
     const row = db.prepare("SELECT ultimaData FROM rotinas_executadas WHERE nome = ?").get(nome);
@@ -414,6 +492,7 @@ async function processarLembretesEventos({
   diasAntecedencia = 5,
   dataBase = new Date(),
   notificarSecretariaFn = notificarSecretaria,
+  etapas = null,
 } = {}) {
   if (!buscarEventos || typeof buscarEventos !== "function") {
     console.log("[Lembretes] buscarEventos não fornecido.");
@@ -704,6 +783,35 @@ async function processarLembretesEventos({
       }
       registrarLembreteEnviado(eventoId, tipoLembrete, dest.telefone);
 
+      // Deixa o bot aberto para receber mensagens do líder/responsável
+      const telLimpo = String(dest.telefone || "").replace(/\D/g, "");
+      const destJid = formatarJidWhatsApp(dest.telefone);
+      const tipoFluxo = isPastoral ? "atendimento" : (isReuniao ? "reuniao" : "evento");
+
+      const dadosEspera = {
+        telefone: telLimpo,
+        eventoId,
+        eventoNome: titulo,
+        tipoLembrete: tipoFluxo,
+        dataEvento: dataEv,
+        horarioEvento: horario,
+        departamento: dest.departamento || "",
+        docUrl: dest.docUrl || "",
+        destinatarioNome: dest.nome || "",
+      };
+
+      registrarLembreteAguardandoResposta(dadosEspera);
+
+      if (etapas && typeof etapas === "object") {
+        const infoEtapa = {
+          fluxo: "resposta_lembrete",
+          etapa: "aguardando_resposta",
+          ...dadosEspera,
+        };
+        etapas[destJid] = infoEtapa;
+        etapas[telLimpo] = infoEtapa;
+      }
+
       // Notifica secretaria sobre lembretes enviados aos líderes (eventos e reuniões - pastoral NUNCA vai para grupo)
       if (!isPastoral && notificarSecretariaFn && typeof notificarSecretariaFn === "function") {
         const tipoDesc = isReuniao ? "Reunião" : "Evento";
@@ -895,6 +1003,7 @@ async function processarEnvioAgendaSecretarias({
   dataBase = new Date(),
   destinatarios = null,
   forcar = false,
+  fetchFn = globalThis.fetch,
 } = {}) {
   const diaSemana = dataBase.getDay(); // 0 = Domingo, 1 = Segunda
   if (!forcar && diaSemana !== 1) {
@@ -907,10 +1016,25 @@ async function processarEnvioAgendaSecretarias({
   const dia = String(dataBase.getDate()).padStart(2, "0");
   const dataBaseStr = `${ano}-${mes}-${dia}`;
   const chaveEnvio = `agenda_quinzenal_secretarias_${dataBaseStr}`;
+  const periodo = obterPeriodoSemana(dataBase);
 
   if (!forcar) {
-    const jaEnviado = buscarLembreteEnviado(chaveEnvio, "agenda_quinzenal_secretarias");
-    if (jaEnviado) {
+    // 1. Antes de enviar a mensagem, o bot deve fazer um POST nesta URL com a action "verificar_envio", passando o "tipo" da mensagem (ex: "agenda_quinzenal") e o "periodo" (ex: semana atual, como "2026-W40").
+    const remotoEnviado = await verificarEnvioRemoto({
+      tipo: "agenda_quinzenal",
+      periodo,
+      fetchFn,
+    });
+
+    // 2. Se retornar "enviado: true", o bot cancela o disparo.
+    if (remotoEnviado === true) {
+      console.log(`[Lembretes:Secretaria] Agenda quinzenal para o período ${periodo} já enviada anteriormente (verificado na planilha de logs). Cancelando disparo.`);
+      return { processados: 0, enviados: 0, pulado: true, motivo: "Ja enviado (planilha)" };
+    }
+
+    // Se o Web App não respondeu de forma conclusiva (fallback offline), verifica no banco local
+    const jaEnviadoLocal = buscarLembreteEnviado(chaveEnvio, "agenda_quinzenal_secretarias");
+    if (remotoEnviado === null && jaEnviadoLocal) {
       console.log(`[Lembretes:Secretaria] Agenda quinzenal de ${dataBaseStr} já enviada anteriormente.`);
       return { processados: 0, enviados: 0, pulado: true, motivo: "Ja enviado hoje" };
     }
@@ -1011,6 +1135,20 @@ async function processarEnvioAgendaSecretarias({
       totalEnviados++;
     }
     registrarLembreteEnviado(chaveEnvio, "agenda_quinzenal_secretarias", dest.telefone);
+  }
+
+  // 3. Se retornar "enviado: false", o bot envia a mensagem e faz um POST com a action "registrar_envio" para salvar o registo na planilha.
+  if (totalEnviados > 0) {
+    await registrarEnvioRemoto({
+      tipo: "agenda_quinzenal",
+      periodo,
+      detalhes: {
+        dataBase: dataBaseStr,
+        totalEnviados,
+        destinatarios: listaDest.map((d) => `${d.nome} (${d.telefone})`).join(", "),
+      },
+      fetchFn,
+    });
   }
 
   return { processados: eventos.length, enviados: totalEnviados };
@@ -1306,6 +1444,7 @@ function iniciarAgendadorLembretes({
   buscarEventos,
   agendasParaLer = [],
   horaExecucao = 8,
+  etapas = null,
 } = {}) {
   let executando = false;
   let ultimoDiaExecutado = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
@@ -1343,6 +1482,7 @@ function iniciarAgendadorLembretes({
         buscarEventos,
         agendasParaLer,
         diasAntecedencia: 5,
+        etapas,
       });
 
       // 3. Lembretes de eventos gerais para os líderes (3 dias de antecedência)
@@ -1351,6 +1491,7 @@ function iniciarAgendadorLembretes({
         buscarEventos,
         agendasParaLer,
         diasAntecedencia: 3,
+        etapas,
       });
 
       // 4. Lembretes de reuniões e atendimentos pastorais (1 dia antes)
@@ -1359,6 +1500,7 @@ function iniciarAgendadorLembretes({
         buscarEventos,
         agendasParaLer,
         diasAntecedencia: 1,
+        etapas,
       });
 
       // 5. Lembretes de divulgação no grupo MULTIMÍDIAS (5 dias antes)
@@ -1437,6 +1579,13 @@ module.exports = {
   ehAtendimentoPastoral,
   buscarLembreteEnviado,
   registrarLembreteEnviado,
+  registrarLembreteAguardandoResposta,
+  buscarLembreteAguardandoResposta,
+  removerLembreteAguardandoResposta,
+  verificarEnvioRemoto,
+  registrarEnvioRemoto,
+  obterPeriodoSemana,
+  URL_PLANILHA_LOGS_PADRAO,
   obterUltimaExecucaoRotina,
   registrarExecucaoRotina,
   registrarAgendamentoPastoral,

@@ -434,6 +434,7 @@ function criarClient() {
         buscarEventos,
         agendasParaLer,
         horaExecucao: 9,
+        etapas,
       });
       console.log("[Lembretes] Agendador de lembretes de eventos iniciado.");
     } catch (errLembrete) {

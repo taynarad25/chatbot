@@ -36,7 +36,12 @@ const { baixarMidiaComRetry } = require("./mediaStorage");
 const { montarResourceEvento, montarResourcesMultiplosBlocos, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { gerarDescricaoEvento, salvarDescricaoEvento, buscarDescricaoEvento } = require("./descricaoEvento");
 const { salvarPendente, buscarPendente, buscarPendentePorPastor, atualizarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
-const { registrarAgendamentoPastoral, buscarPastorAgendamento } = require("./lembretes");
+const {
+  registrarAgendamentoPastoral,
+  buscarPastorAgendamento,
+  buscarLembreteAguardandoResposta,
+  removerLembreteAguardandoResposta,
+} = require("./lembretes");
 const {
   iniciarFormularioEvento,
   processarRespostaFormulario,
@@ -468,6 +473,102 @@ async function processarRespostaEventoExterno({
 
   delete etapas[numero];
   return msg.reply("❌ Etapa desconhecida. Digite *menu* para reiniciar.");
+}
+
+async function processarRetornoLembrete({
+  msg,
+  numero,
+  info,
+  client,
+  notificarSecretaria,
+  etapas,
+  usuario,
+  contato,
+}) {
+  const telDigitos = String(numero).replace(/\D/g, "");
+  const textoLimpo = (msg.body || "").trim();
+  const textoLower = textoLimpo.toLowerCase();
+
+  // Se o usuário digitou "menu", cancela o estado de lembrete e deixa exibir o menu
+  if (textoLower === "menu" || textoLower === "sair" || textoLower === "cancelar") {
+    delete etapas[numero];
+    delete etapas[telDigitos];
+    removerLembreteAguardandoResposta(telDigitos);
+    return null;
+  }
+
+  const ehConfirmacao =
+    /^(sim|confirmado|confirmada|confirmo|confirmar|tudo certo|tudo ok|ok|está confirmado|esta confirmado|confirmad[ií]ssimo|de pé|está de pé|com certeza|positivo|vamos sim|estaremos presentes|pode confirmar)\b/i.test(textoLower) ||
+    textoLower === "1" ||
+    textoLower === "sim" ||
+    textoLower === "confirmado" ||
+    textoLower === "confirmada";
+
+  const nomeResp = usuario?.nome || info.destinatarioNome || nomeContato(contato, numero);
+  const tipoDesc = info.tipoLembrete === "atendimento" ? "Atendimento Pastoral" : (info.tipoLembrete === "reuniao" ? "Reunião" : "Evento");
+  const eventoNome = info.eventoNome || "Evento";
+  const dataEv = info.dataEvento || "";
+  const infoHorario = info.horarioEvento ? ` às ${info.horarioEvento}` : "";
+
+  // Remove o estado de espera para este contato
+  delete etapas[numero];
+  delete etapas[telDigitos];
+  removerLembreteAguardandoResposta(telDigitos);
+
+  if (ehConfirmacao) {
+    let respostaAoLider = "";
+    if (info.tipoLembrete === "atendimento") {
+      respostaAoLider = `✅ *Atendimento Pastoral Confirmado!*\n\nObrigado pelo retorno, Pastor! A confirmação do atendimento foi registrada com sucesso. 🙏`;
+    } else if (info.tipoLembrete === "reuniao") {
+      respostaAoLider = `✅ *Reunião Confirmada!*\n\nObrigado pela confirmação, *${nomeResp}*! Que vocês tenham uma excelente e abençoada reunião. 🙏`;
+    } else {
+      respostaAoLider = `✅ *Evento Confirmado!*\n\nMuito obrigado pelo retorno, *${nomeResp}*! A confirmação para o evento *${eventoNome}* foi registrada com sucesso. Que o Senhor abençoe ricamente toda a programação! 🙏✨`;
+    }
+
+    await msg.reply(respostaAoLider);
+
+    // Notifica secretaria sobre a confirmação (exceto atendimento pastoral que é privado)
+    if (info.tipoLembrete !== "atendimento" && notificarSecretaria && typeof notificarSecretaria === "function") {
+      const msgSec =
+        `📋 *Confirmação de ${tipoDesc} Recebida*\n\n` +
+        `👤 *Responsável:* ${nomeResp} (${mascararTelefone(numero)})\n` +
+        `📅 *${tipoDesc}:* ${eventoNome}\n` +
+        `📆 *Data:* ${dataEv}${infoHorario}\n` +
+        `💬 *Resposta do Líder:* "${textoLimpo}"\n\n` +
+        `_A confirmação foi registrada com sucesso no sistema._`;
+      try {
+        await notificarSecretaria(client, msgSec);
+      } catch (errSec) {
+        console.error(`[Lembretes] Erro ao notificar secretaria sobre confirmação:`, errSec.message);
+      }
+    }
+
+    return;
+  }
+
+  // Caso seja qualquer outra mensagem de texto (ajustes, dúvidas, alteração de horário, observações):
+  const respostaFeedback =
+    `Recebemos sua mensagem sobre o evento *${eventoNome}*, *${nomeResp}*! 📝\n\n` +
+    `Já registramos o seu retorno e encaminhamos diretamente para a equipe da secretaria para os devidos alinhamentos e ajustes. Caso precise de mais alguma alteração, estamos à disposição! 🙏\n\n` +
+    `Digite *menu* se desejar ver as opções disponíveis.`;
+
+  await msg.reply(respostaFeedback);
+
+  // Encaminha a mensagem diretamente à Secretaria
+  if (notificarSecretaria && typeof notificarSecretaria === "function") {
+    const msgSec =
+      `🔔 *Retorno do Líder sobre ${tipoDesc}*\n\n` +
+      `👤 *Líder:* ${nomeResp} (${mascararTelefone(numero)})\n` +
+      `📅 *${tipoDesc}:* ${eventoNome}\n` +
+      `📆 *Data:* ${dataEv}${infoHorario}\n` +
+      `💬 *Mensagem recebida:*\n"${textoLimpo}"\n\n` +
+      `_Favor verificar com o líder e providenciar os alinhamentos ou ajustes necessários._`;
+    try {
+      await notificarSecretaria(client, msgSec);
+    } catch (errSec) {
+      console.error(`[Lembretes] Erro ao notificar secretaria sobre retorno do líder:`, errSec.message);
+    }
+  }
 }
 
 function montarMenuLider() {
@@ -2027,6 +2128,53 @@ function createMessageHandler({
         }
       }
 
+      // Se há um lembrete de evento pendente aguardando resposta desse número (em memória ou no banco SQLite)
+      const telDigitos = String(numero).replace(/\D/g, "");
+      if (!etapas[numero] && !etapas[telDigitos]) {
+        let isQuotedLembrete = false;
+        let eventoQuoted = "";
+        if (msg.hasQuotedMsg) {
+          try {
+            const quoted = await comRetry(() => msg.getQuotedMessage());
+            if (quoted && quoted.body && /Lembrete de Evento Se Aproximando|Passando para saber:.*está confirmad/i.test(quoted.body)) {
+              isQuotedLembrete = true;
+              const matchEv = quoted.body.match(/📅\s*\*Evento:\*\s*([^\n\r]+)/i) || quoted.body.match(/reunião\s*["“\*]([^"”\*]+)["”\*]/i);
+              if (matchEv) eventoQuoted = matchEv[1].trim();
+            }
+          } catch (_) { }
+        }
+
+        const lembreteDb = buscarLembreteAguardandoResposta(telDigitos);
+        if (lembreteDb || isQuotedLembrete) {
+          if (texto !== "menu" && !(texto.length <= 50 && SAUDACOES_REGEX.test(texto))) {
+            const infoLembrete = {
+              fluxo: "resposta_lembrete",
+              etapa: "aguardando_resposta",
+              ...(lembreteDb || {}),
+              eventoNome: lembreteDb?.eventoNome || eventoQuoted || "Evento",
+              tipoLembrete: lembreteDb?.tipoLembrete || "evento",
+              destinatarioNome: lembreteDb?.destinatarioNome || usuario?.nome || "",
+            };
+            etapas[numero] = infoLembrete;
+            const resRetorno = await processarRetornoLembrete({
+              msg,
+              numero,
+              info: infoLembrete,
+              client,
+              notificarSecretaria,
+              etapas,
+              usuario,
+              contato,
+            });
+            if (resRetorno !== null) {
+              return resRetorno;
+            }
+          } else if (lembreteDb) {
+            removerLembreteAguardandoResposta(telDigitos);
+          }
+        }
+      }
+
       const ehSaudacao = texto.length <= 50 && SAUDACOES_REGEX.test(texto);
 
       if (ehSaudacao) {
@@ -2063,6 +2211,22 @@ Escolha uma opção:
       if (etapas[numero]) {
         const info = etapas[numero];
         console.log(`[Fluxo Ativo] ${identificarUsuario(contato, numero, isLider, usuario)} | Fluxo: ${info.fluxo} | Etapa: ${info.etapa}`);
+
+        if (info.fluxo === "resposta_lembrete") {
+          const resRetorno = await processarRetornoLembrete({
+            msg,
+            numero,
+            info,
+            client,
+            notificarSecretaria,
+            etapas,
+            usuario,
+            contato,
+          });
+          if (resRetorno !== null) {
+            return resRetorno;
+          }
+        }
 
         if (info.fluxo === "evento_externo") {
           return await processarRespostaEventoExterno({
@@ -5058,6 +5222,7 @@ module.exports = {
   temPermissao,
   identificarUsuario,
   processarRespostaEventoExterno,
+  processarRetornoLembrete,
   montarMenuLider,
   montarSubmenuLiderAgenda,
   montarSubmenuLiderComunicacao,

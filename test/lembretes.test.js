@@ -77,7 +77,7 @@ test("montarMensagemLembrete inclui aviso de 5 dias, dados do evento, perguntas 
   assert.match(msg, /📍 \*Local:\* Templo Sede/);
   assert.match(msg, /Está tudo certo com os preparativos e alinhamentos\?/);
   assert.match(msg, /Gostaria de adicionar mais alguma informação ao evento ou realizar alguma alteração\?/);
-  assert.match(msg, /📄 \*Formulário de Agendamento Preenchido:\*/);
+  assert.match(msg, /📄 \*Formulário de Agendamento Preenchido[!\:]\*/);
   assert.match(msg, /https:\/\/docs\.google\.com\/document\/d\/12345\/edit/);
 });
 
