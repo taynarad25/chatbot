@@ -740,4 +740,67 @@ test('The Chosen: sincronizarInscricoesComNuvem junta titular com Coluna H e rep
   }
 });
 
+test('The Chosen: rotina automática configurada apenas para o dia do evento às 09:00 (sem confirmação)', async () => {
+  cleanup();
+  await theChosen.realizarInscricao({
+    quantidade: 2,
+    participantes: ['Membro Teste', 'Convidado Teste'],
+    telefone: '11988889999',
+    email: 'membro@exemplo.com'
+  });
+
+  const mensagensEnviadas = [];
+  const mockClient = {
+    sendMessage: async (jid, text) => {
+      mensagensEnviadas.push({ jid, text });
+      return true;
+    }
+  };
+
+  const fakeFetch = async () => ({
+    ok: true,
+    text: async () => JSON.stringify({ enviado: false }),
+    json: async () => ({ enviado: false }),
+  });
+
+  // 1. Em 30/09 (lembretes de 3 dias removidos da rotina): pulado
+  const res30 = await theChosenNotificacoes.processarRotinaTheChosen({
+    client: mockClient,
+    dataReferencia: new Date('2026-09-30T10:00:00-03:00'),
+    fetchFn: fakeFetch,
+  });
+  assert.equal(res30.pulado, true);
+  assert.equal(mensagensEnviadas.length, 0);
+
+  // 2. Em 01/10: pulado
+  const res01 = await theChosenNotificacoes.processarRotinaTheChosen({
+    client: mockClient,
+    dataReferencia: new Date('2026-10-01T10:00:00-03:00'),
+    fetchFn: fakeFetch,
+  });
+  assert.equal(res01.pulado, true);
+  assert.equal(mensagensEnviadas.length, 0);
+
+  // 3. No dia do evento (03/10) antes das 9h (ex: 08:00): aguarda horário das 9h
+  const res03Cedo = await theChosenNotificacoes.processarRotinaTheChosen({
+    client: mockClient,
+    dataReferencia: new Date('2026-10-03T08:00:00-03:00'),
+    fetchFn: fakeFetch,
+  });
+  assert.equal(res03Cedo.aguardandoHorario, true);
+  assert.equal(mensagensEnviadas.length, 0);
+
+  // 4. No dia do evento (03/10) às 09:00: envia lembrete do dia (só lembrando, sem confirmação)
+  const res03Nove = await theChosenNotificacoes.processarRotinaTheChosen({
+    client: mockClient,
+    dataReferencia: new Date('2026-10-03T09:00:00-03:00'),
+    fetchFn: fakeFetch,
+  });
+  assert.equal(res03Nove.ok, true);
+  assert.ok(mensagensEnviadas.length >= 1);
+  assert.match(mensagensEnviadas[0].text, /É HOJE! Pré-estreia The Chosen/);
+  assert.doesNotMatch(mensagensEnviadas[0].text, /Responda com 1 ou SIM/i);
+  assert.doesNotMatch(mensagensEnviadas[0].text, /CONFIRMAR sua presença/i);
+});
+
 

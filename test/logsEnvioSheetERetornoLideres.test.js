@@ -142,6 +142,10 @@ test("processarEnvioAgendaSecretarias: envia e registra na planilha se enviado: 
   const dataSegunda = new Date("2026-10-12T10:00:00.000Z"); // Outra segunda-feira
   const chamadasPlanilha = [];
 
+  try {
+    db.prepare("DELETE FROM lembretes_enviados WHERE eventoId LIKE 'agenda_quinzenal_secretarias_%'").run();
+  } catch {}
+
   const fakeFetch = async (url, options) => {
     const payload = JSON.parse(options.body);
     chamadasPlanilha.push(payload);
@@ -338,6 +342,192 @@ test("Lembretes de líderes: líder responde solicitando alterações e bot avis
 
   // Registro no SQLite deve ter sido limpo após o recebimento
   assert.equal(buscarLembreteAguardandoResposta(TEL_LIDER), null);
+
+  removeLider(TEL_LIDER);
+});
+
+test("processarLembretesEventos: deduplicação via planilha e mensagem enxuta à secretaria", async () => {
+  const TEL_LIDER = "5511977775555";
+  addLider({
+    nome: "Gustavo Louvor",
+    telefone: TEL_LIDER,
+    cargos: ["lider"],
+    departamento: "Epifania",
+  });
+
+  const dataBase = new Date("2026-10-01T10:00:00.000Z");
+  const idEv = "ev-dedup-teste-1";
+  const eventos = [
+    {
+      id: idEv,
+      summary: "Noite de Louvor Epifania",
+      start: { dateTime: "2026-10-06T19:30:00-03:00" },
+      location: "Templo",
+      calendarId: "cal-louvor",
+    },
+  ];
+
+  try {
+    db.prepare("DELETE FROM lembretes_enviados WHERE eventoId = ?").run(idEv);
+  } catch {}
+
+  const postPayloads = [];
+  const fakeFetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    postPayloads.push(body);
+    if (body.action === "verificar_envio") {
+      return { ok: true, json: async () => ({ enviado: false }) };
+    }
+    return { ok: true, json: async () => ({ ok: true, status: "success" }) };
+  };
+
+  const msgsLider = [];
+  const msgsSecretaria = [];
+  const fakeClient = {
+    sendMessage: async (to, txt) => {
+      msgsLider.push({ to, txt });
+    },
+  };
+  const fakeNotificarSec = async (c, txt) => {
+    msgsSecretaria.push(txt);
+  };
+
+  // 1. Envio normal com resposta enviado: false
+  const res = await processarLembretesEventos({
+    client: fakeClient,
+    buscarEventos: async () => eventos,
+    diasAntecedencia: 5,
+    dataBase,
+    notificarSecretariaFn: fakeNotificarSec,
+    fetchFn: fakeFetch,
+  });
+
+  assert.equal(res.enviados, 1);
+  assert.equal(msgsLider.length, 1);
+  assert.equal(msgsSecretaria.length, 1);
+
+  // A mensagem da secretaria NÃO deve conter os detalhes longos da mensagem enviada ao líder
+  assert.match(msgsSecretaria[0], /Aviso à Secretaria - Lembrete de Evento/);
+  assert.match(msgsSecretaria[0], /Lembrete de \*5 dias\* enviado ao líder \*Gustavo Louvor\*/);
+  assert.match(msgsSecretaria[0], /Aguardando retorno do líder\./);
+  assert.doesNotMatch(msgsSecretaria[0], /_Lembrete de Evento Se Aproximando_/);
+
+  // Verificou e registrou via POST JSON na planilha
+  const verifica = postPayloads.find((p) => p.action === "verificar_envio");
+  const registra = postPayloads.find((p) => p.action === "registrar_envio");
+  assert.ok(verifica, "deve fazer POST verificar_envio");
+  assert.equal(verifica.tipo, "lembrete_evento_5_dias");
+  assert.match(verifica.destinatario, /Gustavo Louvor/);
+  assert.equal(verifica.periodo, "2026-10-06");
+
+  assert.ok(registra, "deve fazer POST registrar_envio");
+  assert.equal(registra.tipo, "lembrete_evento_5_dias");
+  assert.match(registra.destinatario, /Gustavo Louvor/);
+  assert.equal(registra.periodo, "2026-10-06");
+
+  // 2. Se a planilha retornar enviado: true, ignora o envio (mesmo se o banco reiniciar)
+  try {
+    db.prepare("DELETE FROM lembretes_enviados WHERE eventoId = ?").run(idEv);
+  } catch {}
+
+  const msgsLider2 = [];
+  const msgsSec2 = [];
+  const fakeFetchJaEnviado = async (url, opts) => {
+    return { ok: true, json: async () => ({ enviado: true }) };
+  };
+
+  const res2 = await processarLembretesEventos({
+    client: { sendMessage: async (to, txt) => msgsLider2.push({ to, txt }) },
+    buscarEventos: async () => eventos,
+    diasAntecedencia: 5,
+    dataBase,
+    notificarSecretariaFn: async (c, txt) => msgsSec2.push(txt),
+    fetchFn: fakeFetchJaEnviado,
+  });
+
+  assert.equal(res2.enviados, 0, "deve ignorar envio se a planilha indicar enviado: true");
+  assert.equal(msgsLider2.length, 0);
+  assert.equal(msgsSec2.length, 0);
+
+  removeLider(TEL_LIDER);
+});
+
+test("processarLembretesItensADefinir: deduplicação remota e aviso à secretaria", async () => {
+  const { salvarFormularioEvento } = require("../bot/formularioEvento");
+  const { processarLembretesItensADefinir } = require("../bot/lembretes");
+
+  const TEL_LIDER = "5511977774444";
+  addLider({
+    nome: "Renata Flores",
+    telefone: TEL_LIDER,
+    cargos: ["lider"],
+    departamento: "Decoração",
+  });
+
+  salvarFormularioEvento({
+    evento: "Chá das Mulheres de Fé",
+    departamento: "Decoração",
+    data: "2026-10-08",
+    solicitanteId: TEL_LIDER,
+    payload: {
+      nomeSolicitante: "Renata Flores",
+      tema: "A definir",
+      cores: "Rosa e Dourado",
+    },
+  });
+
+  const dataBase = new Date("2026-10-01T10:00:00.000Z");
+  const idEv = "ev-itens-cha-" + Date.now();
+  const eventos = [
+    {
+      id: idEv,
+      summary: "Chá das Mulheres de Fé",
+      start: { dateTime: "2026-10-08T15:00:00-03:00" },
+      calendarId: "cal-mulheres",
+    },
+  ];
+
+  const postPayloads = [];
+  const fakeFetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    postPayloads.push(body);
+    if (body.action === "verificar_envio") {
+      return { ok: true, json: async () => ({ enviado: false }) };
+    }
+    return { ok: true, json: async () => ({ ok: true, status: "success" }) };
+  };
+
+  const msgsLider = [];
+  const msgsSecretaria = [];
+  const etapas = {};
+
+  const res = await processarLembretesItensADefinir({
+    client: {
+      sendMessage: async (to, txt) => msgsLider.push({ to, txt }),
+    },
+    buscarEventos: async () => eventos,
+    diasAntecedencia: 7,
+    dataBase,
+    notificarSecretariaFn: async (c, txt) => msgsSecretaria.push(txt),
+    etapas,
+    fetchFn: fakeFetch,
+  });
+
+  assert.equal(res.enviados, 1);
+  assert.equal(msgsLider.length, 1);
+  assert.match(msgsLider[0].txt, /Lembrete de Alinhamento - Faltam 7 dias!/);
+  assert.match(msgsLider[0].txt, /Tema:\* _A definir_/);
+
+  assert.equal(msgsSecretaria.length, 1);
+  assert.match(msgsSecretaria[0], /Aviso à Secretaria - Itens a Definir/);
+  assert.match(msgsSecretaria[0], /Aguardando retorno do líder\./);
+
+  const verifica = postPayloads.find((p) => p.action === "verificar_envio");
+  const registra = postPayloads.find((p) => p.action === "registrar_envio");
+  assert.ok(verifica);
+  assert.equal(verifica.tipo, "lembrete_itens_a_definir");
+  assert.ok(registra);
+  assert.equal(registra.tipo, "lembrete_itens_a_definir");
 
   removeLider(TEL_LIDER);
 });

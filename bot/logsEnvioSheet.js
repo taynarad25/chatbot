@@ -17,16 +17,27 @@ function obterPeriodoSemana(dataRef = new Date()) {
 }
 
 /**
+ * Retorna o período em formato ISO diário (ex: "2026-10-01") para uma data de referência.
+ * @param {Date|string} dataRef 
+ * @returns {string}
+ */
+function obterPeriodoDia(dataRef = new Date()) {
+  return moment(dataRef).tz("America/Sao_Paulo").format("YYYY-MM-DD");
+}
+
+/**
  * Consulta a planilha via Web App para verificar se uma rotina/mensagem já foi enviada no período.
  * @param {object} params
- * @param {string} params.tipo - Tipo da rotina/mensagem (ex: "agenda_quinzenal")
- * @param {string} params.periodo - Período de referência (ex: "2026-W40")
+ * @param {string} params.tipo - Descrição da mensagem (ex: "lembrete_inscricao", "agenda_quinzenal", "aviso_lideres", "aniversario", "confirmacao_inscricao")
+ * @param {string} [params.destinatario="Geral"] - Quem vai receber (pode ser "Geral", identificador do evento ou o destinatário específico)
+ * @param {string} params.periodo - Chave única que identifica o dia ou semana daquele envio (ex: "2026-10-01" ou "2026-W40")
  * @param {string} [params.url] - URL customizada do Web App
  * @param {Function} [params.fetchFn] - Função fetch (útil para testes unitários)
  * @returns {Promise<boolean|null>} true se já enviado, false se não enviado, ou null em caso de falha de conexão/permissão
  */
 async function verificarEnvioRemoto({
   tipo,
+  destinatario = "Geral",
   periodo,
   url = obterUrlPlanilhaLogs(),
   fetchFn = globalThis.fetch,
@@ -38,8 +49,9 @@ async function verificarEnvioRemoto({
 
   const payload = {
     action: "verificar_envio",
-    tipo,
-    periodo,
+    tipo: String(tipo),
+    destinatario: String(destinatario || "Geral"),
+    periodo: String(periodo),
   };
 
   try {
@@ -50,27 +62,33 @@ async function verificarEnvioRemoto({
     });
 
     if (!res.ok) {
-      console.warn(`[LogsEnvioSheet] Web App retornou status HTTP ${res.status} ao verificar envio para '${tipo}' (${periodo}).`);
+      console.warn(`[LogsEnvioSheet] Web App retornou status HTTP ${res.status} ao verificar envio para '${tipo}' (${destinatario}, ${periodo}).`);
       return null;
     }
 
-    const texto = await res.text();
     let data;
-    try {
-      data = JSON.parse(texto);
-    } catch {
-      console.warn(`[LogsEnvioSheet] Resposta não-JSON recebida ao verificar envio para '${tipo}': ${texto.slice(0, 100)}`);
+    if (typeof res.text === "function") {
+      const texto = await res.text();
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        console.warn(`[LogsEnvioSheet] Resposta não-JSON recebida ao verificar envio para '${tipo}': ${texto.slice(0, 100)}`);
+        return null;
+      }
+    } else if (typeof res.json === "function") {
+      data = await res.json();
+    } else {
       return null;
     }
 
-    // A planilha pode responder { enviado: true/false } ou { status: "success", enviado: true/false }
+    // A planilha responderá com { "enviado": true } ou { "enviado": false }
     if (data && typeof data.enviado !== "undefined") {
       return data.enviado === true || data.enviado === "true";
     }
 
     return null;
   } catch (err) {
-    console.warn(`[LogsEnvioSheet] Erro ao comunicar com Web App de logs (${tipo}, ${periodo}): ${err.message}`);
+    console.warn(`[LogsEnvioSheet] Erro ao comunicar com Web App de logs (${tipo}, ${destinatario}, ${periodo}): ${err.message}`);
     return null;
   }
 }
@@ -78,8 +96,9 @@ async function verificarEnvioRemoto({
 /**
  * Registra o envio da rotina/mensagem na planilha via Web App.
  * @param {object} params
- * @param {string} params.tipo - Tipo da rotina/mensagem (ex: "agenda_quinzenal")
- * @param {string} params.periodo - Período de referência (ex: "2026-W40")
+ * @param {string} params.tipo - Descrição da mensagem (ex: "lembrete_inscricao", "agenda_quinzenal", "aviso_lideres", "aniversario", "confirmacao_inscricao")
+ * @param {string} [params.destinatario="Geral"] - Quem recebeu a mensagem
+ * @param {string} params.periodo - Chave única que identifica o dia ou semana do envio
  * @param {object} [params.detalhes] - Informações adicionais a salvar
  * @param {string} [params.url] - URL customizada do Web App
  * @param {Function} [params.fetchFn] - Função fetch (útil para testes unitários)
@@ -87,6 +106,7 @@ async function verificarEnvioRemoto({
  */
 async function registrarEnvioRemoto({
   tipo,
+  destinatario = "Geral",
   periodo,
   detalhes = {},
   url = obterUrlPlanilhaLogs(),
@@ -99,8 +119,9 @@ async function registrarEnvioRemoto({
 
   const payload = {
     action: "registrar_envio",
-    tipo,
-    periodo,
+    tipo: String(tipo),
+    destinatario: String(destinatario || "Geral"),
+    periodo: String(periodo),
     timestamp: new Date().toISOString(),
     ...detalhes,
   };
@@ -113,22 +134,28 @@ async function registrarEnvioRemoto({
     });
 
     if (!res.ok) {
-      console.warn(`[LogsEnvioSheet] Web App retornou status HTTP ${res.status} ao registrar envio para '${tipo}' (${periodo}).`);
+      console.warn(`[LogsEnvioSheet] Web App retornou status HTTP ${res.status} ao registrar envio para '${tipo}' (${destinatario}, ${periodo}).`);
       return false;
     }
 
-    const texto = await res.text();
     let data;
-    try {
-      data = JSON.parse(texto);
-    } catch {
-      // Se respondeu 200 com texto ok
+    if (typeof res.text === "function") {
+      const texto = await res.text();
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        // Se respondeu 200 com texto ok
+        return true;
+      }
+    } else if (typeof res.json === "function") {
+      data = await res.json();
+    } else {
       return true;
     }
 
     return data && (data.sucesso === true || data.status === "success" || data.ok === true || typeof data.enviado !== "undefined");
   } catch (err) {
-    console.warn(`[LogsEnvioSheet] Erro ao registrar envio no Web App de logs (${tipo}, ${periodo}): ${err.message}`);
+    console.warn(`[LogsEnvioSheet] Erro ao registrar envio no Web App de logs (${tipo}, ${destinatario}, ${periodo}): ${err.message}`);
     return false;
   }
 }
@@ -137,6 +164,7 @@ module.exports = {
   URL_PLANILHA_LOGS_PADRAO,
   obterUrlPlanilhaLogs,
   obterPeriodoSemana,
+  obterPeriodoDia,
   verificarEnvioRemoto,
   registrarEnvioRemoto,
 };

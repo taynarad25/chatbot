@@ -8,6 +8,7 @@ const {
   verificarEnvioRemoto,
   registrarEnvioRemoto,
   obterPeriodoSemana,
+  obterPeriodoDia,
   URL_PLANILHA_LOGS_PADRAO,
 } = require("./logsEnvioSheet");
 
@@ -493,6 +494,8 @@ async function processarLembretesEventos({
   dataBase = new Date(),
   notificarSecretariaFn = notificarSecretaria,
   etapas = null,
+  fetchFn = globalThis.fetch,
+  forcar = false,
 } = {}) {
   if (!buscarEventos || typeof buscarEventos !== "function") {
     console.log("[Lembretes] buscarEventos não fornecido.");
@@ -740,6 +743,28 @@ async function processarLembretesEventos({
         continue;
       }
 
+      const tipoRemoto = isPastoral
+        ? "lembrete_atendimento_pastoral_1_dia"
+        : (isReuniao ? "lembrete_reuniao_1_dia" : `lembrete_evento_${diasAntecedencia}_dias`);
+      const telLimpoDest = telDest.replace(/\D/g, "");
+      const destRemoto = `${dest.nome || "Líder"} (${telLimpoDest || telDest}) - ${eventoId}`;
+      const periodoRemoto = dataAlvoStr;
+
+      if (!forcar) {
+        const remotoEnviado = await verificarEnvioRemoto({
+          tipo: tipoRemoto,
+          destinatario: destRemoto,
+          periodo: periodoRemoto,
+          fetchFn,
+        });
+
+        if (remotoEnviado === true) {
+          console.log(`[Lembretes] ${tipoRemoto} para ${destRemoto} (${periodoRemoto}) já enviado anteriormente (verificado na planilha). Ignorando envio.`);
+          registrarLembreteEnviado(eventoId, tipoLembrete, dest.telefone);
+          continue;
+        }
+      }
+
       let msg = "";
       if (isPastoral) {
         msg = montarMensagemConfirmacaoAtendimento({
@@ -783,6 +808,19 @@ async function processarLembretesEventos({
       }
       registrarLembreteEnviado(eventoId, tipoLembrete, dest.telefone);
 
+      await registrarEnvioRemoto({
+        tipo: tipoRemoto,
+        destinatario: destRemoto,
+        periodo: periodoRemoto,
+        detalhes: {
+          evento: titulo,
+          dataEvento: dataEv,
+          horario,
+          diasAntecedencia,
+        },
+        fetchFn,
+      });
+
       // Deixa o bot aberto para receber mensagens do líder/responsável
       const telLimpo = String(dest.telefone || "").replace(/\D/g, "");
       const destJid = formatarJidWhatsApp(dest.telefone);
@@ -817,12 +855,13 @@ async function processarLembretesEventos({
         const tipoDesc = isReuniao ? "Reunião" : "Evento";
         const formAviso = (diasAntecedencia === 5 && dest.docUrl) ? `\n📄 *Formulário Anexado:* ${dest.docUrl}` : "";
         const msgSecretaria =
-          `📋 *Aviso à Secretaria - Lembrete de ${tipoDesc}*\n` +
-          `Lembrete de *${diasAntecedencia} dias* enviado ao líder *${dest.nome || "Líder"}* (${dest.telefone}) sobre *${titulo}*:${formAviso}\n\n${msg}`;
+          `📋 *Aviso à Secretaria - Lembrete de ${tipoDesc}*\n\n` +
+          `Lembrete de *${diasAntecedencia} dias* enviado ao líder *${dest.nome || "Líder"}* (${dest.telefone}) sobre o evento *${titulo}* (${dataEv}${horario ? ' às ' + horario : ''}).${formAviso}\n` +
+          `Aguardando retorno do líder.`;
         try {
           await notificarSecretariaFn(client, msgSecretaria);
         } catch (errSec) {
-          console.error(`[Lembretes] Falha ao enviar cópia do lembrete para secretaria:`, errSec.message);
+          console.error(`[Lembretes] Falha ao enviar aviso do lembrete para secretaria:`, errSec.message);
         }
       }
     }
@@ -840,6 +879,8 @@ async function processarLembretesDivulgacaoMultimidia({
   diasAntecedencia = 5,
   dataBase = new Date(),
   notificarFn = notificarMultimidia,
+  fetchFn = globalThis.fetch,
+  forcar = false,
 } = {}) {
   const targetDate = new Date(dataBase);
   targetDate.setDate(targetDate.getDate() + diasAntecedencia);
@@ -877,6 +918,25 @@ async function processarLembretesDivulgacaoMultimidia({
     const jaEnviado = buscarLembreteEnviado(eventoId, tipoLembrete);
     if (jaEnviado) {
       continue;
+    }
+
+    const tipoRemoto = tipoLembrete;
+    const destRemoto = `MULTIMÍDIAS (${row.evento})`;
+    const periodoRemoto = dataAlvoIso;
+
+    if (!forcar) {
+      const remotoEnviado = await verificarEnvioRemoto({
+        tipo: tipoRemoto,
+        destinatario: destRemoto,
+        periodo: periodoRemoto,
+        fetchFn,
+      });
+
+      if (remotoEnviado === true) {
+        console.log(`[Multimídia] ${tipoRemoto} para ${destRemoto} (${periodoRemoto}) já enviado anteriormente (planilha de logs). Ignorando envio.`);
+        registrarLembreteEnviado(eventoId, tipoLembrete, "MULTIMÍDIAS");
+        continue;
+      }
     }
 
     let payload = {};
@@ -917,6 +977,18 @@ async function processarLembretesDivulgacaoMultimidia({
     }
 
     registrarLembreteEnviado(eventoId, tipoLembrete, "MULTIMÍDIAS");
+
+    await registrarEnvioRemoto({
+      tipo: tipoRemoto,
+      destinatario: destRemoto,
+      periodo: periodoRemoto,
+      detalhes: {
+        evento: row.evento,
+        dataDivulgacao: row.dataMaximaDivulgacao || dataAlvoBr,
+        diasAntecedencia,
+      },
+      fetchFn,
+    });
   }
 
   return { processados: rows.length, enviados: totalEnviados };
@@ -1022,6 +1094,7 @@ async function processarEnvioAgendaSecretarias({
     // 1. Antes de enviar a mensagem, o bot deve fazer um POST nesta URL com a action "verificar_envio", passando o "tipo" da mensagem (ex: "agenda_quinzenal") e o "periodo" (ex: semana atual, como "2026-W40").
     const remotoEnviado = await verificarEnvioRemoto({
       tipo: "agenda_quinzenal",
+      destinatario: "Secretaria",
       periodo,
       fetchFn,
     });
@@ -1032,9 +1105,9 @@ async function processarEnvioAgendaSecretarias({
       return { processados: 0, enviados: 0, pulado: true, motivo: "Ja enviado (planilha)" };
     }
 
-    // Se o Web App não respondeu de forma conclusiva (fallback offline), verifica no banco local
+    // Verifica também no banco local (SQLite) para prevenção imediata de reenvio
     const jaEnviadoLocal = buscarLembreteEnviado(chaveEnvio, "agenda_quinzenal_secretarias");
-    if (remotoEnviado === null && jaEnviadoLocal) {
+    if (jaEnviadoLocal) {
       console.log(`[Lembretes:Secretaria] Agenda quinzenal de ${dataBaseStr} já enviada anteriormente.`);
       return { processados: 0, enviados: 0, pulado: true, motivo: "Ja enviado hoje" };
     }
@@ -1141,6 +1214,7 @@ async function processarEnvioAgendaSecretarias({
   if (totalEnviados > 0) {
     await registrarEnvioRemoto({
       tipo: "agenda_quinzenal",
+      destinatario: "Secretaria",
       periodo,
       detalhes: {
         dataBase: dataBaseStr,
@@ -1177,11 +1251,15 @@ async function processarAniversariantesDoDia({
   client,
   dataBase = new Date(),
   listLideresFn = null,
+  notificarSecretariaFn = notificarSecretaria,
+  fetchFn = globalThis.fetch,
+  forcar = false,
 } = {}) {
   const diaHoje = String(dataBase.getDate()).padStart(2, "0");
   const mesHoje = String(dataBase.getMonth() + 1).padStart(2, "0");
   const anoHoje = String(dataBase.getFullYear());
   const diaMesAlvo = `${diaHoje}/${mesHoje}`;
+  const dataHojeIso = `${anoHoje}-${mesHoje}-${diaHoje}`;
 
   console.log(`[Aniversários] Verificando aniversariantes do dia (${diaMesAlvo})...`);
 
@@ -1230,6 +1308,25 @@ async function processarAniversariantesDoDia({
       continue;
     }
 
+    const tipoRemoto = "aniversario";
+    const destRemoto = `${pessoa.nome || "Membro"} (${telLimpo})`;
+    const periodoRemoto = dataHojeIso;
+
+    if (!forcar) {
+      const remotoEnviado = await verificarEnvioRemoto({
+        tipo: tipoRemoto,
+        destinatario: destRemoto,
+        periodo: periodoRemoto,
+        fetchFn,
+      });
+
+      if (remotoEnviado === true) {
+        console.log(`[Aniversários] Parabéns para ${destRemoto} (${periodoRemoto}) já enviado anteriormente (verificado na planilha). Ignorando.`);
+        registrarLembreteEnviado(eventoId, "aniversario", pessoa.telefone);
+        continue;
+      }
+    }
+
     const mensagem = montarMensagemAniversario({ nome: pessoa.nome });
     const jid = formatarJidWhatsApp(pessoa.telefone);
 
@@ -1247,6 +1344,32 @@ async function processarAniversariantesDoDia({
     }
 
     registrarLembreteEnviado(eventoId, "aniversario", pessoa.telefone);
+
+    await registrarEnvioRemoto({
+      tipo: tipoRemoto,
+      destinatario: destRemoto,
+      periodo: periodoRemoto,
+      detalhes: {
+        nome: pessoa.nome,
+        telefone: pessoa.telefone,
+        dataNascimento: pessoa.dataNascimento,
+      },
+      fetchFn,
+    });
+
+    // Notifica secretaria sobre o aniversário da pessoa
+    if (notificarSecretariaFn && typeof notificarSecretariaFn === "function") {
+      const cargoInfo = pessoa.cargos ? ` (${pessoa.cargos})` : (pessoa.departamento ? ` (${pessoa.departamento})` : "");
+      const msgSecAniv =
+        `🎂 *Aniversariante do Dia!*\n\n` +
+        `Hoje é aniversário de *${pessoa.nome}*${cargoInfo}!\n` +
+        `A mensagem de felicitações já foi enviada no privado. 🎉`;
+      try {
+        await notificarSecretariaFn(client, msgSecAniv);
+      } catch (errSec) {
+        console.error(`[Aniversários] Falha ao notificar secretaria sobre aniversário de ${pessoa.nome}:`, errSec.message);
+      }
+    }
   }
 
   return { processados: membros.length, aniversariantes: aniversariantes.length, enviados: totalEnviados };
@@ -1307,6 +1430,10 @@ async function processarLembretesItensADefinir({
   agendasParaLer = [],
   diasAntecedencia = 7,
   dataBase = new Date(),
+  notificarSecretariaFn = notificarSecretaria,
+  etapas = null,
+  fetchFn = globalThis.fetch,
+  forcar = false,
 } = {}) {
   if (!buscarEventos || typeof buscarEventos !== "function") {
     return { processados: 0, enviados: 0 };
@@ -1412,6 +1539,26 @@ async function processarLembretesItensADefinir({
     if (user && user.nome) nomeDest = user.nome;
 
     const dataEv = datasInfo.dataExibicao || (ev.start?.dateTime ? ev.start.dateTime.split("T")[0] : (ev.start?.date || dataAlvoStr));
+    const tipoRemoto = "lembrete_itens_a_definir";
+    const telLimpo = String(telDest || "").replace(/\D/g, "");
+    const destRemoto = `${nomeDest || "Líder"} (${telLimpo || telDest}) - ${eventoId}`;
+    const periodoRemoto = dataAlvoStr;
+
+    if (!forcar) {
+      const remotoEnviado = await verificarEnvioRemoto({
+        tipo: tipoRemoto,
+        destinatario: destRemoto,
+        periodo: periodoRemoto,
+        fetchFn,
+      });
+
+      if (remotoEnviado === true) {
+        console.log(`[Itens a Definir] ${tipoRemoto} para ${destRemoto} (${periodoRemoto}) já enviado anteriormente (planilha de logs). Ignorando.`);
+        registrarLembreteEnviado(eventoId, tipoLembrete, telDest);
+        continue;
+      }
+    }
+
     const mensagem = montarMensagemItensADefinir({
       nome: nomeDest,
       evento: titulo,
@@ -1434,6 +1581,52 @@ async function processarLembretesItensADefinir({
     }
 
     registrarLembreteEnviado(eventoId, tipoLembrete, telDest);
+
+    await registrarEnvioRemoto({
+      tipo: tipoRemoto,
+      destinatario: destRemoto,
+      periodo: periodoRemoto,
+      detalhes: {
+        evento: titulo,
+        itens: itensADefinir.map((i) => i.campo).join(", "),
+      },
+      fetchFn,
+    });
+
+    // Deixa o bot aberto para resposta do líder sobre os itens a definir
+    const destJid = formatarJidWhatsApp(telDest);
+    const dadosEspera = {
+      telefone: telLimpo,
+      eventoId,
+      eventoNome: titulo,
+      tipoLembrete: "itens_a_definir",
+      dataEvento: dataEv,
+      destinatarioNome: nomeDest || "",
+    };
+    registrarLembreteAguardandoResposta(dadosEspera);
+
+    if (etapas && typeof etapas === "object") {
+      const infoEtapa = {
+        fluxo: "resposta_lembrete",
+        etapa: "aguardando_resposta",
+        ...dadosEspera,
+      };
+      etapas[destJid] = infoEtapa;
+      etapas[telLimpo] = infoEtapa;
+    }
+
+    // Notifica secretaria sobre envio do lembrete de itens a definir
+    if (notificarSecretariaFn && typeof notificarSecretariaFn === "function") {
+      const msgSec =
+        `📋 *Aviso à Secretaria - Itens a Definir*\n\n` +
+        `Lembrete de *7 dias* enviado ao líder *${nomeDest || "Líder"}* (${telDest}) solicitando definições pendentes do evento *${titulo}* (${dataEv}).\n` +
+        `Aguardando retorno do líder.`;
+      try {
+        await notificarSecretariaFn(client, msgSec);
+      } catch (errSec) {
+        console.error(`[Itens a Definir] Falha ao notificar secretaria:`, errSec.message);
+      }
+    }
   }
 
   return { processados: eventos.length, enviados: totalEnviados };
@@ -1474,6 +1667,7 @@ function iniciarAgendadorLembretes({
         buscarEventos,
         agendasParaLer,
         diasAntecedencia: 7,
+        etapas,
       });
 
       // 2. Lembretes de eventos gerais para os líderes (5 dias de antecedência)
@@ -1522,10 +1716,10 @@ function iniciarAgendadorLembretes({
         agendasParaLer,
       });
 
-      // 8. Lembretes e relatórios do The Chosen (30/09, 01/10 e 03/10)
+      // 8. Lembretes e relatórios do The Chosen (apenas no dia 03/10 a partir das 09:00, só lembrando sem confirmação)
       try {
         const { processarRotinaTheChosen } = require("../web/the_chosen_notificacoes");
-        await processarRotinaTheChosen({ client });
+        await processarRotinaTheChosen({ client, horaMinima: 9 });
       } catch (errTC) {
         console.error("[Agendador Lembretes] Erro na rotina The Chosen:", errTC.message);
       }
@@ -1556,16 +1750,27 @@ function iniciarAgendadorLembretes({
       checarExecutar();
     } else {
       console.log(`[Agendador Lembretes] Inicialização: rotina já executada hoje (${ultimaData}) ou antes do horário (${agora.getHours()}h < ${horaExecucao}h).`);
+      // Verifica rotinas com horário específico (ex: The Chosen no dia do evento a partir das 09:00)
+      try {
+        const { processarRotinaTheChosen } = require("../web/the_chosen_notificacoes");
+        processarRotinaTheChosen({ client, horaMinima: 9 }).catch(() => {});
+      } catch {}
     }
   }, 60 * 1000);
 
-  // Executa diariamente no horário configurado (padrão 08:00)
+  // Executa periodicamente (a cada 30 min) checando rotina diária e horários específicos
   const timer = setInterval(() => {
     const agora = new Date();
     const diaHoje = agora.toISOString().slice(0, 10);
     if (agora.getHours() >= horaExecucao && ultimoDiaExecutado !== diaHoje) {
       checarExecutar();
     }
+
+    // Rotinas com horários específicos (The Chosen: no dia 03/10 a partir das 09:00)
+    try {
+      const { processarRotinaTheChosen } = require("../web/the_chosen_notificacoes");
+      processarRotinaTheChosen({ client, horaMinima: 9 }).catch(() => {});
+    } catch {}
   }, 30 * 60 * 1000);
 
   return { timer, timeoutInicial, checarExecutar };

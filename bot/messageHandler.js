@@ -603,7 +603,9 @@ async function processarRetornoLembrete({
     textoLower === "confirmada";
 
   const nomeResp = usuario?.nome || info.destinatarioNome || nomeContato(contato, numero);
-  const tipoDesc = info.tipoLembrete === "atendimento" ? "Atendimento Pastoral" : (info.tipoLembrete === "reuniao" ? "Reunião" : "Evento");
+  const tipoDesc = info.tipoLembrete === "atendimento"
+    ? "Atendimento Pastoral"
+    : (info.tipoLembrete === "reuniao" ? "Reunião" : (info.tipoLembrete === "itens_a_definir" ? "Itens a Definir" : "Evento"));
   const eventoNome = info.eventoNome || "Evento";
   const dataEv = info.dataEvento || "";
   const infoHorario = info.horarioEvento ? ` às ${info.horarioEvento}` : "";
@@ -619,6 +621,8 @@ async function processarRetornoLembrete({
       respostaAoLider = `✅ *Atendimento Pastoral Confirmado!*\n\nObrigado pelo retorno, Pastor! A confirmação do atendimento foi registrada com sucesso. 🙏`;
     } else if (info.tipoLembrete === "reuniao") {
       respostaAoLider = `✅ *Reunião Confirmada!*\n\nObrigado pela confirmação, *${nomeResp}*! Que vocês tenham uma excelente e abençoada reunião. 🙏`;
+    } else if (info.tipoLembrete === "itens_a_definir") {
+      respostaAoLider = `✅ *Definições Confirmadas!*\n\nMuito obrigado pelo retorno, *${nomeResp}*! Registramos que os itens do evento *${eventoNome}* estão alinhados e encaminhamos para a secretaria. 🙏✨`;
     } else {
       respostaAoLider = `✅ *Evento Confirmado!*\n\nMuito obrigado pelo retorno, *${nomeResp}*! A confirmação para o evento *${eventoNome}* foi registrada com sucesso. Que o Senhor abençoe ricamente toda a programação! 🙏✨`;
     }

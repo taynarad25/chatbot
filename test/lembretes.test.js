@@ -950,11 +950,18 @@ test("processarEnvioAgendaSecretarias: envia na segunda-feira para Isabelly e Ga
     },
   };
 
+  const fakeFetchNaoEnviado = async () => ({
+    ok: true,
+    text: async () => JSON.stringify({ enviado: false }),
+    json: async () => ({ enviado: false }),
+  });
+
   // 1. Em dia que NÃO é segunda-feira (ex: domingo 2026-09-20), não deve enviar
   const resDomingo = await processarEnvioAgendaSecretarias({
     client: fakeClient,
     buscarEventos: async () => eventosMock,
     dataBase: new Date("2026-09-20T10:00:00.000Z"), // Domingo
+    fetchFn: fakeFetchNaoEnviado,
   });
   assert.equal(resDomingo.pulado, true);
   assert.equal(mensagensEnviadas.length, 0);
@@ -964,6 +971,7 @@ test("processarEnvioAgendaSecretarias: envia na segunda-feira para Isabelly e Ga
     client: fakeClient,
     buscarEventos: async () => eventosMock,
     dataBase: new Date("2026-09-21T10:00:00.000Z"), // Segunda-feira
+    fetchFn: fakeFetchNaoEnviado,
   });
   assert.equal(resSegunda.enviados, 2);
   assert.equal(mensagensEnviadas.length, 2);
@@ -977,6 +985,7 @@ test("processarEnvioAgendaSecretarias: envia na segunda-feira para Isabelly e Ga
     client: fakeClient,
     buscarEventos: async () => eventosMock,
     dataBase: new Date("2026-09-21T14:00:00.000Z"), // Mesma segunda-feira
+    fetchFn: fakeFetchNaoEnviado,
   });
   assert.equal(resSegundaNovamente.pulado, true);
   assert.equal(mensagensEnviadas.length, 2); // Não aumentou

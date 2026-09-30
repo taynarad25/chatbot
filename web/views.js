@@ -2151,7 +2151,7 @@ function renderIndexHtml() {
       }
 
       tbody.innerHTML = lista.map((item, idx) => {
-        const telFormatado = item.telefone ? item.telefone.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') : '-';
+        const telFormatado = item.telefone ? item.telefone.replace(/^(\\d{2})(\\d{4,5})(\\d{4})$/, '($1) $2-$3') : '-';
         const dataCriacao = item.criadoEm ? new Date(item.criadoEm).toLocaleDateString('pt-BR') : '-';
         const zapStatus = item.whatsappConfirmacaoEnviado
           ? '<span style="color: #4ade80; font-size: 0.85rem; font-weight: 600;">✅ Enviado</span>'
@@ -2165,7 +2165,7 @@ function renderIndexHtml() {
           '<td style="text-align: center; font-size: 0.85rem; color: var(--cor-texto-mutado);">' + dataCriacao + '</td>' +
           '<td style="text-align: center;">' + zapStatus + '</td>' +
           '<td style="text-align: center;">' +
-            '<button onclick="excluirMulherInscricao(\'' + (item.id || '') + '\', \'' + (item.nome || '').replace(/'/g, "\\'") + '\')" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">' +
+            '<button data-id="' + (item.id || '') + '" data-nome="' + (item.nome || '').replace(/"/g, '&quot;') + '" onclick="excluirMulherInscricao(this.dataset.id, this.dataset.nome)" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">' +
               '🗑️ Excluir' +
             '</button>' +
           '</td>' +

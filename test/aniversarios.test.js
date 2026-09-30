@@ -100,15 +100,18 @@ test("processarAniversariantesDoDia: dispara mensagem para aniversariantes do di
 
   assert.equal(resultado1.aniversariantes, 2);
   assert.equal(resultado1.enviados, 2);
-  assert.equal(mensagensEnviadas.length, 2);
 
-  assert.match(mensagensEnviadas[0].jid, /5511999990011/);
-  assert.match(mensagensEnviadas[0].texto, /Aniversariante Hoje 1/);
-  assert.match(mensagensEnviadas[0].texto, /Comunidade Cristã Curados/);
+  const msgsAniversariantes = mensagensEnviadas.filter((m) => m.texto.includes("Comunidade Cristã Curados"));
+  const msgsSec = mensagensEnviadas.filter((m) => m.texto.includes("Aniversariante do Dia!"));
 
-  assert.match(mensagensEnviadas[1].jid, /5511999990022/);
-  assert.match(mensagensEnviadas[1].texto, /Aniversariante Hoje 2/);
-  assert.match(mensagensEnviadas[1].texto, /Comunidade Cristã Curados/);
+  assert.equal(msgsAniversariantes.length, 2);
+  assert.equal(msgsSec.length, 2);
+
+  assert.match(msgsAniversariantes[0].jid, /5511999990011/);
+  assert.match(msgsAniversariantes[0].texto, /Aniversariante Hoje 1/);
+
+  assert.match(msgsAniversariantes[1].jid, /5511999990022/);
+  assert.match(msgsAniversariantes[1].texto, /Aniversariante Hoje 2/);
 
   // 2. Segunda execução no mesmo dia/ano: não deve reenviar (idempotência anual)
   const resultado2 = await processarAniversariantesDoDia({
@@ -119,5 +122,86 @@ test("processarAniversariantesDoDia: dispara mensagem para aniversariantes do di
 
   assert.equal(resultado2.aniversariantes, 2);
   assert.equal(resultado2.enviados, 0);
-  assert.equal(mensagensEnviadas.length, 2); // Nenhuma nova mensagem enviada
+  assert.equal(mensagensEnviadas.length, 4); // Nenhuma nova mensagem enviada
+});
+
+test("processarAniversariantesDoDia: notifica secretaria e integra com planilha remota", async () => {
+  const tel = "5511999990044";
+  const dataBase = new Date(2026, 8, 25, 8, 0, 0); // 25/09/2026
+  const membros = [
+    { nome: "Lucas Aniversário", telefone: tel, dataNascimento: "25/09", cargos: "Líder" },
+  ];
+
+  try {
+    db.prepare("DELETE FROM lembretes_enviados WHERE eventoId LIKE 'aniversario_%'").run();
+  } catch {}
+
+  const postPayloads = [];
+  const mockFetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    postPayloads.push(body);
+    if (body.action === "verificar_envio") {
+      return {
+        ok: true,
+        json: async () => ({ enviado: false }),
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({ sucesso: true }),
+    };
+  };
+
+  const msgsSecretaria = [];
+  const fakeNotificarSecretaria = async (c, txt) => {
+    msgsSecretaria.push(txt);
+  };
+
+  const resultado = await processarAniversariantesDoDia({
+    client: {},
+    dataBase,
+    listLideresFn: () => membros,
+    notificarSecretariaFn: fakeNotificarSecretaria,
+    fetchFn: mockFetch,
+  });
+
+  assert.equal(resultado.enviados, 1);
+  // Notificou secretaria
+  assert.equal(msgsSecretaria.length, 1);
+  assert.match(msgsSecretaria[0], /Aniversariante do Dia!/);
+  assert.match(msgsSecretaria[0], /Lucas Aniversário/);
+
+  // Verificou e registrou na planilha
+  const verificaReq = postPayloads.find((p) => p.action === "verificar_envio");
+  const registraReq = postPayloads.find((p) => p.action === "registrar_envio");
+  assert.ok(verificaReq, "deve ter chamado verificar_envio na planilha");
+  assert.equal(verificaReq.tipo, "aniversario");
+  assert.equal(verificaReq.periodo, "2026-09-25");
+  assert.ok(registraReq, "deve ter chamado registrar_envio na planilha");
+  assert.equal(registraReq.tipo, "aniversario");
+  assert.equal(registraReq.periodo, "2026-09-25");
+
+  // Se a planilha responder enviado: true, ignora o envio
+  const mockFetchJaEnviado = async (url, opts) => {
+    return {
+      ok: true,
+      json: async () => ({ enviado: true }),
+    };
+  };
+
+  try {
+    db.prepare("DELETE FROM lembretes_enviados WHERE eventoId LIKE 'aniversario_%'").run();
+  } catch {}
+
+  const msgsSec2 = [];
+  const resPulado = await processarAniversariantesDoDia({
+    client: {},
+    dataBase,
+    listLideresFn: () => membros,
+    notificarSecretariaFn: async (c, t) => msgsSec2.push(t),
+    fetchFn: mockFetchJaEnviado,
+  });
+
+  assert.equal(resPulado.enviados, 0, "deve pular envio quando planilha retornar enviado: true");
+  assert.equal(msgsSec2.length, 0, "não deve notificar secretaria se pulado");
 });

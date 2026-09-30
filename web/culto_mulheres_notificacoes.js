@@ -12,6 +12,10 @@ const {
 } = require('./culto_mulheres');
 
 const { obterLideresPorDepartamento, listLideres } = require('./lideres');
+const {
+  verificarEnvioRemoto,
+  registrarEnvioRemoto,
+} = require('../bot/logsEnvioSheet');
 
 function formatarJidWhatsApp(telefone) {
   if (!telefone) return '';
@@ -44,9 +48,30 @@ function registrarExecucao(nomeRotina, dataRef) {
 /**
  * Envia WhatsApp de confirmação de inscrição para a participante recém-inscrita.
  */
-async function enviarMensagemConfirmacaoInscricaoMulheres(client, { nome, telefone, email } = {}) {
+async function enviarMensagemConfirmacaoInscricaoMulheres(client, { nome, telefone, email } = {}, { fetchFn = globalThis.fetch } = {}) {
   if (!client || !telefone) {
     return { ok: false, reason: 'CLIENT_OU_TELEFONE_AUSENTE' };
+  }
+
+  const telLimpo = String(telefone || '').replace(/\D/g, '');
+  const tipo = 'confirmacao_inscricao_culto_mulheres';
+  const destinatario = `${nome || 'Participante'} (${telLimpo})`;
+  const periodo = String(email || telLimpo);
+
+  // 1. ANTES de enviar: verifica na planilha
+  const jaEnviadoRemoto = await verificarEnvioRemoto({
+    tipo,
+    destinatario,
+    periodo,
+    fetchFn,
+  });
+
+  if (jaEnviadoRemoto === true) {
+    console.log(`[Culto Mulheres] Confirmação já enviada anteriormente para ${destinatario} (${periodo}) via planilha. Pulando.`);
+    if (email) {
+      marcarConfirmacaoMulheresEnviada(email);
+    }
+    return { ok: true, jaEnviado: true };
   }
 
   const jid = formatarJidWhatsApp(telefone);
@@ -60,6 +85,16 @@ async function enviarMensagemConfirmacaoInscricaoMulheres(client, { nome, telefo
       marcarConfirmacaoMulheresEnviada(email);
     }
     console.log(`[Culto Mulheres] Confirmação enviada via WhatsApp para ${telefone} (${nome})`);
+
+    // 2. LOGO APÓS envio bem-sucedido: registra na planilha
+    await registrarEnvioRemoto({
+      tipo,
+      destinatario,
+      periodo,
+      detalhes: { email, nome },
+      fetchFn,
+    });
+
     return { ok: true };
   } catch (err) {
     console.error(`[Culto Mulheres] Erro ao enviar confirmação WhatsApp para ${telefone}:`, err.message);
@@ -75,6 +110,7 @@ async function processarNotificacoesRedeMulheres({
   client,
   dataBase = new Date(),
   dataEventoStr = '2026-10-24',
+  fetchFn = globalThis.fetch,
 } = {}) {
   // Converte data base e data evento para meia-noite UTC/local para contagem precisa de dias
   const [evAno, evMes, evDia] = dataEventoStr.split('-').map(Number);
@@ -127,6 +163,24 @@ async function processarNotificacoesRedeMulheres({
   const erros = [];
 
   for (const lider of lideresMulheres) {
+    const telLimpo = String(lider.telefone || '').replace(/\D/g, '');
+    const tipo = `aviso_lideres_mulheres_${diasRestantes}_dias`;
+    const destinatario = `${lider.nome || 'Líder'} (${telLimpo})`;
+    const periodo = diaHojeIso;
+
+    // 1. ANTES de enviar: verifica na planilha
+    const jaEnviadoRemoto = await verificarEnvioRemoto({
+      tipo,
+      destinatario,
+      periodo,
+      fetchFn,
+    });
+
+    if (jaEnviadoRemoto === true) {
+      console.log(`[Culto Mulheres] Notificação de ${diasRestantes} dias já enviada para ${destinatario} (${periodo}) via planilha.`);
+      continue;
+    }
+
     const jid = formatarJidWhatsApp(lider.telefone);
     if (!jid) continue;
 
@@ -143,6 +197,15 @@ async function processarNotificacoesRedeMulheres({
         await client.sendMessage(jid, texto);
         enviados++;
         console.log(`[Culto Mulheres] Notificação de ${diasRestantes} dias enviada para ${lider.nome} (${lider.telefone})`);
+
+        // 2. LOGO APÓS envio bem-sucedido: registra na planilha
+        await registrarEnvioRemoto({
+          tipo,
+          destinatario,
+          periodo,
+          detalhes: { totalInscritas, diasRestantes },
+          fetchFn,
+        });
       } catch (err) {
         console.error(`[Culto Mulheres] Falha ao enviar para ${lider.telefone}:`, err.message);
         erros.push({ telefone: lider.telefone, erro: err.message });
