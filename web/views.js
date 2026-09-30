@@ -1387,7 +1387,7 @@ function renderIndexHtml() {
             </div>
             <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Culto de Mulheres — O Vaso e o Oleiro</h4>
             <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
-              🗓️ <strong>24/10/2026 às 18:00</strong> &nbsp;•&nbsp; 📍 <strong>R. Benedicto de Abreu Júnior, 40</strong> &nbsp;•&nbsp; <em>Inscrição Estritamente Individual</em>
+              🗓️ <strong>24/10/2026 às 16:00</strong> &nbsp;•&nbsp; 📍 <strong>R. Benedicto de Abreu Júnior, 40</strong> &nbsp;•&nbsp; <em>Inscrição Estritamente Individual</em>
             </p>
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -2157,21 +2157,19 @@ function renderIndexHtml() {
           ? '<span style="color: #4ade80; font-size: 0.85rem; font-weight: 600;">✅ Enviado</span>'
           : '<span style="color: #facc15; font-size: 0.85rem;">⏳ Pendente</span>';
 
-        return `
-          <tr>
-            <td style="text-align: center; font-weight: bold; color: var(--cor-texto-mutado);">${idx + 1}</td>
-            <td><strong style="color: #fff; font-size: 0.95rem;">${item.nome || '-'}</strong></td>
-            <td style="font-size: 0.88rem; color: #cbd5e1;">${item.email || '-'}</td>
-            <td style="font-size: 0.88rem;">${telFormatado}</td>
-            <td style="text-align: center; font-size: 0.85rem; color: var(--cor-texto-mutado);">${dataCriacao}</td>
-            <td style="text-align: center;">${zapStatus}</td>
-            <td style="text-align: center;">
-              <button onclick="excluirMulherInscricao('${item.id}', '${item.nome}')" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
-                🗑️ Excluir
-              </button>
-            </td>
-          </tr>
-        `;
+        return '<tr>' +
+          '<td style="text-align: center; font-weight: bold; color: var(--cor-texto-mutado);">' + (idx + 1) + '</td>' +
+          '<td><strong style="color: #fff; font-size: 0.95rem;">' + (item.nome || '-') + '</strong></td>' +
+          '<td style="font-size: 0.88rem; color: #cbd5e1;">' + (item.email || '-') + '</td>' +
+          '<td style="font-size: 0.88rem;">' + telFormatado + '</td>' +
+          '<td style="text-align: center; font-size: 0.85rem; color: var(--cor-texto-mutado);">' + dataCriacao + '</td>' +
+          '<td style="text-align: center;">' + zapStatus + '</td>' +
+          '<td style="text-align: center;">' +
+            '<button onclick="excluirMulherInscricao(\'' + (item.id || '') + '\', \'' + (item.nome || '').replace(/'/g, "\\'") + '\')" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">' +
+              '🗑️ Excluir' +
+            '</button>' +
+          '</td>' +
+        '</tr>';
       }).join('');
     }
 

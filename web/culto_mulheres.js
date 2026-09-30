@@ -111,7 +111,7 @@ function salvarInscricaoMulheres({
   email,
   telefone,
   evento = 'Culto de Mulheres: O Vaso e o Oleiro',
-  dataEvento = '2026-10-24 18:00',
+  dataEvento = '2026-10-24 16:00',
   whatsappConfirmacaoEnviado = 0,
   criadoEm = null,
 } = {}) {
@@ -224,7 +224,7 @@ function montarMensagemConfirmacaoMulheres({ nome } = {}) {
     `🌸 *Inscrição Confirmada - Culto de Mulheres*\n\n` +
     `Olá, *${primeiroNome}*! Sua inscrição para o *Culto de Mulheres: O Vaso e o Oleiro* foi confirmada com sucesso! ✨\n\n` +
     `📅 *Data:* Sábado, 24/10/2026\n` +
-    `⏰ *Horário:* 18:00\n` +
+    `⏰ *Horário:* 16:00\n` +
     `📍 *Local:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi (Comunidade Cristã Curados)\n\n` +
     `Esperamos por você no dia! Será um momento precioso na presença de Deus! 🙏❤️`
   );
@@ -311,7 +311,7 @@ function renderMulheresPdfHtml() {
       <h1>Comunidade Cristã Curados • Secretaria</h1>
       <h2>Lista Oficial de Portaria & Presença • Culto de Mulheres: O Vaso e o Oleiro</h2>
       <div class="header-meta">
-        <strong>Data do Evento:</strong> Sábado, 24/10/2026 às 18:00 &nbsp;|&nbsp; 
+        <strong>Data do Evento:</strong> Sábado, 24/10/2026 às 16:00 &nbsp;|&nbsp; 
         <strong>Local:</strong> R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi &nbsp;|&nbsp;
         <strong>Gerado em:</strong> ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
       </div>

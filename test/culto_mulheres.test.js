@@ -173,7 +173,7 @@ test("Culto de Mulheres: renderMulheresPdfHtml gera o modelo de impressão no pa
 
   assert.ok(html.includes("Comunidade Cristã Curados • Secretaria"));
   assert.ok(html.includes("Culto de Mulheres: O Vaso e o Oleiro"));
-  assert.ok(html.includes("24/10/2026 às 18:00"));
+  assert.ok(html.includes("24/10/2026 às 16:00"));
   assert.ok(html.includes("Ester Rainha"));
   assert.ok(html.includes("ester@exemplo.com"));
   assert.ok(html.includes("window.print()"));
@@ -184,7 +184,7 @@ test("Culto de Mulheres: mensagem curta de confirmação no WhatsApp", () => {
   assert.ok(msg.includes("Rebeca"));
   assert.ok(msg.includes("O Vaso e o Oleiro"));
   assert.ok(msg.includes("24/10/2026"));
-  assert.ok(msg.includes("18:00"));
+  assert.ok(msg.includes("16:00"));
   assert.ok(msg.includes("Esperamos por você no dia"));
 });
 

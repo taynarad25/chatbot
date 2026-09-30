@@ -5205,7 +5205,7 @@ Digite *menu* para voltar ao menu principal.`;
         };
         return msg.reply(
           `🌸 *Culto de Mulheres: O Vaso e o Oleiro*\n\n` +
-          `🗓️ *Data:* Sábado, 24/10/2026 às 18:00\n` +
+          `🗓️ *Data:* Sábado, 24/10/2026 às 16:00\n` +
           `📍 *Local:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi (Comunidade Cristã Curados)\n\n` +
           `A inscrição é estritamente individual e gratuita. Vamos começar!\n\n` +
           `1️⃣ Por favor, digite o seu *Nome completo*:\n\n` +

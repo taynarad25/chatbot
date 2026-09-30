@@ -134,7 +134,7 @@ async function processarNotificacoesRedeMulheres({
     const texto =
       `🌸 *Atualização de Inscrições - Culto de Mulheres*\n\n` +
       `Olá, *${primeiroNome}*!\n` +
-      `Faltam apenas *${diasRestantes} dias* para o nosso *Culto de Mulheres: O Vaso e o Oleiro* (Sábado, 24/10 às 18h)! ✨\n\n` +
+      `Faltam apenas *${diasRestantes} dias* para o nosso *Culto de Mulheres: O Vaso e o Oleiro* (Sábado, 24/10 às 16h)! ✨\n\n` +
       `📊 *Total de inscritas até o momento:* *${totalInscritas} participante(s)*\n\n` +
       `Seguimos em oração e na expectativa de tudo o que Deus irá fazer! 🙏❤️`;
 

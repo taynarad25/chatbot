@@ -137,7 +137,7 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     telefone TEXT NOT NULL,
     evento TEXT NOT NULL DEFAULT 'Culto de Mulheres: O Vaso e o Oleiro',
-    dataEvento TEXT NOT NULL DEFAULT '2026-10-24 18:00',
+    dataEvento TEXT NOT NULL DEFAULT '2026-10-24 16:00',
     whatsappConfirmacaoEnviado INTEGER NOT NULL DEFAULT 0,
     criadoEm TEXT NOT NULL
   );

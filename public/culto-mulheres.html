@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inscrição: Culto de Mulheres — O Vaso e o Oleiro | Comunidade Cristã Curados</title>
-    <meta name="description" content="Inscrição individual para o Culto de Mulheres: O Vaso e o Oleiro. Dia 24/10/2026 às 18h na Comunidade Cristã Curados. Participe!">
+    <meta name="description" content="Inscrição individual para o Culto de Mulheres: O Vaso e o Oleiro. Dia 24/10/2026 às 16h na Comunidade Cristã Curados. Participe!">
     
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3">
@@ -403,7 +403,7 @@
                         <span class="meta-icon">🗓️</span>
                         <div>
                             <strong>Sábado, 24 de Outubro de 2026</strong>
-                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Horário: 18:00</div>
+                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Horário: 16:00</div>
                         </div>
                     </li>
                     <li class="meta-item">
@@ -519,12 +519,12 @@
                 if (data.ja_inscrito) {
                     feedback.className = 'feedback-box duplicate';
                     fTitle.innerHTML = '⚠️ E-mail Já Inscrito!';
-                    fBody.innerHTML = `O e-mail <strong>${email}</strong> já está cadastrado para o Culto de Mulheres: <em>O Vaso e o Oleiro</em>. Não é necessário se inscrever novamente! Esperamos por você no dia 24/10 às 18h.`;
+                    fBody.innerHTML = `O e-mail <strong>${email}</strong> já está cadastrado para o Culto de Mulheres: <em>O Vaso e o Oleiro</em>. Não é necessário se inscrever novamente! Esperamos por você no dia 24/10 às 16h.`;
                     feedback.style.display = 'block';
                 } else if (data.ok) {
                     feedback.className = 'feedback-box success';
                     fTitle.innerHTML = '🎉 Inscrição Confirmada com Sucesso!';
-                    fBody.innerHTML = `Olá, <strong>${nome}</strong>! Sua vaga está garantida para o <strong>Culto de Mulheres: O Vaso e o Oleiro</strong> no dia <strong>24/10 às 18:00</strong>.<br><br>Esperamos com alegria por você! Você também receberá uma mensagem curta de confirmação no seu WhatsApp.`;
+                    fBody.innerHTML = `Olá, <strong>${nome}</strong>! Sua vaga está garantida para o <strong>Culto de Mulheres: O Vaso e o Oleiro</strong> no dia <strong>24/10 às 16:00</strong>.<br><br>Esperamos com alegria por você! Você também receberá uma mensagem curta de confirmação no seu WhatsApp.`;
                     feedback.style.display = 'block';
                     document.getElementById('formInscricao').reset();
                 } else {
