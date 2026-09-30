@@ -131,6 +131,20 @@ db.exec(`
     criadoEm TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS mulheres_inscricoes (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    telefone TEXT NOT NULL,
+    evento TEXT NOT NULL DEFAULT 'Culto de Mulheres: O Vaso e o Oleiro',
+    dataEvento TEXT NOT NULL DEFAULT '2026-10-24 18:00',
+    whatsappConfirmacaoEnviado INTEGER NOT NULL DEFAULT 0,
+    criadoEm TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_mulheres_email ON mulheres_inscricoes(email);
+  CREATE INDEX IF NOT EXISTS idx_mulheres_telefone ON mulheres_inscricoes(telefone);
+
   CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,

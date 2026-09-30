@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscrição: Culto de Mulheres — O Vaso e o Oleiro | Comunidade Cristã Curados</title>
+    <meta name="description" content="Inscrição individual para o Culto de Mulheres: O Vaso e o Oleiro. Dia 24/10/2026 às 18h na Comunidade Cristã Curados. Participe!">
+    
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3">
+    <link rel="icon" type="image/png" href="/images/logo.png?v=3">
+    <link rel="shortcut icon" type="image/png" href="/images/logo.png?v=3">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --cor-terracota: #c86452;
+            --cor-terracota-dark: #9e4333;
+            --cor-rose: #f4a290;
+            --cor-rose-light: #fcebe7;
+            --cor-fundo: #120e0d;
+            --cor-card: #1c1514;
+            --cor-card-alt: #241c1b;
+            --cor-borda: rgba(244, 162, 144, 0.18);
+            --cor-texto: #f9f6f5;
+            --cor-texto-mutado: #a89a97;
+            --cor-sucesso: #22c55e;
+            --cor-alerta: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: rgba(18, 14, 13, 0.94);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--cor-borda);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .top-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #ffffff;
+        }
+
+        .top-brand img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        .top-brand-text {
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: var(--cor-rose);
+        }
+
+        .top-tag {
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 999px;
+            background: rgba(200, 100, 82, 0.2);
+            color: var(--cor-rose);
+            border: 1px solid rgba(244, 162, 144, 0.4);
+        }
+
+        /* Main Container */
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+            flex: 1;
+        }
+
+        /* Banner Hero Responsivo */
+        .banner-wrapper {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--cor-borda);
+            margin-bottom: 32px;
+            background: #000;
+        }
+
+        .banner-img-desktop {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 480px;
+            object-fit: cover;
+            object-position: center;
+        }
+
+        .banner-img-mobile {
+            display: none;
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+        }
+
+        @media (max-width: 768px) {
+            .banner-img-desktop {
+                display: none;
+            }
+            .banner-img-mobile {
+                display: block;
+                max-height: 520px;
+            }
+        }
+
+        /* Informações e Formulário em Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.15fr;
+            gap: 32px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cartão de Detalhes do Evento */
+        .event-details-card {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 18px;
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .event-badge {
+            display: inline-block;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(200, 100, 82, 0.25);
+            color: var(--cor-rose);
+            margin-bottom: 14px;
+        }
+
+        .event-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.85rem;
+            line-height: 1.25;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+
+        .event-subtitle {
+            font-size: 1.05rem;
+            color: var(--cor-rose);
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .meta-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 0.95rem;
+            color: var(--cor-texto);
+        }
+
+        .meta-icon {
+            font-size: 1.25rem;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .notice-individual {
+            background: rgba(200, 100, 82, 0.12);
+            border-left: 4px solid var(--cor-terracota);
+            border-radius: 0 8px 8px 0;
+            padding: 12px 16px;
+            font-size: 0.88rem;
+            color: #f7dcd7;
+            margin-top: 14px;
+        }
+
+        /* Cartão do Formulário */
+        .form-card {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 18px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        .form-header {
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 16px;
+        }
+
+        .form-header h2 {
+            font-size: 1.45rem;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .form-header p {
+            font-size: 0.9rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.88rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #f2e9e7;
+        }
+
+        .form-input {
+            width: 100%;
+            background: var(--cor-card-alt);
+            border: 1.5px solid rgba(244, 162, 144, 0.25);
+            border-radius: 10px;
+            padding: 14px 16px;
+            color: #fff;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--cor-rose);
+            box-shadow: 0 0 0 3px rgba(244, 162, 144, 0.2);
+            background: #2a201f;
+        }
+
+        .form-input::placeholder {
+            color: #796c69;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: linear-gradient(135deg, var(--cor-terracota), #d4705e);
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 6px 18px rgba(200, 100, 82, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(200, 100, 82, 0.55);
+            background: linear-gradient(135deg, #d4705e, #e27d6a);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Mensagens de Feedback */
+        .feedback-box {
+            display: none;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .feedback-box.success {
+            background: rgba(34, 197, 94, 0.12);
+            border: 1px solid rgba(34, 197, 94, 0.35);
+            color: #bbf7d0;
+        }
+
+        .feedback-box.duplicate {
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            color: #fde68a;
+        }
+
+        .feedback-box.error {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+        }
+
+        .feedback-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feedback-body {
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--cor-borda);
+            padding: 24px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--cor-texto-mutado);
+            background: #0f0b0a;
+        }
+    </style>
+</head>
+<body>
+    <header class="top-bar">
+        <a href="/" class="top-brand">
+            <img src="/images/logo.png" alt="Comunidade Cristã Curados" onerror="this.style.display='none'">
+            <span class="top-brand-text">CURADOS</span>
+        </a>
+        <div class="top-tag">🌸 Rede de Mulheres</div>
+    </header>
+
+    <main class="container">
+        <!-- Banner Responsivo -->
+        <section class="banner-wrapper">
+            <img src="/images/mulheres-desktop.png" alt="Culto de Mulheres: O Vaso e o Oleiro" class="banner-img-desktop" onerror="this.src='/images/mulheres-desktop.jpg'">
+            <img src="/images/mulheres-mobile.png" alt="Culto de Mulheres: O Vaso e o Oleiro" class="banner-img-mobile" onerror="this.src='/images/mulheres-mobile.jpg'">
+        </section>
+
+        <section class="content-grid">
+            <!-- Informações do Evento -->
+            <article class="event-details-card">
+                <span class="event-badge">Culto de Mulheres</span>
+                <h1 class="event-title">O Vaso e o Oleiro</h1>
+                <p class="event-subtitle">Uma noite de transformação, oração e renovo.</p>
+
+                <ul class="meta-list">
+                    <li class="meta-item">
+                        <span class="meta-icon">🗓️</span>
+                        <div>
+                            <strong>Sábado, 24 de Outubro de 2026</strong>
+                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Horário: 18:00</div>
+                        </div>
+                    </li>
+                    <li class="meta-item">
+                        <span class="meta-icon">📍</span>
+                        <div>
+                            <strong>Comunidade Cristã Curados</strong>
+                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi</div>
+                        </div>
+                    </li>
+                    <li class="meta-item">
+                        <span class="meta-icon">🎟️</span>
+                        <div>
+                            <strong>Entrada Gratuita</strong>
+                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Inscrição individual obrigatória</div>
+                        </div>
+                    </li>
+                </ul>
+
+                <div class="notice-individual">
+                    📌 <strong>Aviso Importante:</strong> A inscrição é <strong>estritamente individual</strong>. Cada participante deve preencher o seu próprio formulário com seu respectivo e-mail e telefone de contato.
+                </div>
+            </article>
+
+            <!-- Formulário de Inscrição Individual -->
+            <section class="form-card">
+                <div class="form-header">
+                    <h2>Faça sua Inscrição</h2>
+                    <p>Preencha os campos abaixo para garantir sua participação.</p>
+                </div>
+
+                <form id="formInscricao" onsubmit="realizarInscricao(event)">
+                    <div class="form-group">
+                        <label for="campoNome" class="form-label">Nome Completo *</label>
+                        <input type="text" id="campoNome" class="form-input" placeholder="Ex: Maria de Jesus da Silva" required minlength="3">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="campoEmail" class="form-label">E-mail *</label>
+                        <input type="email" id="campoEmail" class="form-input" placeholder="seuemail@exemplo.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="campoTelefone" class="form-label">Telefone para Contato (WhatsApp) *</label>
+                        <input type="tel" id="campoTelefone" class="form-input" placeholder="(11) 99999-8888" required minlength="10" oninput="formatarTelefoneInput(this)">
+                    </div>
+
+                    <button type="submit" id="btnEnviar" class="btn-submit">
+                        <span>Confirmar Minha Inscrição</span>
+                    </button>
+                </form>
+
+                <!-- Feedback Visual -->
+                <div id="feedbackBox" class="feedback-box">
+                    <div id="feedbackTitle" class="feedback-title"></div>
+                    <div id="feedbackBody" class="feedback-body"></div>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <footer>
+        Comunidade Cristã Curados &copy; 2026 • Todos os direitos reservados.
+    </footer>
+
+    <script>
+        function formatarTelefoneInput(input) {
+            let v = input.value.replace(/\D/g, '');
+            if (v.length > 11) v = v.substring(0, 11);
+            if (v.length > 10) {
+                input.value = `(${v.substring(0,2)}) ${v.substring(2,7)}-${v.substring(7)}`;
+            } else if (v.length > 6) {
+                input.value = `(${v.substring(0,2)}) ${v.substring(2,6)}-${v.substring(6)}`;
+            } else if (v.length > 2) {
+                input.value = `(${v.substring(0,2)}) ${v.substring(2)}`;
+            } else if (v.length > 0) {
+                input.value = `(${v}`;
+            }
+        }
+
+        async function realizarInscricao(ev) {
+            ev.preventDefault();
+
+            const btn = document.getElementById('btnEnviar');
+            const feedback = document.getElementById('feedbackBox');
+            const fTitle = document.getElementById('feedbackTitle');
+            const fBody = document.getElementById('feedbackBody');
+
+            const nome = document.getElementById('campoNome').value.trim();
+            const email = document.getElementById('campoEmail').value.trim().toLowerCase();
+            const telefone = document.getElementById('campoTelefone').value.trim();
+
+            if (!nome || !email || !telefone) {
+                feedback.className = 'feedback-box error';
+                fTitle.innerHTML = '❌ Dados Incompletos';
+                fBody.innerHTML = 'Por favor, preencha todos os campos obrigatórios.';
+                feedback.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳ Processando inscrição...</span>';
+            feedback.style.display = 'none';
+
+            try {
+                const response = await fetch('/mulheres/api/inscrever', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, email, telefone })
+                });
+
+                const data = await response.json();
+
+                if (data.ja_inscrito) {
+                    feedback.className = 'feedback-box duplicate';
+                    fTitle.innerHTML = '⚠️ E-mail Já Inscrito!';
+                    fBody.innerHTML = `O e-mail <strong>${email}</strong> já está cadastrado para o Culto de Mulheres: <em>O Vaso e o Oleiro</em>. Não é necessário se inscrever novamente! Esperamos por você no dia 24/10 às 18h.`;
+                    feedback.style.display = 'block';
+                } else if (data.ok) {
+                    feedback.className = 'feedback-box success';
+                    fTitle.innerHTML = '🎉 Inscrição Confirmada com Sucesso!';
+                    fBody.innerHTML = `Olá, <strong>${nome}</strong>! Sua vaga está garantida para o <strong>Culto de Mulheres: O Vaso e o Oleiro</strong> no dia <strong>24/10 às 18:00</strong>.<br><br>Esperamos com alegria por você! Você também receberá uma mensagem curta de confirmação no seu WhatsApp.`;
+                    feedback.style.display = 'block';
+                    document.getElementById('formInscricao').reset();
+                } else {
+                    feedback.className = 'feedback-box error';
+                    fTitle.innerHTML = '❌ Não foi possível concluir';
+                    fBody.innerHTML = data.message || 'Ocorreu um erro ao enviar sua inscrição. Por favor, tente novamente.';
+                    feedback.style.display = 'block';
+                }
+            } catch (err) {
+                feedback.className = 'feedback-box error';
+                fTitle.innerHTML = '❌ Erro de Conexão';
+                fBody.innerHTML = 'Não conseguimos conectar ao servidor. Verifique sua conexão e tente novamente.';
+                feedback.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>Confirmar Minha Inscrição</span>';
+            }
+        }
+    </script>
+</body>
+</html>

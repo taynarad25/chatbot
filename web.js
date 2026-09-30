@@ -11,6 +11,8 @@ const { getClientIp } = require("./web/clientIp");
 const theChosen = require("./web/the_chosen");
 const theChosenSheets = require("./web/the_chosen_sheets");
 const theChosenNotificacoes = require("./web/the_chosen_notificacoes");
+const cultoMulheres = require("./web/culto_mulheres");
+const cultoMulheresNotificacoes = require("./web/culto_mulheres_notificacoes");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
@@ -38,6 +40,9 @@ const QUEMSOMOS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "quemso
 const THE_CHOSEN_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "the-chosen.html"))
   ? path.join(__dirname, "public", "the-chosen.html")
   : path.join(__dirname, "web", "public", "the-chosen.html");
+const MULHERES_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "culto-mulheres.html"))
+  ? path.join(__dirname, "public", "culto-mulheres.html")
+  : path.join(__dirname, "web", "public", "culto-mulheres.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -495,6 +500,133 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         } catch (err) {
           console.error('[The Chosen] Erro ao limpar inscrições de teste:', err.message);
           return sendJson(res, 500, { ok: false, message: 'Erro interno ao limpar testes.' });
+        }
+      }
+
+      // Rota pública: Culto de Mulheres (/mulheres, /culto-mulheres)
+      if (req.method === 'GET' && (
+        pathname === '/mulheres' || pathname === '/mulheres/' || pathname === '/mulheres.html' ||
+        pathname === '/culto-mulheres' || pathname === '/culto-mulheres/' || pathname === '/culto-mulheres.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "culto-mulheres.html"))
+          ? path.join(__dirname, "public", "culto-mulheres.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "culto-mulheres.html")) ? path.join(__dirname, "web", "public", "culto-mulheres.html") : MULHERES_HTML_FILE);
+        if (fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // API: Processamento de inscrição (/mulheres/api/inscrever)
+      if (req.method === 'POST' && (pathname === '/mulheres/api/inscrever' || pathname === '/mulheres/inscrever')) {
+        try {
+          const body = await parseRequestBody(req);
+          const { nome, email, telefone } = body || {};
+          if (!nome || !email || !telefone) {
+            return sendJson(res, 400, { ok: false, message: 'Nome, e-mail e telefone são obrigatórios.' });
+          }
+
+          const resultadoPlanilha = await cultoMulheres.enviarInscricaoPlanilhaMulheres({ nome, email, telefone });
+
+          if (resultadoPlanilha.ja_inscrito) {
+            return sendJson(res, 200, {
+              ok: false,
+              ja_inscrito: true,
+              message: 'Este e-mail já está cadastrado para o Culto de Mulheres!'
+            });
+          }
+
+          if (resultadoPlanilha.ok || resultadoPlanilha.status === 'success') {
+            const inscricao = cultoMulheres.salvarInscricaoMulheres({
+              nome,
+              email,
+              telefone,
+              whatsappConfirmacaoEnviado: 0
+            });
+
+            // Disparo de confirmação oficial no WhatsApp da participante
+            try {
+              const botClient = typeof getClient === 'function' ? getClient() : null;
+              if (botClient) {
+                cultoMulheresNotificacoes.enviarMensagemConfirmacaoInscricaoMulheres(botClient, { nome, telefone, email })
+                  .catch(errZap => console.error('[Culto Mulheres] Erro no envio WhatsApp:', errZap.message));
+              }
+            } catch (errDisparo) {
+              console.error('[Culto Mulheres] Erro ao obter cliente WhatsApp:', errDisparo.message);
+            }
+
+            return sendJson(res, 200, {
+              ok: true,
+              ja_inscrito: false,
+              message: 'Inscrição realizada com sucesso!',
+              inscricao
+            });
+          }
+
+          return sendJson(res, 500, { ok: false, message: resultadoPlanilha.message || 'Erro ao salvar na planilha.' });
+        } catch (err) {
+          console.error('[Culto Mulheres] Erro ao processar inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro interno ao processar inscrição.' });
+        }
+      }
+
+      // API: Listagem de inscritas e estatísticas (/mulheres/api/inscritas)
+      if (req.method === 'GET' && pathname === '/mulheres/api/inscritas') {
+        try {
+          const inscricoes = cultoMulheres.listarInscricoesMulheres();
+          const stats = cultoMulheres.obterEstatisticasMulheres();
+          return sendJson(res, 200, { ok: true, inscricoes, stats });
+        } catch (err) {
+          console.error('[Culto Mulheres] Erro ao listar inscritas:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao listar inscritas.' });
+        }
+      }
+
+      // API: Relatório / Exportação PDF (/mulheres/api/relatorio-pdf, /mulheres/relatorio-pdf)
+      if (req.method === 'GET' && (pathname === '/mulheres/api/relatorio-pdf' || pathname === '/mulheres/relatorio-pdf')) {
+        try {
+          const html = cultoMulheres.renderMulheresPdfHtml();
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+          });
+          return res.end(html);
+        } catch (errPdf) {
+          console.error('[Culto Mulheres] Erro ao gerar PDF:', errPdf);
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          return res.end('Erro ao gerar relatório PDF.');
+        }
+      }
+
+      // API: Excluir inscrição (/mulheres/api/excluir-inscricao ou DELETE /mulheres/api/inscricoes/:id)
+      if ((req.method === 'POST' && pathname === '/mulheres/api/excluir-inscricao') ||
+          (req.method === 'DELETE' && pathname.startsWith('/mulheres/api/inscricoes/'))) {
+        try {
+          let termo = null;
+          if (req.method === 'DELETE') {
+            termo = decodeURIComponent(pathname.replace('/mulheres/api/inscricoes/', ''));
+          } else {
+            const body = await parseRequestBody(req);
+            termo = body?.id || body?.email;
+          }
+          if (!termo) {
+            return sendJson(res, 400, { ok: false, message: 'ID ou e-mail da inscrição não informado.' });
+          }
+          const removido = cultoMulheres.excluirInscricaoMulheres(termo);
+          if (removido) {
+            return sendJson(res, 200, { ok: true, message: 'Inscrição removida com sucesso.' });
+          } else {
+            return sendJson(res, 404, { ok: false, message: 'Inscrição não encontrada.' });
+          }
+        } catch (err) {
+          console.error('[Culto Mulheres] Erro ao excluir inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
         }
       }
 

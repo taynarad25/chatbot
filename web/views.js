@@ -1377,6 +1377,74 @@ function renderIndexHtml() {
           </tbody>
         </table>
       </div>
+
+      <!-- Card do Evento Culto de Mulheres -->
+      <div class="evento-card-item" style="margin-top: 2.5rem; border-color: rgba(200, 100, 82, 0.35);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(200, 100, 82, 0.2); color: #f4a290; border: 1px solid rgba(200, 100, 82, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
+              🌸 Rede de Mulheres
+            </div>
+            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Culto de Mulheres — O Vaso e o Oleiro</h4>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
+              🗓️ <strong>24/10/2026 às 18:00</strong> &nbsp;•&nbsp; 📍 <strong>R. Benedicto de Abreu Júnior, 40</strong> &nbsp;•&nbsp; <em>Inscrição Estritamente Individual</em>
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button onclick="window.open('/mulheres', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver página pública de inscrição">
+              🔗 Abrir Formulário
+            </button>
+            <button onclick="window.open('/mulheres/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #c86452, #e27d60); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(200, 100, 82, 0.35);">
+              📄 Exportar Lista (PDF)
+            </button>
+            <button onclick="fetchMulheresInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+              🔄 Atualizar
+            </button>
+          </div>
+        </div>
+
+        <div class="evento-metric-grid" id="mulheresMetrics">
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="mulheresTotal" style="color: #f4a290;">-</div>
+            <div class="evento-metric-lbl">Total de Inscritas</div>
+          </div>
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="mulheresConfirmadosZap" style="color: #4ade80;">-</div>
+            <div class="evento-metric-lbl">Confirmação WhatsApp</div>
+          </div>
+          <div class="evento-metric-box">
+            <div class="evento-metric-val" id="mulheresPendentesZap" style="color: #facc15;">-</div>
+            <div class="evento-metric-lbl">Pendentes de WhatsApp</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros e Busca do Culto de Mulheres -->
+      <div class="evento-toolbar" style="margin-top: 1rem;">
+        <input type="text" id="mulheresSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, e-mail ou telefone..." oninput="filtrarMulheresInscricoes()" />
+      </div>
+
+      <!-- Tabela de Inscritas do Culto de Mulheres -->
+      <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto; margin-bottom: 2rem;">
+        <table class="evento-table">
+          <thead>
+            <tr>
+              <th style="width: 60px; text-align: center;">Nº</th>
+              <th>Nome da Participante</th>
+              <th>E-mail</th>
+              <th>Telefone / WhatsApp</th>
+              <th style="width: 150px; text-align: center;">Data da Inscrição</th>
+              <th style="width: 140px; text-align: center;">WhatsApp</th>
+              <th style="width: 110px; text-align: center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="mulheresTbodyInscritos">
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando inscritas...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div id="tab-admin" class="tab-content">
@@ -1480,7 +1548,7 @@ function renderIndexHtml() {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(name).classList.add('active');
       evt.currentTarget.classList.add('active');
-      if(name === 'tab-eventos') { fetchTheChosenInscricoes(); fetchEventosCadastrados(); }
+      if(name === 'tab-eventos') { fetchTheChosenInscricoes(); fetchMulheresInscricoes(); fetchEventosCadastrados(); }
       if(name === 'tab-admin') fetchUsers();
       if(name === 'tab-lideres') fetchLideres();
     }
@@ -2030,6 +2098,103 @@ function renderIndexHtml() {
           btn.disabled = false;
           btn.innerHTML = originalText || '🔄 Puxar da Planilha';
         }
+      }
+    }
+
+    /* =========================================================================
+       FRONTEND: Culto de Mulheres — O Vaso e o Oleiro
+       ========================================================================= */
+    let mulheresInscricoesCache = [];
+
+    async function fetchMulheresInscricoes() {
+      try {
+        const res = await fetch('/mulheres/api/inscritas');
+        if (res.status === 401) { window.location.href = '/secretaria/login'; return; }
+        if (!res.ok) return;
+        const data = await res.json();
+        mulheresInscricoesCache = data.inscricoes || [];
+
+        const stats = data.stats || {};
+        const elTotal = document.getElementById('mulheresTotal');
+        const elZap = document.getElementById('mulheresConfirmadosZap');
+        const elPend = document.getElementById('mulheresPendentesZap');
+
+        if (elTotal) elTotal.textContent = stats.total !== undefined ? stats.total : mulheresInscricoesCache.length;
+        if (elZap) elZap.textContent = stats.whatsappConfirmados || 0;
+        if (elPend) elPend.textContent = stats.pendentesConfirmacao || 0;
+
+        filtrarMulheresInscricoes();
+      } catch (err) {
+        console.error('Erro ao buscar inscritas do Culto de Mulheres:', err);
+      }
+    }
+
+    function filtrarMulheresInscricoes() {
+      const termo = (document.getElementById('mulheresSearchInput')?.value || '').toLowerCase().trim();
+      const filtrados = mulheresInscricoesCache.filter(item => {
+        if (!termo) return true;
+        const nomeStr = (item.nome || '').toLowerCase();
+        const emailStr = (item.email || '').toLowerCase();
+        const telStr = (item.telefone || '').toLowerCase();
+        return nomeStr.includes(termo) || emailStr.includes(termo) || telStr.includes(termo);
+      });
+      renderMulheresTable(filtrados);
+    }
+
+    function renderMulheresTable(lista) {
+      const tbody = document.getElementById('mulheresTbodyInscritos');
+      if (!tbody) return;
+
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Nenhuma participante inscrita encontrada.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map((item, idx) => {
+        const telFormatado = item.telefone ? item.telefone.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') : '-';
+        const dataCriacao = item.criadoEm ? new Date(item.criadoEm).toLocaleDateString('pt-BR') : '-';
+        const zapStatus = item.whatsappConfirmacaoEnviado
+          ? '<span style="color: #4ade80; font-size: 0.85rem; font-weight: 600;">✅ Enviado</span>'
+          : '<span style="color: #facc15; font-size: 0.85rem;">⏳ Pendente</span>';
+
+        return `
+          <tr>
+            <td style="text-align: center; font-weight: bold; color: var(--cor-texto-mutado);">${idx + 1}</td>
+            <td><strong style="color: #fff; font-size: 0.95rem;">${item.nome || '-'}</strong></td>
+            <td style="font-size: 0.88rem; color: #cbd5e1;">${item.email || '-'}</td>
+            <td style="font-size: 0.88rem;">${telFormatado}</td>
+            <td style="text-align: center; font-size: 0.85rem; color: var(--cor-texto-mutado);">${dataCriacao}</td>
+            <td style="text-align: center;">${zapStatus}</td>
+            <td style="text-align: center;">
+              <button onclick="excluirMulherInscricao('${item.id}', '${item.nome}')" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                🗑️ Excluir
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function excluirMulherInscricao(id, nome) {
+      if (!id) return;
+      const confirmou = confirm('Tem certeza que deseja excluir a inscrição de "' + (nome || 'Participante') + '"?');
+      if (!confirmou) return;
+
+      try {
+        const res = await fetch('/mulheres/api/excluir-inscricao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          fetchMulheresInscricoes();
+        } else {
+          alert(data.message || 'Erro ao excluir inscrição.');
+        }
+      } catch (err) {
+        console.error('Erro ao excluir inscrição de mulher:', err);
+        alert('Erro ao conectar com o servidor.');
       }
     }
 
@@ -2687,6 +2852,7 @@ function renderIndexHtml() {
     refresh();
     fetchEventosCadastrados();
     fetchTheChosenInscricoes();
+    fetchMulheresInscricoes();
   </script>
 </body></html>`;
 }

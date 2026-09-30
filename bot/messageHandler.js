@@ -295,6 +295,104 @@ async function comRetry(fn, { tentativas = 2, esperaMs = 1500 } = {}) {
   throw ultimoErro;
 }
 
+async function processarFluxoInscricaoMulheres({
+  msg,
+  numero,
+  info,
+  client,
+  etapas,
+  fetchFn = global.fetch,
+}) {
+  const texto = (msg.body || "").trim();
+
+  if (!info.dados) {
+    info.dados = {};
+  }
+
+  // 1. Nome completo
+  if (info.etapa === "coletar_nome") {
+    if (!texto || texto.length < 3) {
+      return msg.reply("❌ Por favor, digite o seu *nome completo*:");
+    }
+    info.dados.nome = texto;
+    info.etapa = "coletar_email";
+    return msg.reply(
+      `✨ Prazer, *${info.dados.nome}*!\n\n` +
+      `2️⃣ Agora, por favor, informe o seu *e-mail*:`
+    );
+  }
+
+  // 2. E-mail
+  if (info.etapa === "coletar_email") {
+    const emailLimpo = texto.toLowerCase().trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLimpo)) {
+      return msg.reply(
+        "❌ Formato de e-mail inválido.\n\n" +
+        "Por favor, digite um e-mail válido (ex: seuemail@gmail.com):"
+      );
+    }
+    info.dados.email = emailLimpo;
+    info.etapa = "coletar_telefone";
+    return msg.reply(
+      `📱 3️⃣ Para concluir, informe o seu *telefone para contato* (com DDD):\n\n` +
+      `(Ex: 11999998888)`
+    );
+  }
+
+  // 3. Telefone para contato
+  if (info.etapa === "coletar_telefone") {
+    const telDigitos = texto.replace(/\D/g, "");
+    if (!telDigitos || telDigitos.length < 10) {
+      return msg.reply(
+        "❌ Telefone inválido.\n\n" +
+        "Por favor, informe seu telefone com DDD (mínimo de 10 dígitos, ex: 11999998888):"
+      );
+    }
+    info.dados.telefone = telDigitos;
+
+    await msg.reply("⏳ Processando sua inscrição, aguarde só um instante...");
+
+    const {
+      enviarInscricaoPlanilhaMulheres,
+      salvarInscricaoMulheres,
+      montarMensagemConfirmacaoMulheres,
+    } = require("../web/culto_mulheres");
+
+    const resultado = await enviarInscricaoPlanilhaMulheres({
+      nome: info.dados.nome,
+      email: info.dados.email,
+      telefone: info.dados.telefone,
+      fetchFn,
+    });
+
+    if (resultado && resultado.ja_inscrito) {
+      delete etapas[numero];
+      return msg.reply(
+        `⚠️ *Aviso de Inscrição*\n\n` +
+        `O e-mail *${info.dados.email}* já está inscrito para o *Culto de Mulheres: O Vaso e o Oleiro*!\n\n` +
+        `Se precisar de suporte, procure a secretaria da igreja ou a liderança da Rede de Mulheres.\n\n` +
+        `Digite *menu* para voltar ao menu principal.`
+      );
+    }
+
+    // Sucesso
+    try {
+      salvarInscricaoMulheres({
+        nome: info.dados.nome,
+        email: info.dados.email,
+        telefone: info.dados.telefone,
+        whatsappConfirmacaoEnviado: 1,
+      });
+    } catch (dbErr) {
+      console.warn("[Culto Mulheres] Aviso ao salvar no banco local:", dbErr.message);
+    }
+
+    delete etapas[numero];
+    const confirmacaoMsg = montarMensagemConfirmacaoMulheres({ nome: info.dados.nome });
+    return msg.reply(confirmacaoMsg);
+  }
+}
+
 async function processarRespostaEventoExterno({
   msg,
   numero,
@@ -2204,6 +2302,7 @@ Escolha uma opção:
           menu += `\n7️⃣ Área do Líder`;
         }
 
+        menu += `\n🌸 Culto de Mulheres: O Vaso e o Oleiro (digite *mulheres*)`;
         menu += `\n\nDigite *menu* a qualquer momento para voltar ao menu principal.`;
         return msg.reply(menu);
       }
@@ -2226,6 +2325,16 @@ Escolha uma opção:
           if (resRetorno !== null) {
             return resRetorno;
           }
+        }
+
+        if (info.fluxo === "inscricao_mulheres") {
+          return await processarFluxoInscricaoMulheres({
+            msg,
+            numero,
+            info,
+            client,
+            etapas,
+          });
         }
 
         if (info.fluxo === "evento_externo") {
@@ -5087,6 +5196,23 @@ Digite *menu* para voltar ao menu principal.`;
         );
       }
 
+      if (/culto\s*(de\s*)?mulher|vaso\s*e\s*o?\s*oleiro|inscri[cç][aã]o\s*(para\s*)?mulher|\bmulher(es)?\b/i.test(texto)) {
+        console.log(`[Culto Mulheres] Início de fluxo de inscrição por ${identificarUsuario(contato, numero, isLider)}`);
+        etapas[numero] = {
+          fluxo: "inscricao_mulheres",
+          etapa: "coletar_nome",
+          dados: {},
+        };
+        return msg.reply(
+          `🌸 *Culto de Mulheres: O Vaso e o Oleiro*\n\n` +
+          `🗓️ *Data:* Sábado, 24/10/2026 às 18:00\n` +
+          `📍 *Local:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi (Comunidade Cristã Curados)\n\n` +
+          `A inscrição é estritamente individual e gratuita. Vamos começar!\n\n` +
+          `1️⃣ Por favor, digite o seu *Nome completo*:\n\n` +
+          `(Digite *menu* a qualquer momento para cancelar)`
+        );
+      }
+
       if (texto === "3" || texto === "agenda" || texto === "ver agenda") {
         console.log(`Opção 3 (Ver agenda) selecionada por ${identificarUsuario(contato, numero, isLider)}`);
         const hoje = new Date();
@@ -5221,6 +5347,7 @@ module.exports = {
   resolverOpcaoLocalReuniao,
   temPermissao,
   identificarUsuario,
+  processarFluxoInscricaoMulheres,
   processarRespostaEventoExterno,
   processarRetornoLembrete,
   montarMenuLider,

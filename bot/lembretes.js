@@ -1530,6 +1530,14 @@ function iniciarAgendadorLembretes({
         console.error("[Agendador Lembretes] Erro na rotina The Chosen:", errTC.message);
       }
 
+      // 9. Atualizações de inscritas para líderes da Rede de Mulheres (faltando 10, 5 e 3 dias)
+      try {
+        const { processarNotificacoesRedeMulheres } = require("../web/culto_mulheres_notificacoes");
+        await processarNotificacoesRedeMulheres({ client });
+      } catch (errMulheres) {
+        console.error("[Agendador Lembretes] Erro na rotina Rede de Mulheres:", errMulheres.message);
+      }
+
       registrarExecucaoRotina("rotina_diaria_lembretes", diaHoje);
       ultimoDiaExecutado = diaHoje;
     } catch (err) {
