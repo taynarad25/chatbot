@@ -116,9 +116,39 @@ function gerarResumoTheChosen() {
   );
 }
 
+const URL_WEBAPP_CRIANCAS =
+  process.env.CRIANCAS_WEBAPP_URL ||
+  "https://script.google.com/macros/s/AKfycbwVKUZxE7mzupcvdPjDck4tACDeUCvMFl2xH5XzzmxNVtb2HZhxtsK8wDjsr23jqmPLJA/exec";
+
+let cacheCriancas = {
+  total: 0,
+  ultimaAtualizacao: 0,
+};
+
+async function sincronizarInscricoesCriancas(fetchFn = globalThis.fetch) {
+  try {
+    const res = await fetchFn(URL_WEBAPP_CRIANCAS, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json();
+    if (data && typeof data.total === "number") {
+      cacheCriancas.total = data.total;
+      cacheCriancas.ultimaAtualizacao = Date.now();
+    }
+  } catch (err) {
+    console.warn("[Crianças] Erro ao sincronizar com Google Apps Script:", err.message);
+  }
+  return cacheCriancas;
+}
+
 function gerarResumoDiaDasCriancas() {
+  const total = cacheCriancas.total || 0;
+
   return (
     `🎈 *Inscrições - Especial Dia das Crianças*\n\n` +
+    `📊 *Estatísticas das Inscrições:*\n` +
+    `• Total de Crianças Inscritas: *${total}*\n\n` +
     `🗓️ *Data:* Sábado, 17/10/2026 às 14:00\n` +
     `📍 *Local:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi\n\n` +
     `📝 *Formulário de Inscrição Oficial:*\n` +
@@ -353,6 +383,13 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
   ) {
     try {
       await theChosen.sincronizarInscricoesComNuvem();
+    } catch {}
+  } else if (
+    process.env.NODE_ENV !== "test" &&
+    eventoId === "dia_das_criancas"
+  ) {
+    try {
+      await sincronizarInscricoesCriancas();
     } catch {}
   }
 
