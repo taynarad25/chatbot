@@ -38,9 +38,6 @@ const CATALOGO_EVENTOS = [
     nome: "Pré-estreia The Chosen - Temporada 6",
     icone: "🎬",
     departamentos: [
-      "Geral",
-      "Pastoral",
-      "Direção",
       "Comunicação",
       "Multimídia",
       "Eventos",
@@ -53,7 +50,29 @@ const CATALOGO_EVENTOS = [
           : [usuario?.departamento || ""]
       ).map((d) => String(d || "").toLowerCase().trim());
       return deptos.some((d) =>
-        /geral|dire[cç][aã]o|pastoral|comunica|m[ií]dia|evento/i.test(d)
+        /comunica|m[ií]dia|evento|the chosen/i.test(d)
+      );
+    },
+  },
+  {
+    id: "dia_das_criancas",
+    nome: "Especial Dia das Crianças",
+    icone: "🎈",
+    departamentos: [
+      "Ministério Infantil",
+      "Infantil",
+      "Crianças",
+      "Kids",
+    ],
+    verificarPermissao: (usuario, isPastor, isDiretor) => {
+      if (isPastor || isDiretor) return true;
+      const deptos = (
+        Array.isArray(usuario?.departamentos)
+          ? usuario.departamentos
+          : [usuario?.departamento || ""]
+      ).map((d) => String(d || "").toLowerCase().trim());
+      return deptos.some((d) =>
+        /infantil|crian[cç]a|kids/i.test(d)
       );
     },
   },
@@ -94,6 +113,16 @@ function gerarResumoTheChosen() {
     `📊 *Estatísticas das Inscrições:*\n` +
     `• Vagas Ocupadas: *${statusVagas.preenchidas} / ${statusVagas.total}*\n` +
     `• Vagas Restantes: *${statusVagas.restantes}*\n`
+  );
+}
+
+function gerarResumoDiaDasCriancas() {
+  return (
+    `🎈 *Inscrições - Especial Dia das Crianças*\n\n` +
+    `🗓️ *Data:* Sábado, 17/10/2026 às 14:00\n` +
+    `📍 *Local:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi\n\n` +
+    `📝 *Formulário de Inscrição Oficial:*\n` +
+    `https://forms.gle/jb3ytK348u3keMi8A\n`
   );
 }
 
@@ -195,6 +224,9 @@ async function gerarPdfEvento({ eventoId, client }) {
   } else if (eventoId === "the_chosen") {
     html = theChosen.renderTheChosenPdfHtml();
     filename = "Lista_Inscricoes_The_Chosen.pdf";
+  } else if (eventoId === "dia_das_criancas") {
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Dia das Crianças</title></head><body><h1>Especial Dia das Crianças</h1><p>Lista oficial de inscrições (Google Forms).</p></body></html>`;
+    filename = "Lista_Inscricoes_Dia_das_Criancas.pdf";
   } else {
     return { ok: false, error: "Evento não reconhecido." };
   }
@@ -287,6 +319,17 @@ function obterLinksDocumentos(eventoId) {
     };
   }
 
+  if (eventoId === "dia_das_criancas") {
+    const ssId =
+      process.env.CRIANCAS_SPREADSHEET_ID ||
+      "11-WWQL2485gSCcM5N4XnWX8sfIj-knQCBUi5koGG6F8";
+    return {
+      spreadsheetId: ssId,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`,
+      pdfUrl: `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`,
+    };
+  }
+
   return { spreadsheetId: null, spreadsheetUrl: null, pdfUrl: null };
 }
 
@@ -318,6 +361,8 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
     resumoTexto = gerarResumoCultoMulheres();
   } else if (eventoId === "the_chosen") {
     resumoTexto = gerarResumoTheChosen();
+  } else if (eventoId === "dia_das_criancas") {
+    resumoTexto = gerarResumoDiaDasCriancas();
   }
 
   // Links oficiais das planilhas do Google Sheets e PDF nativo

@@ -19,16 +19,17 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     usuario: { nome: "Pr. Gabriel", cargos: ["pastor"], departamentos: [] },
     isPastor: true,
   });
-  assert.equal(eventosPastor.length, 2);
+  assert.equal(eventosPastor.length, 3);
   assert.ok(eventosPastor.some((e) => e.id === "culto_mulheres"));
   assert.ok(eventosPastor.some((e) => e.id === "the_chosen"));
+  assert.ok(eventosPastor.some((e) => e.id === "dia_das_criancas"));
 
   // 2. Diretor tem acesso a todos os eventos
   const eventosDiretor = obterEventosInscricaoParaUsuario({
     usuario: { nome: "Dir. Fernando", cargos: ["diretor"], departamentos: [] },
     isDiretor: true,
   });
-  assert.equal(eventosDiretor.length, 2);
+  assert.equal(eventosDiretor.length, 3);
 
   // 3. Líder da Rede de Mulheres tem acesso SOMENTE ao Culto de Mulheres
   const eventosLiderMulheres = obterEventosInscricaoParaUsuario({
@@ -201,14 +202,14 @@ test("Consulta Inscrições: líder sem eventos no departamento recebe mensagem 
     numero: "5511999990003@c.us",
     etapas,
     usuario: {
-      nome: "Líder Kids",
+      nome: "Líder Diaconia",
       cargos: ["lider"],
-      departamentos: ["Rede Kids"],
+      departamentos: ["Diaconia"],
     },
     isLider: true,
   });
 
   assert.ok(replies.length >= 1);
   assert.ok(replies[0].includes("No momento não há eventos com inscrições ativas"));
-  assert.ok(replies[0].includes("Rede Kids"));
+  assert.ok(replies[0].includes("Diaconia"));
 });
