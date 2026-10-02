@@ -366,7 +366,7 @@ async function puxarInscricoesDoGoogleAppsScript(url = URL_WEBAPP_MULHERES_PADRA
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       redirect: 'follow',
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(30000)
     });
 
     if (!res.ok) {
@@ -477,7 +477,7 @@ async function excluirInscricaoPlanilhaMulheres(inscricao, url = URL_WEBAPP_MULH
         telefone
       }),
       redirect: 'follow',
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(20000)
     });
     return { ok: res.ok, status: res.status };
   } catch (err) {
