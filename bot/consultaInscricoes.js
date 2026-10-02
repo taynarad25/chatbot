@@ -365,20 +365,16 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
     resumoTexto = gerarResumoDiaDasCriancas();
   }
 
-  // Links oficiais das planilhas do Google Sheets e PDF nativo
+  // Link oficial da planilha do Google Sheets
   const links = obterLinksDocumentos(eventoId);
 
   let blocoLinks = "";
-  if (links.pdfUrl) {
-    blocoLinks += `\n📥 *Baixar Lista Oficial em PDF:*\n${links.pdfUrl}\n`;
-  }
   if (links.spreadsheetUrl) {
-    blocoLinks += `\n📊 *Acessar Planilha Online:*\n${links.spreadsheetUrl}\n`;
+    blocoLinks = `\n📊 *Planilha de Inscrições:*\n${links.spreadsheetUrl}\n`;
   }
 
   const corpoMensagem =
     resumoTexto +
-    `\n📑 *Documentos Oficiais:*` +
     blocoLinks +
     `\nDigite *menu* para voltar ao menu principal.`;
 
