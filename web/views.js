@@ -2137,7 +2137,7 @@ function renderIndexHtml() {
         const res = await fetch('/the-chosen/api/sincronizar', { method: 'POST' });
         const data = await res.json();
         if (res.ok && data.ok) {
-          alert('✅ Sincronização concluída com sucesso!\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
+          alert('✅ Sincronização concluída com sucesso!\\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
           await fetchTheChosenInscricoes();
         } else {
           alert('⚠️ Aviso ao sincronizar: ' + (data.error || data.message || 'Verifique a configuração do Apps Script'));
@@ -2163,7 +2163,7 @@ function renderIndexHtml() {
         const res = await fetch('/mulheres/api/sincronizar', { method: 'POST' });
         const data = await res.json();
         if (res.ok && data.ok) {
-          alert('✅ Sincronização concluída com sucesso!\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
+          alert('✅ Sincronização concluída com sucesso!\\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
           await fetchMulheresInscricoes();
         } else {
           alert('⚠️ Aviso ao sincronizar: ' + (data.error || data.message || 'Verifique a configuração do Apps Script'));

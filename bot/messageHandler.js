@@ -2306,7 +2306,6 @@ Escolha uma opção:
           menu += `\n7️⃣ Área do Líder`;
         }
 
-        menu += `\n🌸 Culto de Mulheres: O Vaso e o Oleiro (digite *mulheres*)`;
         menu += `\n\nDigite *menu* a qualquer momento para voltar ao menu principal.`;
         return msg.reply(menu);
       }
@@ -5197,23 +5196,6 @@ Digite *menu* para voltar ao menu principal.`;
           `🎟️ *Faça sua inscrição e garanta sua vaga:*\n` +
           `👉 https://www.comunidadecristacurados.com.br/the-chosen\n\n` +
           `Digite *menu* para voltar ao menu principal.`
-        );
-      }
-
-      if (/culto\s*(de\s*)?mulher|vaso\s*e\s*o?\s*oleiro|inscri[cç][aã]o\s*(para\s*)?mulher|\bmulher(es)?\b/i.test(texto)) {
-        console.log(`[Culto Mulheres] Início de fluxo de inscrição por ${identificarUsuario(contato, numero, isLider)}`);
-        etapas[numero] = {
-          fluxo: "inscricao_mulheres",
-          etapa: "coletar_nome",
-          dados: {},
-        };
-        return msg.reply(
-          `🌸 *Culto de Mulheres: O Vaso e o Oleiro*\n\n` +
-          `🗓️ *Data:* Sábado, 24/10/2026 às 15:00\n` +
-          `📍 *Local:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi (Comunidade Cristã Curados)\n\n` +
-          `A inscrição é estritamente individual e gratuita. Vamos começar!\n\n` +
-          `1️⃣ Por favor, digite o seu *Nome completo*:\n\n` +
-          `(Digite *menu* a qualquer momento para cancelar)`
         );
       }
 
