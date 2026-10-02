@@ -11,6 +11,37 @@ const URL_WEBAPP_MULHERES_PADRAO =
   process.env.MULHERES_WEBAPP_URL ||
   'https://script.google.com/macros/s/AKfycbzGYDJzHufmbaOP39WH_ouv_EyrM9vnAkjjOC06fBJ5XJAop1ZcWo92mnJIevDPc19UcQ/exec';
 
+let metadataPlanilhaMulheres = {
+  spreadsheetId: process.env.MULHERES_SPREADSHEET_ID || null,
+  spreadsheetUrl: process.env.MULHERES_SPREADSHEET_URL || null,
+  pdfUrl: null,
+};
+
+function obterLinksPlanilhaMulheres() {
+  const ssId = metadataPlanilhaMulheres.spreadsheetId;
+  const webappUrl = URL_WEBAPP_MULHERES_PADRAO;
+
+  const pdfUrl = ssId
+    ? `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`
+    : (metadataPlanilhaMulheres.pdfUrl || `${webappUrl}?action=pdf`);
+
+  const spreadsheetUrl = ssId
+    ? `https://docs.google.com/spreadsheets/d/${ssId}/edit`
+    : (metadataPlanilhaMulheres.spreadsheetUrl || webappUrl);
+
+  return {
+    spreadsheetId: ssId,
+    spreadsheetUrl,
+    pdfUrl,
+  };
+}
+
+function atualizarMetadataPlanilhaMulheres({ spreadsheetId, spreadsheetUrl, pdfUrl } = {}) {
+  if (spreadsheetId) metadataPlanilhaMulheres.spreadsheetId = spreadsheetId;
+  if (spreadsheetUrl) metadataPlanilhaMulheres.spreadsheetUrl = spreadsheetUrl;
+  if (pdfUrl) metadataPlanilhaMulheres.pdfUrl = pdfUrl;
+}
+
 function normalizarTelefone(telefone) {
   return String(telefone || '').replace(/\D/g, '');
 }
@@ -381,6 +412,16 @@ async function puxarInscricoesDoGoogleAppsScript(url = URL_WEBAPP_MULHERES_PADRA
       return { ok: false, error: 'Resposta não é JSON válido', inscricoes: [] };
     }
 
+    if (data && typeof data === 'object') {
+      if (data.spreadsheetId || data.spreadsheetUrl || data.pdfUrl) {
+        atualizarMetadataPlanilhaMulheres({
+          spreadsheetId: data.spreadsheetId,
+          spreadsheetUrl: data.spreadsheetUrl,
+          pdfUrl: data.pdfUrl,
+        });
+      }
+    }
+
     let lista = [];
     if (Array.isArray(data)) {
       lista = data;
@@ -501,4 +542,6 @@ module.exports = {
   puxarInscricoesDoGoogleAppsScript,
   sincronizarInscricoesComNuvem,
   excluirInscricaoPlanilhaMulheres,
+  obterLinksPlanilhaMulheres,
+  atualizarMetadataPlanilhaMulheres,
 };

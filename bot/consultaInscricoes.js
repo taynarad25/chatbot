@@ -307,7 +307,50 @@ async function gerarPdfEvento({ eventoId, client }) {
 }
 
 /**
- * Envia o resumo e o arquivo PDF diretamente para o WhatsApp do usuário
+ * Retorna os links oficiais do Google Sheets / Google Docs / PDF para o evento
+ */
+function obterLinksDocumentos(eventoId) {
+  if (eventoId === "culto_mulheres") {
+    if (typeof cultoMulheres.obterLinksPlanilhaMulheres === "function") {
+      return cultoMulheres.obterLinksPlanilhaMulheres();
+    }
+    const ssId = process.env.MULHERES_SPREADSHEET_ID;
+    const webappUrl =
+      process.env.MULHERES_WEBAPP_URL ||
+      "https://script.google.com/macros/s/AKfycbzGYDJzHufmbaOP39WH_ouv_EyrM9vnAkjjOC06fBJ5XJAop1ZcWo92mnJIevDPc19UcQ/exec";
+    return {
+      spreadsheetId: ssId || null,
+      spreadsheetUrl: ssId
+        ? `https://docs.google.com/spreadsheets/d/${ssId}/edit`
+        : webappUrl,
+      pdfUrl: ssId
+        ? `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`
+        : `${webappUrl}?action=pdf`,
+    };
+  }
+
+  if (eventoId === "the_chosen") {
+    let ssId =
+      process.env.GOOGLE_SHEETS_SPREADSHEET_ID ||
+      "1eFQTr1uMTtr1RMaU1KXtxtTpzVlUdGvQOFRtK0quHIM";
+    try {
+      const theChosenSheets = require("../web/the_chosen_sheets");
+      if (typeof theChosenSheets.getSpreadsheetId === "function") {
+        ssId = theChosenSheets.getSpreadsheetId() || ssId;
+      }
+    } catch {}
+    return {
+      spreadsheetId: ssId,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit`,
+      pdfUrl: `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`,
+    };
+  }
+
+  return { spreadsheetId: null, spreadsheetUrl: null, pdfUrl: null };
+}
+
+/**
+ * Envia o resumo, lista de inscritos e links oficiais do Google Docs/Sheets
  */
 async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
   // Sincroniza com o Google Sheets em produção para garantir dados frescos
@@ -336,95 +379,80 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
     resumoTexto = gerarResumoTheChosen();
   }
 
-  // 1. Envia o resumo textual de imediato
-  await msg.reply(
-    resumoTexto +
-      `⏳ _Gerando a Lista Oficial de Inscrições em PDF para você..._`
-  );
-
   const destino = msg.from || numero;
+  const isLid = String(destino).includes("@lid");
 
-  // 2. Tenta gerar e enviar o documento PDF em anexo
-  let pdfEnviado = false;
-  let erroPdfMsg = null;
+  // 1. Lista nominal de inscritos
+  const listaTexto = montarListaInscritosTexto(eventoId);
 
-  try {
-    const pdfRes = await gerarPdfEvento({ eventoId, client });
-    if (pdfRes.ok && pdfRes.buffer && MessageMedia) {
-      const tempFilePath = path.join(
-        os.tmpdir(),
-        `inscricoes_${Date.now()}_${pdfRes.filename}`
-      );
-      try {
-        fs.writeFileSync(tempFilePath, pdfRes.buffer);
-        let media;
-        if (typeof MessageMedia.fromFilePath === "function") {
-          media = MessageMedia.fromFilePath(tempFilePath);
-        } else {
-          media = new MessageMedia(
-            "application/pdf",
-            pdfRes.buffer.toString("base64"),
-            pdfRes.filename
-          );
-        }
+  // 2. Links oficiais do Google Drive / Docs / Sheets
+  const links = obterLinksDocumentos(eventoId);
 
-        const sendOptions = {
-          caption: `📄 *Lista Oficial de Inscrições / Folha de Portaria*\n\nDocumento atualizado gerado para conferência de liderança.`,
-          sendMediaAsDocument: true,
-        };
-
-        if (typeof client?.sendMessage === "function") {
-          try {
-            await client.sendMessage(destino, media, sendOptions);
-            pdfEnviado = true;
-          } catch (sendErr1) {
-            console.warn(
-              "[Inscrições] Falha no client.sendMessage com documento, tentando msg.reply:",
-              sendErr1.message
-            );
-          }
-        }
-
-        if (!pdfEnviado && typeof msg.reply === "function") {
-          await msg.reply(media, undefined, sendOptions);
-          pdfEnviado = true;
-        }
-
-        if (pdfEnviado) {
-          console.log(
-            `[Inscrições] PDF ${pdfRes.filename} enviado com sucesso para ${destino}`
-          );
-          return;
-        }
-      } finally {
-        try {
-          if (fs.existsSync(tempFilePath)) {
-            fs.unlinkSync(tempFilePath);
-          }
-        } catch {}
-      }
-    } else if (!pdfRes.ok) {
-      erroPdfMsg = pdfRes.error;
-    }
-  } catch (errPdf) {
-    erroPdfMsg = errPdf.message;
-    console.warn(
-      "[Inscrições] Erro ao enviar anexo PDF via WhatsApp:",
-      errPdf.message
-    );
+  let blocoLinks = "";
+  if (links.pdfUrl) {
+    blocoLinks += `\n📥 *Baixar Lista Oficial em PDF (Google Drive):*\n${links.pdfUrl}\n`;
+  }
+  if (links.spreadsheetUrl) {
+    blocoLinks += `\n📊 *Acessar Planilha Online em Tempo Real:*\n${links.spreadsheetUrl}\n`;
   }
 
-  // 3. Fallback inteligente: se o PDF não pôde ser gerado/enviado, envia a lista nominal em texto
-  const listaTexto = montarListaInscritosTexto(eventoId);
-  const msgAviso = erroPdfMsg
-    ? `⚠️ _Não foi possível anexar o arquivo PDF (${erroPdfMsg}), mas aqui está a lista de inscritos:_\n\n`
-    : `📋 *Lista Nominal de Inscritos:*\n\n`;
+  const corpoMensagem =
+    resumoTexto +
+    `📋 *Lista de Inscritos:*\n` +
+    listaTexto +
+    `\n\n` +
+    `📑 *Documentos Oficiais (Google Docs/Drive):*` +
+    blocoLinks +
+    `\nDigite *menu* para voltar ao menu principal.`;
 
-  await msg.reply(
-    msgAviso +
-      listaTexto +
-      `\n\n📄 _O relatório e download do PDF também estão disponíveis no painel da secretaria._\n\nDigite *menu* para voltar ao menu principal.`
-  );
+  // Envio garantido e imediato da mensagem
+  await msg.reply(corpoMensagem);
+
+  // 3. Se for usuário com @c.us e puppeteer ativo, tenta anexar o PDF como cortesia
+  if (!isLid && MessageMedia && puppeteer) {
+    try {
+      const pdfRes = await gerarPdfEvento({ eventoId, client });
+      if (pdfRes.ok && pdfRes.buffer) {
+        const tempFilePath = path.join(
+          os.tmpdir(),
+          `inscricoes_${Date.now()}_${pdfRes.filename}`
+        );
+        try {
+          fs.writeFileSync(tempFilePath, pdfRes.buffer);
+          let media;
+          if (typeof MessageMedia.fromFilePath === "function") {
+            media = MessageMedia.fromFilePath(tempFilePath);
+          } else {
+            media = new MessageMedia(
+              "application/pdf",
+              pdfRes.buffer.toString("base64"),
+              pdfRes.filename
+            );
+          }
+
+          const sendOptions = {
+            caption: `📄 *Lista Oficial de Inscrições / Folha de Portaria*`,
+            sendMediaAsDocument: true,
+          };
+
+          if (typeof client?.sendMessage === "function") {
+            await client.sendMessage(destino, media, sendOptions);
+          } else if (typeof msg.reply === "function") {
+            await msg.reply(media, undefined, sendOptions);
+          }
+        } finally {
+          try {
+            if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+          } catch {}
+        }
+      }
+    } catch (errAnexo) {
+      console.warn(
+        "[Inscrições] Aviso ao enviar anexo secundário em PDF:",
+        errAnexo.message
+      );
+    }
+  }
 }
 
 /**
