@@ -2459,10 +2459,22 @@
             border-color: rgba(244, 114, 182, 0.85);
             box-shadow: 0 20px 60px rgba(236, 72, 153, 0.25);
         }
+        #home-page .evento-home-card.card-criancas {
+            border-color: rgba(6, 182, 212, 0.4);
+            background: linear-gradient(135deg, rgba(16, 28, 34, 0.95), rgba(14, 20, 26, 0.98));
+        }
+        #home-page .evento-home-card.card-criancas:hover {
+            border-color: rgba(6, 182, 212, 0.85);
+            box-shadow: 0 20px 60px rgba(6, 182, 212, 0.25);
+        }
         #home-page .evento-home-image {
             position: relative;
             min-height: 280px;
             background: #000;
+            display: block;
+            text-decoration: none;
+            cursor: pointer;
+            overflow: hidden;
         }
         #home-page .evento-home-image picture {
             display: block;
@@ -2474,6 +2486,26 @@
             height: 100%;
             object-fit: cover;
             display: block;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), filter 0.3s ease;
+        }
+        #home-page .evento-home-card:hover .evento-home-image img,
+        #home-page .evento-home-image:hover img {
+            transform: scale(1.03);
+            filter: brightness(1.06);
+        }
+        #home-page .evento-home-title a {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        #home-page .evento-home-title a:hover {
+            color: #e5b869;
+        }
+        #home-page .card-criancas .evento-home-title a:hover {
+            color: #38bdf8;
+        }
+        #home-page .card-mulheres .evento-home-title a:hover {
+            color: #f472b6;
         }
         #home-page .tag-mulheres {
             color: #f472b6 !important;
@@ -2493,6 +2525,25 @@
         }
         #home-page .aviso-mulheres {
             color: #fbcfe8 !important;
+        }
+        #home-page .tag-criancas {
+            color: #38bdf8 !important;
+            border-color: rgba(56, 189, 248, 0.4) !important;
+        }
+        #home-page .meta-criancas span {
+            background: rgba(6, 182, 212, 0.12) !important;
+            color: #38bdf8 !important;
+            border-color: rgba(6, 182, 212, 0.3) !important;
+        }
+        #home-page .btn-criancas-cta {
+            background: linear-gradient(135deg, #06b6d4, #f97316) !important;
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4) !important;
+        }
+        #home-page .btn-criancas-cta:hover {
+            box-shadow: 0 10px 28px rgba(249, 115, 22, 0.6) !important;
+        }
+        #home-page .aviso-criancas {
+            color: #bae6fd !important;
         }
         #home-page .evento-home-tag {
             position: absolute;
@@ -2633,6 +2684,7 @@
                 <li><a href="#home"><span class="drawer-nav-svg"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span> Início</a></li>
                 <li><a href="/quemsomos"><span class="drawer-nav-svg"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg></span> Quem Somos</a></li>
                 <li><a href="#eventos"><span class="drawer-nav-svg"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg></span> Eventos & Destaques</a></li>
+                <li><a href="https://docs.google.com/forms/d/e/1FAIpQLSfWm5T9oDTCTymZt5qzSctQkFph6x0Niexl3f8RnmywFebYJQ/viewform?usp=dialog" target="_blank" rel="noopener noreferrer"><span class="drawer-nav-svg"><span style="font-size: 1.2rem; display: flex; align-items: center; justify-content: center;">🎈</span></span> Dia das Crianças <span class="drawer-sub-badge" style="background: rgba(6,182,212,0.18); color: #38bdf8; border: 1px solid rgba(6,182,212,0.35); font-weight: 700; margin-left: auto;">17/10</span></a></li>
                 <li><a href="/culto-mulheres"><span class="drawer-nav-svg"><span style="font-size: 1.2rem; display: flex; align-items: center; justify-content: center;">🌸</span></span> Culto de Mulheres <span class="drawer-sub-badge" style="background: rgba(244,114,182,0.18); color: #f472b6; border: 1px solid rgba(244,114,182,0.35); font-weight: 700; margin-left: auto;">24/10</span></a></li>
                 <li><a href="#cultos"><span class="drawer-nav-svg"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM12 20c-3.31 0-6-2.69-6-6 0-1.53.5-2.94 1.34-4.08.34.78.89 1.45 1.58 1.94.39.28.84.49 1.32.61-.15.48-.24.99-.24 1.53 0 2.21 1.79 4 4 4s4-1.79 4-4c0-.7-.18-1.35-.5-1.92.5.38.92.87 1.22 1.44.82 1.14 1.28 2.53 1.28 4.48 0 3.31-2.69 6-6 6z"/></svg></span> Horários de Culto</a></li>
                 <li><a href="#como-chegar"><span class="drawer-nav-svg"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg></span> Localização</a></li>
@@ -2902,10 +2954,10 @@
             <div class="eventos-cards-stack">
                 <!-- Evento 1: The Chosen -->
                 <div class="evento-home-card">
-                    <div class="evento-home-image">
+                    <a href="/the-chosen" class="evento-home-image" aria-label="Acessar ingressos da Pré-estreia The Chosen">
                         <img src="/images/the-chosen-desktop.jpg" alt="Pré-estreia The Chosen - Temporada 6" />
                         <span class="evento-home-tag">🎬 Pré-estreia Exclusiva</span>
-                    </div>
+                    </a>
                     <div class="evento-home-content">
                         <div class="evento-home-meta">
                             <span>📅 Sábado, 03 de Outubro de 2026</span>
@@ -2913,7 +2965,7 @@
                             <span>🍿 Pipoca & Suco à vontade!</span>
                             <span>📍 Auditório Principal</span>
                         </div>
-                        <h3 class="evento-home-title">Pré-estreia The Chosen • Temporada 6 (Episódio 1)</h3>
+                        <h3 class="evento-home-title"><a href="/the-chosen">Pré-estreia The Chosen • Temporada 6 (Episódio 1)</a></h3>
                         <p class="evento-home-desc">
                             Participe desta noite cinematográfica inesquecível! Venha assistir em primeira mão aos passos emocionantes do ministério de Jesus na 6ª temporada de The Chosen. Sessão especial gratuita com pipoca e suco à vontade para toda a família (crianças de colo não contam como vaga). Chegue cedo para garantir um bom lugar e não perder nada!
                         </p>
@@ -2927,15 +2979,45 @@
                     </div>
                 </div>
 
-                <!-- Evento 2: Culto de Mulheres -->
+                <!-- Evento 2: Dia das Crianças -->
+                <div class="evento-home-card card-criancas">
+                    <a href="https://docs.google.com/forms/d/e/1FAIpQLSfWm5T9oDTCTymZt5qzSctQkFph6x0Niexl3f8RnmywFebYJQ/viewform?usp=dialog" target="_blank" rel="noopener noreferrer" class="evento-home-image" aria-label="Acessar formulário oficial de inscrição do Especial Dia das Crianças">
+                        <picture>
+                            <source media="(max-width: 768px)" srcset="/images/criancas-mobile.jpg">
+                            <img src="/images/criancas-desktop.jpg" alt="Dia das Crianças - Comunidade Cristã Curados" />
+                        </picture>
+                        <span class="evento-home-tag tag-criancas">🎈 Ministério Infantil</span>
+                    </a>
+                    <div class="evento-home-content">
+                        <div class="evento-home-meta meta-criancas">
+                            <span>📅 Sábado, 17 de Outubro de 2026</span>
+                            <span>⏰ 14:00</span>
+                            <span>🎈 Entrada Franca</span>
+                            <span>📍 Templo Principal</span>
+                        </div>
+                        <h3 class="evento-home-title"><a href="https://docs.google.com/forms/d/e/1FAIpQLSfWm5T9oDTCTymZt5qzSctQkFph6x0Niexl3f8RnmywFebYJQ/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Especial Dia das Crianças</a></h3>
+                        <p class="evento-home-desc">
+                            Uma tarde inesquecível e cheia de alegria, brincadeiras, guloseimas e a palavra de Deus preparada com muito carinho para todas as crianças! Traga seus filhos para celebrar e viver momentos abençoados em família. Inscrições gratuitas pelo formulário oficial!
+                        </p>
+                        <div class="evento-home-actions">
+                            <a href="https://docs.google.com/forms/d/e/1FAIpQLSfWm5T9oDTCTymZt5qzSctQkFph6x0Niexl3f8RnmywFebYJQ/viewform?usp=dialog" target="_blank" rel="noopener noreferrer" class="btn-evento-cta btn-criancas-cta">
+                                <span>Inscrever Meus Filhos (Google Forms)</span>
+                                <span>➔</span>
+                            </a>
+                            <span class="evento-home-aviso aviso-criancas">Entrada Franca • Inscrição via Google Forms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Evento 3: Culto de Mulheres -->
                 <div class="evento-home-card card-mulheres">
-                    <div class="evento-home-image">
+                    <a href="/culto-mulheres" class="evento-home-image" aria-label="Acessar página de inscrição do Culto de Mulheres">
                         <picture>
                             <source media="(max-width: 768px)" srcset="/images/mulheres-mobile.png">
                             <img src="/images/mulheres-desktop.png" alt="Culto de Mulheres: O Vaso e o Oleiro" onerror="this.src='/images/mulheres-desktop.jpg'" />
                         </picture>
                         <span class="evento-home-tag tag-mulheres">🌸 Rede de Mulheres</span>
-                    </div>
+                    </a>
                     <div class="evento-home-content">
                         <div class="evento-home-meta meta-mulheres">
                             <span>📅 Sábado, 24 de Outubro de 2026</span>
@@ -2943,7 +3025,7 @@
                             <span>✨ Entrada Franca</span>
                             <span>📍 Auditório Principal</span>
                         </div>
-                        <h3 class="evento-home-title">Culto de Mulheres — O Vaso e o Oleiro</h3>
+                        <h3 class="evento-home-title"><a href="/culto-mulheres">Culto de Mulheres — O Vaso e o Oleiro</a></h3>
                         <p class="evento-home-desc">
                             Uma tarde transformadora e acolhedora dedicada a todas as mulheres! Venha viver momentos inesquecíveis de adoração, renovação espiritual e comunhão, permitindo-se ser moldada pelas mãos do Oleiro. As vagas são gratuitas e as inscrições estritamente individuais!
                         </p>
