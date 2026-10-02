@@ -60,6 +60,10 @@ const {
   montarPayloadEventoExterno,
   enviarWebhookGoogleDocsExternos,
 } = require("./eventosExternos");
+const {
+  iniciarFluxoConsultaInscricoes,
+  processarFluxoConsultaInscricoes,
+} = require("./consultaInscricoes");
 
 // Cada "átomo" é uma saudação isolada reconhecida. A mensagem inteira precisa ser só
 // uma sequência desses átomos (separados por vírgula/ponto/"e"/espaço) pra contar como
@@ -678,7 +682,8 @@ function montarMenuLider() {
     "👑 *Área do Líder*\n\n" +
     "Escolha um subgrupo:\n\n" +
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
-    "2️⃣ 📢 *Comunicação e Mídia*\n\n" +
+    "2️⃣ 📢 *Comunicação e Mídia*\n" +
+    "3️⃣ 📋 *Inscrições de Eventos*\n\n" +
     "Digite *menu* para voltar ao menu principal."
   );
 }
@@ -690,7 +695,8 @@ function montarSubmenuLiderAgenda() {
     "1️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
     "2️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar reunião)\n" +
     "3️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
-    "4️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n\n" +
+    "4️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n" +
+    "5️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n\n" +
     "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu anterior ou *menu* para o início."
   );
@@ -714,7 +720,8 @@ function montarMenuPastoral() {
     "Escolha um subgrupo:\n\n" +
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
     "2️⃣ 🤝 *Atendimento Pastoral*\n" +
-    "3️⃣ 📢 *Comunicação e Mídia*\n\n" +
+    "3️⃣ 📢 *Comunicação e Mídia*\n" +
+    "4️⃣ 📋 *Inscrições de Eventos*\n\n" +
     "Digite *menu* para voltar ao menu principal."
   );
 }
@@ -727,7 +734,8 @@ function montarSubmenuPastoralAgenda() {
     "2️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
     "3️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar)\n" +
     "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
-    "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n\n" +
+    "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n" +
+    "6️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n\n" +
     "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu pastoral ou *menu* para o início."
   );
@@ -762,7 +770,8 @@ function montarMenuDiretor() {
     "📋 *Área da Direção*\n\n" +
     "Escolha um subgrupo:\n\n" +
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
-    "2️⃣ 📢 *Comunicação e Mídia*\n\n" +
+    "2️⃣ 📢 *Comunicação e Mídia*\n" +
+    "3️⃣ 📋 *Inscrições de Eventos*\n\n" +
     "Digite *menu* para voltar ao menu principal."
   );
 }
@@ -775,7 +784,8 @@ function montarSubmenuDiretorAgenda() {
     "2️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
     "3️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar)\n" +
     "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
-    "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n\n" +
+    "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n" +
+    "6️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n\n" +
     "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu da direção ou *menu* para o início."
   );
@@ -2340,6 +2350,23 @@ Escolha uma opção:
           });
         }
 
+        if (info.fluxo === "consulta_inscricoes") {
+          return await processarFluxoConsultaInscricoes({
+            msg,
+            numero,
+            info,
+            client,
+            etapas,
+            usuario,
+            isPastor,
+            isDiretor,
+            isLider,
+            menuLiderFn: montarMenuLider,
+            menuPastoralFn: montarMenuPastoral,
+            menuDiretorFn: montarMenuDiretor,
+          });
+        }
+
         if (info.fluxo === "evento_externo") {
           return await processarRespostaEventoExterno({
             msg,
@@ -3619,8 +3646,22 @@ Escolha uma opção:
               return msg.reply(montarSubmenuLiderComunicacao());
             }
 
+            if (escolha === "3" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+              return await iniciarFluxoConsultaInscricoes({
+                msg,
+                numero,
+                etapas,
+                usuario,
+                isPastor,
+                isDiretor,
+                isLider,
+                client,
+                origem: "lider",
+              });
+            }
+
             // Atalhos diretos preservados
-            if (escolha === "3" || /artes|flyers/i.test(escolha)) {
+            if (escolha === "4" || /artes|flyers/i.test(escolha)) {
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
@@ -3690,7 +3731,20 @@ Escolha uma opção:
                 "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
               );
             }
-            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 4, digite *voltar* para o menu anterior ou *menu* para o início.");
+            if (escolha === "5" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+              return await iniciarFluxoConsultaInscricoes({
+                msg,
+                numero,
+                etapas,
+                usuario,
+                isPastor,
+                isDiretor,
+                isLider,
+                client,
+                origem: "lider",
+              });
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, digite *voltar* para o menu anterior ou *menu* para o início.");
           }
 
           if (info.etapa === "lider_sub_comunicacao") {
@@ -3731,9 +3785,22 @@ Escolha uma opção:
               info.etapa = "pastoral_sub_comunicacao";
               return msg.reply(montarSubmenuPastoralComunicacao());
             }
+            if (escolha === "4" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+              return await iniciarFluxoConsultaInscricoes({
+                msg,
+                numero,
+                etapas,
+                usuario,
+                isPastor,
+                isDiretor,
+                isLider,
+                client,
+                origem: "pastoral",
+              });
+            }
 
             // Atalhos diretos preservados
-            if (escolha === "4" || /aviso|comunicado/i.test(escolha)) {
+            if (escolha === "5" || /aviso|comunicado/i.test(escolha)) {
               info.fluxo = "comunicados";
               info.etapa = "texto_comunicado";
               return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
@@ -3825,7 +3892,20 @@ Escolha uma opção:
                 "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
               );
             }
-            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, digite *voltar* para o menu anterior ou *menu* para o início.");
+            if (escolha === "6" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+              return await iniciarFluxoConsultaInscricoes({
+                msg,
+                numero,
+                etapas,
+                usuario,
+                isPastor,
+                isDiretor,
+                isLider,
+                client,
+                origem: "pastoral",
+              });
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 6, digite *voltar* para o menu anterior ou *menu* para o início.");
           }
 
           if (info.etapa === "pastoral_sub_comunicacao") {
@@ -4324,8 +4404,22 @@ Escolha uma opção:
               return msg.reply(montarSubmenuDiretorComunicacao());
             }
 
+            if (escolha === "3" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+              return await iniciarFluxoConsultaInscricoes({
+                msg,
+                numero,
+                etapas,
+                usuario,
+                isPastor,
+                isDiretor,
+                isLider,
+                client,
+                origem: "diretor",
+              });
+            }
+
             // Atalhos diretos preservados
-            if (escolha === "3" || /aviso|comunicado/i.test(escolha)) {
+            if (escolha === "4" || /aviso|comunicado/i.test(escolha)) {
               info.fluxo = "comunicados";
               info.etapa = "texto_comunicado";
               return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
@@ -4414,7 +4508,20 @@ Escolha uma opção:
                 "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
               );
             }
-            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, digite *voltar* para o menu anterior ou *menu* para o início.");
+            if (escolha === "6" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+              return await iniciarFluxoConsultaInscricoes({
+                msg,
+                numero,
+                etapas,
+                usuario,
+                isPastor,
+                isDiretor,
+                isLider,
+                client,
+                origem: "diretor",
+              });
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 6, digite *voltar* para o menu anterior ou *menu* para o início.");
           }
 
           if (info.etapa === "diretor_sub_comunicacao") {
@@ -5273,6 +5380,21 @@ Digite *menu* para voltar ao menu principal.`;
         );
       }
 
+      if ((isLider || isPastor || isDiretor) && /^(?:consultar\s+|ver\s+)?inscri[cç][õo]es(?:\s+de\s+eventos?)?$/i.test(texto.trim())) {
+        console.log(`[Inscrições Eventos] Atalho acionado por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+        return await iniciarFluxoConsultaInscricoes({
+          msg,
+          numero,
+          etapas,
+          usuario,
+          isPastor,
+          isDiretor,
+          isLider,
+          client,
+          origem: isPastor ? "pastoral" : (isDiretor ? "diretor" : "lider"),
+        });
+      }
+
       if (isLider && /^(pedir|solicitar)?\s*(m[ií]dias?|artes?|flyers?)$/i.test(texto.trim())) {
         console.log(`[Atalho Mídia] Iniciado por ${identificarUsuario(contato, numero, isLider, usuario)}`);
         etapas[numero] = { fluxo: "artes_flyers", etapa: "artes_departamento" };
@@ -5347,4 +5469,6 @@ module.exports = {
   montarSubmenuDiretorAgenda,
   montarSubmenuDiretorComunicacao,
   montarMenuEventos,
+  iniciarFluxoConsultaInscricoes,
+  processarFluxoConsultaInscricoes,
 };
