@@ -19,6 +19,9 @@ const {
   marcarConfirmacaoMulheresEnviada,
   montarMensagemConfirmacaoMulheres,
   renderMulheresPdfHtml,
+  puxarInscricoesDoGoogleAppsScript,
+  sincronizarInscricoesComNuvem,
+  excluirInscricaoPlanilhaMulheres,
 } = require("../web/culto_mulheres");
 
 const {
@@ -173,7 +176,7 @@ test("Culto de Mulheres: renderMulheresPdfHtml gera o modelo de impressão no pa
 
   assert.ok(html.includes("Comunidade Cristã Curados • Secretaria"));
   assert.ok(html.includes("Culto de Mulheres: O Vaso e o Oleiro"));
-  assert.ok(html.includes("24/10/2026 às 16:00"));
+  assert.ok(html.includes("24/10/2026 às 15:00"));
   assert.ok(html.includes("Ester Rainha"));
   assert.ok(html.includes("ester@exemplo.com"));
   assert.ok(html.includes("window.print()"));
@@ -184,7 +187,7 @@ test("Culto de Mulheres: mensagem curta de confirmação no WhatsApp", () => {
   assert.ok(msg.includes("Rebeca"));
   assert.ok(msg.includes("O Vaso e o Oleiro"));
   assert.ok(msg.includes("24/10/2026"));
-  assert.ok(msg.includes("16:00"));
+  assert.ok(msg.includes("15:00"));
   assert.ok(msg.includes("Esperamos por você no dia"));
 });
 
@@ -376,4 +379,56 @@ test("Culto de Mulheres: notificação de marcos de 10, 5 e 3 dias para líderes
     dataBase: data7Dias,
   });
   assert.equal(res7.executado, false);
+});
+
+test("Culto de Mulheres: puxarInscricoesDoGoogleAppsScript e sincronizarInscricoesComNuvem", async () => {
+  const dadosPlanilhaMock = {
+    status: "success",
+    inscricoes: [
+      {
+        nome: "Maria Madalena",
+        email: "maria.madalena@teste.com",
+        telefone: "11988887777",
+        criadoEm: "2026-10-01T12:00:00.000Z"
+      },
+      {
+        nome: "Sara Abrao",
+        email: "sara@teste.com",
+        telefone: "11977776666",
+        criadoEm: "2026-10-01T12:30:00.000Z"
+      }
+    ]
+  };
+
+  const mockFetchGet = async (url) => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify(dadosPlanilhaMock),
+  });
+
+  const resPuxar = await puxarInscricoesDoGoogleAppsScript("https://fake-url.com/exec", mockFetchGet);
+  assert.equal(resPuxar.ok, true);
+  assert.equal(resPuxar.inscricoes.length, 2);
+  assert.equal(resPuxar.inscricoes[0].nome, "Maria Madalena");
+
+  const resSync = await sincronizarInscricoesComNuvem("https://fake-url.com/exec", mockFetchGet);
+  assert.equal(resSync.ok, true);
+  assert.ok(resSync.total >= 2);
+
+  const local = buscarInscricaoMulheresPorEmail("maria.madalena@teste.com");
+  assert.ok(local);
+  assert.equal(local.nome, "Maria Madalena");
+  assert.equal(local.telefone, "11988887777");
+
+  // Testa exclusão na planilha
+  let exclusaoPayload = null;
+  const mockFetchPost = async (url, opts) => {
+    exclusaoPayload = JSON.parse(opts.body);
+    return { ok: true, status: 200 };
+  };
+
+  const resExcluir = await excluirInscricaoPlanilhaMulheres(local, "https://fake-url.com/exec", mockFetchPost);
+  assert.equal(resExcluir.ok, true);
+  assert.equal(exclusaoPayload.action, "excluir");
+  assert.equal(exclusaoPayload.email, "maria.madalena@teste.com");
 });

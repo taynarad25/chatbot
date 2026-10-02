@@ -680,8 +680,44 @@ function renderIndexHtml() {
       border: 1px solid rgba(0, 188, 212, 0.35);
       border-radius: 18px;
       padding: 1.5rem;
-      margin-bottom: 1.5rem;
+      margin-bottom: 2rem;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      transition: all 0.3s ease;
+    }
+    .btn-gaveta-toggle {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      padding: 9px 15px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.2s ease;
+      width: auto;
+      margin-top: 0;
+    }
+    .btn-gaveta-toggle:hover {
+      background: rgba(255, 255, 255, 0.22);
+      transform: translateY(-1px);
+    }
+    .gaveta-arrow {
+      display: inline-block;
+      font-size: 0.95rem;
+      font-weight: bold;
+      transition: transform 0.25s ease;
+    }
+    .evento-gaveta-body {
+      transition: opacity 0.25s ease;
+      opacity: 1;
+      margin-top: 1rem;
+    }
+    .evento-gaveta-body.recolhida {
+      display: none;
+      opacity: 0;
     }
     .evento-metric-grid {
       display: grid;
@@ -1300,7 +1336,11 @@ function renderIndexHtml() {
               🗓️ <strong>03/10/2026 às 19:00</strong> &nbsp;•&nbsp; 📍 <strong>Auditório Principal</strong> (Capacidade: 50 vagas)
             </p>
           </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn-gaveta-toggle" id="btnToggleTheChosen" onclick="toggleGavetaEvento('theChosen')" title="Recolher ou expandir inscrições (engavetar)">
+              <span class="gaveta-toggle-text">Recolher</span>
+              <span class="gaveta-arrow" id="arrow-theChosen">▲</span>
+            </button>
             <button onclick="sincronizarComPlanilha()" id="btnSyncPlanilha" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
               🔄 Puxar da Planilha
             </button>
@@ -1316,70 +1356,72 @@ function renderIndexHtml() {
           </div>
         </div>
 
-        <div class="evento-metric-grid" id="theChosenMetrics">
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="tcTotalInscricoes">-</div>
-            <div class="evento-metric-lbl">Inscrições</div>
+        <div class="evento-gaveta-body" id="gaveta-theChosen">
+          <div class="evento-metric-grid" id="theChosenMetrics">
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="tcTotalInscricoes">-</div>
+              <div class="evento-metric-lbl">Inscrições</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="tcTotalIngressos" style="color: var(--cor-ciano);">-</div>
+              <div class="evento-metric-lbl">Vagas Ocupadas (de 50)</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="tcVagasRestantes" style="color: #4ade80;">-</div>
+              <div class="evento-metric-lbl">Vagas Restantes</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="tcConfirmados" style="color: #22c55e;">-</div>
+              <div class="evento-metric-lbl">Confirmados</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="tcPendentes" style="color: #facc15;">-</div>
+              <div class="evento-metric-lbl">Aguardando</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="tcCancelados" style="color: #f87171;">-</div>
+              <div class="evento-metric-lbl">Cancelados</div>
+            </div>
           </div>
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="tcTotalIngressos" style="color: var(--cor-ciano);">-</div>
-            <div class="evento-metric-lbl">Vagas Ocupadas (de 50)</div>
+
+          <!-- Barra de Filtros e Busca -->
+          <div class="evento-toolbar" style="margin-top: 1.2rem;">
+            <input type="text" id="tcSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, titular, telefone ou código (TC-)..." oninput="filtrarTheChosenInscricoes()" />
+            <select id="tcStatusFilter" onchange="filtrarTheChosenInscricoes()" style="padding: 0.75rem 1rem; background: #1e1e26; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; color: #fff; font-size: 0.88rem;">
+              <option value="todos">Todos os status</option>
+              <option value="confirmado">Apenas Confirmados</option>
+              <option value="pendente">Apenas Pendentes</option>
+              <option value="cancelado">Apenas Cancelados</option>
+            </select>
           </div>
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="tcVagasRestantes" style="color: #4ade80;">-</div>
-            <div class="evento-metric-lbl">Vagas Restantes</div>
-          </div>
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="tcConfirmados" style="color: #22c55e;">-</div>
-            <div class="evento-metric-lbl">Confirmados</div>
-          </div>
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="tcPendentes" style="color: #facc15;">-</div>
-            <div class="evento-metric-lbl">Aguardando</div>
-          </div>
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="tcCancelados" style="color: #f87171;">-</div>
-            <div class="evento-metric-lbl">Cancelados</div>
+
+          <!-- Tabela de Inscritos -->
+          <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto;">
+            <table class="evento-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Código</th>
+                  <th>Titular</th>
+                  <th style="text-align: center; width: 60px;">Qtd</th>
+                  <th>Participantes</th>
+                  <th>WhatsApp / Contato</th>
+                  <th>E-mail</th>
+                  <th style="width: 130px; text-align: center;">Presença</th>
+                  <th style="width: 145px; text-align: center;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tcTbodyInscritos">
+                <tr>
+                  <td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando inscritos...</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <!-- Barra de Filtros e Busca -->
-      <div class="evento-toolbar">
-        <input type="text" id="tcSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, titular, telefone ou código (TC-)..." oninput="filtrarTheChosenInscricoes()" />
-        <select id="tcStatusFilter" onchange="filtrarTheChosenInscricoes()" style="padding: 0.75rem 1rem; background: #1e1e26; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; color: #fff; font-size: 0.88rem;">
-          <option value="todos">Todos os status</option>
-          <option value="confirmado">Apenas Confirmados</option>
-          <option value="pendente">Apenas Pendentes</option>
-          <option value="cancelado">Apenas Cancelados</option>
-        </select>
-      </div>
-
-      <!-- Tabela de Inscritos -->
-      <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto;">
-        <table class="evento-table">
-          <thead>
-            <tr>
-              <th style="width: 100px;">Código</th>
-              <th>Titular</th>
-              <th style="text-align: center; width: 60px;">Qtd</th>
-              <th>Participantes</th>
-              <th>WhatsApp / Contato</th>
-              <th>E-mail</th>
-              <th style="width: 130px; text-align: center;">Presença</th>
-              <th style="width: 145px; text-align: center;">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="tcTbodyInscritos">
-            <tr>
-              <td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando inscritos...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
       <!-- Card do Evento Culto de Mulheres -->
-      <div class="evento-card-item" style="margin-top: 2.5rem; border-color: rgba(200, 100, 82, 0.35);">
+      <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(200, 100, 82, 0.35);">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(200, 100, 82, 0.2); color: #f4a290; border: 1px solid rgba(200, 100, 82, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
@@ -1387,10 +1429,17 @@ function renderIndexHtml() {
             </div>
             <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Culto de Mulheres — O Vaso e o Oleiro</h4>
             <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
-              🗓️ <strong>24/10/2026 às 16:00</strong> &nbsp;•&nbsp; 📍 <strong>R. Benedicto de Abreu Júnior, 40</strong> &nbsp;•&nbsp; <em>Inscrição Estritamente Individual</em>
+              🗓️ <strong>24/10/2026 às 15:00</strong> &nbsp;•&nbsp; 📍 <strong>R. Benedicto de Abreu Júnior, 40</strong> &nbsp;•&nbsp; <em>Inscrição Estritamente Individual</em>
             </p>
           </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn-gaveta-toggle" id="btnToggleMulheres" onclick="toggleGavetaEvento('mulheres')" title="Recolher ou expandir inscrições (engavetar)">
+              <span class="gaveta-toggle-text">Recolher</span>
+              <span class="gaveta-arrow" id="arrow-mulheres">▲</span>
+            </button>
+            <button onclick="sincronizarComPlanilhaMulheres()" id="btnSyncPlanilhaMulheres" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
+              🔄 Puxar da Planilha
+            </button>
             <button onclick="window.open('/mulheres', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver página pública de inscrição">
               🔗 Abrir Formulário
             </button>
@@ -1403,47 +1452,49 @@ function renderIndexHtml() {
           </div>
         </div>
 
-        <div class="evento-metric-grid" id="mulheresMetrics">
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="mulheresTotal" style="color: #f4a290;">-</div>
-            <div class="evento-metric-lbl">Total de Inscritas</div>
+        <div class="evento-gaveta-body" id="gaveta-mulheres">
+          <div class="evento-metric-grid" id="mulheresMetrics">
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="mulheresTotal" style="color: #f4a290;">-</div>
+              <div class="evento-metric-lbl">Total de Inscritas</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="mulheresConfirmadosZap" style="color: #4ade80;">-</div>
+              <div class="evento-metric-lbl">Confirmação WhatsApp</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="mulheresPendentesZap" style="color: #facc15;">-</div>
+              <div class="evento-metric-lbl">Pendentes de WhatsApp</div>
+            </div>
           </div>
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="mulheresConfirmadosZap" style="color: #4ade80;">-</div>
-            <div class="evento-metric-lbl">Confirmação WhatsApp</div>
+
+          <!-- Barra de Filtros e Busca do Culto de Mulheres -->
+          <div class="evento-toolbar" style="margin-top: 1.2rem;">
+            <input type="text" id="mulheresSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, e-mail ou telefone..." oninput="filtrarMulheresInscricoes()" />
           </div>
-          <div class="evento-metric-box">
-            <div class="evento-metric-val" id="mulheresPendentesZap" style="color: #facc15;">-</div>
-            <div class="evento-metric-lbl">Pendentes de WhatsApp</div>
+
+          <!-- Tabela de Inscritas do Culto de Mulheres -->
+          <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto; margin-bottom: 0.5rem;">
+            <table class="evento-table">
+              <thead>
+                <tr>
+                  <th style="width: 60px; text-align: center;">Nº</th>
+                  <th>Nome da Participante</th>
+                  <th>E-mail</th>
+                  <th>Telefone / WhatsApp</th>
+                  <th style="width: 150px; text-align: center;">Data da Inscrição</th>
+                  <th style="width: 140px; text-align: center;">WhatsApp</th>
+                  <th style="width: 110px; text-align: center;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="mulheresTbodyInscritos">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando inscritas...</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
-
-      <!-- Barra de Filtros e Busca do Culto de Mulheres -->
-      <div class="evento-toolbar" style="margin-top: 1rem;">
-        <input type="text" id="mulheresSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, e-mail ou telefone..." oninput="filtrarMulheresInscricoes()" />
-      </div>
-
-      <!-- Tabela de Inscritas do Culto de Mulheres -->
-      <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto; margin-bottom: 2rem;">
-        <table class="evento-table">
-          <thead>
-            <tr>
-              <th style="width: 60px; text-align: center;">Nº</th>
-              <th>Nome da Participante</th>
-              <th>E-mail</th>
-              <th>Telefone / WhatsApp</th>
-              <th style="width: 150px; text-align: center;">Data da Inscrição</th>
-              <th style="width: 140px; text-align: center;">WhatsApp</th>
-              <th style="width: 110px; text-align: center;">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="mulheresTbodyInscritos">
-            <tr>
-              <td colspan="7" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando inscritas...</td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
 
@@ -2086,7 +2137,7 @@ function renderIndexHtml() {
         const res = await fetch('/the-chosen/api/sincronizar', { method: 'POST' });
         const data = await res.json();
         if (res.ok && data.ok) {
-          alert('✅ Sincronização concluída com sucesso!\\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
+          alert('✅ Sincronização concluída com sucesso!\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
           await fetchTheChosenInscricoes();
         } else {
           alert('⚠️ Aviso ao sincronizar: ' + (data.error || data.message || 'Verifique a configuração do Apps Script'));
@@ -2099,6 +2150,74 @@ function renderIndexHtml() {
           btn.innerHTML = originalText || '🔄 Puxar da Planilha';
         }
       }
+    }
+
+    async function sincronizarComPlanilhaMulheres() {
+      const btn = document.getElementById('btnSyncPlanilhaMulheres');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Sincronizando...';
+      }
+      try {
+        const res = await fetch('/mulheres/api/sincronizar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          alert('✅ Sincronização concluída com sucesso!\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
+          await fetchMulheresInscricoes();
+        } else {
+          alert('⚠️ Aviso ao sincronizar: ' + (data.error || data.message || 'Verifique a configuração do Apps Script'));
+        }
+      } catch (err) {
+        alert('Erro ao sincronizar com a planilha: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText || '🔄 Puxar da Planilha';
+        }
+      }
+    }
+
+    function toggleGavetaEvento(nomeEvento) {
+      const gaveta = document.getElementById('gaveta-' + nomeEvento);
+      const btn = document.getElementById('btnToggle' + (nomeEvento === 'theChosen' ? 'TheChosen' : 'Mulheres'));
+      if (!gaveta || !btn) return;
+
+      const isRecolhida = gaveta.classList.contains('recolhida');
+      const textEl = btn.querySelector('.gaveta-toggle-text');
+      const arrowEl = btn.querySelector('.gaveta-arrow');
+
+      if (isRecolhida) {
+        gaveta.classList.remove('recolhida');
+        btn.classList.remove('recolhida');
+        if (textEl) textEl.textContent = 'Recolher';
+        if (arrowEl) arrowEl.innerHTML = '▲';
+        localStorage.setItem('gaveta_' + nomeEvento, 'aberta');
+      } else {
+        gaveta.classList.add('recolhida');
+        btn.classList.add('recolhida');
+        if (textEl) textEl.textContent = 'Abrir';
+        if (arrowEl) arrowEl.innerHTML = '▼';
+        localStorage.setItem('gaveta_' + nomeEvento, 'fechada');
+      }
+    }
+
+    function restaurarEstadoGavetas() {
+      ['theChosen', 'mulheres'].forEach(nomeEvento => {
+        const salvo = localStorage.getItem('gaveta_' + nomeEvento);
+        if (salvo === 'fechada') {
+          const gaveta = document.getElementById('gaveta-' + nomeEvento);
+          const btn = document.getElementById('btnToggle' + (nomeEvento === 'theChosen' ? 'TheChosen' : 'Mulheres'));
+          if (gaveta && btn) {
+            gaveta.classList.add('recolhida');
+            btn.classList.add('recolhida');
+            const textEl = btn.querySelector('.gaveta-toggle-text');
+            const arrowEl = btn.querySelector('.gaveta-arrow');
+            if (textEl) textEl.textContent = 'Abrir';
+            if (arrowEl) arrowEl.innerHTML = '▼';
+          }
+        }
+      });
     }
 
     /* =========================================================================
@@ -2851,6 +2970,7 @@ function renderIndexHtml() {
     fetchEventosCadastrados();
     fetchTheChosenInscricoes();
     fetchMulheresInscricoes();
+    restaurarEstadoGavetas();
   </script>
 </body></html>`;
 }

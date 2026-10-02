@@ -111,7 +111,7 @@ function salvarInscricaoMulheres({
   email,
   telefone,
   evento = 'Culto de Mulheres: O Vaso e o Oleiro',
-  dataEvento = '2026-10-24 16:00',
+  dataEvento = '2026-10-24 15:00',
   whatsappConfirmacaoEnviado = 0,
   criadoEm = null,
 } = {}) {
@@ -224,7 +224,7 @@ function montarMensagemConfirmacaoMulheres({ nome } = {}) {
     `🌸 *Inscrição Confirmada - Culto de Mulheres*\n\n` +
     `Olá, *${primeiroNome}*! Sua inscrição para o *Culto de Mulheres: O Vaso e o Oleiro* foi confirmada com sucesso! ✨\n\n` +
     `📅 *Data:* Sábado, 24/10/2026\n` +
-    `⏰ *Horário:* 16:00\n` +
+    `⏰ *Horário:* 15:00\n` +
     `📍 *Local:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi (Comunidade Cristã Curados)\n\n` +
     `Esperamos por você no dia! Será um momento precioso na presença de Deus! 🙏❤️`
   );
@@ -311,7 +311,7 @@ function renderMulheresPdfHtml() {
       <h1>Comunidade Cristã Curados • Secretaria</h1>
       <h2>Lista Oficial de Portaria & Presença • Culto de Mulheres: O Vaso e o Oleiro</h2>
       <div class="header-meta">
-        <strong>Data do Evento:</strong> Sábado, 24/10/2026 às 16:00 &nbsp;|&nbsp; 
+        <strong>Data do Evento:</strong> Sábado, 24/10/2026 às 15:00 &nbsp;|&nbsp; 
         <strong>Local:</strong> R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi &nbsp;|&nbsp;
         <strong>Gerado em:</strong> ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
       </div>
@@ -356,6 +356,136 @@ function renderMulheresPdfHtml() {
   </html>`;
 }
 
+let sincronizacaoMulheresEmAndamento = null;
+
+async function puxarInscricoesDoGoogleAppsScript(url = URL_WEBAPP_MULHERES_PADRAO, fetchFn = global.fetch) {
+  if (!url) return { ok: false, error: 'URL do Apps Script não configurada.', inscricoes: [] };
+
+  try {
+    const res = await fetchFn(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!res.ok) {
+      return { ok: false, error: `HTTP ${res.status}`, inscricoes: [] };
+    }
+
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return { ok: false, error: 'Resposta não é JSON válido', inscricoes: [] };
+    }
+
+    let lista = [];
+    if (Array.isArray(data)) {
+      lista = data;
+    } else if (Array.isArray(data.inscricoes)) {
+      lista = data.inscricoes;
+    } else if (Array.isArray(data.dados)) {
+      lista = data.dados;
+    } else if (data.status === 'active' || data.message) {
+      return { ok: true, active: true, message: data.message, inscricoes: [] };
+    }
+
+    const normalizadas = lista.map(item => {
+      const nome = String(item.nome || item.Nome || item.titular || '').trim();
+      const email = normalizarEmail(item.email || item.Email || item['E-mail']);
+      const telefone = normalizarTelefone(item.telefone || item.Telefone || item.whatsapp || item.WhatsApp);
+      const dataEvento = item.dataEvento || item.data || '2026-10-24 15:00';
+      const criadoEm = item.criadoEm || item.dataHora || item.timestamp || item.CarimboDeDataHora || new Date().toISOString();
+      return {
+        id: item.id || crypto.randomUUID(),
+        nome,
+        email,
+        telefone,
+        evento: 'Culto de Mulheres: O Vaso e o Oleiro',
+        dataEvento,
+        whatsappConfirmacaoEnviado: Boolean(item.whatsappConfirmacaoEnviado || item.confirmado || item.zap),
+        criadoEm
+      };
+    }).filter(i => i.email || i.nome);
+
+    return { ok: true, inscricoes: normalizadas };
+  } catch (err) {
+    console.error('[Culto Mulheres] Erro de rede ao buscar inscrições da planilha:', err.message);
+    return { ok: false, error: err.message, inscricoes: [] };
+  }
+}
+
+async function sincronizarInscricoesComNuvem(url = URL_WEBAPP_MULHERES_PADRAO, fetchFn = global.fetch) {
+  if (sincronizacaoMulheresEmAndamento) {
+    return sincronizacaoMulheresEmAndamento;
+  }
+  sincronizacaoMulheresEmAndamento = executarSincronizacaoMulheresComNuvem(url, fetchFn).finally(() => {
+    sincronizacaoMulheresEmAndamento = null;
+  });
+  return sincronizacaoMulheresEmAndamento;
+}
+
+async function executarSincronizacaoMulheresComNuvem(url, fetchFn) {
+  try {
+    const res = await puxarInscricoesDoGoogleAppsScript(url, fetchFn);
+    if (!res.ok) {
+      return { ok: false, error: res.error || 'Falha ao buscar dados da planilha.', total: 0 };
+    }
+
+    if (Array.isArray(res.inscricoes) && res.inscricoes.length > 0) {
+      for (const item of res.inscricoes) {
+        if (item.email) {
+          salvarInscricaoMulheres(item);
+        }
+      }
+    }
+
+    const inscricoesAtualizadas = listarInscricoesMulheres();
+    const stats = obterEstatisticasMulheres();
+
+    return {
+      ok: true,
+      total: inscricoesAtualizadas.length,
+      inscricoes: inscricoesAtualizadas,
+      stats,
+      message: res.active && res.inscricoes.length === 0
+        ? 'Planilha conectada e ativa via Web App.'
+        : `${inscricoesAtualizadas.length} inscrição(ões) sincronizada(s).`
+    };
+  } catch (err) {
+    console.error('[Culto Mulheres] Erro ao sincronizar inscrições com a nuvem:', err.message);
+    return { ok: false, error: err.message, total: 0 };
+  }
+}
+
+async function excluirInscricaoPlanilhaMulheres(inscricao, url = URL_WEBAPP_MULHERES_PADRAO, fetchFn = global.fetch) {
+  const item = typeof inscricao === 'string' ? { email: inscricao } : (inscricao || {});
+  const email = normalizarEmail(item.email);
+  const nome = String(item.nome || '').trim();
+  const telefone = normalizarTelefone(item.telefone);
+
+  try {
+    const res = await fetchFn(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'excluir',
+        email,
+        nome,
+        telefone
+      }),
+      redirect: 'follow',
+      signal: AbortSignal.timeout(8000)
+    });
+    return { ok: res.ok, status: res.status };
+  } catch (err) {
+    console.warn('[Culto Mulheres] Aviso ao enviar exclusão para a planilha:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   URL_WEBAPP_MULHERES_PADRAO,
   enviarInscricaoPlanilhaMulheres,
@@ -368,4 +498,7 @@ module.exports = {
   marcarConfirmacaoMulheresEnviada,
   montarMensagemConfirmacaoMulheres,
   renderMulheresPdfHtml,
+  puxarInscricoesDoGoogleAppsScript,
+  sincronizarInscricoesComNuvem,
+  excluirInscricaoPlanilhaMulheres,
 };

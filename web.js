@@ -579,12 +579,36 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       // API: Listagem de inscritas e estatísticas (/mulheres/api/inscritas)
       if (req.method === 'GET' && pathname === '/mulheres/api/inscritas') {
         try {
+          const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+          const shouldSync = parsedUrl.searchParams.get('sync') === '1' || cultoMulheres.listarInscricoesMulheres().length === 0;
+          if (shouldSync && typeof cultoMulheres.sincronizarInscricoesComNuvem === 'function') {
+            await cultoMulheres.sincronizarInscricoesComNuvem().catch(err => {
+              console.warn('[Web] Aviso ao sincronizar com planilha em /mulheres/api/inscritas:', err.message);
+            });
+          }
+
           const inscricoes = cultoMulheres.listarInscricoesMulheres();
           const stats = cultoMulheres.obterEstatisticasMulheres();
           return sendJson(res, 200, { ok: true, inscricoes, stats });
         } catch (err) {
           console.error('[Culto Mulheres] Erro ao listar inscritas:', err);
           return sendJson(res, 500, { ok: false, message: 'Erro ao listar inscritas.' });
+        }
+      }
+
+      // API: Sincronização manual com a planilha do Google (Secretaria)
+      if (req.method === 'POST' && pathname === '/mulheres/api/sincronizar') {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          const resultado = typeof cultoMulheres.sincronizarInscricoesComNuvem === 'function'
+            ? await cultoMulheres.sincronizarInscricoesComNuvem()
+            : { ok: false, message: 'Função de sincronização não disponível.' };
+          return sendJson(res, resultado.ok ? 200 : 500, resultado);
+        } catch (err) {
+          console.error('[Web] Erro ao sincronizar Culto de Mulheres com Google Sheets:', err.message);
+          return sendJson(res, 500, { ok: false, message: err.message });
         }
       }
 
@@ -618,8 +642,12 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           if (!termo) {
             return sendJson(res, 400, { ok: false, message: 'ID ou e-mail da inscrição não informado.' });
           }
+          const inscricaoParaExcluir = cultoMulheres.buscarInscricaoMulheresPorEmail(termo) || { id: termo, email: termo };
           const removido = cultoMulheres.excluirInscricaoMulheres(termo);
           if (removido) {
+            if (typeof cultoMulheres.excluirInscricaoPlanilhaMulheres === 'function') {
+              cultoMulheres.excluirInscricaoPlanilhaMulheres(inscricaoParaExcluir).catch(() => {});
+            }
             return sendJson(res, 200, { ok: true, message: 'Inscrição removida com sucesso.' });
           } else {
             return sendJson(res, 404, { ok: false, message: 'Inscrição não encontrada.' });
@@ -990,6 +1018,11 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
     if (typeof theChosen.sincronizarInscricoesComNuvem === 'function' && !process.env.THE_CHOSEN_DATA_PATH) {
       theChosen.sincronizarInscricoesComNuvem().catch(err => {
         console.warn('[Web] Aviso na sincronização inicial com a planilha Google:', err.message);
+      });
+    }
+    if (typeof cultoMulheres.sincronizarInscricoesComNuvem === 'function' && process.env.NODE_ENV !== 'test') {
+      cultoMulheres.sincronizarInscricoesComNuvem().catch(err => {
+        console.warn('[Web] Aviso na sincronização inicial de Mulheres com a planilha Google:', err.message);
       });
     }
   });
