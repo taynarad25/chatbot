@@ -12,22 +12,21 @@ const URL_WEBAPP_MULHERES_PADRAO =
   'https://script.google.com/macros/s/AKfycbzGYDJzHufmbaOP39WH_ouv_EyrM9vnAkjjOC06fBJ5XJAop1ZcWo92mnJIevDPc19UcQ/exec';
 
 let metadataPlanilhaMulheres = {
-  spreadsheetId: process.env.MULHERES_SPREADSHEET_ID || null,
-  spreadsheetUrl: process.env.MULHERES_SPREADSHEET_URL || null,
-  pdfUrl: null,
+  spreadsheetId: process.env.MULHERES_SPREADSHEET_ID || '12OfRGFDbMYxUdxJ9WJJ7LlsfdqRbWOvI8n13cULIMd4',
+  spreadsheetUrl: process.env.MULHERES_SPREADSHEET_URL || 'https://docs.google.com/spreadsheets/d/12OfRGFDbMYxUdxJ9WJJ7LlsfdqRbWOvI8n13cULIMd4/edit?usp=sharing',
+  pdfUrl: 'https://docs.google.com/spreadsheets/d/12OfRGFDbMYxUdxJ9WJJ7LlsfdqRbWOvI8n13cULIMd4/export?format=pdf&portrait=true&size=a4&gridlines=true',
 };
 
 function obterLinksPlanilhaMulheres() {
   const ssId = metadataPlanilhaMulheres.spreadsheetId;
-  const webappUrl = URL_WEBAPP_MULHERES_PADRAO;
 
   const pdfUrl = ssId
     ? `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`
-    : (metadataPlanilhaMulheres.pdfUrl || `${webappUrl}?action=pdf`);
+    : metadataPlanilhaMulheres.pdfUrl;
 
   const spreadsheetUrl = ssId
-    ? `https://docs.google.com/spreadsheets/d/${ssId}/edit`
-    : (metadataPlanilhaMulheres.spreadsheetUrl || webappUrl);
+    ? `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`
+    : metadataPlanilhaMulheres.spreadsheetUrl;
 
   return {
     spreadsheetId: ssId,

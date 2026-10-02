@@ -75,71 +75,26 @@ function obterEventosInscricaoParaUsuario({
 }
 
 function gerarResumoCultoMulheres() {
-  const inscricoes = cultoMulheres.listarInscricoesMulheres();
   const stats = cultoMulheres.obterEstatisticasMulheres();
 
-  let texto =
-    `🌸 *Culto de Mulheres: O Vaso e o Oleiro*\n` +
-    `🗓️ *Data:* Sábado, 24/10/2026 às 15:00\n` +
-    `📍 *Local:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi\n\n` +
+  return (
+    `🌸 *Inscrições - Culto de Mulheres: O Vaso e o Oleiro*\n\n` +
     `📊 *Estatísticas das Inscrições:*\n` +
     `• Total de Inscritas: *${stats.total}*\n` +
     `• Confirmações WhatsApp: *${stats.whatsappConfirmados}*\n` +
-    `• Pendentes de Confirmação: *${stats.pendentesConfirmacao}*\n\n`;
-
-  if (inscricoes.length === 0) {
-    texto += `_Nenhuma inscrição registrada até o momento._\n\n`;
-  } else {
-    texto += `📋 *Inscritas Recentes:*\n`;
-    const exibicao = inscricoes.slice(0, 15);
-    exibicao.forEach((item, idx) => {
-      const tel = item.telefone
-        ? ` (${String(item.telefone).replace(/\D/g, "")})`
-        : "";
-      texto += `${idx + 1}. *${item.nome || "Participante"}*${tel}\n`;
-    });
-    if (inscricoes.length > 15) {
-      texto += `_... e mais ${inscricoes.length - 15} participante(s) no documento PDF anexo._\n\n`;
-    } else {
-      texto += `\n`;
-    }
-  }
-
-  return texto;
+    `• Pendentes de Confirmação: *${stats.pendentesConfirmacao}*\n`
+  );
 }
 
 function gerarResumoTheChosen() {
-  const inscricoes = theChosen.carregarInscricoes();
   const statusVagas = theChosen.obterStatusVagas();
 
-  let texto =
-    `🎬 *Pré-estreia The Chosen - Temporada 6*\n` +
-    `🗓️ *Data:* Sábado, 03/10/2026 às 19:00\n` +
-    `📍 *Local:* Templo da Comunidade Cristã Curados\n\n` +
+  return (
+    `🎬 *Inscrições - Pré-estreia The Chosen*\n\n` +
     `📊 *Estatísticas das Inscrições:*\n` +
     `• Vagas Ocupadas: *${statusVagas.preenchidas} / ${statusVagas.total}*\n` +
-    `• Vagas Restantes: *${statusVagas.restantes}*\n\n`;
-
-  if (inscricoes.length === 0) {
-    texto += `_Nenhuma inscrição registrada até o momento._\n\n`;
-  } else {
-    texto += `📋 *Inscrições Recentes:*\n`;
-    const exibicao = inscricoes.slice(0, 15);
-    exibicao.forEach((item, idx) => {
-      const qtd = Number(item.quantidade) || 1;
-      const tel = item.telefone
-        ? ` (${String(item.telefone).replace(/\D/g, "")})`
-        : "";
-      texto += `${idx + 1}. *${item.titular || item.nome || "Participante"}* (${qtd} vaga${qtd > 1 ? "s" : ""})${tel}\n`;
-    });
-    if (inscricoes.length > 15) {
-      texto += `_... e mais ${inscricoes.length - 15} inscrição(ões) no documento PDF anexo._\n\n`;
-    } else {
-      texto += `\n`;
-    }
-  }
-
-  return texto;
+    `• Vagas Restantes: *${statusVagas.restantes}*\n`
+  );
 }
 
 /**
@@ -311,37 +266,23 @@ async function gerarPdfEvento({ eventoId, client }) {
  */
 function obterLinksDocumentos(eventoId) {
   if (eventoId === "culto_mulheres") {
-    if (typeof cultoMulheres.obterLinksPlanilhaMulheres === "function") {
-      return cultoMulheres.obterLinksPlanilhaMulheres();
-    }
-    const ssId = process.env.MULHERES_SPREADSHEET_ID;
-    const webappUrl =
-      process.env.MULHERES_WEBAPP_URL ||
-      "https://script.google.com/macros/s/AKfycbzGYDJzHufmbaOP39WH_ouv_EyrM9vnAkjjOC06fBJ5XJAop1ZcWo92mnJIevDPc19UcQ/exec";
+    const ssId =
+      process.env.MULHERES_SPREADSHEET_ID ||
+      "12OfRGFDbMYxUdxJ9WJJ7LlsfdqRbWOvI8n13cULIMd4";
     return {
-      spreadsheetId: ssId || null,
-      spreadsheetUrl: ssId
-        ? `https://docs.google.com/spreadsheets/d/${ssId}/edit`
-        : webappUrl,
-      pdfUrl: ssId
-        ? `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`
-        : `${webappUrl}?action=pdf`,
+      spreadsheetId: ssId,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`,
+      pdfUrl: `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`,
     };
   }
 
   if (eventoId === "the_chosen") {
-    let ssId =
+    const ssId =
       process.env.GOOGLE_SHEETS_SPREADSHEET_ID ||
       "1eFQTr1uMTtr1RMaU1KXtxtTpzVlUdGvQOFRtK0quHIM";
-    try {
-      const theChosenSheets = require("../web/the_chosen_sheets");
-      if (typeof theChosenSheets.getSpreadsheetId === "function") {
-        ssId = theChosenSheets.getSpreadsheetId() || ssId;
-      }
-    } catch {}
     return {
       spreadsheetId: ssId,
-      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit`,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`,
       pdfUrl: `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`,
     };
   }
@@ -350,7 +291,7 @@ function obterLinksDocumentos(eventoId) {
 }
 
 /**
- * Envia o resumo, lista de inscritos e links oficiais do Google Docs/Sheets
+ * Envia o resumo conciso (cabeçalho, estatísticas e links oficiais da planilha)
  */
 async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
   // Sincroniza com o Google Sheets em produção para garantir dados frescos
@@ -379,80 +320,24 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
     resumoTexto = gerarResumoTheChosen();
   }
 
-  const destino = msg.from || numero;
-  const isLid = String(destino).includes("@lid");
-
-  // 1. Lista nominal de inscritos
-  const listaTexto = montarListaInscritosTexto(eventoId);
-
-  // 2. Links oficiais do Google Drive / Docs / Sheets
+  // Links oficiais das planilhas do Google Sheets e PDF nativo
   const links = obterLinksDocumentos(eventoId);
 
   let blocoLinks = "";
   if (links.pdfUrl) {
-    blocoLinks += `\n📥 *Baixar Lista Oficial em PDF (Google Drive):*\n${links.pdfUrl}\n`;
+    blocoLinks += `\n📥 *Baixar Lista Oficial em PDF:*\n${links.pdfUrl}\n`;
   }
   if (links.spreadsheetUrl) {
-    blocoLinks += `\n📊 *Acessar Planilha Online em Tempo Real:*\n${links.spreadsheetUrl}\n`;
+    blocoLinks += `\n📊 *Acessar Planilha Online:*\n${links.spreadsheetUrl}\n`;
   }
 
   const corpoMensagem =
     resumoTexto +
-    `📋 *Lista de Inscritos:*\n` +
-    listaTexto +
-    `\n\n` +
-    `📑 *Documentos Oficiais (Google Docs/Drive):*` +
+    `\n📑 *Documentos Oficiais:*` +
     blocoLinks +
     `\nDigite *menu* para voltar ao menu principal.`;
 
-  // Envio garantido e imediato da mensagem
   await msg.reply(corpoMensagem);
-
-  // 3. Se for usuário com @c.us e puppeteer ativo, tenta anexar o PDF como cortesia
-  if (!isLid && MessageMedia && puppeteer) {
-    try {
-      const pdfRes = await gerarPdfEvento({ eventoId, client });
-      if (pdfRes.ok && pdfRes.buffer) {
-        const tempFilePath = path.join(
-          os.tmpdir(),
-          `inscricoes_${Date.now()}_${pdfRes.filename}`
-        );
-        try {
-          fs.writeFileSync(tempFilePath, pdfRes.buffer);
-          let media;
-          if (typeof MessageMedia.fromFilePath === "function") {
-            media = MessageMedia.fromFilePath(tempFilePath);
-          } else {
-            media = new MessageMedia(
-              "application/pdf",
-              pdfRes.buffer.toString("base64"),
-              pdfRes.filename
-            );
-          }
-
-          const sendOptions = {
-            caption: `📄 *Lista Oficial de Inscrições / Folha de Portaria*`,
-            sendMediaAsDocument: true,
-          };
-
-          if (typeof client?.sendMessage === "function") {
-            await client.sendMessage(destino, media, sendOptions);
-          } else if (typeof msg.reply === "function") {
-            await msg.reply(media, undefined, sendOptions);
-          }
-        } finally {
-          try {
-            if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-          } catch {}
-        }
-      }
-    } catch (errAnexo) {
-      console.warn(
-        "[Inscrições] Aviso ao enviar anexo secundário em PDF:",
-        errAnexo.message
-      );
-    }
-  }
 }
 
 /**
