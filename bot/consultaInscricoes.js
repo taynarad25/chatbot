@@ -1,4 +1,6 @@
 const fs = require("fs");
+const path = require("path");
+const os = require("os");
 let MessageMedia;
 try {
   MessageMedia = require("whatsapp-web.js").MessageMedia;
@@ -141,6 +143,91 @@ function gerarResumoTheChosen() {
 }
 
 /**
+ * Monta lista nominal em texto caso o PDF falhe ou para consulta rápida
+ */
+function montarListaInscritosTexto(eventoId) {
+  if (eventoId === "culto_mulheres") {
+    const lista =
+      typeof cultoMulheres.listarInscricoesMulheres === "function"
+        ? cultoMulheres.listarInscricoesMulheres()
+        : [];
+    if (!lista || lista.length === 0) {
+      return "_Nenhuma inscrição registrada até o momento._";
+    }
+    const maxExibir = 40;
+    const itens = lista.slice(0, maxExibir).map((item, idx) => {
+      const tel = item.telefone ? `📞 ${item.telefone}` : "";
+      const email = item.email ? `✉️ ${item.email}` : "";
+      const info = [tel, email].filter(Boolean).join(" | ");
+      return `${idx + 1}. *${item.nome}*${info ? `\n   ${info}` : ""}`;
+    });
+    let texto = itens.join("\n\n");
+    if (lista.length > maxExibir) {
+      texto += `\n\n_... e mais ${lista.length - maxExibir} inscritos (consulte a lista completa no painel da secretaria)._`;
+    }
+    return texto;
+  }
+
+  if (eventoId === "the_chosen") {
+    const lista =
+      typeof theChosen.listarInscricoes === "function"
+        ? theChosen.listarInscricoes()
+        : [];
+    if (!lista || lista.length === 0) {
+      return "_Nenhuma inscrição registrada até o momento._";
+    }
+    const maxExibir = 40;
+    const itens = lista.slice(0, maxExibir).map((item, idx) => {
+      const tel = item.telefone ? `📞 ${item.telefone}` : "";
+      const status = item.presente
+        ? "✅ Presente"
+        : item.confirmado
+        ? "👍 Confirmado"
+        : "⏳ Pendente";
+      return `${idx + 1}. *${item.nome}* (${status})${tel ? `\n   ${tel}` : ""}`;
+    });
+    let texto = itens.join("\n\n");
+    if (lista.length > maxExibir) {
+      texto += `\n\n_... e mais ${lista.length - maxExibir} inscritos._`;
+    }
+    return texto;
+  }
+
+  return "";
+}
+
+/**
+ * Obtém argumentos de inicialização seguros para Puppeteer em qualquer SO / VPS
+ */
+function getPuppeteerLaunchArgs() {
+  const opts = {
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--disable-gpu",
+      "--disable-extensions",
+    ],
+  };
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    opts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  } else if (fs.existsSync("/usr/bin/chromium")) {
+    opts.executablePath = "/usr/bin/chromium";
+  } else if (fs.existsSync("/usr/bin/google-chrome-stable")) {
+    opts.executablePath = "/usr/bin/google-chrome-stable";
+  } else if (fs.existsSync("/usr/bin/chromium-browser")) {
+    opts.executablePath = "/usr/bin/chromium-browser";
+  }
+
+  return opts;
+}
+
+/**
  * Gera o buffer PDF correspondente ao evento usando Puppeteer
  */
 async function gerarPdfEvento({ eventoId, client }) {
@@ -157,20 +244,31 @@ async function gerarPdfEvento({ eventoId, client }) {
     return { ok: false, error: "Evento não reconhecido." };
   }
 
-  let browser = client?.pupBrowser;
+  let browser = null;
   let fecharBrowser = false;
 
   try {
-    if (
-      !browser ||
-      (typeof browser.isConnected === "function" && !browser.isConnected())
-    ) {
-      if (puppeteer && typeof puppeteer.launch === "function") {
-        browser = await puppeteer.launch({
-          headless: "new",
-          args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        });
+    // 1. Prioriza instância Puppeteer isolada para não afetar o WhatsApp Web
+    if (puppeteer && typeof puppeteer.launch === "function") {
+      try {
+        browser = await puppeteer.launch(getPuppeteerLaunchArgs());
         fecharBrowser = true;
+      } catch (launchErr) {
+        console.warn(
+          "[Inscrições PDF] Falha ao iniciar Puppeteer isolado, tentando pupBrowser do client:",
+          launchErr.message
+        );
+      }
+    }
+
+    // 2. Fallback: reaproveita client.pupBrowser se estiver conectado
+    if (!browser && client?.pupBrowser) {
+      if (
+        typeof client.pupBrowser.isConnected !== "function" ||
+        client.pupBrowser.isConnected()
+      ) {
+        browser = client.pupBrowser;
+        fecharBrowser = false;
       }
     }
 
@@ -182,7 +280,7 @@ async function gerarPdfEvento({ eventoId, client }) {
     }
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "load", timeout: 20000 });
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 });
     const rawBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
@@ -201,7 +299,7 @@ async function gerarPdfEvento({ eventoId, client }) {
       await browser.close().catch(() => {});
     }
     console.warn(
-      `[Inscrições PDF] Aviso ao gerar PDF de ${eventoId}:`,
+      `[Inscrições PDF] Erro ao gerar PDF de ${eventoId}:`,
       err.message
     );
     return { ok: false, error: err.message };
@@ -244,31 +342,88 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
       `⏳ _Gerando a Lista Oficial de Inscrições em PDF para você..._`
   );
 
+  const destino = msg.from || numero;
+
   // 2. Tenta gerar e enviar o documento PDF em anexo
+  let pdfEnviado = false;
+  let erroPdfMsg = null;
+
   try {
     const pdfRes = await gerarPdfEvento({ eventoId, client });
     if (pdfRes.ok && pdfRes.buffer && MessageMedia) {
-      const media = new MessageMedia(
-        "application/pdf",
-        pdfRes.buffer.toString("base64"),
-        pdfRes.filename
+      const tempFilePath = path.join(
+        os.tmpdir(),
+        `inscricoes_${Date.now()}_${pdfRes.filename}`
       );
-      if (typeof client?.sendMessage === "function") {
-        await client.sendMessage(numero, media, {
+      try {
+        fs.writeFileSync(tempFilePath, pdfRes.buffer);
+        let media;
+        if (typeof MessageMedia.fromFilePath === "function") {
+          media = MessageMedia.fromFilePath(tempFilePath);
+        } else {
+          media = new MessageMedia(
+            "application/pdf",
+            pdfRes.buffer.toString("base64"),
+            pdfRes.filename
+          );
+        }
+
+        const sendOptions = {
           caption: `📄 *Lista Oficial de Inscrições / Folha de Portaria*\n\nDocumento atualizado gerado para conferência de liderança.`,
-        });
-        return;
+          sendMediaAsDocument: true,
+        };
+
+        if (typeof client?.sendMessage === "function") {
+          try {
+            await client.sendMessage(destino, media, sendOptions);
+            pdfEnviado = true;
+          } catch (sendErr1) {
+            console.warn(
+              "[Inscrições] Falha no client.sendMessage com documento, tentando msg.reply:",
+              sendErr1.message
+            );
+          }
+        }
+
+        if (!pdfEnviado && typeof msg.reply === "function") {
+          await msg.reply(media, undefined, sendOptions);
+          pdfEnviado = true;
+        }
+
+        if (pdfEnviado) {
+          console.log(
+            `[Inscrições] PDF ${pdfRes.filename} enviado com sucesso para ${destino}`
+          );
+          return;
+        }
+      } finally {
+        try {
+          if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+          }
+        } catch {}
       }
+    } else if (!pdfRes.ok) {
+      erroPdfMsg = pdfRes.error;
     }
   } catch (errPdf) {
+    erroPdfMsg = errPdf.message;
     console.warn(
       "[Inscrições] Erro ao enviar anexo PDF via WhatsApp:",
       errPdf.message
     );
   }
 
+  // 3. Fallback inteligente: se o PDF não pôde ser gerado/enviado, envia a lista nominal em texto
+  const listaTexto = montarListaInscritosTexto(eventoId);
+  const msgAviso = erroPdfMsg
+    ? `⚠️ _Não foi possível anexar o arquivo PDF (${erroPdfMsg}), mas aqui está a lista de inscritos:_\n\n`
+    : `📋 *Lista Nominal de Inscritos:*\n\n`;
+
   await msg.reply(
-    `📄 _O relatório completo também pode ser consultado no painel da secretaria._\n\nDigite *menu* para voltar ao menu principal.`
+    msgAviso +
+      listaTexto +
+      `\n\n📄 _O relatório e download do PDF também estão disponíveis no painel da secretaria._\n\nDigite *menu* para voltar ao menu principal.`
   );
 }
 

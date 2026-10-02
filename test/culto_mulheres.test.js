@@ -330,11 +330,18 @@ test("Culto de Mulheres: notificação de marcos de 10, 5 e 3 dias para líderes
     },
   };
 
+  const mockFetchNotif = async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ status: "success", exists: false }),
+  });
+
   // 1. Teste faltando exatamente 10 dias (14/10/2026 para evento 24/10/2026)
   const data10Dias = new Date(2026, 9, 14, 8, 0, 0); // 14 de Outubro de 2026
   const res10 = await processarNotificacoesRedeMulheres({
     client: mockClient,
     dataBase: data10Dias,
+    fetchFn: mockFetchNotif,
   });
 
   assert.equal(res10.executado, true);
@@ -347,6 +354,7 @@ test("Culto de Mulheres: notificação de marcos de 10, 5 e 3 dias para líderes
   const res10Repetido = await processarNotificacoesRedeMulheres({
     client: mockClient,
     dataBase: data10Dias,
+    fetchFn: mockFetchNotif,
   });
   assert.equal(res10Repetido.executado, false);
 
@@ -356,6 +364,7 @@ test("Culto de Mulheres: notificação de marcos de 10, 5 e 3 dias para líderes
   const res5 = await processarNotificacoesRedeMulheres({
     client: mockClient,
     dataBase: data5Dias,
+    fetchFn: mockFetchNotif,
   });
   assert.equal(res5.executado, true);
   assert.equal(res5.diasRestantes, 5);
@@ -367,6 +376,7 @@ test("Culto de Mulheres: notificação de marcos de 10, 5 e 3 dias para líderes
   const res3 = await processarNotificacoesRedeMulheres({
     client: mockClient,
     dataBase: data3Dias,
+    fetchFn: mockFetchNotif,
   });
   assert.equal(res3.executado, true);
   assert.equal(res3.diasRestantes, 3);
