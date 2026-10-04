@@ -8,9 +8,6 @@ const { validatePassword, hashPassword, createSession, isAuthenticated, getSessi
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 const { createRateLimiter } = require("./web/rateLimiter");
 const { getClientIp } = require("./web/clientIp");
-const theChosen = require("./web/the_chosen");
-const theChosenSheets = require("./web/the_chosen_sheets");
-const theChosenNotificacoes = require("./web/the_chosen_notificacoes");
 const cultoMulheres = require("./web/culto_mulheres");
 const cultoMulheresNotificacoes = require("./web/culto_mulheres_notificacoes");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
@@ -37,9 +34,6 @@ const LIDERANCA_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "lidera
 const QUEMSOMOS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "quemsomos.html"))
   ? path.join(__dirname, "public", "quemsomos.html")
   : path.join(__dirname, "web", "public", "quemsomos.html");
-const THE_CHOSEN_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "the-chosen.html"))
-  ? path.join(__dirname, "public", "the-chosen.html")
-  : path.join(__dirname, "web", "public", "the-chosen.html");
 const MULHERES_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "culto-mulheres.html"))
   ? path.join(__dirname, "public", "culto-mulheres.html")
   : path.join(__dirname, "web", "public", "culto-mulheres.html");
@@ -305,202 +299,18 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
       }
 
-      // Rota /the-chosen (e variações como /thechosen): Inscrição exclusiva para a Pré-estreia The Chosen
-      if (req.method === 'GET' && (
+      // Rota /the-chosen (e variações como /thechosen): Evento The Chosen encerrado -> redireciona para a home
+      if (
         pathname === '/the-chosen' || pathname === '/the-chosen/' || pathname === '/the-chosen.html' ||
         pathname === '/thechosen' || pathname === '/thechosen/' || pathname === '/thechosen.html'
-      )) {
-        if (theChosen.estaExpirado()) {
-          // Conforme solicitado: no dia 04/10 a página é desativada
-          res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
-          return res.end('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Evento Encerrado</title></head><body style="background:#0d0d12;color:#fff;font-family:sans-serif;text-align:center;padding:80px 20px;"><h1>Evento Encerrado</h1><p>A Pré-estreia de The Chosen ocorreu em 03/10/2026 e esta página foi encerrada.</p><p><a href="/" style="color:#00B7D9;">Voltar para a página inicial</a></p></body></html>');
-        }
-
-        const fileToServe = fs.existsSync(path.join(__dirname, "public", "the-chosen.html"))
-          ? path.join(__dirname, "public", "the-chosen.html")
-          : (fs.existsSync(path.join(__dirname, "web", "public", "the-chosen.html")) ? path.join(__dirname, "web", "public", "the-chosen.html") : THE_CHOSEN_HTML_FILE);
-        if (fs.existsSync(fileToServe)) {
-          const content = fs.readFileSync(fileToServe, 'utf8');
-          res.writeHead(200, {
-            'Content-Type': 'text/html; charset=utf-8',
-            'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'DENY',
-            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
-          });
-          return res.end(content);
-        }
+      ) {
+        res.writeHead(302, { Location: '/' });
+        return res.end();
       }
 
-      // API: Consulta de vagas em tempo real (sincronizada com Google Sheets de forma segura)
-      if (req.method === 'GET' && pathname === '/the-chosen/api/vagas') {
-        try {
-          const statusVagas = typeof theChosen.obterStatusVagasAsync === 'function'
-            ? await theChosen.obterStatusVagasAsync()
-            : theChosen.obterStatusVagas();
-          return sendJson(res, 200, statusVagas);
-        } catch (errVagas) {
-          console.error('[Web] Erro ao consultar vagas The Chosen:', errVagas.message);
-          return sendJson(res, 200, theChosen.obterStatusVagas());
-        }
-      }
-
-      // API: Processamento de inscrição (/the-chosen/api/inscrever e /the-chosen)
-      if (req.method === 'POST' && (
-        pathname === '/the-chosen/api/inscrever' ||
-        pathname === '/the-chosen' ||
-        pathname === '/the-chosen/'
-      )) {
-        try {
-          const body = await parseRequestBody(req);
-          const resultado = await theChosen.realizarInscricao(body);
-          if (resultado.ok) {
-            // Disparo não-bloqueante de confirmação oficial no WhatsApp do participante
-            try {
-              const botClient = typeof getClient === 'function' ? getClient() : null;
-              if (botClient) {
-                theChosenNotificacoes.enviarMensagemConfirmacaoInscricao(botClient, resultado.inscricao)
-                  .catch(errZap => console.error('[The Chosen] Erro no envio WhatsApp:', errZap.message));
-              }
-            } catch (errDisparo) {
-              console.error('[The Chosen] Erro ao obter cliente WhatsApp:', errDisparo.message);
-            }
-            return sendJson(res, 200, resultado);
-          } else {
-            const status = resultado.code === 'ESGOTADO' || resultado.code === 'VAGAS_INSUFICIENTES' ? 409 : 400;
-            return sendJson(res, status, resultado);
-          }
-        } catch (err) {
-          console.error('[The Chosen] Erro ao processar inscrição:', err);
-          return sendJson(res, 500, { ok: false, message: 'Erro interno ao processar inscrição.' });
-        }
-      }
-
-      // API: Listagem de inscritos para a administração/secretaria
-      if (req.method === 'GET' && pathname === '/the-chosen/api/inscritos') {
-        if (!isAuthenticated(req)) {
-          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
-        }
-
-        // Se solicitado via ?sync=1 ou se o banco local estiver vazio, puxa da planilha
-        const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-        const shouldSync = parsedUrl.searchParams.get('sync') === '1' || theChosen.listarInscricoes().length === 0;
-        if (shouldSync && typeof theChosen.sincronizarInscricoesComNuvem === 'function') {
-          await theChosen.sincronizarInscricoesComNuvem().catch(err => {
-            console.warn('[Web] Aviso ao sincronizar com Google Sheets em /the-chosen/api/inscritos:', err.message);
-          });
-        }
-
-        return sendJson(res, 200, { 
-          ok: true, 
-          inscricoes: theChosen.listarInscricoes(),
-          estatisticas: theChosen.obterEstatisticasConfirmacao()
-        });
-      }
-
-      // API: Sincronização manual com a planilha do Google (Secretaria)
-      if (req.method === 'POST' && pathname === '/the-chosen/api/sincronizar') {
-        if (!isAuthenticated(req)) {
-          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
-        }
-        try {
-          const resultado = typeof theChosen.sincronizarInscricoesComNuvem === 'function'
-            ? await theChosen.sincronizarInscricoesComNuvem()
-            : { ok: false, message: 'Função de sincronização não disponível.' };
-          return sendJson(res, resultado.ok ? 200 : 500, resultado);
-        } catch (err) {
-          console.error('[Web] Erro ao sincronizar com Google Sheets:', err.message);
-          return sendJson(res, 500, { ok: false, message: err.message });
-        }
-      }
-
-      // Rota: Folha de Presença / Relatório Oficial em PDF (Protegido por login)
-      if (req.method === 'GET' && (pathname === '/the-chosen/api/relatorio-pdf' || pathname === '/the-chosen/relatorio-pdf')) {
-        if (!isAuthenticated(req)) {
-          res.writeHead(302, { Location: '/secretaria/login?message=Faça login para acessar o relatório.' });
-          return res.end();
-        }
-        return sendHtml(res, theChosen.renderTheChosenPdfHtml());
-      }
-
-      // API: Alterar status de confirmação de presença (Secretaria / Presença)
-      if (req.method === 'POST' && pathname === '/the-chosen/api/confirmar-presenca') {
-        if (!isAuthenticated(req)) {
-          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
-        }
-        try {
-          const body = await parseRequestBody(req);
-          const termo = body.id || body.codigo || body.telefone;
-          const status = body.status || 'confirmado'; // 'confirmado' | 'cancelado' | 'pendente'
-          const resultado = theChosen.confirmarPresenca(termo, status);
-          return sendJson(res, resultado.ok ? 200 : 404, resultado);
-        } catch (err) {
-          return sendJson(res, 500, { ok: false, message: 'Erro ao registrar status de confirmação.' });
-        }
-      }
-
-      // API: Editar nomes de participantes (Secretaria)
-      if (req.method === 'POST' && pathname === '/the-chosen/api/editar-participantes') {
-        if (!isAuthenticated(req)) {
-          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
-        }
-        try {
-          const body = await parseRequestBody(req);
-          const termo = body.id || body.codigo;
-          const participantes = body.participantes;
-          const resultado = typeof theChosen.editarParticipantesInscricao === 'function'
-            ? theChosen.editarParticipantesInscricao(termo, participantes)
-            : { ok: false, message: 'Função de edição não disponível.' };
-          return sendJson(res, resultado.ok ? 200 : 400, resultado);
-        } catch (err) {
-          console.error('[The Chosen] Erro ao editar participantes:', err.message);
-          return sendJson(res, 500, { ok: false, message: 'Erro ao salvar participantes.' });
-        }
-      }
-
-      // API: Excluir inscrição (Secretaria)
-      if ((req.method === 'POST' && pathname === '/the-chosen/api/excluir-inscricao') ||
-          (req.method === 'DELETE' && pathname.startsWith('/the-chosen/api/inscricoes/'))) {
-        if (!isAuthenticated(req)) {
-          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
-        }
-        try {
-          let termo = '';
-          if (req.method === 'DELETE') {
-            termo = decodeURIComponent(pathname.replace('/the-chosen/api/inscricoes/', ''));
-          } else {
-            const body = await parseRequestBody(req);
-            termo = body.id || body.codigo || body.telefone;
-          }
-          const resultado = theChosen.excluirInscricao(termo);
-          if (resultado.ok && resultado.inscricao && typeof theChosenSheets.excluirInscricaoPlanilha === 'function') {
-            await theChosenSheets.excluirInscricaoPlanilha(resultado.inscricao).catch(err => {
-              console.error('[Web] Erro ao sincronizar exclusão com a planilha:', err.message);
-            });
-          }
-          return sendJson(res, resultado.ok ? 200 : 404, resultado);
-        } catch (err) {
-          console.error('[The Chosen] Erro ao excluir inscrição:', err.message);
-          return sendJson(res, 500, { ok: false, message: 'Erro interno ao excluir inscrição.' });
-        }
-      }
-
-      // API: Limpar todas as inscrições de teste (Secretaria)
-      if (req.method === 'POST' && pathname === '/the-chosen/api/limpar-testes') {
-        if (!isAuthenticated(req)) {
-          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
-        }
-        try {
-          const resultado = theChosen.limparInscricoesTeste();
-          if (resultado.ok && Array.isArray(resultado.removidasInscricoes) && typeof theChosenSheets.excluirInscricaoPlanilha === 'function') {
-            for (const item of resultado.removidasInscricoes) {
-              await theChosenSheets.excluirInscricaoPlanilha(item).catch(() => {});
-            }
-          }
-          return sendJson(res, 200, resultado);
-        } catch (err) {
-          console.error('[The Chosen] Erro ao limpar inscrições de teste:', err.message);
-          return sendJson(res, 500, { ok: false, message: 'Erro interno ao limpar testes.' });
-        }
+      // APIs legadas de The Chosen respondem como evento encerrado / não encontrado
+      if (pathname.startsWith('/the-chosen/')) {
+        return sendJson(res, 404, { ok: false, message: 'Evento The Chosen encerrado.' });
       }
 
       // Rota pública: Culto de Mulheres (/mulheres, /culto-mulheres)
@@ -1015,11 +825,6 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
     console.log(`✅ Site de controle rodando em http://0.0.0.0:${server.address().port}`);
 
     // Sincroniza dados da planilha ao iniciar o servidor
-    if (typeof theChosen.sincronizarInscricoesComNuvem === 'function' && !process.env.THE_CHOSEN_DATA_PATH) {
-      theChosen.sincronizarInscricoesComNuvem().catch(err => {
-        console.warn('[Web] Aviso na sincronização inicial com a planilha Google:', err.message);
-      });
-    }
     if (typeof cultoMulheres.sincronizarInscricoesComNuvem === 'function' && process.env.NODE_ENV !== 'test') {
       cultoMulheres.sincronizarInscricoesComNuvem().catch(err => {
         console.warn('[Web] Aviso na sincronização inicial de Mulheres com a planilha Google:', err.message);

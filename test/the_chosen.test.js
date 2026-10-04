@@ -8,6 +8,7 @@ const TEST_DATA_FILE = path.join(__dirname, 'the_chosen_test.json');
 process.env.THE_CHOSEN_DATA_PATH = TEST_DATA_FILE;
 process.env.THE_CHOSEN_LIMITE_VAGAS = '50';
 process.env.APPS_SCRIPT_URL = ''; // Desativa envio real durante testes em lote
+process.env.THE_CHOSEN_DATA_REFERENCIA = '2026-10-01T12:00:00-03:00';
 
 
 const theChosen = require('../web/the_chosen');

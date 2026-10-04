@@ -2,7 +2,7 @@ const db = require("../db");
 const { REDES } = require("./redes");
 const { obterFormularioEvento } = require("./formularioEvento");
 const { notificarMultimidia, notificarSecretaria } = require("./secretaria");
-const { unificarEventosPreparacaoLimpeza, isEventoTheChosen, URL_THE_CHOSEN } = require("./agenda");
+const { unificarEventosPreparacaoLimpeza } = require("./agenda");
 const { obterUsuarioPorTelefone, obterLideresPorDepartamento } = require("../web/lideres");
 const {
   verificarEnvioRemoto,
@@ -425,17 +425,65 @@ function registrarLembreteAguardandoResposta({
   }
 }
 
+function isDataEventoPassada(dataEventoStr) {
+  if (!dataEventoStr) return false;
+  try {
+    const moment = require("moment-timezone");
+    const hoje = moment.tz("America/Sao_Paulo").startOf("day");
+    let d = null;
+    const str = String(dataEventoStr).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      d = moment.tz(str.slice(0, 10), "YYYY-MM-DD", "America/Sao_Paulo");
+    } else if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) {
+      d = moment.tz(str.slice(0, 10), "DD/MM/YYYY", "America/Sao_Paulo");
+    } else if (/^\d{2}\/\d{2}/.test(str)) {
+      const ano = hoje.year();
+      d = moment.tz(`${str.slice(0, 5)}/${ano}`, "DD/MM/YYYY", "America/Sao_Paulo");
+    }
+    if (d && d.isValid()) {
+      return d.isBefore(hoje, "day"); // No dia seguinte ao evento já é passado
+    }
+  } catch (_) {}
+  return false;
+}
+
+function limparLembretesEventosPassados() {
+  try {
+    const rows = db.prepare("SELECT telefone, dataEvento FROM lembretes_aguardando_resposta").all();
+    let removidos = 0;
+    for (const r of rows) {
+      if (isDataEventoPassada(r.dataEvento)) {
+        removerLembreteAguardandoResposta(r.telefone);
+        removidos++;
+      }
+    }
+    if (removidos > 0) {
+      console.log(`[Lembretes] Limpeza automática: ${removidos} lembrete(s) de evento(s) encerrado(s) removido(s).`);
+    }
+    return removidos;
+  } catch (err) {
+    console.error("[Lembretes] Erro ao limpar lembretes de eventos passados:", err.message);
+    return 0;
+  }
+}
+
 function buscarLembreteAguardandoResposta(telefone) {
   if (!telefone) return null;
   try {
     const telLimpo = String(telefone).replace(/\D/g, "");
-    const row = db.prepare("SELECT * FROM lembretes_aguardando_resposta WHERE telefone = ?").get(telLimpo);
-    if (row) return row;
-
-    if (telLimpo.length >= 8) {
+    let row = db.prepare("SELECT * FROM lembretes_aguardando_resposta WHERE telefone = ?").get(telLimpo);
+    if (!row && telLimpo.length >= 8) {
       const sufixo = telLimpo.slice(-8);
       const rows = db.prepare("SELECT * FROM lembretes_aguardando_resposta WHERE telefone LIKE '%' || ?").all(sufixo);
-      if (rows && rows.length > 0) return rows[0];
+      if (rows && rows.length > 0) row = rows[0];
+    }
+    if (row) {
+      // Se o evento já passou (no dia seguinte ou depois), apaga automaticamente
+      if (isDataEventoPassada(row.dataEvento)) {
+        removerLembreteAguardandoResposta(row.telefone);
+        return null;
+      }
+      return row;
     }
     return null;
   } catch (err) {
@@ -1052,9 +1100,6 @@ function montarMensagemAgendaQuinzenalSecretarias(eventos = [], dataInicio = "",
       corpo += `• *${ev.summary || "Evento"}*${horaStr}${localStr}\n`;
       if (ev.horarioPreparacaoLimpeza) {
         corpo += `  🧹 _${ev.horarioPreparacaoLimpeza}_\n`;
-      }
-      if (isEventoTheChosen(ev)) {
-        corpo += `  🎟️ _Inscrições: ${URL_THE_CHOSEN}_\n`;
       }
     }
     corpo += `\n`;
@@ -1716,21 +1761,16 @@ function iniciarAgendadorLembretes({
         agendasParaLer,
       });
 
-      // 8. Lembretes e relatórios do The Chosen (apenas no dia 03/10 a partir das 09:00, só lembrando sem confirmação)
-      try {
-        const { processarRotinaTheChosen } = require("../web/the_chosen_notificacoes");
-        await processarRotinaTheChosen({ client, horaMinima: 9 });
-      } catch (errTC) {
-        console.error("[Agendador Lembretes] Erro na rotina The Chosen:", errTC.message);
-      }
-
-      // 9. Atualizações de inscritas para líderes da Rede de Mulheres (faltando 10, 5 e 3 dias)
+      // 8. Atualizações de inscritas para líderes da Rede de Mulheres (faltando 10, 5 e 3 dias)
       try {
         const { processarNotificacoesRedeMulheres } = require("../web/culto_mulheres_notificacoes");
         await processarNotificacoesRedeMulheres({ client });
       } catch (errMulheres) {
         console.error("[Agendador Lembretes] Erro na rotina Rede de Mulheres:", errMulheres.message);
       }
+
+      // 9. Limpeza automática: todo dia seguinte a um evento, apaga pendências do evento encerrado
+      limparLembretesEventosPassados();
 
       registrarExecucaoRotina("rotina_diaria_lembretes", diaHoje);
       ultimoDiaExecutado = diaHoje;
@@ -1743,6 +1783,7 @@ function iniciarAgendadorLembretes({
 
   // Executa uma vez após 1 minuto da inicialização SE ainda não executou hoje
   const timeoutInicial = setTimeout(() => {
+    limparLembretesEventosPassados();
     const agora = new Date();
     const diaHoje = agora.toISOString().slice(0, 10);
     const ultimaData = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
@@ -1750,11 +1791,6 @@ function iniciarAgendadorLembretes({
       checarExecutar();
     } else {
       console.log(`[Agendador Lembretes] Inicialização: rotina já executada hoje (${ultimaData}) ou antes do horário (${agora.getHours()}h < ${horaExecucao}h).`);
-      // Verifica rotinas com horário específico (ex: The Chosen no dia do evento a partir das 09:00)
-      try {
-        const { processarRotinaTheChosen } = require("../web/the_chosen_notificacoes");
-        processarRotinaTheChosen({ client, horaMinima: 9 }).catch(() => {});
-      } catch {}
     }
   }, 60 * 1000);
 
@@ -1765,12 +1801,6 @@ function iniciarAgendadorLembretes({
     if (agora.getHours() >= horaExecucao && ultimoDiaExecutado !== diaHoje) {
       checarExecutar();
     }
-
-    // Rotinas com horários específicos (The Chosen: no dia 03/10 a partir das 09:00)
-    try {
-      const { processarRotinaTheChosen } = require("../web/the_chosen_notificacoes");
-      processarRotinaTheChosen({ client, horaMinima: 9 }).catch(() => {});
-    } catch {}
   }, 30 * 60 * 1000);
 
   return { timer, timeoutInicial, checarExecutar };
@@ -1795,6 +1825,8 @@ module.exports = {
   registrarLembreteAguardandoResposta,
   buscarLembreteAguardandoResposta,
   removerLembreteAguardandoResposta,
+  limparLembretesEventosPassados,
+  isDataEventoPassada,
   verificarEnvioRemoto,
   registrarEnvioRemoto,
   obterPeriodoSemana,

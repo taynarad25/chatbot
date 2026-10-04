@@ -19,17 +19,17 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     usuario: { nome: "Pr. Gabriel", cargos: ["pastor"], departamentos: [] },
     isPastor: true,
   });
-  assert.equal(eventosPastor.length, 3);
+  assert.equal(eventosPastor.length, 2);
   assert.ok(eventosPastor.some((e) => e.id === "culto_mulheres"));
-  assert.ok(eventosPastor.some((e) => e.id === "the_chosen"));
   assert.ok(eventosPastor.some((e) => e.id === "dia_das_criancas"));
+  assert.ok(!eventosPastor.some((e) => e.id === "the_chosen"));
 
   // 2. Diretor tem acesso a todos os eventos
   const eventosDiretor = obterEventosInscricaoParaUsuario({
     usuario: { nome: "Dir. Fernando", cargos: ["diretor"], departamentos: [] },
     isDiretor: true,
   });
-  assert.equal(eventosDiretor.length, 3);
+  assert.equal(eventosDiretor.length, 2);
 
   // 3. Líder da Rede de Mulheres tem acesso SOMENTE ao Culto de Mulheres
   const eventosLiderMulheres = obterEventosInscricaoParaUsuario({
@@ -71,10 +71,6 @@ test("Consulta Inscrições: geração de resumos em texto", () => {
   const resumoMulheres = gerarResumoCultoMulheres();
   assert.ok(resumoMulheres.includes("Culto de Mulheres: O Vaso e o Oleiro"));
   assert.ok(resumoMulheres.includes("Estatísticas"));
-
-  const resumoChosen = gerarResumoTheChosen();
-  assert.ok(resumoChosen.includes("Pré-estreia The Chosen"));
-  assert.ok(resumoChosen.includes("Estatísticas"));
 });
 
 test("Consulta Inscrições: geração de PDF com Puppeteer", async () => {
@@ -85,10 +81,7 @@ test("Consulta Inscrições: geração de PDF com Puppeteer", async () => {
   assert.equal(resultadoMulheres.filename, "Lista_Inscricoes_Culto_Mulheres.pdf");
 
   const resultadoChosen = await gerarPdfEvento({ eventoId: "the_chosen" });
-  assert.equal(resultadoChosen.ok, true);
-  assert.ok(resultadoChosen.buffer instanceof Buffer);
-  assert.ok(resultadoChosen.buffer.length > 1000);
-  assert.equal(resultadoChosen.filename, "Lista_Inscricoes_The_Chosen.pdf");
+  assert.equal(resultadoChosen.ok, false);
 });
 
 test("Consulta Inscrições: fluxo para líder de mulheres entrega relatório direto", async () => {
@@ -159,7 +152,8 @@ test("Consulta Inscrições: fluxo para pastor lista os eventos disponíveis", a
   assert.equal(etapas["5511999990002@c.us"].etapa, "escolher_evento");
   assert.ok(replies.length >= 1);
   assert.ok(replies[0].includes("Culto de Mulheres"));
-  assert.ok(replies[0].includes("The Chosen"));
+  assert.ok(replies[0].includes("Dia das Crianças"));
+  assert.ok(!replies[0].includes("The Chosen"));
 
   // Pastor seleciona a opção 1 (Culto de Mulheres)
   const repliesEscolha = [];

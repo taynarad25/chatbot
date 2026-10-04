@@ -207,16 +207,10 @@ function agruparEventosAgenda(eventosRaw = []) {
   return itens;
 }
 
-const URL_THE_CHOSEN = "https://www.comunidadecristacurados.com.br/the-chosen";
+const URL_THE_CHOSEN = "";
 
 function isEventoTheChosen(itemOuEv = {}) {
-  if (!itemOuEv) return false;
-  const summary = itemOuEv.summary || "";
-  const desc = itemOuEv.description || "";
-  const evSummary = (itemOuEv.eventos && itemOuEv.eventos[0] && itemOuEv.eventos[0].summary) || "";
-  const evDesc = (itemOuEv.eventos && itemOuEv.eventos[0] && itemOuEv.eventos[0].description) || "";
-  const texto = `${summary} ${desc} ${evSummary} ${evDesc}`.toLowerCase();
-  return /the[\s\-_]*chosen|\bchosen\b/i.test(texto);
+  return false;
 }
 
 function montarMensagemAgenda(itens, tituloPeriodo) {
@@ -230,9 +224,6 @@ function montarMensagemAgenda(itens, tituloPeriodo) {
       msgAgenda += `${numero} - 🗓️ *${prefixo} ${DIAS_SEMANA_PLURAL[item.weekday]}*${horaStr} | ${item.summary}\n`;
     } else {
       msgAgenda += `${numero} - 📌 *${item.dataFmt}*${horaStr} | ${item.summary}\n`;
-    }
-    if (isEventoTheChosen(item)) {
-      msgAgenda += `   🎟️ *Inscrição:* ${URL_THE_CHOSEN}\n`;
     }
   });
 
@@ -380,9 +371,6 @@ function montarMensagemAgendaCompletaPorSecoes(itensRaw, tituloPeriodo, agendasI
         if (item.horarioPreparacaoLimpeza) {
           msgAgenda += `   ⏰ ${item.horarioPreparacaoLimpeza}\n`;
         }
-        if (isEventoTheChosen(item)) {
-          msgAgenda += `   🎟️ *Inscrição:* ${URL_THE_CHOSEN}\n`;
-        }
       });
     }
   });
@@ -444,9 +432,7 @@ function montarDetalheEvento(item, opcoes = {}) {
     }
     detalhe += `📝 *Descrição:* ${desc}\n`;
   }
-  if (isEventoTheChosen(item) || isEventoTheChosen(evento)) {
-    detalhe += `\n🎟️ *Inscrições:* Garanta sua vaga acessando:\n👉 ${URL_THE_CHOSEN}\n`;
-  }
+
   detalhe += `\nDigite outro número para ver mais detalhes, ou *menu* para voltar.`;
   return detalhe;
 }

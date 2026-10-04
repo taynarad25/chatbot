@@ -1324,101 +1324,7 @@ function renderIndexHtml() {
         </div>
       </div>
 
-      <!-- Card do Evento The Chosen -->
-      <div class="evento-card-item">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(0, 188, 212, 0.15); color: var(--cor-ciano); border: 1px solid rgba(0, 188, 212, 0.35); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
-              🎬 Pré-estreia Exclusiva
-            </div>
-            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Pré-estreia The Chosen - Temporada 6 (Ep. 1)</h4>
-            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
-              🗓️ <strong>03/10/2026 às 19:00</strong> &nbsp;•&nbsp; 📍 <strong>Auditório Principal</strong> (Capacidade: 50 vagas)
-            </p>
-          </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-            <button type="button" class="btn-gaveta-toggle" id="btnToggleTheChosen" onclick="toggleGavetaEvento('theChosen')" title="Recolher ou expandir inscrições (engavetar)">
-              <span class="gaveta-toggle-text">Recolher</span>
-              <span class="gaveta-arrow" id="arrow-theChosen">▲</span>
-            </button>
-            <button onclick="sincronizarComPlanilha()" id="btnSyncPlanilha" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
-              🔄 Puxar da Planilha
-            </button>
-            <button onclick="window.open('/the-chosen/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #0284c7, #00bcd4); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0, 188, 212, 0.3);">
-              📄 Exportar como PDF
-            </button>
-            <button onclick="limparInscricoesDeTeste()" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(239, 68, 68, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Remover todas as inscrições identificadas como teste">
-              🧹 Limpar Testes
-            </button>
-            <button onclick="fetchTheChosenInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
-              🔄 Atualizar
-            </button>
-          </div>
-        </div>
 
-        <div class="evento-gaveta-body" id="gaveta-theChosen">
-          <div class="evento-metric-grid" id="theChosenMetrics">
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="tcTotalInscricoes">-</div>
-              <div class="evento-metric-lbl">Inscrições</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="tcTotalIngressos" style="color: var(--cor-ciano);">-</div>
-              <div class="evento-metric-lbl">Vagas Ocupadas (de 50)</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="tcVagasRestantes" style="color: #4ade80;">-</div>
-              <div class="evento-metric-lbl">Vagas Restantes</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="tcConfirmados" style="color: #22c55e;">-</div>
-              <div class="evento-metric-lbl">Confirmados</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="tcPendentes" style="color: #facc15;">-</div>
-              <div class="evento-metric-lbl">Aguardando</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="tcCancelados" style="color: #f87171;">-</div>
-              <div class="evento-metric-lbl">Cancelados</div>
-            </div>
-          </div>
-
-          <!-- Barra de Filtros e Busca -->
-          <div class="evento-toolbar" style="margin-top: 1.2rem;">
-            <input type="text" id="tcSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, titular, telefone ou código (TC-)..." oninput="filtrarTheChosenInscricoes()" />
-            <select id="tcStatusFilter" onchange="filtrarTheChosenInscricoes()" style="padding: 0.75rem 1rem; background: #1e1e26; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; color: #fff; font-size: 0.88rem;">
-              <option value="todos">Todos os status</option>
-              <option value="confirmado">Apenas Confirmados</option>
-              <option value="pendente">Apenas Pendentes</option>
-              <option value="cancelado">Apenas Cancelados</option>
-            </select>
-          </div>
-
-          <!-- Tabela de Inscritos -->
-          <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto;">
-            <table class="evento-table">
-              <thead>
-                <tr>
-                  <th style="width: 100px;">Código</th>
-                  <th>Titular</th>
-                  <th style="text-align: center; width: 60px;">Qtd</th>
-                  <th>Participantes</th>
-                  <th>WhatsApp / Contato</th>
-                  <th>E-mail</th>
-                  <th style="width: 130px; text-align: center;">Presença</th>
-                  <th style="width: 145px; text-align: center;">Ações</th>
-                </tr>
-              </thead>
-              <tbody id="tcTbodyInscritos">
-                <tr>
-                  <td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando inscritos...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
 
       <!-- Card do Evento Culto de Mulheres -->
       <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(200, 100, 82, 0.35);">
@@ -1599,7 +1505,7 @@ function renderIndexHtml() {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(name).classList.add('active');
       evt.currentTarget.classList.add('active');
-      if(name === 'tab-eventos') { fetchTheChosenInscricoes(); fetchMulheresInscricoes(); fetchEventosCadastrados(); }
+      if(name === 'tab-eventos') { fetchMulheresInscricoes(); fetchEventosCadastrados(); }
       if(name === 'tab-admin') fetchUsers();
       if(name === 'tab-lideres') fetchLideres();
     }
@@ -1914,243 +1820,7 @@ function renderIndexHtml() {
       }
     }
 
-    let tcInscricoesCache = [];
 
-    async function fetchTheChosenInscricoes() {
-      try {
-        const res = await fetch('/the-chosen/api/inscritos');
-        if (res.status === 401) { window.location.href = '/secretaria/login'; return; }
-        if (!res.ok) return;
-        const data = await res.json();
-        tcInscricoesCache = data.inscricoes || [];
-        
-        const stats = data.estatisticas || {};
-        const elInscricoes = document.getElementById('tcTotalInscricoes');
-        const elIngressos = document.getElementById('tcTotalIngressos');
-        const elRestantes = document.getElementById('tcVagasRestantes');
-        const elConfirmados = document.getElementById('tcConfirmados');
-        const elPendentes = document.getElementById('tcPendentes');
-        const elCancelados = document.getElementById('tcCancelados');
-
-        if (elInscricoes) elInscricoes.textContent = stats.totalInscricoes || tcInscricoesCache.length;
-        if (elIngressos) elIngressos.textContent = (stats.totalIngressos || 0) + ' / ' + (stats.limite || 50);
-        if (elRestantes) elRestantes.textContent = stats.restantes !== undefined ? stats.restantes : Math.max(0, 50 - (stats.totalIngressos || 0));
-        if (elConfirmados) elConfirmados.textContent = (stats.ingressosConfirmados || 0) + ' (' + (stats.confirmados || 0) + ')';
-        if (elPendentes) elPendentes.textContent = (stats.ingressosPendentes || 0) + ' (' + (stats.pendentes || 0) + ')';
-        if (elCancelados) elCancelados.textContent = (stats.ingressosCancelados || 0) + ' (' + (stats.cancelados || 0) + ')';
-
-        filtrarTheChosenInscricoes();
-      } catch (err) {
-        console.error('Erro ao buscar inscritos do The Chosen:', err);
-      }
-    }
-
-    function filtrarTheChosenInscricoes() {
-      const termo = (document.getElementById('tcSearchInput')?.value || '').toLowerCase().trim();
-      const statusFiltro = document.getElementById('tcStatusFilter')?.value || 'todos';
-
-      const filtrados = tcInscricoesCache.filter(item => {
-        const matchStatus = statusFiltro === 'todos' || item.statusConfirmacao === statusFiltro;
-        if (!matchStatus) return false;
-        if (!termo) return true;
-
-        const participantesStr = (item.participantes || []).join(' ').toLowerCase();
-        const titularStr = (item.titular || '').toLowerCase();
-        const telStr = (item.telefone || '').toLowerCase();
-        const codStr = (item.codigo || '').toLowerCase();
-        const emailStr = (item.email || '').toLowerCase();
-
-        return participantesStr.includes(termo) || titularStr.includes(termo) || telStr.includes(termo) || codStr.includes(termo) || emailStr.includes(termo);
-      });
-
-      renderTheChosenTable(filtrados);
-    }
-
-    function renderTheChosenTable(lista) {
-      const tbody = document.getElementById('tcTbodyInscritos');
-      if (!tbody) return;
-
-      if (!lista || lista.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2.5rem;">Nenhuma inscrição encontrada para os critérios selecionados.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = lista.map(item => {
-        let parts = Array.isArray(item.participantes) && item.participantes.length > 0 ? [...item.participantes] : [item.titular || 'Participante'];
-        const titularNome = item.titular || parts[0] || 'Participante';
-        const qtdItem = Number(item.quantidade) || parts.length || 1;
-        while (parts.length < qtdItem) {
-          parts.push('Acompanhante ' + (parts.length + 1) + ' (' + titularNome + ')');
-        }
-
-        const nomesParticipantes = parts.map((n, idx) => {
-          const isTitular = idx === 0;
-          return '<span style="display:inline-flex; align-items:center; gap:4px; background:' + (isTitular ? 'rgba(0, 183, 217, 0.16)' : 'rgba(255,255,255,0.06)') + '; color:' + (isTitular ? '#38bdf8' : '#e2e8f0') + '; padding:2px 8px; border-radius:6px; margin:2px; font-size:0.8rem; border:1px solid ' + (isTitular ? 'rgba(0, 183, 217, 0.35)' : 'rgba(255,255,255,0.08)') + ';">' + (idx + 1) + '. ' + n + '</span>';
-        }).join('') + '<button type="button" title="Editar participantes / acompanhantes" data-id="' + item.id + '" onclick="editarParticipantesModal(this.dataset.id)" style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 6px; color: #fbbf24; cursor: pointer; padding: 2px 6px; font-size: 0.78rem; margin-left: 4px; vertical-align: middle;">✏️</button>';
-        
-        let statusBadge = '';
-        if (item.statusConfirmacao === 'confirmado') {
-          statusBadge = '<span class="status-badge status-confirmado">✅ Confirmado</span>';
-        } else if (item.statusConfirmacao === 'cancelado') {
-          statusBadge = '<span class="status-badge status-cancelado">❌ Cancelado</span>';
-        } else {
-          statusBadge = '<span class="status-badge status-pendente">⏳ Pendente</span>';
-        }
-
-        const zapTel = (item.telefone || '').replace(/\D/g, '');
-        const zapLink = zapTel ? ('https://wa.me/55' + zapTel) : '#';
-
-        return '<tr>' +
-          '<td style="font-family: monospace; font-weight: 700; color: var(--cor-ciano); font-size: 0.88rem;">' + (item.codigo || '-') + '</td>' +
-          '<td><strong style="color: #fff;">' + (item.titular || '-') + '</strong></td>' +
-          '<td style="text-align: center; font-weight: 800; font-size: 1rem; color: #fff;">' + (item.quantidade || 1) + '</td>' +
-          '<td>' + nomesParticipantes + '</td>' +
-          '<td><a href="' + zapLink + '" target="_blank" style="color: #4ade80; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">💬 ' + (item.telefone || '-') + '</a></td>' +
-          '<td style="color: var(--cor-texto-mutado); font-size: 0.82rem;">' + (item.email || '-') + '</td>' +
-          '<td style="text-align: center;">' + statusBadge + '</td>' +
-          '<td style="text-align: center;">' +
-            '<div style="display: flex; gap: 6px; align-items: center; justify-content: center;">' +
-              '<select data-id="' + item.id + '" onchange="alterarStatusPresenca(this.dataset.id, this.value)" style="padding: 5px 8px; background: #22222a; color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 0.78rem; cursor: pointer;">' +
-                '<option value="">Alterar...</option>' +
-                '<option value="confirmado" ' + (item.statusConfirmacao === 'confirmado' ? 'selected' : '') + '>Confirmado ✅</option>' +
-                '<option value="pendente" ' + (item.statusConfirmacao === 'pendente' ? 'selected' : '') + '>Pendente ⏳</option>' +
-                '<option value="cancelado" ' + (item.statusConfirmacao === 'cancelado' ? 'selected' : '') + '>Cancelar ❌</option>' +
-              '</select>' +
-              '<button data-id="' + item.id + '" data-nome="' + (item.titular || '').replace(/"/g, '&quot;') + '" onclick="excluirTheChosenInscricao(this.dataset.id, this.dataset.nome)" title="Excluir inscrição permanentemente" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">' +
-                '🗑️' +
-              '</button>' +
-            '</div>' +
-          '</td>' +
-        '</tr>';
-      }).join('');
-    }
-
-    async function editarParticipantesModal(id) {
-      const item = (tcInscricoesCache || []).find(i => String(i.id) === String(id) || String(i.codigo) === String(id));
-      if (!item) return;
-
-      let parts = Array.isArray(item.participantes) && item.participantes.length > 0 ? [...item.participantes] : [item.titular || 'Participante'];
-      const titularNome = item.titular || parts[0] || 'Participante';
-      const qtdItem = Number(item.quantidade) || parts.length || 1;
-      while (parts.length < qtdItem) {
-        parts.push('Acompanhante ' + (parts.length + 1) + ' (' + titularNome + ')');
-      }
-
-      const textoAtual = parts.join(', ');
-      const novoTexto = prompt('Editar participantes de ' + titularNome + ' (' + qtdItem + ' ingresso(s)):\\nSepare os nomes por vírgula:', textoAtual);
-      if (novoTexto === null) return;
-
-      const novosNomes = novoTexto.split(',').map(s => s.trim()).filter(Boolean);
-      if (novosNomes.length === 0) {
-        alert('Informe ao menos 1 participante.');
-        return;
-      }
-
-      try {
-        const res = await fetch('/the-chosen/api/editar-participantes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: item.id || item.codigo, participantes: novosNomes })
-        });
-        const data = await res.json();
-        if (res.ok && data.ok) {
-          fetchTheChosenInscricoes();
-        } else {
-          alert(data.message || 'Erro ao salvar participantes.');
-        }
-      } catch (err) {
-        console.error('Erro ao editar participantes:', err);
-        alert('Erro de conexão ao salvar participantes.');
-      }
-    }
-
-    async function alterarStatusPresenca(id, novoStatus) {
-      if (!novoStatus) return;
-      try {
-        const res = await fetch('/the-chosen/api/confirmar-presenca', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, status: novoStatus })
-        });
-        if (res.ok) {
-          fetchTheChosenInscricoes();
-        } else {
-          alert('Erro ao atualizar status de presença.');
-        }
-      } catch (err) {
-        console.error('Erro ao alterar status:', err);
-      }
-    }
-
-    async function excluirTheChosenInscricao(id, nome) {
-      if (!id) return;
-      const confirmou = confirm('Tem certeza que deseja EXCLUIR permanentemente a inscrição de "' + (nome || 'Participante') + '"?\\nAs vagas ocupadas serão liberadas imediatamente.');
-      if (!confirmou) return;
-
-      try {
-        const res = await fetch('/the-chosen/api/excluir-inscricao', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id })
-        });
-        const data = await res.json();
-        if (res.ok && data.ok) {
-          fetchTheChosenInscricoes();
-        } else {
-          alert(data.message || 'Erro ao excluir inscrição.');
-        }
-      } catch (err) {
-        console.error('Erro ao excluir inscrição:', err);
-        alert('Erro de conexão ao tentar excluir inscrição.');
-      }
-    }
-
-    async function limparInscricoesDeTeste() {
-      const confirmou = confirm('Deseja realmente remover todas as inscrições identificadas como TESTE?\\nEsta ação limpará registros de testes e liberará as vagas no painel.');
-      if (!confirmou) return;
-
-      try {
-        const res = await fetch('/the-chosen/api/limpar-testes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await res.json();
-        if (res.ok && data.ok) {
-          alert((data.removidas || 0) + ' inscrição(ões) de teste removida(s) com sucesso!');
-          fetchTheChosenInscricoes();
-        } else {
-          alert(data.message || 'Erro ao limpar inscrições de teste.');
-        }
-      } catch (err) {
-        console.error('Erro ao limpar testes:', err);
-      }
-    }
-
-    async function sincronizarComPlanilha() {
-      const btn = document.getElementById('btnSyncPlanilha');
-      const originalText = btn ? btn.innerHTML : '';
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Sincronizando...';
-      }
-      try {
-        const res = await fetch('/the-chosen/api/sincronizar', { method: 'POST' });
-        const data = await res.json();
-        if (res.ok && data.ok) {
-          alert('✅ Sincronização concluída com sucesso!\\n' + (data.total || 0) + ' inscrições sincronizadas da planilha.');
-          await fetchTheChosenInscricoes();
-        } else {
-          alert('⚠️ Aviso ao sincronizar: ' + (data.error || data.message || 'Verifique a configuração do Apps Script'));
-        }
-      } catch (err) {
-        alert('Erro ao sincronizar com a planilha: ' + err.message);
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = originalText || '🔄 Puxar da Planilha';
-        }
-      }
-    }
 
     async function sincronizarComPlanilhaMulheres() {
       const btn = document.getElementById('btnSyncPlanilhaMulheres');
@@ -2203,7 +1873,7 @@ function renderIndexHtml() {
     }
 
     function restaurarEstadoGavetas() {
-      ['theChosen', 'mulheres'].forEach(nomeEvento => {
+      ['mulheres'].forEach(nomeEvento => {
         const salvo = localStorage.getItem('gaveta_' + nomeEvento);
         if (salvo === 'fechada') {
           const gaveta = document.getElementById('gaveta-' + nomeEvento);
@@ -2968,7 +2638,6 @@ function renderIndexHtml() {
     setInterval(refresh, 5000);
     refresh();
     fetchEventosCadastrados();
-    fetchTheChosenInscricoes();
     fetchMulheresInscricoes();
     restaurarEstadoGavetas();
   </script>

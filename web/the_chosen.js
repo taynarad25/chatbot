@@ -375,15 +375,25 @@ function salvarInscricoes(inscricoes) {
   return salvoBanco || salvoArquivo;
 }
 
-function estaExpirado(dataReferencia = new Date()) {
-  return dataReferencia.getTime() >= DATA_EXPIRACAO.getTime();
+function getAgora(dataReferencia) {
+  if (dataReferencia) return dataReferencia;
+  if (process.env.THE_CHOSEN_DATA_REFERENCIA) {
+    return new Date(process.env.THE_CHOSEN_DATA_REFERENCIA);
+  }
+  return new Date();
 }
 
-function obterStatusVagas(dataReferencia = new Date()) {
+function estaExpirado(dataReferencia) {
+  const data = getAgora(dataReferencia);
+  return data.getTime() >= DATA_EXPIRACAO.getTime();
+}
+
+function obterStatusVagas(dataReferencia) {
+  const data = getAgora(dataReferencia);
   const inscricoes = carregarInscricoes();
   let preenchidas = inscricoes.reduce((acc, curr) => acc + (Number(curr.quantidade) || 0), 0);
   const restantes = Math.max(0, LIMITE_VAGAS - preenchidas);
-  const expirado = estaExpirado(dataReferencia);
+  const expirado = estaExpirado(data);
 
   return {
     total: LIMITE_VAGAS,
@@ -396,7 +406,8 @@ function obterStatusVagas(dataReferencia = new Date()) {
   };
 }
 
-async function obterStatusVagasAsync(dataReferencia = new Date()) {
+async function obterStatusVagasAsync(dataReferencia) {
+  const data = getAgora(dataReferencia);
   let inscricoes = carregarInscricoes();
 
   // Se estiver zerado (ex: reinicialização do Docker), tenta puxar automaticamente da nuvem
@@ -419,7 +430,7 @@ async function obterStatusVagasAsync(dataReferencia = new Date()) {
     }
   }
   const restantes = Math.max(0, LIMITE_VAGAS - preenchidas);
-  const expirado = estaExpirado(dataReferencia);
+  const expirado = estaExpirado(data);
 
   return {
     total: LIMITE_VAGAS,
@@ -432,8 +443,9 @@ async function obterStatusVagasAsync(dataReferencia = new Date()) {
   };
 }
 
-async function realizarInscricao({ quantidade, participantes, telefone, email }, dataReferencia = new Date()) {
-  if (estaExpirado(dataReferencia)) {
+async function realizarInscricao({ quantidade, participantes, telefone, email }, dataReferencia) {
+  const data = getAgora(dataReferencia);
+  if (estaExpirado(data)) {
     return { ok: false, code: 'EVENTO_EXPIRADO', message: 'As inscrições para este evento foram encerradas no dia 04/10.' };
   }
 

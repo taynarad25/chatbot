@@ -155,114 +155,19 @@ test("GET /lideranca e /nossa-lideranca: serve a página dedicada à liderança 
   }
 });
 
-test("GET /the-chosen: serve a página de inscrição de The Chosen isolada com status 200 e banners responsivos", async () => {
+test("GET /the-chosen: redireciona para a home após encerramento do evento", async () => {
   for (const url of [`${baseUrl}/the-chosen`, `${baseUrl}/the-chosen/`, `${baseUrl}/thechosen`]) {
-    const res = await fetch(url);
-    assert.equal(res.status, 200, `deve retornar 200 para ${url}`);
-    assert.match(res.headers.get("content-type"), /text\/html/);
-    const html = await res.text();
-    assert.match(html, /Pré-estreia The Chosen/i);
-    assert.match(html, /the-chosen-desktop\.jpg/);
-    assert.match(html, /the-chosen-mobile\.jpg/);
-    assert.match(html, /Inscrições Abertas/i);
-    assert.doesNotMatch(html, /Capacidade: \d+ vagas/i, "quantidade de vagas não deve estar exposta publicamente");
-    assert.match(html, /Crianças de colo/i);
-    assert.doesNotMatch(html, /href="\/secretaria"/, "link da secretaria não deve estar exposto");
+    const res = await fetch(url, { redirect: "manual" });
+    assert.equal(res.status, 302, `deve retornar 302 para ${url}`);
+    assert.equal(res.headers.get("location"), "/");
   }
 });
 
-test("API /the-chosen: consulta de vagas e realização de inscrição", async () => {
-  // 1. Consulta vagas
+test("API /the-chosen: rotas de API retornam 404 evento encerrado", async () => {
   const resVagas = await fetch(`${baseUrl}/the-chosen/api/vagas`);
-  assert.equal(resVagas.status, 200);
+  assert.equal(resVagas.status, 404);
   const jsonVagas = await resVagas.json();
-  assert.equal(jsonVagas.total, 50);
-  assert.ok(jsonVagas.restantes >= 0);
-
-  // 2. Inscrição com sucesso
-  const resInscrever = await fetch(`${baseUrl}/the-chosen/api/inscrever`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      quantidade: 2,
-      participantes: ["Gabriel Teste", "Acompanhante Teste"],
-      telefone: "11942685501",
-      email: "teste@curados.com"
-    })
-  });
-
-  assert.equal(resInscrever.status, 200);
-  const jsonInscricao = await resInscrever.json();
-  assert.equal(jsonInscricao.ok, true);
-  assert.ok(jsonInscricao.inscricao.codigo.startsWith("TC-"));
-  assert.equal(jsonInscricao.inscricao.quantidade, 2);
-});
-
-test("API /the-chosen: relatório PDF, confirmação de presença e exclusão exigem autenticação", async () => {
-  // Sem autenticação: relatorio-pdf redireciona para login
-  const resPdfAnonimo = await fetch(`${baseUrl}/the-chosen/api/relatorio-pdf`, { redirect: 'manual' });
-  assert.equal(resPdfAnonimo.status, 302);
-  assert.match(resPdfAnonimo.headers.get('location'), /\/secretaria\/login/);
-
-  // Sem autenticação: confirmar-presenca retorna 401
-  const resConfAnonimo = await fetch(`${baseUrl}/the-chosen/api/confirmar-presenca`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: 'invalido', status: 'confirmado' })
-  });
-  assert.equal(resConfAnonimo.status, 401);
-
-  // Sem autenticação: excluir-inscricao retorna 401
-  const resExcluirAnonimo = await fetch(`${baseUrl}/the-chosen/api/excluir-inscricao`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: 'invalido' })
-  });
-  assert.equal(resExcluirAnonimo.status, 401);
-});
-
-test("API /the-chosen: exclusão de inscrição e limpeza de testes funcionam quando autenticado", async () => {
-  sessions["sess-admin-the-chosen"] = { username: "admin", role: "admin", status: "active", createdAt: Date.now() };
-
-  // 1. Cria uma inscrição
-  const resInscrever = await fetch(`${baseUrl}/the-chosen/api/inscrever`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      quantidade: 1,
-      participantes: ["Exclusao Teste"],
-      telefone: "11988887777",
-      email: "exclusao@teste.com"
-    })
-  });
-  const dataIns = await resInscrever.json();
-  assert.equal(dataIns.ok, true);
-  const inscricaoId = dataIns.inscricao.id;
-
-  // 2. Exclui com autenticação
-  const resExcluir = await fetch(`${baseUrl}/the-chosen/api/excluir-inscricao`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Cookie": "whatsapp_control_session=sess-admin-the-chosen"
-    },
-    body: JSON.stringify({ id: inscricaoId })
-  });
-  assert.equal(resExcluir.status, 200);
-  const dataExcluir = await resExcluir.json();
-  assert.equal(dataExcluir.ok, true);
-
-  // 3. Limpa testes
-  const resLimpar = await fetch(`${baseUrl}/the-chosen/api/limpar-testes`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Cookie": "whatsapp_control_session=sess-admin-the-chosen"
-    }
-  });
-  assert.equal(resLimpar.status, 200);
-  const dataLimpar = await resLimpar.json();
-  assert.equal(dataLimpar.ok, true);
+  assert.equal(jsonVagas.ok, false);
 });
 
 
@@ -648,32 +553,7 @@ test("rota desconhecida fora de /secretaria: 404 direto, sem exigir login (livre
   assert.equal(res.status, 404, "só o que está sob /secretaria é protegido por login; o resto do site fica livre");
 });
 
-test("The Chosen HTTP API: GET /the-chosen/api/vagas retorna status das 50 vagas", async () => {
-  const res = await fetch(`${baseUrl}/the-chosen/api/vagas`);
-  assert.equal(res.status, 200);
-  const data = await res.json();
-  assert.equal(data.total, 50);
-  assert.ok(data.restantes <= 50);
-  assert.equal(typeof data.esgotado, "boolean");
-});
 
-test("The Chosen HTTP API: POST /the-chosen realiza inscrição com sucesso", async () => {
-  const res = await fetch(`${baseUrl}/the-chosen`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      quantidade: 1,
-      participantes: ["Mariana Web Teste"],
-      telefone: "11988889999",
-      email: "mariana.web@teste.com"
-    })
-  });
-  assert.equal(res.status, 200);
-  const data = await res.json();
-  assert.equal(data.ok, true);
-  assert.ok(data.inscricao.codigo.startsWith("TC-"));
-  assert.equal(data.inscricao.titular, "Mariana Web Teste");
-});
 
 // Deixado por último de propósito: consome o limite de tentativas do rate limiter,
 // que é compartilhado (por IP) entre todas as requisições deste arquivo de teste.

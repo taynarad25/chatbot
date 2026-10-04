@@ -15,13 +15,13 @@ try {
 }
 
 const cultoMulheres = require("../web/culto_mulheres");
-const theChosen = require("../web/the_chosen");
 
 const CATALOGO_EVENTOS = [
   {
     id: "culto_mulheres",
     nome: "Culto de Mulheres: O Vaso e o Oleiro",
     icone: "🌸",
+    dataEvento: "2026-10-24 15:00",
     departamentos: ["Rede de Mulheres", "Mulheres"],
     verificarPermissao: (usuario, isPastor, isDiretor) => {
       if (isPastor || isDiretor) return true;
@@ -34,30 +34,10 @@ const CATALOGO_EVENTOS = [
     },
   },
   {
-    id: "the_chosen",
-    nome: "Pré-estreia The Chosen - Temporada 6",
-    icone: "🎬",
-    departamentos: [
-      "Comunicação",
-      "Multimídia",
-      "Eventos",
-    ],
-    verificarPermissao: (usuario, isPastor, isDiretor) => {
-      if (isPastor || isDiretor) return true;
-      const deptos = (
-        Array.isArray(usuario?.departamentos)
-          ? usuario.departamentos
-          : [usuario?.departamento || ""]
-      ).map((d) => String(d || "").toLowerCase().trim());
-      return deptos.some((d) =>
-        /comunica|m[ií]dia|evento|the chosen/i.test(d)
-      );
-    },
-  },
-  {
     id: "dia_das_criancas",
     nome: "Especial Dia das Crianças",
     icone: "🎈",
+    dataEvento: "2026-10-17 14:00",
     departamentos: [
       "Ministério Infantil",
       "Infantil",
@@ -78,6 +58,20 @@ const CATALOGO_EVENTOS = [
   },
 ];
 
+function isEventoExpirado(ev) {
+  if (!ev || !ev.dataEvento) return false;
+  try {
+    const moment = require("moment-timezone");
+    const hoje = moment.tz("America/Sao_Paulo").startOf("day");
+    const dataStr = ev.dataEvento.slice(0, 10);
+    const d = moment.tz(dataStr, "YYYY-MM-DD", "America/Sao_Paulo");
+    if (d.isValid()) {
+      return d.isBefore(hoje, "day"); // No dia seguinte ao evento já expira e é apagado/ocultado
+    }
+  } catch (_) {}
+  return false;
+}
+
 /**
  * Retorna a lista de eventos com inscrição acessíveis ao usuário
  * conforme seu cargo e departamento.
@@ -89,7 +83,7 @@ function obterEventosInscricaoParaUsuario({
   isLider = false,
 }) {
   return CATALOGO_EVENTOS.filter((ev) =>
-    ev.verificarPermissao(usuario, isPastor, isDiretor)
+    !isEventoExpirado(ev) && ev.verificarPermissao(usuario, isPastor, isDiretor)
   );
 }
 
@@ -105,16 +99,7 @@ function gerarResumoCultoMulheres() {
   );
 }
 
-function gerarResumoTheChosen() {
-  const statusVagas = theChosen.obterStatusVagas();
 
-  return (
-    `🎬 *Inscrições - Pré-estreia The Chosen*\n\n` +
-    `📊 *Estatísticas das Inscrições:*\n` +
-    `• Vagas Ocupadas: *${statusVagas.preenchidas} / ${statusVagas.total}*\n` +
-    `• Vagas Restantes: *${statusVagas.restantes}*\n`
-  );
-}
 
 const URL_WEBAPP_CRIANCAS =
   process.env.CRIANCAS_WEBAPP_URL ||
@@ -182,30 +167,7 @@ function montarListaInscritosTexto(eventoId) {
     return texto;
   }
 
-  if (eventoId === "the_chosen") {
-    const lista =
-      typeof theChosen.listarInscricoes === "function"
-        ? theChosen.listarInscricoes()
-        : [];
-    if (!lista || lista.length === 0) {
-      return "_Nenhuma inscrição registrada até o momento._";
-    }
-    const maxExibir = 40;
-    const itens = lista.slice(0, maxExibir).map((item, idx) => {
-      const tel = item.telefone ? `📞 ${item.telefone}` : "";
-      const status = item.presente
-        ? "✅ Presente"
-        : item.confirmado
-        ? "👍 Confirmado"
-        : "⏳ Pendente";
-      return `${idx + 1}. *${item.nome}* (${status})${tel ? `\n   ${tel}` : ""}`;
-    });
-    let texto = itens.join("\n\n");
-    if (lista.length > maxExibir) {
-      texto += `\n\n_... e mais ${lista.length - maxExibir} inscritos._`;
-    }
-    return texto;
-  }
+
 
   return "";
 }
@@ -251,9 +213,7 @@ async function gerarPdfEvento({ eventoId, client }) {
   if (eventoId === "culto_mulheres") {
     html = cultoMulheres.renderMulheresPdfHtml();
     filename = "Lista_Inscricoes_Culto_Mulheres.pdf";
-  } else if (eventoId === "the_chosen") {
-    html = theChosen.renderTheChosenPdfHtml();
-    filename = "Lista_Inscricoes_The_Chosen.pdf";
+
   } else if (eventoId === "dia_das_criancas") {
     html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Dia das Crianças</title></head><body><h1>Especial Dia das Crianças</h1><p>Lista oficial de inscrições (Google Forms).</p></body></html>`;
     filename = "Lista_Inscricoes_Dia_das_Criancas.pdf";
@@ -338,16 +298,7 @@ function obterLinksDocumentos(eventoId) {
     };
   }
 
-  if (eventoId === "the_chosen") {
-    const ssId =
-      process.env.GOOGLE_SHEETS_SPREADSHEET_ID ||
-      "1eFQTr1uMTtr1RMaU1KXtxtTpzVlUdGvQOFRtK0quHIM";
-    return {
-      spreadsheetId: ssId,
-      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`,
-      pdfUrl: `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`,
-    };
-  }
+
 
   if (eventoId === "dia_das_criancas") {
     const ssId =
@@ -376,14 +327,7 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
     try {
       await cultoMulheres.sincronizarInscricoesComNuvem();
     } catch {}
-  } else if (
-    process.env.NODE_ENV !== "test" &&
-    eventoId === "the_chosen" &&
-    typeof theChosen.sincronizarInscricoesComNuvem === "function"
-  ) {
-    try {
-      await theChosen.sincronizarInscricoesComNuvem();
-    } catch {}
+
   } else if (
     process.env.NODE_ENV !== "test" &&
     eventoId === "dia_das_criancas"
@@ -396,8 +340,7 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
   let resumoTexto = "";
   if (eventoId === "culto_mulheres") {
     resumoTexto = gerarResumoCultoMulheres();
-  } else if (eventoId === "the_chosen") {
-    resumoTexto = gerarResumoTheChosen();
+
   } else if (eventoId === "dia_das_criancas") {
     resumoTexto = gerarResumoDiaDasCriancas();
   }
@@ -546,8 +489,7 @@ async function processarFluxoConsultaInscricoes({
       selecionado = eventos.find(
         (e) =>
           escolha.includes(e.id) ||
-          (/mulher/i.test(escolha) && e.id === "culto_mulheres") ||
-          (/chosen/i.test(escolha) && e.id === "the_chosen")
+          (/mulher/i.test(escolha) && e.id === "culto_mulheres")
       );
     }
 
@@ -609,8 +551,9 @@ async function processarFluxoConsultaInscricoes({
 module.exports = {
   CATALOGO_EVENTOS,
   obterEventosInscricaoParaUsuario,
+  isEventoExpirado,
   gerarResumoCultoMulheres,
-  gerarResumoTheChosen,
+  gerarResumoTheChosen: () => "",
   gerarPdfEvento,
   enviarInscricoesComPdf,
   iniciarFluxoConsultaInscricoes,
