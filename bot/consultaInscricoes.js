@@ -15,6 +15,7 @@ try {
 }
 
 const cultoMulheres = require("../web/culto_mulheres");
+const diaDasCriancas = require("../web/dia_das_criancas");
 
 const CATALOGO_EVENTOS = [
   {
@@ -112,13 +113,9 @@ let cacheCriancas = {
 
 async function sincronizarInscricoesCriancas(fetchFn = globalThis.fetch) {
   try {
-    const res = await fetchFn(URL_WEBAPP_CRIANCAS, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(15000),
-    });
-    const data = await res.json();
-    if (data && typeof data.total === "number") {
-      cacheCriancas.total = data.total;
+    const res = await diaDasCriancas.sincronizarInscricoesComNuvem(URL_WEBAPP_CRIANCAS, fetchFn);
+    if (res && typeof res.total === "number") {
+      cacheCriancas.total = res.total;
       cacheCriancas.ultimaAtualizacao = Date.now();
     }
   } catch (err) {
@@ -128,7 +125,8 @@ async function sincronizarInscricoesCriancas(fetchFn = globalThis.fetch) {
 }
 
 function gerarResumoDiaDasCriancas() {
-  const total = cacheCriancas.total || 0;
+  const stats = diaDasCriancas.obterEstatisticasCriancas();
+  const total = stats.total || cacheCriancas.total || 0;
 
   return (
     `🎈 *Inscrições - Especial Dia das Crianças*\n\n` +
@@ -167,7 +165,28 @@ function montarListaInscritosTexto(eventoId) {
     return texto;
   }
 
-
+  if (eventoId === "dia_das_criancas") {
+    const lista =
+      typeof diaDasCriancas.listarInscricoesCriancas === "function"
+        ? diaDasCriancas.listarInscricoesCriancas()
+        : [];
+    if (!lista || lista.length === 0) {
+      return "_Nenhuma inscrição de criança registrada até o momento._";
+    }
+    const maxExibir = 40;
+    const itens = lista.slice(0, maxExibir).map((item, idx) => {
+      const resp = item.nomeResponsavel ? `👩‍👧 Resp: ${item.nomeResponsavel}` : "";
+      const idade = item.idade ? `🎂 Idade: ${item.idade}` : "";
+      const tel = item.telefone ? `📞 ${item.telefone}` : "";
+      const info = [idade, resp, tel].filter(Boolean).join(" | ");
+      return `${idx + 1}. *${item.nomeCrianca}*${info ? `\n   ${info}` : ""}`;
+    });
+    let texto = itens.join("\n\n");
+    if (lista.length > maxExibir) {
+      texto += `\n\n_... e mais ${lista.length - maxExibir} crianças (consulte a lista completa no painel da secretaria)._`;
+    }
+    return texto;
+  }
 
   return "";
 }
@@ -215,7 +234,7 @@ async function gerarPdfEvento({ eventoId, client }) {
     filename = "Lista_Inscricoes_Culto_Mulheres.pdf";
 
   } else if (eventoId === "dia_das_criancas") {
-    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Dia das Crianças</title></head><body><h1>Especial Dia das Crianças</h1><p>Lista oficial de inscrições (Google Forms).</p></body></html>`;
+    html = diaDasCriancas.renderCriancasPdfHtml();
     filename = "Lista_Inscricoes_Dia_das_Criancas.pdf";
   } else {
     return { ok: false, error: "Evento não reconhecido." };
@@ -553,7 +572,9 @@ module.exports = {
   obterEventosInscricaoParaUsuario,
   isEventoExpirado,
   gerarResumoCultoMulheres,
+  gerarResumoDiaDasCriancas,
   gerarResumoTheChosen: () => "",
+  montarListaInscritosTexto,
   gerarPdfEvento,
   enviarInscricoesComPdf,
   iniciarFluxoConsultaInscricoes,

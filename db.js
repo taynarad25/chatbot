@@ -145,6 +145,23 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_mulheres_email ON mulheres_inscricoes(email);
   CREATE INDEX IF NOT EXISTS idx_mulheres_telefone ON mulheres_inscricoes(telefone);
 
+  CREATE TABLE IF NOT EXISTS criancas_inscricoes (
+    id TEXT PRIMARY KEY,
+    nomeCrianca TEXT NOT NULL,
+    nomeResponsavel TEXT,
+    idade TEXT,
+    telefone TEXT,
+    alergiaAlimentos TEXT,
+    alergiaMedicamentos TEXT,
+    evento TEXT NOT NULL DEFAULT 'Especial Dia das Crianças',
+    dataEvento TEXT NOT NULL DEFAULT '2026-10-17 14:00',
+    whatsappConfirmacaoEnviado INTEGER NOT NULL DEFAULT 0,
+    criadoEm TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_criancas_telefone ON criancas_inscricoes(telefone);
+  CREATE INDEX IF NOT EXISTS idx_criancas_nome ON criancas_inscricoes(nomeCrianca);
+
   CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,

@@ -1326,6 +1326,92 @@ function renderIndexHtml() {
 
 
 
+      <!-- Seção de Eventos com Inscrições Ativas -->
+      <div style="margin-top: 2.5rem; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h4 style="font-size: 1.2rem; color: #fff; margin: 0 0 4px; font-weight: 800;">📝 Inscrições por Evento</h4>
+          <p style="color: var(--cor-texto-mutado); font-size: 0.85rem; margin: 0;">Acompanhe em tempo real as listas de participantes, formulários e sincronizações de cada evento ativo.</p>
+        </div>
+      </div>
+
+      <!-- Card do Evento Especial Dia das Crianças -->
+      <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(2, 132, 199, 0.45); background: linear-gradient(135deg, rgba(2, 132, 199, 0.14), rgba(245, 158, 11, 0.08));">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
+              🎈 Ministério Infantil
+            </div>
+            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Especial Dia das Crianças</h4>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
+              🗓️ <strong>17/10/2026 às 14:00</strong> &nbsp;•&nbsp; 📍 <strong>R. Benedicto de Abreu Júnior, 40</strong> &nbsp;•&nbsp; <em>Inscrições via Formulário Oficial</em>
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn-gaveta-toggle" id="btnToggleCriancas" onclick="toggleGavetaEvento('criancas')" title="Recolher ou expandir inscrições (engavetar)">
+              <span class="gaveta-toggle-text">Recolher</span>
+              <span class="gaveta-arrow" id="arrow-criancas">▲</span>
+            </button>
+            <button onclick="sincronizarComPlanilhaCriancas()" id="btnSyncPlanilhaCriancas" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
+              🔄 Puxar da Planilha
+            </button>
+            <button onclick="window.open('https://forms.gle/jb3ytK348u3keMi8A', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver formulário público de inscrição">
+              🔗 Abrir Formulário
+            </button>
+            <button onclick="window.open('/criancas/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);">
+              📄 Exportar Lista (PDF)
+            </button>
+            <button onclick="fetchCriancasInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+              🔄 Atualizar
+            </button>
+          </div>
+        </div>
+
+        <div class="evento-gaveta-body" id="gaveta-criancas">
+          <div class="evento-metric-grid" id="criancasMetrics">
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="criancasTotal" style="color: #38bdf8;">-</div>
+              <div class="evento-metric-lbl">Total de Crianças</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="criancasConfirmadosZap" style="color: #4ade80;">-</div>
+              <div class="evento-metric-lbl">Confirmação WhatsApp</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="criancasPendentesZap" style="color: #facc15;">-</div>
+              <div class="evento-metric-lbl">Pendentes de WhatsApp</div>
+            </div>
+          </div>
+
+          <!-- Barra de Filtros e Busca do Especial Dia das Crianças -->
+          <div class="evento-toolbar" style="margin-top: 1.2rem;">
+            <input type="text" id="criancasSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por criança, mãe/responsável, alergia ou telefone..." oninput="filtrarCriancasInscricoes()" />
+          </div>
+
+          <!-- Tabela de Inscritos do Especial Dia das Crianças -->
+          <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto; margin-bottom: 0.5rem;">
+            <table class="evento-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px; text-align: center;">Nº</th>
+                  <th>Nome da Criança</th>
+                  <th style="width: 80px; text-align: center;">Idade</th>
+                  <th>Mãe / Responsável</th>
+                  <th>Telefone / Contato</th>
+                  <th>Alergias / Restrições</th>
+                  <th style="width: 140px; text-align: center;">Data Inscrição</th>
+                  <th style="width: 100px; text-align: center;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="criancasTbodyInscritos">
+                <tr>
+                  <td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando crianças inscritas...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Card do Evento Culto de Mulheres -->
       <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(200, 100, 82, 0.35);">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
@@ -1848,9 +1934,15 @@ function renderIndexHtml() {
       }
     }
 
+    function getBtnGaveta(nomeEvento) {
+      if (nomeEvento === 'criancas') return document.getElementById('btnToggleCriancas');
+      if (nomeEvento === 'theChosen') return document.getElementById('btnToggleTheChosen');
+      return document.getElementById('btnToggleMulheres');
+    }
+
     function toggleGavetaEvento(nomeEvento) {
       const gaveta = document.getElementById('gaveta-' + nomeEvento);
-      const btn = document.getElementById('btnToggle' + (nomeEvento === 'theChosen' ? 'TheChosen' : 'Mulheres'));
+      const btn = getBtnGaveta(nomeEvento);
       if (!gaveta || !btn) return;
 
       const isRecolhida = gaveta.classList.contains('recolhida');
@@ -1873,11 +1965,11 @@ function renderIndexHtml() {
     }
 
     function restaurarEstadoGavetas() {
-      ['mulheres'].forEach(nomeEvento => {
+      ['criancas', 'mulheres'].forEach(nomeEvento => {
         const salvo = localStorage.getItem('gaveta_' + nomeEvento);
         if (salvo === 'fechada') {
           const gaveta = document.getElementById('gaveta-' + nomeEvento);
-          const btn = document.getElementById('btnToggle' + (nomeEvento === 'theChosen' ? 'TheChosen' : 'Mulheres'));
+          const btn = getBtnGaveta(nomeEvento);
           if (gaveta && btn) {
             gaveta.classList.add('recolhida');
             btn.classList.add('recolhida');
@@ -1888,6 +1980,140 @@ function renderIndexHtml() {
           }
         }
       });
+    }
+
+    /* =========================================================================
+       FRONTEND: Especial Dia das Crianças
+       ========================================================================= */
+    let criancasInscricoesCache = [];
+
+    async function fetchCriancasInscricoes() {
+      try {
+        const res = await fetch('/criancas/api/inscritas');
+        if (res.status === 401) { window.location.href = '/secretaria/login'; return; }
+        if (!res.ok) return;
+        const data = await res.json();
+        criancasInscricoesCache = data.inscricoes || [];
+
+        const stats = data.stats || {};
+        const elTotal = document.getElementById('criancasTotal');
+        const elZap = document.getElementById('criancasConfirmadosZap');
+        const elPend = document.getElementById('criancasPendentesZap');
+
+        if (elTotal) elTotal.textContent = stats.total !== undefined ? stats.total : criancasInscricoesCache.length;
+        if (elZap) elZap.textContent = stats.whatsappConfirmados || 0;
+        if (elPend) elPend.textContent = stats.pendentesConfirmacao || 0;
+
+        filtrarCriancasInscricoes();
+      } catch (err) {
+        console.error('Erro ao buscar inscritos do Dia das Crianças:', err);
+      }
+    }
+
+    function filtrarCriancasInscricoes() {
+      const termo = (document.getElementById('criancasSearchInput')?.value || '').toLowerCase().trim();
+      const filtrados = criancasInscricoesCache.filter(item => {
+        if (!termo) return true;
+        const criancaStr = (item.nomeCrianca || '').toLowerCase();
+        const respStr = (item.nomeResponsavel || '').toLowerCase();
+        const telStr = (item.telefone || '').toLowerCase();
+        const alergiaStr = ((item.alergiaAlimentos || '') + ' ' + (item.alergiaMedicamentos || '')).toLowerCase();
+        return criancaStr.includes(termo) || respStr.includes(termo) || telStr.includes(termo) || alergiaStr.includes(termo);
+      });
+      renderCriancasTable(filtrados);
+    }
+
+    function renderCriancasTable(lista) {
+      const tbody = document.getElementById('criancasTbodyInscritos');
+      if (!tbody) return;
+
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Nenhuma criança inscrita encontrada.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map((item, idx) => {
+        const telFormatado = item.telefone ? item.telefone.replace(/^(\\d{2})(\\d{4,5})(\\d{4})$/, '($1) $2-$3') : '-';
+        const dataCriacao = item.criadoEm ? new Date(item.criadoEm).toLocaleDateString('pt-BR') : '-';
+
+        let alergiasHtml = '<span style="color: #94a3b8; font-size: 0.82rem;">Nenhuma</span>';
+        const alergias = [];
+        if (item.alergiaAlimentos && !/n[aã]o|nenhum/i.test(item.alergiaAlimentos)) {
+          alergias.push('🍽️ ' + item.alergiaAlimentos);
+        }
+        if (item.alergiaMedicamentos && !/n[aã]o|nenhum/i.test(item.alergiaMedicamentos)) {
+          alergias.push('💊 ' + item.alergiaMedicamentos);
+        }
+        if (alergias.length > 0) {
+          alergiasHtml = '<span style="background: rgba(239, 68, 68, 0.18); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; display: inline-block;">' +
+            alergias.join(' | ') +
+            '</span>';
+        }
+
+        return '<tr>' +
+          '<td style="text-align: center; font-weight: bold; color: var(--cor-texto-mutado);">' + (idx + 1) + '</td>' +
+          '<td><strong style="color: #fff; font-size: 0.95rem;">' + (item.nomeCrianca || '-') + '</strong></td>' +
+          '<td style="text-align: center; font-size: 0.88rem; color: #38bdf8; font-weight: 600;">' + (item.idade || '-') + '</td>' +
+          '<td style="font-size: 0.88rem; color: #cbd5e1;">' + (item.nomeResponsavel || '-') + '</td>' +
+          '<td style="font-size: 0.88rem;">' + telFormatado + '</td>' +
+          '<td>' + alergiasHtml + '</td>' +
+          '<td style="text-align: center; font-size: 0.85rem; color: var(--cor-texto-mutado);">' + dataCriacao + '</td>' +
+          '<td style="text-align: center;">' +
+            '<button data-id="' + (item.id || '') + '" data-nome="' + (item.nomeCrianca || '').replace(/"/g, '&quot;') + '" onclick="excluirCriancaInscricao(this.dataset.id, this.dataset.nome)" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">' +
+              '🗑️ Excluir' +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    async function excluirCriancaInscricao(id, nome) {
+      if (!id) return;
+      const confirmou = confirm('Tem certeza que deseja excluir a inscrição de "' + (nome || 'Criança') + '"?');
+      if (!confirmou) return;
+
+      try {
+        const res = await fetch('/criancas/api/excluir-inscricao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          fetchCriancasInscricoes();
+        } else {
+          alert(data.message || 'Erro ao excluir inscrição.');
+        }
+      } catch (err) {
+        console.error('Erro ao excluir inscrição de criança:', err);
+        alert('Erro ao conectar com o servidor.');
+      }
+    }
+
+    async function sincronizarComPlanilhaCriancas() {
+      const btn = document.getElementById('btnSyncPlanilhaCriancas');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Sincronizando...';
+      }
+      try {
+        const res = await fetch('/criancas/api/sincronizar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          alert('✅ Sincronização concluída com sucesso!\\n' + (data.total || 0) + ' inscrições de crianças sincronizadas da planilha.');
+          await fetchCriancasInscricoes();
+        } else {
+          alert('⚠️ Aviso ao sincronizar: ' + (data.error || data.message || 'Verifique a configuração do Apps Script'));
+        }
+      } catch (err) {
+        alert('Erro ao sincronizar com a planilha: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText || '🔄 Puxar da Planilha';
+        }
+      }
     }
 
     /* =========================================================================
@@ -2638,6 +2864,7 @@ function renderIndexHtml() {
     setInterval(refresh, 5000);
     refresh();
     fetchEventosCadastrados();
+    fetchCriancasInscricoes();
     fetchMulheresInscricoes();
     restaurarEstadoGavetas();
   </script>

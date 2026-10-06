@@ -10,6 +10,7 @@ const { createRateLimiter } = require("./web/rateLimiter");
 const { getClientIp } = require("./web/clientIp");
 const cultoMulheres = require("./web/culto_mulheres");
 const cultoMulheresNotificacoes = require("./web/culto_mulheres_notificacoes");
+const diaDasCriancas = require("./web/dia_das_criancas");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
@@ -464,6 +465,84 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           }
         } catch (err) {
           console.error('[Culto Mulheres] Erro ao excluir inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
+        }
+      }
+
+      // API: Listagem de inscritos e estatísticas do Dia das Crianças (/criancas/api/inscritas)
+      if (req.method === 'GET' && pathname === '/criancas/api/inscritas') {
+        try {
+          const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+          const shouldSync = parsedUrl.searchParams.get('sync') === '1' || diaDasCriancas.listarInscricoesCriancas().length === 0;
+          if (shouldSync && typeof diaDasCriancas.sincronizarInscricoesComNuvem === 'function') {
+            await diaDasCriancas.sincronizarInscricoesComNuvem().catch(err => {
+              console.warn('[Web] Aviso ao sincronizar com planilha em /criancas/api/inscritas:', err.message);
+            });
+          }
+
+          const inscricoes = diaDasCriancas.listarInscricoesCriancas();
+          const stats = diaDasCriancas.obterEstatisticasCriancas();
+          return sendJson(res, 200, { ok: true, inscricoes, stats });
+        } catch (err) {
+          console.error('[Dia das Crianças] Erro ao listar inscritos:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao listar inscritos.' });
+        }
+      }
+
+      // API: Sincronização manual com a planilha do Google (Secretaria - Crianças)
+      if (req.method === 'POST' && pathname === '/criancas/api/sincronizar') {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          const resultado = typeof diaDasCriancas.sincronizarInscricoesComNuvem === 'function'
+            ? await diaDasCriancas.sincronizarInscricoesComNuvem()
+            : { ok: false, message: 'Função de sincronização não disponível.' };
+          return sendJson(res, resultado.ok ? 200 : 500, resultado);
+        } catch (err) {
+          console.error('[Web] Erro ao sincronizar Dia das Crianças com Google Sheets:', err.message);
+          return sendJson(res, 500, { ok: false, message: err.message });
+        }
+      }
+
+      // API: Relatório / Exportação PDF (/criancas/api/relatorio-pdf, /criancas/relatorio-pdf)
+      if (req.method === 'GET' && (pathname === '/criancas/api/relatorio-pdf' || pathname === '/criancas/relatorio-pdf')) {
+        try {
+          const html = diaDasCriancas.renderCriancasPdfHtml();
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+          });
+          return res.end(html);
+        } catch (errPdf) {
+          console.error('[Dia das Crianças] Erro ao gerar PDF:', errPdf);
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          return res.end('Erro ao gerar relatório PDF.');
+        }
+      }
+
+      // API: Excluir inscrição de criança (/criancas/api/excluir-inscricao ou DELETE /criancas/api/inscricoes/:id)
+      if ((req.method === 'POST' && pathname === '/criancas/api/excluir-inscricao') ||
+          (req.method === 'DELETE' && pathname.startsWith('/criancas/api/inscricoes/'))) {
+        try {
+          let termo = null;
+          if (req.method === 'DELETE') {
+            termo = decodeURIComponent(pathname.replace('/criancas/api/inscricoes/', ''));
+          } else {
+            const body = await parseRequestBody(req);
+            termo = body?.id;
+          }
+          if (!termo) {
+            return sendJson(res, 400, { ok: false, message: 'ID da inscrição não informado.' });
+          }
+          const removido = diaDasCriancas.excluirInscricaoCriancas(termo);
+          if (removido) {
+            return sendJson(res, 200, { ok: true, message: 'Inscrição removida com sucesso.' });
+          } else {
+            return sendJson(res, 404, { ok: false, message: 'Inscrição não encontrada.' });
+          }
+        } catch (err) {
+          console.error('[Dia das Crianças] Erro ao excluir inscrição:', err);
           return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
         }
       }
