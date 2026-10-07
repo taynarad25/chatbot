@@ -566,7 +566,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             'Content-Type': 'text/html; charset=utf-8',
             'X-Content-Type-Options': 'nosniff',
             'X-Frame-Options': 'DENY',
-            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://script.google.com https://script.googleusercontent.com"
           });
           return res.end(content);
         }
@@ -583,9 +583,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
           const inscricao = saudeMulher.salvarInscricaoSaudeMulher(body);
 
-          // Envia em segundo plano para o Web App do Google Apps Script se configurado
-          saudeMulher.enviarInscricaoPlanilhaSaudeMulher(body)
-            .catch(errSheet => console.warn('[Saúde da Mulher] Aviso ao salvar na planilha:', errSheet.message));
+          // Envia para o Web App do Google Apps Script se configurado
+          let resultadoPlanilha = { ok: false };
+          try {
+            resultadoPlanilha = await saudeMulher.enviarInscricaoPlanilhaSaudeMulher(body);
+          } catch (errSheet) {
+            console.warn('[Saúde da Mulher] Aviso ao salvar na planilha:', errSheet.message);
+          }
 
           // Disparo de confirmação amigável no WhatsApp se o bot estiver conectado
           try {
@@ -605,6 +609,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           return sendJson(res, 200, {
             ok: true,
             message: 'Inscrição realizada com sucesso!',
+            salvoNaPlanilha: Boolean(resultadoPlanilha?.ok),
+            avisoPlanilha: resultadoPlanilha?.ok ? '' : resultadoPlanilha?.message,
             inscricao
           });
         } catch (err) {

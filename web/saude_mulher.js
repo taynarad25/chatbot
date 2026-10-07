@@ -234,19 +234,44 @@ async function enviarInscricaoPlanilhaSaudeMulher(dados, { url = URL_WEBAPP_SAUD
       redirect: 'manual',
     });
 
+    let rawText = '';
     let retorno = null;
+
     if (res.status >= 300 && res.status < 400 && res.headers && typeof res.headers.get === 'function') {
       const location = res.headers.get('location');
       if (location) {
         const redirected = await fetchFn(location, { method: 'GET' });
-        const text = await redirected.text();
-        try { retorno = JSON.parse(text); } catch { retorno = { raw: text }; }
+        rawText = await redirected.text();
+        try { retorno = JSON.parse(rawText); } catch { retorno = { raw: rawText }; }
       }
     }
 
     if (!retorno) {
-      const text = await res.text();
-      try { retorno = JSON.parse(text); } catch { retorno = { raw: text }; }
+      rawText = await res.text();
+      try { retorno = JSON.parse(rawText); } catch { retorno = { raw: rawText }; }
+    }
+
+    const ehAcessoNegado = res.status === 401 || res.status === 403 ||
+      (typeof rawText === 'string' && (rawText.includes('Acesso negado') || rawText.includes('Você precisa ter acesso') || rawText.includes('Sign in to continue')));
+
+    if (ehAcessoNegado) {
+      const msgErro = 'Acesso negado pelo Google Apps Script (HTTP 403). Altere a implantação do Apps Script para "Quem pode acessar: Qualquer pessoa".';
+      console.warn(`[Saúde da Mulher] ${msgErro}`);
+      return {
+        ok: false,
+        status: 'forbidden',
+        message: msgErro,
+        dados: retorno,
+      };
+    }
+
+    if (res.status >= 400 || retorno?.status === 'error') {
+      return {
+        ok: false,
+        status: 'error',
+        message: retorno?.message || `Erro da planilha (HTTP ${res.status}).`,
+        dados: retorno,
+      };
     }
 
     return {
