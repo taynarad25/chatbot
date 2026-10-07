@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscrição & Anamnese: Saúde da Mulher — Palestra + Pilates | Comunidade Cristã Curados</title>
+    <meta name="description" content="Inscrição individual e Ficha de Anamnese para a aula de Pilates do evento Saúde da Mulher (Outubro Rosa). Sábado, 31/10/2026 às 15h. Entrada Franca!">
+    
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3">
+    <link rel="icon" type="image/png" href="/images/logo.png?v=3">
+    <link rel="shortcut icon" type="image/png" href="/images/logo.png?v=3">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --cor-rosa-primaria: #e11d48;
+            --cor-rosa-vibrante: #f43f5e;
+            --cor-rosa-suave: #fb7185;
+            --cor-rosa-claro: #ffe4e6;
+            --cor-rosa-dark: #881337;
+            --cor-magenta: #db2777;
+            --cor-fundo: #0f0a0d;
+            --cor-card: #181014;
+            --cor-card-alt: #22151c;
+            --cor-borda: rgba(244, 63, 94, 0.22);
+            --cor-borda-hover: rgba(244, 63, 94, 0.5);
+            --cor-texto: #fdf2f4;
+            --cor-texto-mutado: #bfaab2;
+            --cor-sucesso: #22c55e;
+            --cor-alerta: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: rgba(15, 10, 13, 0.94);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--cor-borda);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .top-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #ffffff;
+        }
+
+        .top-brand img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        .top-brand-text {
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: var(--cor-rosa-suave);
+        }
+
+        .top-tag {
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 5px 14px;
+            border-radius: 999px;
+            background: rgba(225, 29, 72, 0.2);
+            color: #fda4af;
+            border: 1px solid rgba(244, 63, 94, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Main Container */
+        .container {
+            width: 100%;
+            max-width: 1140px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+            flex: 1;
+        }
+
+        /* Banner Hero Responsivo */
+        .banner-wrapper {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--cor-borda);
+            margin-bottom: 32px;
+            background: #000;
+        }
+
+        .banner-img-desktop {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 480px;
+            object-fit: cover;
+            object-position: center;
+        }
+
+        .banner-img-mobile {
+            display: none;
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+        }
+
+        @media (max-width: 768px) {
+            .banner-img-desktop {
+                display: none;
+            }
+            .banner-img-mobile {
+                display: block;
+                max-height: 520px;
+            }
+        }
+
+        /* Grid de Conteúdo */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.35fr;
+            gap: 32px;
+            align-items: start;
+        }
+
+        @media (max-width: 960px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cartão de Detalhes do Evento */
+        .event-details-card {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+        }
+
+        .event-badge {
+            display: inline-block;
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 4px 12px;
+            border-radius: 8px;
+            background: rgba(225, 29, 72, 0.22);
+            color: #fda4af;
+            border: 1px solid rgba(244, 63, 94, 0.35);
+            margin-bottom: 14px;
+        }
+
+        .event-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.85rem;
+            line-height: 1.25;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .event-subtitle {
+            font-size: 1rem;
+            color: var(--cor-rosa-suave);
+            font-weight: 600;
+            margin-bottom: 22px;
+        }
+
+        .meta-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 0.95rem;
+            color: var(--cor-texto);
+        }
+
+        .meta-icon {
+            font-size: 1.3rem;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .notice-anamnese {
+            background: rgba(225, 29, 72, 0.12);
+            border-left: 4px solid var(--cor-rosa-vibrante);
+            border-radius: 0 10px 10px 0;
+            padding: 14px 18px;
+            font-size: 0.88rem;
+            color: #ffe4e6;
+            margin-top: 18px;
+            line-height: 1.55;
+        }
+
+        .notice-anamnese strong {
+            color: #ffffff;
+        }
+
+        /* Cartão do Formulário */
+        .form-card {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 20px;
+            padding: 32px 28px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+            position: relative;
+        }
+
+        .form-header {
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(244, 63, 94, 0.18);
+            padding-bottom: 16px;
+        }
+
+        .form-header h2 {
+            font-size: 1.45rem;
+            color: #ffffff;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-header p {
+            font-size: 0.9rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        /* Seção Anamnese dentro do Form */
+        .anamnese-section-divider {
+            margin: 28px 0 20px;
+            padding: 12px 16px;
+            background: linear-gradient(90deg, rgba(225, 29, 72, 0.25), rgba(219, 39, 119, 0.1));
+            border-left: 4px solid var(--cor-rosa-vibrante);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .anamnese-section-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+
+        .anamnese-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: rgba(244, 63, 94, 0.3);
+            color: #ffe4e6;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.92rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+
+        .form-label .required {
+            color: var(--cor-rosa-vibrante);
+        }
+
+        .form-hint {
+            font-size: 0.82rem;
+            color: var(--cor-texto-mutado);
+            margin-top: 4px;
+        }
+
+        .form-input, .form-textarea {
+            width: 100%;
+            background: var(--cor-card-alt);
+            border: 1.5px solid rgba(244, 63, 94, 0.25);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: #ffffff;
+            font-size: 0.98rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 85px;
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--cor-rosa-vibrante);
+            box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.25);
+            background: #2b1823;
+        }
+
+        .form-input::placeholder, .form-textarea::placeholder {
+            color: #7a666e;
+        }
+
+        /* Checkboxes e Radios Estilizados */
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(244, 63, 94, 0.15);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .option-item:hover {
+            background: rgba(244, 63, 94, 0.08);
+            border-color: rgba(244, 63, 94, 0.35);
+        }
+
+        .option-item input[type="checkbox"],
+        .option-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--cor-rosa-vibrante);
+            cursor: pointer;
+        }
+
+        .radio-inline-group {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+        }
+
+        .radio-inline-item {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1.5px solid rgba(244, 63, 94, 0.2);
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.92rem;
+            transition: all 0.2s ease;
+        }
+
+        .radio-inline-item:hover {
+            border-color: var(--cor-rosa-suave);
+            background: rgba(244, 63, 94, 0.08);
+        }
+
+        .radio-inline-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--cor-rosa-vibrante);
+        }
+
+        /* Detalhes condicionais */
+        .conditional-detail {
+            margin-top: 10px;
+            animation: fadeIn 0.25s ease;
+        }
+
+        /* Botão de Envio */
+        .btn-submit {
+            width: 100%;
+            background: linear-gradient(135deg, var(--cor-rosa-primaria), #be123c);
+            color: #ffffff;
+            border: none;
+            border-radius: 14px;
+            padding: 16px 20px;
+            font-size: 1.05rem;
+            font-weight: 800;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 8px 22px rgba(225, 29, 72, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 28px;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(225, 29, 72, 0.55);
+            background: linear-gradient(135deg, var(--cor-rosa-vibrante), #e11d48);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Feedback Visual */
+        .feedback-box {
+            display: none;
+            padding: 22px;
+            border-radius: 14px;
+            margin-top: 24px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .feedback-box.success {
+            background: rgba(34, 197, 94, 0.12);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #bbf7d0;
+        }
+
+        .feedback-box.duplicate {
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fde68a;
+        }
+
+        .feedback-box.error {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+
+        .feedback-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feedback-body {
+            font-size: 0.95rem;
+            line-height: 1.55;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--cor-borda);
+            padding: 24px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--cor-texto-mutado);
+            background: #0a0608;
+        }
+    </style>
+</head>
+<body>
+    <header class="top-bar">
+        <a href="/" class="top-brand">
+            <img src="/images/logo.png" alt="Comunidade Cristã Curados" onerror="this.style.display='none'">
+            <span class="top-brand-text">CURADOS</span>
+        </a>
+        <div class="top-tag">🎀 Outubro Rosa • Saúde da Mulher</div>
+    </header>
+
+    <main class="container">
+        <!-- Banner Responsivo Oficial do Evento -->
+        <section class="banner-wrapper">
+            <img src="/images/saude-mulher-desktop.png" alt="Outubro Rosa: Saúde da Mulher - Palestra + Pilates" class="banner-img-desktop" onerror="this.src='/images/saude-mulher-mobile.png'">
+            <img src="/images/saude-mulher-mobile.png" alt="Outubro Rosa: Saúde da Mulher - Palestra + Pilates" class="banner-img-mobile" onerror="this.src='/images/saude-mulher-desktop.png'">
+        </section>
+
+        <section class="content-grid">
+            <!-- Informações do Evento -->
+            <article class="event-details-card">
+                <span class="event-badge">Outubro Rosa • Prevenção & Bem-Estar</span>
+                <h1 class="event-title">Saúde da Mulher • Palestra + Pilates</h1>
+                <p class="event-subtitle">Uma tarde dedicada ao autocuidado, prevenção e bem-estar integral feminino.</p>
+
+                <ul class="meta-list">
+                    <li class="meta-item">
+                        <span class="meta-icon">🗓️</span>
+                        <div>
+                            <strong>Sábado, 31 de Outubro de 2026</strong>
+                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Horário: 15:00</div>
+                        </div>
+                    </li>
+                    <li class="meta-item">
+                        <span class="meta-icon">📍</span>
+                        <div>
+                            <strong>Comunidade Cristã Curados — Templo Principal</strong>
+                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi</div>
+                        </div>
+                    </li>
+                    <li class="meta-item">
+                        <span class="meta-icon">🧘</span>
+                        <div>
+                            <strong>Palestra Médica / Preventiva + Sessão de Pilates</strong>
+                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Com instrutora especializada</div>
+                        </div>
+                    </li>
+                    <li class="meta-item">
+                        <span class="meta-icon">🎟️</span>
+                        <div>
+                            <strong>Entrada Gratuita</strong>
+                            <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Vagas limitadas • Ficha de Anamnese obrigatória</div>
+                        </div>
+                    </li>
+                </ul>
+
+                <div class="notice-anamnese">
+                    📌 <strong>Por que preencher a Anamnese?</strong><br>
+                    O Pilates trabalha flexibilidade, força e respiração. Para que a instrutora conduza os exercícios com total segurança para sua coluna, articulações e saúde geral, é fundamental conhecermos seu histórico médico e eventuais limitações físicas.
+                </div>
+            </article>
+
+            <!-- Formulário de Inscrição e Anamnese -->
+            <section class="form-card">
+                <div class="form-header">
+                    <h2>📝 Inscrição & Ficha de Anamnese</h2>
+                    <p>Preencha os campos abaixo com atenção para garantir sua vaga na aula de Pilates.</p>
+                </div>
+
+                <form id="formSaudeMulher" onsubmit="realizarInscricaoPilates(event)">
+                    <!-- DADOS PESSOAIS -->
+                    <div class="form-group">
+                        <label for="campoNome" class="form-label">Nome Completo <span class="required">*</span></label>
+                        <input type="text" id="campoNome" class="form-input" placeholder="Ex: Maria Aparecida da Silva" required minlength="3">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 14px;">
+                        <div class="form-group">
+                            <label for="campoIdade" class="form-label">Idade <span class="required">*</span></label>
+                            <input type="number" id="campoIdade" class="form-input" placeholder="Ex: 38" min="10" max="110" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="campoTelefone" class="form-label">Telefone (WhatsApp) <span class="required">*</span></label>
+                            <input type="tel" id="campoTelefone" class="form-input" placeholder="(11) 99999-8888" required minlength="10" oninput="formatarTelefoneInput(this)">
+                        </div>
+                    </div>
+
+                    <!-- DIVISOR ANAMNESE -->
+                    <div class="anamnese-section-divider">
+                        <span class="anamnese-section-title">Anamnese – Aula de Pilates</span>
+                        <span class="anamnese-badge">Avaliação Física</span>
+                    </div>
+
+                    <!-- PERGUNTA 1 -->
+                    <div class="form-group">
+                        <label class="form-label">1- Possui alguma condição de saúde?</label>
+                        <div class="options-list">
+                            <label class="option-item">
+                                <input type="checkbox" name="condicao_saude" value="Diabetes">
+                                <span>Diabetes</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" name="condicao_saude" value="Hipertensão (pressão alta)">
+                                <span>Hipertensão (pressão alta)</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" name="condicao_saude" value="Problemas cardíacos">
+                                <span>Problemas cardíacos</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" name="condicao_saude" value="Problemas respiratórios">
+                                <span>Problemas respiratórios</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="chkOutraCondicao" onchange="toggleOutraCondicao(this)">
+                                <span>Outra</span>
+                            </label>
+                        </div>
+                        <div id="boxOutraCondicao" class="conditional-detail" style="display: none;">
+                            <input type="text" id="campoOutraCondicao" class="form-input" placeholder="Especifique qual outra condição de saúde...">
+                        </div>
+
+                        <div style="margin-top: 14px;">
+                            <label for="campoMedicamento" class="form-label" style="font-size: 0.88rem; font-weight: 600; color: #ffe4e6;">
+                                Se sim, realiza tratamento ou utiliza algum medicamento?
+                            </label>
+                            <input type="text" id="campoMedicamento" class="form-input" placeholder="Ex: Faço uso contínuo de Losartana / Nenhum">
+                        </div>
+                    </div>
+
+                    <!-- PERGUNTA 2 -->
+                    <div class="form-group">
+                        <label class="form-label">2- Já realizou alguma cirurgia?</label>
+                        <div class="radio-inline-group">
+                            <label class="radio-inline-item">
+                                <input type="radio" name="cirurgia" value="Não" checked onchange="toggleDetalheCirurgia(false)">
+                                <span>Não</span>
+                            </label>
+                            <label class="radio-inline-item">
+                                <input type="radio" name="cirurgia" value="Sim" onchange="toggleDetalheCirurgia(true)">
+                                <span>Sim</span>
+                            </label>
+                        </div>
+                        <div id="boxDetalheCirurgia" class="conditional-detail" style="display: none;">
+                            <input type="text" id="campoCirurgiaDetalhes" class="form-input" placeholder="Qual cirurgia e quando realizou?">
+                        </div>
+                    </div>
+
+                    <!-- PERGUNTA 3 -->
+                    <div class="form-group">
+                        <label class="form-label">3- Possui ou já teve alguma lesão, dor ou problema na coluna, joelho, ombro, quadril ou outra região do corpo?</label>
+                        <div class="radio-inline-group">
+                            <label class="radio-inline-item">
+                                <input type="radio" name="lesao_dor" value="Não" checked onchange="toggleDetalheLesao(false)">
+                                <span>Não</span>
+                            </label>
+                            <label class="radio-inline-item">
+                                <input type="radio" name="lesao_dor" value="Sim" onchange="toggleDetalheLesao(true)">
+                                <span>Sim</span>
+                            </label>
+                        </div>
+                        <div id="boxDetalheLesao" class="conditional-detail" style="display: none;">
+                            <input type="text" id="campoLesaoDetalhes" class="form-input" placeholder="Qual região e qual o tipo de dor ou lesão? (Ex: Hérnia de disco lombar)">
+                        </div>
+                    </div>
+
+                    <!-- PERGUNTA 4 -->
+                    <div class="form-group">
+                        <label class="form-label">4- Possui alguma limitação física ou intelectual?</label>
+                        <div class="radio-inline-group">
+                            <label class="radio-inline-item">
+                                <input type="radio" name="limitacao" value="Não" checked onchange="toggleDetalheLimitacao(false)">
+                                <span>Não</span>
+                            </label>
+                            <label class="radio-inline-item">
+                                <input type="radio" name="limitacao" value="Sim" onchange="toggleDetalheLimitacao(true)">
+                                <span>Sim</span>
+                            </label>
+                        </div>
+                        <div id="boxDetalheLimitacao" class="conditional-detail" style="display: none;">
+                            <input type="text" id="campoLimitacaoDetalhes" class="form-input" placeholder="Qual limitação?">
+                        </div>
+                    </div>
+
+                    <!-- PERGUNTA 5 -->
+                    <div class="form-group">
+                        <label class="form-label">5- Está grávida ou existe possibilidade de gravidez?</label>
+                        <div class="radio-inline-group">
+                            <label class="radio-inline-item">
+                                <input type="radio" name="gravidez" value="Não" checked>
+                                <span>Não</span>
+                            </label>
+                            <label class="radio-inline-item">
+                                <input type="radio" name="gravidez" value="Sim">
+                                <span>Sim</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- PERGUNTA 6 -->
+                    <div class="form-group">
+                        <label class="form-label">6- Faz algum tipo de atividade física atualmente?</label>
+                        <div class="radio-inline-group">
+                            <label class="radio-inline-item">
+                                <input type="radio" name="atividade_fisica" value="Não" checked onchange="toggleDetalheAtividade(false)">
+                                <span>Não</span>
+                            </label>
+                            <label class="radio-inline-item">
+                                <input type="radio" name="atividade_fisica" value="Sim" onchange="toggleDetalheAtividade(true)">
+                                <span>Sim</span>
+                            </label>
+                        </div>
+                        <div id="boxDetalheAtividade" class="conditional-detail" style="display: none;">
+                            <input type="text" id="campoAtividadeDetalhes" class="form-input" placeholder="Qual atividade pratica? (Ex: Caminhada 3x na semana, Musculação)">
+                        </div>
+                    </div>
+
+                    <!-- PERGUNTA 7 -->
+                    <div class="form-group">
+                        <label for="campoOutrasInfos" class="form-label">7- Há alguma outra informação relacionada à sua saúde que você considera importante me informar antes da aula?</label>
+                        <textarea id="campoOutrasInfos" class="form-textarea" placeholder="Descreva aqui qualquer observação adicional relevante para a instrutora..."></textarea>
+                    </div>
+
+                    <button type="submit" id="btnEnviar" class="btn-submit">
+                        <span>Confirmar Minha Inscrição no Pilates</span>
+                    </button>
+                </form>
+
+                <!-- Feedback Visual -->
+                <div id="feedbackBox" class="feedback-box">
+                    <div id="feedbackTitle" class="feedback-title"></div>
+                    <div id="feedbackBody" class="feedback-body"></div>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <footer>
+        Comunidade Cristã Curados &copy; 2026 • Outubro Rosa • Saúde da Mulher
+    </footer>
+
+    <script>
+        function formatarTelefoneInput(input) {
+            let v = input.value.replace(/\D/g, '');
+            if (v.length > 11) v = v.substring(0, 11);
+            if (v.length > 10) {
+                input.value = `(${v.substring(0,2)}) ${v.substring(2,7)}-${v.substring(7)}`;
+            } else if (v.length > 6) {
+                input.value = `(${v.substring(0,2)}) ${v.substring(2,6)}-${v.substring(6)}`;
+            } else if (v.length > 2) {
+                input.value = `(${v.substring(0,2)}) ${v.substring(2)}`;
+            } else if (v.length > 0) {
+                input.value = `(${v}`;
+            }
+        }
+
+        function toggleOutraCondicao(chk) {
+            const box = document.getElementById('boxOutraCondicao');
+            box.style.display = chk.checked ? 'block' : 'none';
+            if (chk.checked) document.getElementById('campoOutraCondicao').focus();
+        }
+
+        function toggleDetalheCirurgia(mostrar) {
+            const box = document.getElementById('boxDetalheCirurgia');
+            box.style.display = mostrar ? 'block' : 'none';
+            if (mostrar) document.getElementById('campoCirurgiaDetalhes').focus();
+        }
+
+        function toggleDetalheLesao(mostrar) {
+            const box = document.getElementById('boxDetalheLesao');
+            box.style.display = mostrar ? 'block' : 'none';
+            if (mostrar) document.getElementById('campoLesaoDetalhes').focus();
+        }
+
+        function toggleDetalheLimitacao(mostrar) {
+            const box = document.getElementById('boxDetalheLimitacao');
+            box.style.display = mostrar ? 'block' : 'none';
+            if (mostrar) document.getElementById('campoLimitacaoDetalhes').focus();
+        }
+
+        function toggleDetalheAtividade(mostrar) {
+            const box = document.getElementById('boxDetalheAtividade');
+            box.style.display = mostrar ? 'block' : 'none';
+            if (mostrar) document.getElementById('campoAtividadeDetalhes').focus();
+        }
+
+        async function realizarInscricaoPilates(ev) {
+            ev.preventDefault();
+
+            const btn = document.getElementById('btnEnviar');
+            const feedback = document.getElementById('feedbackBox');
+            const fTitle = document.getElementById('feedbackTitle');
+            const fBody = document.getElementById('feedbackBody');
+
+            const nome = document.getElementById('campoNome').value.trim();
+            const idade = document.getElementById('campoIdade').value.trim();
+            const telefone = document.getElementById('campoTelefone').value.trim();
+
+            if (!nome || !idade || !telefone) {
+                feedback.className = 'feedback-box error';
+                fTitle.innerHTML = '❌ Dados Incompletos';
+                fBody.innerHTML = 'Por favor, preencha nome completo, idade e telefone de contato.';
+                feedback.style.display = 'block';
+                return;
+            }
+
+            // Coleta das Condições de Saúde
+            const condicoesSelecionadas = [];
+            document.querySelectorAll('input[name="condicao_saude"]:checked').forEach(cb => {
+                condicoesSelecionadas.push(cb.value);
+            });
+            if (document.getElementById('chkOutraCondicao').checked) {
+                const outra = document.getElementById('campoOutraCondicao').value.trim();
+                condicoesSelecionadas.push(outra ? `Outra: ${outra}` : 'Outra');
+            }
+            const condicoesStr = condicoesSelecionadas.length > 0 ? condicoesSelecionadas.join(', ') : 'Nenhuma';
+            const tratamentoMedicamento = document.getElementById('campoMedicamento').value.trim();
+
+            // Perguntas 2 a 7
+            const cirurgia = document.querySelector('input[name="cirurgia"]:checked')?.value || 'Não';
+            const cirurgiaDetalhes = cirurgia === 'Sim' ? document.getElementById('campoCirurgiaDetalhes').value.trim() : '';
+
+            const lesaoDor = document.querySelector('input[name="lesao_dor"]:checked')?.value || 'Não';
+            const lesaoDorDetalhes = lesaoDor === 'Sim' ? document.getElementById('campoLesaoDetalhes').value.trim() : '';
+
+            const limitacao = document.querySelector('input[name="limitacao"]:checked')?.value || 'Não';
+            const limitacaoDetalhes = limitacao === 'Sim' ? document.getElementById('campoLimitacaoDetalhes').value.trim() : '';
+
+            const gravida = document.querySelector('input[name="gravidez"]:checked')?.value || 'Não';
+
+            const atividadeFisica = document.querySelector('input[name="atividade_fisica"]:checked')?.value || 'Não';
+            const atividadeFisicaDetalhes = atividadeFisica === 'Sim' ? document.getElementById('campoAtividadeDetalhes').value.trim() : '';
+
+            const outrasInformacoes = document.getElementById('campoOutrasInfos').value.trim();
+
+            const payload = {
+                nome,
+                idade,
+                telefone,
+                condicoesSaude: condicoesStr,
+                tratamentoMedicamento,
+                cirurgia,
+                cirurgiaDetalhes,
+                lesaoDor,
+                lesaoDorDetalhes,
+                limitacao,
+                limitacaoDetalhes,
+                gravida,
+                atividadeFisica,
+                atividadeFisicaDetalhes,
+                outrasInformacoes
+            };
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳ Enviando sua anamnese...</span>';
+            feedback.style.display = 'none';
+
+            try {
+                const response = await fetch('/saude-mulher/api/inscrever', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.ok) {
+                    feedback.className = 'feedback-box success';
+                    fTitle.innerHTML = '🎉 Inscrição & Anamnese Confirmadas!';
+                    fBody.innerHTML = `Olá, <strong>${nome}</strong>! Sua vaga está garantida para o evento <strong>Saúde da Mulher — Palestra + Aula de Pilates</strong> no dia <strong>31/10 às 15:00</strong>.<br><br>Sua ficha de anamnese foi encaminhada com sucesso para a nossa equipe e instrutora. Aguardamos você com alegria! Venha com roupas confortáveis para a aula.`;
+                    feedback.style.display = 'block';
+                    document.getElementById('formSaudeMulher').reset();
+                    // Recolhe campos condicionais
+                    document.getElementById('boxOutraCondicao').style.display = 'none';
+                    document.getElementById('boxDetalheCirurgia').style.display = 'none';
+                    document.getElementById('boxDetalheLesao').style.display = 'none';
+                    document.getElementById('boxDetalheLimitacao').style.display = 'none';
+                    document.getElementById('boxDetalheAtividade').style.display = 'none';
+                } else {
+                    feedback.className = 'feedback-box error';
+                    fTitle.innerHTML = '❌ Não foi possível concluir';
+                    fBody.innerHTML = data.message || 'Ocorreu um erro ao enviar sua inscrição. Por favor, tente novamente.';
+                    feedback.style.display = 'block';
+                }
+            } catch (err) {
+                feedback.className = 'feedback-box error';
+                fTitle.innerHTML = '❌ Erro de Conexão';
+                fBody.innerHTML = 'Não conseguimos conectar ao servidor. Verifique sua conexão e tente novamente.';
+                feedback.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>Confirmar Minha Inscrição no Pilates</span>';
+            }
+        }
+    </script>
+</body>
+</html>

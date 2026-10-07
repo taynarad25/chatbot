@@ -11,6 +11,7 @@ const { getClientIp } = require("./web/clientIp");
 const cultoMulheres = require("./web/culto_mulheres");
 const cultoMulheresNotificacoes = require("./web/culto_mulheres_notificacoes");
 const diaDasCriancas = require("./web/dia_das_criancas");
+const saudeMulher = require("./web/saude_mulher");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
@@ -38,6 +39,9 @@ const QUEMSOMOS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "quemso
 const MULHERES_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "culto-mulheres.html"))
   ? path.join(__dirname, "public", "culto-mulheres.html")
   : path.join(__dirname, "web", "public", "culto-mulheres.html");
+const SAUDE_MULHER_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "saude-da-mulher.html"))
+  ? path.join(__dirname, "public", "saude-da-mulher.html")
+  : path.join(__dirname, "web", "public", "saude-da-mulher.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -543,6 +547,144 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           }
         } catch (err) {
           console.error('[Dia das Crianças] Erro ao excluir inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
+        }
+      }
+
+      // Rota pública: Saúde da Mulher — Palestra + Pilates (/saude-da-mulher, /saude-mulher, /pilates)
+      if (req.method === 'GET' && (
+        pathname === '/saude-da-mulher' || pathname === '/saude-da-mulher/' || pathname === '/saude-da-mulher.html' ||
+        pathname === '/saude-mulher' || pathname === '/saude-mulher/' || pathname === '/saude-mulher.html' ||
+        pathname === '/pilates' || pathname === '/pilates/' || pathname === '/pilates.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "saude-da-mulher.html"))
+          ? path.join(__dirname, "public", "saude-da-mulher.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "saude-da-mulher.html")) ? path.join(__dirname, "web", "public", "saude-da-mulher.html") : SAUDE_MULHER_HTML_FILE);
+        if (fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // API: Processamento de inscrição e anamnese (/saude-mulher/api/inscrever)
+      if (req.method === 'POST' && (pathname === '/saude-mulher/api/inscrever' || pathname === '/saude-mulher/inscrever')) {
+        try {
+          const body = await parseRequestBody(req);
+          const { nome, idade, telefone } = body || {};
+          if (!nome || !idade || !telefone) {
+            return sendJson(res, 400, { ok: false, message: 'Nome, idade e telefone são obrigatórios.' });
+          }
+
+          const inscricao = saudeMulher.salvarInscricaoSaudeMulher(body);
+
+          // Envia em segundo plano para o Web App do Google Apps Script se configurado
+          saudeMulher.enviarInscricaoPlanilhaSaudeMulher(body)
+            .catch(errSheet => console.warn('[Saúde da Mulher] Aviso ao salvar na planilha:', errSheet.message));
+
+          // Disparo de confirmação amigável no WhatsApp se o bot estiver conectado
+          try {
+            const botClient = typeof getClient === 'function' ? getClient() : null;
+            if (botClient && botClient.info) {
+              const msgZap = saudeMulher.montarMensagemConfirmacaoSaudeMulher(body);
+              const numLimpo = String(telefone).replace(/\D/g, '');
+              const chatId = numLimpo.includes('@') ? numLimpo : `${numLimpo.startsWith('55') ? numLimpo : '55' + numLimpo}@c.us`;
+              botClient.sendMessage(chatId, msgZap)
+                .then(() => saudeMulher.marcarConfirmacaoSaudeMulherEnviada(inscricao.id))
+                .catch(errZap => console.warn('[Saúde da Mulher] Aviso no envio WhatsApp:', errZap.message));
+            }
+          } catch (errDisparo) {
+            console.warn('[Saúde da Mulher] Bot WhatsApp não disponível para confirmação imediata');
+          }
+
+          return sendJson(res, 200, {
+            ok: true,
+            message: 'Inscrição realizada com sucesso!',
+            inscricao
+          });
+        } catch (err) {
+          console.error('[Saúde da Mulher] Erro ao processar inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro interno ao processar inscrição.' });
+        }
+      }
+
+      // API: Listagem de inscritas e estatísticas (/saude-mulher/api/inscritas)
+      if (req.method === 'GET' && pathname === '/saude-mulher/api/inscritas') {
+        try {
+          const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+          const shouldSync = parsedUrl.searchParams.get('sync') === '1' || saudeMulher.listarInscricoesSaudeMulher().length === 0;
+          if (shouldSync && typeof saudeMulher.sincronizarInscricoesComNuvemSaudeMulher === 'function') {
+            await saudeMulher.sincronizarInscricoesComNuvemSaudeMulher().catch(err => {
+              console.warn('[Web] Aviso ao sincronizar com planilha em /saude-mulher/api/inscritas:', err.message);
+            });
+          }
+
+          const inscricoes = saudeMulher.listarInscricoesSaudeMulher();
+          const stats = saudeMulher.obterEstatisticasSaudeMulher();
+          return sendJson(res, 200, { ok: true, inscricoes, stats });
+        } catch (err) {
+          console.error('[Saúde da Mulher] Erro ao listar inscritas:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao listar inscritas.' });
+        }
+      }
+
+      // API: Sincronização manual com a planilha do Google (Secretaria - Saúde da Mulher)
+      if (req.method === 'POST' && pathname === '/saude-mulher/api/sincronizar') {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          const resultado = await saudeMulher.sincronizarInscricoesComNuvemSaudeMulher();
+          return sendJson(res, resultado.ok ? 200 : 500, resultado);
+        } catch (err) {
+          console.error('[Web] Erro ao sincronizar Saúde da Mulher com Google Sheets:', err.message);
+          return sendJson(res, 500, { ok: false, message: err.message });
+        }
+      }
+
+      // API: Relatório / Exportação PDF (/saude-mulher/api/relatorio-pdf, /saude-mulher/relatorio-pdf)
+      if (req.method === 'GET' && (pathname === '/saude-mulher/api/relatorio-pdf' || pathname === '/saude-mulher/relatorio-pdf')) {
+        try {
+          const html = saudeMulher.renderSaudeMulherPdfHtml();
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+          });
+          return res.end(html);
+        } catch (errPdf) {
+          console.error('[Saúde da Mulher] Erro ao gerar PDF:', errPdf);
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          return res.end('Erro ao gerar relatório PDF.');
+        }
+      }
+
+      // API: Excluir inscrição (/saude-mulher/api/excluir-inscricao ou DELETE /saude-mulher/api/inscricoes/:id)
+      if ((req.method === 'POST' && pathname === '/saude-mulher/api/excluir-inscricao') ||
+          (req.method === 'DELETE' && pathname.startsWith('/saude-mulher/api/inscricoes/'))) {
+        try {
+          let termo = null;
+          if (req.method === 'DELETE') {
+            termo = decodeURIComponent(pathname.replace('/saude-mulher/api/inscricoes/', ''));
+          } else {
+            const body = await parseRequestBody(req);
+            termo = body?.id;
+          }
+          if (!termo) {
+            return sendJson(res, 400, { ok: false, message: 'ID da inscrição não informado.' });
+          }
+          const removido = saudeMulher.excluirInscricaoSaudeMulher(termo);
+          if (removido) {
+            return sendJson(res, 200, { ok: true, message: 'Inscrição removida com sucesso.' });
+          } else {
+            return sendJson(res, 404, { ok: false, message: 'Inscrição não encontrada.' });
+          }
+        } catch (err) {
+          console.error('[Saúde da Mulher] Erro ao excluir inscrição:', err);
           return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
         }
       }

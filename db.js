@@ -162,6 +162,32 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_criancas_telefone ON criancas_inscricoes(telefone);
   CREATE INDEX IF NOT EXISTS idx_criancas_nome ON criancas_inscricoes(nomeCrianca);
 
+  CREATE TABLE IF NOT EXISTS saude_mulher_inscricoes (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    idade TEXT,
+    telefone TEXT NOT NULL,
+    condicoesSaude TEXT,
+    tratamentoMedicamento TEXT,
+    cirurgia TEXT,
+    cirurgiaDetalhes TEXT,
+    lesaoDor TEXT,
+    lesaoDorDetalhes TEXT,
+    limitacao TEXT,
+    limitacaoDetalhes TEXT,
+    gravida TEXT,
+    atividadeFisica TEXT,
+    atividadeFisicaDetalhes TEXT,
+    outrasInformacoes TEXT,
+    evento TEXT NOT NULL DEFAULT 'Saúde da Mulher — Pilates',
+    dataEvento TEXT NOT NULL DEFAULT '2026-10-31 15:00',
+    whatsappConfirmacaoEnviado INTEGER NOT NULL DEFAULT 0,
+    criadoEm TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_saude_mulher_telefone ON saude_mulher_inscricoes(telefone);
+  CREATE INDEX IF NOT EXISTS idx_saude_mulher_nome ON saude_mulher_inscricoes(nome);
+
   CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,

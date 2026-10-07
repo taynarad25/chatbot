@@ -1488,6 +1488,92 @@ function renderIndexHtml() {
           </div>
         </div>
       </div>
+
+      <!-- Card do Evento Saúde da Mulher — Palestra + Pilates -->
+      <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(225, 29, 72, 0.45); background: linear-gradient(135deg, rgba(225, 29, 72, 0.12), rgba(219, 39, 119, 0.06));">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(225, 29, 72, 0.2); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
+              🎀 Outubro Rosa • Saúde da Mulher
+            </div>
+            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Saúde da Mulher — Palestra + Pilates (Anamnese)</h4>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
+              🗓️ <strong>31/10/2026 às 15:00</strong> &nbsp;•&nbsp; 📍 <strong>Comunidade Cristã Curados (Templo Principal)</strong> &nbsp;•&nbsp; <em>Ficha de Anamnese Obrigatória</em>
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn-gaveta-toggle" id="btnToggleSaudeMulher" onclick="toggleGavetaEvento('saude_mulher')" title="Recolher ou expandir inscrições (engavetar)">
+              <span class="gaveta-toggle-text">Recolher</span>
+              <span class="gaveta-arrow" id="arrow-saude_mulher">▲</span>
+            </button>
+            <button onclick="sincronizarComPlanilhaSaudeMulher()" id="btnSyncPlanilhaSaudeMulher" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
+              🔄 Puxar da Planilha
+            </button>
+            <button onclick="window.open('/saude-da-mulher', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver formulário e anamnese pública">
+              🔗 Abrir Formulário
+            </button>
+            <button onclick="window.open('/saude-mulher/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #e11d48, #be123c); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(225, 29, 72, 0.35);">
+              📄 Exportar Lista (PDF)
+            </button>
+            <button onclick="fetchSaudeMulherInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+              🔄 Atualizar
+            </button>
+          </div>
+        </div>
+
+        <div class="evento-gaveta-body" id="gaveta-saude_mulher">
+          <div class="evento-metric-grid" id="saudeMulherMetrics">
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="saudeMulherTotal" style="color: #fda4af;">-</div>
+              <div class="evento-metric-lbl">Total de Alunas</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="saudeMulherComCondicao" style="color: #fb7185;">-</div>
+              <div class="evento-metric-lbl">Condição de Saúde</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="saudeMulherComLesao" style="color: #f43f5e;">-</div>
+              <div class="evento-metric-lbl">Dores / Lesões</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="saudeMulherGestantes" style="color: #f472b6;">-</div>
+              <div class="evento-metric-lbl">Gestantes</div>
+            </div>
+          </div>
+
+          <!-- Barra de Filtros e Busca de Saúde da Mulher -->
+          <div class="evento-toolbar" style="margin-top: 1.2rem;">
+            <input type="text" id="saudeMulherSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por aluna, telefone, condição de saúde, lesão ou cirurgia..." oninput="filtrarSaudeMulherInscricoes()" />
+          </div>
+
+          <!-- Tabela de Inscritas com Respostas de Anamnese -->
+          <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto; margin-bottom: 0.5rem;">
+            <table class="evento-table">
+              <thead>
+                <tr>
+                  <th style="width: 45px; text-align: center;">Nº</th>
+                  <th>Nome da Aluna</th>
+                  <th style="width: 60px; text-align: center;">Idade</th>
+                  <th>Telefone / WhatsApp</th>
+                  <th>Condições de Saúde / Medicamentos</th>
+                  <th>Cirurgia</th>
+                  <th>Lesões / Dores</th>
+                  <th>Limitações</th>
+                  <th style="width: 75px; text-align: center;">Gestante</th>
+                  <th>Atividade Física</th>
+                  <th>Observações</th>
+                  <th style="width: 100px; text-align: center;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="saudeMulherTbodyInscritos">
+                <tr>
+                  <td colspan="12" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando alunas inscritas...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="tab-admin" class="tab-content">
@@ -1591,7 +1677,7 @@ function renderIndexHtml() {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(name).classList.add('active');
       evt.currentTarget.classList.add('active');
-      if(name === 'tab-eventos') { fetchMulheresInscricoes(); fetchEventosCadastrados(); }
+      if(name === 'tab-eventos') { fetchMulheresInscricoes(); fetchCriancasInscricoes(); fetchSaudeMulherInscricoes(); fetchEventosCadastrados(); }
       if(name === 'tab-admin') fetchUsers();
       if(name === 'tab-lideres') fetchLideres();
     }
@@ -1937,6 +2023,7 @@ function renderIndexHtml() {
     function getBtnGaveta(nomeEvento) {
       if (nomeEvento === 'criancas') return document.getElementById('btnToggleCriancas');
       if (nomeEvento === 'theChosen') return document.getElementById('btnToggleTheChosen');
+      if (nomeEvento === 'saude_mulher') return document.getElementById('btnToggleSaudeMulher');
       return document.getElementById('btnToggleMulheres');
     }
 
@@ -1965,7 +2052,7 @@ function renderIndexHtml() {
     }
 
     function restaurarEstadoGavetas() {
-      ['criancas', 'mulheres'].forEach(nomeEvento => {
+      ['criancas', 'mulheres', 'saude_mulher'].forEach(nomeEvento => {
         const salvo = localStorage.getItem('gaveta_' + nomeEvento);
         if (salvo === 'fechada') {
           const gaveta = document.getElementById('gaveta-' + nomeEvento);
@@ -2208,6 +2295,149 @@ function renderIndexHtml() {
       } catch (err) {
         console.error('Erro ao excluir inscrição de mulher:', err);
         alert('Erro ao conectar com o servidor.');
+      }
+    }
+
+    /* =========================================================================
+       FRONTEND: Saúde da Mulher — Pilates (Anamnese)
+       ========================================================================= */
+    let saudeMulherInscricoesCache = [];
+
+    async function fetchSaudeMulherInscricoes() {
+      try {
+        const res = await fetch('/saude-mulher/api/inscritas');
+        if (res.status === 401) { window.location.href = '/secretaria/login'; return; }
+        if (!res.ok) return;
+        const data = await res.json();
+        saudeMulherInscricoesCache = data.inscricoes || [];
+
+        const stats = data.stats || {};
+        const elTotal = document.getElementById('saudeMulherTotal');
+        const elCond = document.getElementById('saudeMulherComCondicao');
+        const elLesao = document.getElementById('saudeMulherComLesao');
+        const elGest = document.getElementById('saudeMulherGestantes');
+
+        if (elTotal) elTotal.textContent = stats.total !== undefined ? stats.total : saudeMulherInscricoesCache.length;
+        if (elCond) elCond.textContent = stats.comCondicaoSaude || 0;
+        if (elLesao) elLesao.textContent = stats.comLesaoDor || 0;
+        if (elGest) elGest.textContent = stats.gestantes || 0;
+
+        filtrarSaudeMulherInscricoes();
+      } catch (err) {
+        console.error('Erro ao buscar inscritas de Saúde da Mulher / Pilates:', err);
+      }
+    }
+
+    function filtrarSaudeMulherInscricoes() {
+      const termo = (document.getElementById('saudeMulherSearchInput')?.value || '').toLowerCase().trim();
+      const filtrados = saudeMulherInscricoesCache.filter(item => {
+        if (!termo) return true;
+        const nomeStr = (item.nome || '').toLowerCase();
+        const telStr = (item.telefone || '').toLowerCase();
+        const condStr = (item.condicoesSaude || '').toLowerCase();
+        const cirurgStr = (item.cirurgiaDetalhes || '').toLowerCase();
+        const lesaoStr = (item.lesaoDorDetalhes || '').toLowerCase();
+        return nomeStr.includes(termo) || telStr.includes(termo) || condStr.includes(termo) || cirurgStr.includes(termo) || lesaoStr.includes(termo);
+      });
+      renderSaudeMulherTable(filtrados);
+    }
+
+    function renderSaudeMulherTable(lista) {
+      const tbody = document.getElementById('saudeMulherTbodyInscritos');
+      if (!tbody) return;
+
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Nenhuma aluna inscrita encontrada.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map((item, idx) => {
+        const telFormatado = item.telefone ? item.telefone.replace(/^(\\d{2})(\\d{4,5})(\\d{4})$/, '($1) $2-$3') : '-';
+        const condicoes = item.condicoesSaude ? '<strong style="color: #fb7185;">' + item.condicoesSaude + '</strong>' : '<span style="color: var(--cor-texto-mutado);">Nenhuma</span>';
+        const tratamento = item.tratamentoMedicamento ? '<br><small style="color: #fda4af;">Med: ' + item.tratamentoMedicamento + '</small>' : '';
+        const cirurgia = (item.cirurgia === 'Sim' || item.cirurgiaDetalhes)
+          ? '<span style="color: #f87171; font-weight: 600;">Sim</span>' + (item.cirurgiaDetalhes ? ': <small>' + item.cirurgiaDetalhes + '</small>' : '')
+          : '<span style="color: var(--cor-texto-mutado);">Não</span>';
+        const lesao = (item.lesaoDor === 'Sim' || item.lesaoDorDetalhes)
+          ? '<span style="color: #f87171; font-weight: 600;">Sim</span>' + (item.lesaoDorDetalhes ? ': <small>' + item.lesaoDorDetalhes + '</small>' : '')
+          : '<span style="color: var(--cor-texto-mutado);">Não</span>';
+        const limitacao = (item.limitacao === 'Sim' || item.limitacaoDetalhes)
+          ? '<span style="color: #fb923c; font-weight: 600;">Sim</span>' + (item.limitacaoDetalhes ? ': <small>' + item.limitacaoDetalhes + '</small>' : '')
+          : '<span style="color: var(--cor-texto-mutado);">Não</span>';
+        const gravida = item.gravida === 'Sim'
+          ? '<span style="background: rgba(244, 63, 94, 0.2); color: #fda4af; font-weight: bold; padding: 2px 6px; border-radius: 4px;">🤰 Sim</span>'
+          : '<span style="color: var(--cor-texto-mutado);">Não</span>';
+        const atividade = item.atividadeFisica === 'Sim'
+          ? '<span style="color: #4ade80; font-weight: 600;">Sim</span>' + (item.atividadeFisicaDetalhes ? ': <small>' + item.atividadeFisicaDetalhes + '</small>' : '')
+          : '<span style="color: var(--cor-texto-mutado);">Não</span>';
+
+        return '<tr>' +
+          '<td style="text-align: center; font-weight: bold; color: var(--cor-texto-mutado);">' + (idx + 1) + '</td>' +
+          '<td><strong style="color: #fff; font-size: 0.95rem;">' + (item.nome || '-') + '</strong></td>' +
+          '<td style="text-align: center; font-size: 0.88rem; color: #fda4af; font-weight: 600;">' + (item.idade || '-') + '</td>' +
+          '<td style="font-size: 0.88rem;">' + telFormatado + '</td>' +
+          '<td style="font-size: 0.85rem;">' + condicoes + tratamento + '</td>' +
+          '<td style="font-size: 0.85rem;">' + cirurgia + '</td>' +
+          '<td style="font-size: 0.85rem;">' + lesao + '</td>' +
+          '<td style="font-size: 0.85rem;">' + limitacao + '</td>' +
+          '<td style="text-align: center;">' + gravida + '</td>' +
+          '<td style="font-size: 0.85rem;">' + atividade + '</td>' +
+          '<td style="font-size: 0.85rem; color: #e2e8f0;">' + (item.outrasInformacoes || '<span style="color: var(--cor-texto-mutado);">-</span>') + '</td>' +
+          '<td style="text-align: center;">' +
+            '<button data-id="' + (item.id || '') + '" data-nome="' + (item.nome || '').replace(/"/g, '&quot;') + '" onclick="excluirSaudeMulherInscricao(this.dataset.id, this.dataset.nome)" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">' +
+              '🗑️ Excluir' +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    async function excluirSaudeMulherInscricao(id, nome) {
+      if (!id) return;
+      const confirmou = confirm('Tem certeza que deseja excluir a inscrição de "' + (nome || 'Aluna') + '"?');
+      if (!confirmou) return;
+
+      try {
+        const res = await fetch('/saude-mulher/api/excluir-inscricao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          fetchSaudeMulherInscricoes();
+        } else {
+          alert(data.message || 'Erro ao excluir inscrição.');
+        }
+      } catch (err) {
+        console.error('Erro ao excluir inscrição de Pilates:', err);
+        alert('Erro ao conectar com o servidor.');
+      }
+    }
+
+    async function sincronizarComPlanilhaSaudeMulher() {
+      const btn = document.getElementById('btnSyncPlanilhaSaudeMulher');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Sincronizando...';
+      }
+      try {
+        const res = await fetch('/saude-mulher/api/sincronizar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          alert('✅ Sincronização concluída com sucesso!\\n' + (data.message || (data.total || 0) + ' inscrições'));
+          await fetchSaudeMulherInscricoes();
+        } else {
+          alert('⚠️ Aviso ao sincronizar: ' + (data.message || 'Verifique se a planilha está configurada.'));
+        }
+      } catch (err) {
+        alert('Erro ao sincronizar com a planilha: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText || '🔄 Puxar da Planilha';
+        }
       }
     }
 
@@ -2866,6 +3096,7 @@ function renderIndexHtml() {
     fetchEventosCadastrados();
     fetchCriancasInscricoes();
     fetchMulheresInscricoes();
+    fetchSaudeMulherInscricoes();
     restaurarEstadoGavetas();
   </script>
 </body></html>`;
