@@ -195,6 +195,29 @@ function ehEnsaio(ev) {
   return titulo.includes("ensaio");
 }
 
+function ehEnsaioEpifania(ev) {
+  if (!ev) return false;
+  const titulo = (ev.summary || "").toLowerCase();
+  const desc = (ev.description || "").toLowerCase();
+  const calId = (ev.calendarId || "").toLowerCase();
+  const depto = (ev.departamento || "").toLowerCase();
+
+  const ehDeEnsaio = ehEnsaio(ev) || titulo.includes("ensaio") || desc.includes("ensaio");
+  if (!ehDeEnsaio) return false;
+
+  // Ensaios ligados ao ministério de louvor Epifania (já são regra fixa da igreja)
+  const ehEpifania =
+    titulo.includes("epifania") ||
+    desc.includes("epifania") ||
+    depto.includes("epifania") ||
+    calId.includes("epifania") ||
+    titulo.includes("louvor") ||
+    desc.includes("louvor") ||
+    depto.includes("louvor");
+
+  return ehEpifania;
+}
+
 function ehReuniao(ev) {
   if (!ev) return false;
   if (ev.calendarId === ID_AGENDA_REUNIOES) return true;
@@ -1063,8 +1086,15 @@ function montarMensagemAgendaQuinzenalSecretarias(eventos = [], dataInicio = "",
     ? unificarEventosPreparacaoLimpeza(eventos)
     : eventos;
 
+  // Ensaios do Epifania já são regra fixa e não precisam aparecer na agenda quinzenal das secretárias
+  const eventosFiltrados = eventosTratados.filter((ev) => !ehEnsaioEpifania(ev));
+
+  if (eventosFiltrados.length === 0) {
+    return cabecalho + `_Nenhum evento agendado para as próximas duas semanas._ 🙏`;
+  }
+
   // Ordena cronologicamente
-  const ordenados = [...eventosTratados].sort((a, b) => {
+  const ordenados = [...eventosFiltrados].sort((a, b) => {
     const timeA = new Date(a.start?.dateTime || a.start?.date || 0).getTime();
     const timeB = new Date(b.start?.dateTime || b.start?.date || 0).getTime();
     return timeA - timeB;
@@ -1818,6 +1848,7 @@ module.exports = {
   montarMensagemAniversario,
   montarMensagemItensADefinir,
   ehEnsaio,
+  ehEnsaioEpifania,
   ehReuniao,
   ehAtendimentoPastoral,
   buscarLembreteEnviado,

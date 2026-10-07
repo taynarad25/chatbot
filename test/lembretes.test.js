@@ -16,6 +16,7 @@ const {
   montarMensagemConfirmacaoReuniao,
   montarMensagemAgendaQuinzenalSecretarias,
   ehEnsaio,
+  ehEnsaioEpifania,
   ehReuniao,
   ehAtendimentoPastoral,
   formatarDataBrasil,
@@ -919,6 +920,50 @@ test("montarMensagemAgendaQuinzenalSecretarias: unifica horários de preparaçã
   assert.match(msg, /horário para preparação e limpeza/);
   // Não deve aparecer itens avulsos repetidos
   assert.doesNotMatch(msg, /• \*\[Preparação\/Decoração\]/);
+});
+
+test("montarMensagemAgendaQuinzenalSecretarias: não inclui ensaios da Epifania (já é regra fixa)", () => {
+  const eventos = [
+    {
+      summary: "Culto de Celebração",
+      start: { dateTime: "2026-09-27T18:00:00-03:00" },
+      location: "Templo Principal",
+    },
+    {
+      summary: "Ensaio Geral da Epifania",
+      start: { dateTime: "2026-09-24T20:00:00-03:00" },
+      location: "Templo",
+    },
+    {
+      summary: "Ensaio Louvor Epifania",
+      start: { dateTime: "2026-09-26T16:00:00-03:00" },
+    },
+    {
+      summary: "Ensaio de Louvor",
+      departamento: "Epifania",
+      start: { dateTime: "2026-09-29T20:00:00-03:00" },
+    },
+    {
+      summary: "Reunião de Líderes",
+      start: { dateTime: "2026-09-28T19:30:00-03:00" },
+      location: "Sala de Reuniões",
+    },
+  ];
+
+  assert.equal(ehEnsaioEpifania({ summary: "Ensaio Geral da Epifania" }), true);
+  assert.equal(ehEnsaioEpifania({ summary: "Ensaio de Louvor", departamento: "Epifania" }), true);
+  assert.equal(ehEnsaioEpifania({ summary: "Culto de Domingo" }), false);
+
+  const msg = montarMensagemAgendaQuinzenalSecretarias(eventos, "2026-09-21", "2026-10-05");
+
+  // Deve incluir os cultos e reuniões normais
+  assert.match(msg, /Culto de Celebração/);
+  assert.match(msg, /Reunião de Líderes/);
+
+  // NÃO deve incluir ensaios do ministério Epifania
+  assert.doesNotMatch(msg, /Ensaio Geral da Epifania/);
+  assert.doesNotMatch(msg, /Ensaio Louvor Epifania/);
+  assert.doesNotMatch(msg, /Ensaio de Louvor/);
 });
 
 test("processarEnvioAgendaSecretarias: envia na segunda-feira para Isabelly e Gabriela e previne reenvio", async () => {

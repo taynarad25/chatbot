@@ -9,11 +9,11 @@ try {
 
 const URL_WEBAPP_SAUDE_MULHER_PADRAO =
   process.env.SAUDE_MULHER_WEBAPP_URL ||
-  'https://script.google.com/macros/s/AKfycbwdSkqBBsMYBVngZtzwfXSry3aJQSJZxSOejmXVizq_m0JKeuMih6J8_tiR4k_0fd68Pg/exec';
+  'https://script.google.com/macros/s/AKfycbw989dW9XDJVYU2VJHi1moFcDyxvwHoX1CeBU7vK0ni9wI1HoYd9JaTQ5wJeSuZ1jwN/exec';
 
 let metadataPlanilhaSaudeMulher = {
-  spreadsheetId: process.env.SAUDE_MULHER_SPREADSHEET_ID || '',
-  spreadsheetUrl: process.env.SAUDE_MULHER_SPREADSHEET_URL || '',
+  spreadsheetId: process.env.SAUDE_MULHER_SPREADSHEET_ID || '1YpwxerkKjdkYieBpLIw_KTEFeveHe_yPBxObrcUA24Y',
+  spreadsheetUrl: process.env.SAUDE_MULHER_SPREADSHEET_URL || 'https://docs.google.com/spreadsheets/d/1YpwxerkKjdkYieBpLIw_KTEFeveHe_yPBxObrcUA24Y/edit?usp=sharing',
   pdfUrl: process.env.SAUDE_MULHER_PDF_URL || '',
 };
 
