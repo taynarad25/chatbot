@@ -1512,7 +1512,7 @@ function renderIndexHtml() {
             <button onclick="window.open('/saude-da-mulher', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver formulário e anamnese pública">
               🔗 Abrir Formulário
             </button>
-            <button onclick="window.open('https://docs.google.com/spreadsheets/d/1YpwxerkKjdkYieBpLIw_KTEFeveHe_yPBxObrcUA24Y/edit?usp=sharing', '_blank')" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Abrir planilha no Google Sheets">
+            <button onclick="window.open('https://docs.google.com/spreadsheets/d/1UzaEVYBZe7NDosUtRS5aT-QJkNFoFu5PJCjicnE5_lg/edit?usp=sharing', '_blank')" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Abrir planilha no Google Sheets">
               📊 Planilha Google
             </button>
             <button onclick="window.open('/saude-mulher/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #e11d48, #be123c); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(225, 29, 72, 0.35);">
