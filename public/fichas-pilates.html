@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fichas de Anamnese — Saúde da Mulher & Pilates | Comunidade Cristã Curados</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/logo.png">
+    <style>
+        :root {
+            --cor-primaria: #be185d;
+            --cor-primaria-hover: #9d174d;
+            --cor-primaria-clara: #f43f5e;
+            --cor-fundo-profundo: #0d060a;
+            --cor-fundo-card: rgba(26, 15, 22, 0.85);
+            --cor-fundo-card-hover: rgba(38, 20, 31, 0.95);
+            --cor-borda: rgba(244, 63, 94, 0.22);
+            --cor-borda-hover: rgba(244, 63, 94, 0.45);
+            --cor-texto: #fce7f3;
+            --cor-texto-mutado: #fbcfe8;
+            --cor-texto-suave: #fda4af;
+            --cor-sucesso: #10b981;
+            --cor-alerta: #f59e0b;
+            --cor-perigo: #ef4444;
+            --cor-rosa-neon: #ec4899;
+            --sombra-card: 0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(190, 24, 93, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        body {
+            background-color: var(--cor-fundo-profundo);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(190, 24, 93, 0.18) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(244, 63, 94, 0.14) 0%, transparent 45%),
+                radial-gradient(circle at 50% 50%, rgba(136, 19, 55, 0.1) 0%, transparent 60%);
+            background-attachment: fixed;
+            color: var(--cor-texto);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        /* CABEÇALHO */
+        header {
+            background: rgba(18, 10, 15, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--cor-borda);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            padding: 1rem 1.5rem;
+        }
+
+        .header-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .logo-badge {
+            background: linear-gradient(135deg, #be185d, #e11d48);
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            box-shadow: 0 4px 14px rgba(190, 24, 93, 0.4);
+        }
+
+        .logo-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-sub {
+            font-size: 0.76rem;
+            color: var(--cor-texto-suave);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #be185d, #9d174d);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(190, 24, 93, 0.3);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #db2777, #be185d);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--cor-texto);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* CONTAINER PRINCIPAL */
+        main {
+            flex: 1;
+            max-width: 1280px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        /* BANNER DO EVENTO */
+        .event-banner {
+            background: linear-gradient(135deg, rgba(80, 10, 36, 0.7), rgba(40, 10, 22, 0.85));
+            border: 1px solid var(--cor-borda);
+            border-radius: 18px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            box-shadow: var(--sombra-card);
+        }
+
+        .event-details h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.55rem;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .event-details p {
+            font-size: 0.88rem;
+            color: var(--cor-texto-mutado);
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .event-details span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* CARDS DE ESTATÍSTICAS */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--cor-fundo-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 14px;
+            padding: 1rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .stat-card:hover, .stat-card.active {
+            border-color: var(--cor-primaria-clara);
+            background: var(--cor-fundo-card-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(190, 24, 93, 0.2);
+        }
+
+        .stat-num {
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.1;
+        }
+
+        .stat-lbl {
+            font-size: 0.76rem;
+            color: var(--cor-texto-suave);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        /* BARRA DE BUSCA E FILTROS */
+        .controls-bar {
+            background: var(--cor-fundo-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 16px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(13, 6, 10, 0.7);
+            border: 1px solid rgba(244, 63, 94, 0.25);
+            border-radius: 12px;
+            padding: 12px 16px 12px 42px;
+            color: #fff;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .search-input:focus {
+            border-color: var(--cor-primaria-clara);
+            box-shadow: 0 0 0 3px rgba(190, 24, 93, 0.2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.1rem;
+            color: var(--cor-texto-suave);
+            pointer-events: none;
+        }
+
+        .filters-row {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            scrollbar-width: thin;
+        }
+
+        .filter-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--cor-texto-mutado);
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+        .filter-btn.active {
+            background: var(--cor-primaria);
+            border-color: var(--cor-primaria-clara);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(190, 24, 93, 0.4);
+        }
+
+        /* GRID DE FICHAS DE ANAMNESE */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 1.25rem;
+        }
+
+        /* CARD INDIVIDUAL DA ALUNA */
+        .anamnese-card {
+            background: var(--cor-fundo-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 18px;
+            padding: 1.35rem;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            position: relative;
+            box-shadow: var(--sombra-card);
+            transition: all 0.25s ease;
+        }
+        .anamnese-card:hover {
+            border-color: var(--cor-borda-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 34px -5px rgba(0, 0, 0, 0.7), 0 0 20px rgba(190, 24, 93, 0.2);
+        }
+
+        /* Alerta de dor ou gestação no card */
+        .anamnese-card.has-pain {
+            border-left: 4px solid #ef4444;
+        }
+        .anamnese-card.is-pregnant {
+            border-left: 4px solid #ec4899;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            border-bottom: 1px solid rgba(244, 63, 94, 0.14);
+            padding-bottom: 10px;
+        }
+
+        .student-title {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .student-num {
+            font-size: 0.72rem;
+            color: var(--cor-texto-suave);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .student-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1.2;
+        }
+
+        .student-meta {
+            font-size: 0.82rem;
+            color: var(--cor-texto-mutado);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 2px;
+        }
+
+        .badge-age {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+
+        .btn-whatsapp {
+            background: rgba(37, 211, 102, 0.16);
+            color: #86efac;
+            border: 1px solid rgba(37, 211, 102, 0.35);
+            padding: 6px 11px;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .btn-whatsapp:hover {
+            background: #25d366;
+            color: #000;
+            transform: scale(1.02);
+        }
+
+        /* BADGES DE SAÚDE */
+        .health-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .health-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fde68a;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .badge-pregnant {
+            background: rgba(236, 72, 153, 0.25);
+            color: #fbcfe8;
+            border: 1px solid rgba(236, 72, 153, 0.5);
+            box-shadow: 0 0 10px rgba(236, 72, 153, 0.25);
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.18);
+            color: #a7f3d0;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-neutral {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--cor-texto-mutado);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        /* SEÇÕES DA ANAMNESE */
+        .anamnese-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-size: 0.85rem;
+        }
+
+        .anamnese-item {
+            background: rgba(13, 6, 10, 0.55);
+            border: 1px solid rgba(244, 63, 94, 0.12);
+            border-radius: 10px;
+            padding: 9px 12px;
+        }
+
+        .item-label {
+            font-size: 0.72rem;
+            color: var(--cor-texto-suave);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 700;
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .item-value {
+            color: #fff;
+            font-weight: 500;
+            line-height: 1.35;
+        }
+
+        .item-value.highlight-alert {
+            color: #fca5a5;
+            font-weight: 700;
+        }
+
+        .item-value.highlight-ok {
+            color: #9ca3af;
+        }
+
+        /* CARD FOOTER */
+        .card-footer {
+            margin-top: auto;
+            border-top: 1px solid rgba(244, 63, 94, 0.1);
+            padding-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.72rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        .btn-copy-card {
+            background: none;
+            border: none;
+            color: var(--cor-texto-suave);
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .btn-copy-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        /* ESTADO VAZIO / CARREGANDO */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 4rem 1rem;
+            background: var(--cor-fundo-card);
+            border: 1px dashed var(--cor-borda);
+            border-radius: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 1.25rem;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .empty-state p {
+            color: var(--cor-texto-mutado);
+            font-size: 0.88rem;
+        }
+
+        /* RODAPÉ */
+        footer {
+            border-top: 1px solid var(--cor-borda);
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--cor-texto-mutado);
+            background: rgba(13, 6, 10, 0.9);
+            margin-top: 2rem;
+        }
+
+        /* ESTILOS DE IMPRESSÃO */
+        @media print {
+            body {
+                background: #fff !important;
+                color: #000 !important;
+            }
+            header, .controls-bar, .header-actions, .btn-whatsapp, .btn-copy-card, footer {
+                display: none !important;
+            }
+            .event-banner {
+                background: #fdf2f8 !important;
+                border: 1px solid #f43f5e !important;
+                color: #000 !important;
+            }
+            .event-details h1, .event-details p {
+                color: #000 !important;
+            }
+            .cards-grid {
+                display: block !important;
+            }
+            .anamnese-card {
+                background: #fff !important;
+                border: 1px solid #cbd5e1 !important;
+                color: #000 !important;
+                break-inside: avoid;
+                margin-bottom: 12px !important;
+                box-shadow: none !important;
+            }
+            .student-name, .item-value {
+                color: #000 !important;
+            }
+            .anamnese-item {
+                background: #f8fafc !important;
+                border: 1px solid #e2e8f0 !important;
+            }
+            .item-label {
+                color: #475569 !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+            .header-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .event-banner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CABEÇALHO -->
+    <header>
+        <div class="header-container">
+            <a href="/saude-da-mulher" class="logo-area">
+                <div class="logo-badge">🧘‍♀️</div>
+                <div>
+                    <div class="logo-title">Saúde da Mulher & Pilates</div>
+                    <div class="logo-sub">Comunidade Cristã Curados • Outubro Rosa</div>
+                </div>
+            </a>
+            <div class="header-actions">
+                <button onclick="window.print()" class="btn-action btn-secondary" title="Imprimir fichas em folha A4">
+                    🖨️ Imprimir Fichas
+                </button>
+                <button onclick="copiarLinkCompartilhamento()" class="btn-action btn-secondary" title="Copiar link para a Professora ou Líder">
+                    📋 Copiar Link
+                </button>
+                <a href="/saude-mulher/api/relatorio-pdf" target="_blank" class="btn-action btn-primary" title="Exportar tabela oficial em PDF">
+                    📄 Exportar PDF
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main>
+        <!-- BANNER DE IDENTIFICAÇÃO DO EVENTO -->
+        <section class="event-banner">
+            <div class="event-details">
+                <h1>Fichas Individuais de Anamnese</h1>
+                <p>
+                    <span>📅 <strong>31 de Outubro de 2026 às 15:00</strong></span>
+                    <span>📍 <strong>Templo Principal — Comunidade Cristã Curados</strong></span>
+                    <span>👩‍🏫 <strong>Professora de Pilates & Liderança da Mulher</strong></span>
+                </p>
+            </div>
+            <div>
+                <button onclick="carregarInscricoes(true)" class="btn-action btn-secondary" id="btnRecarregar">
+                    🔄 Atualizar Dados
+                </button>
+            </div>
+        </section>
+
+        <!-- CARDS DE ESTATÍSTICAS E ALERTAS MÉDICOS -->
+        <section class="stats-grid" id="statsGrid">
+            <div class="stat-card active" onclick="aplicarFiltroRapido('todas', this)">
+                <div class="stat-num" id="statTotal" style="color: #fda4af;">-</div>
+                <div class="stat-lbl">Total de Alunas</div>
+            </div>
+            <div class="stat-card" onclick="aplicarFiltroRapido('dor', this)">
+                <div class="stat-num" id="statDores" style="color: #f87171;">-</div>
+                <div class="stat-lbl">⚡ Dores / Lesões</div>
+            </div>
+            <div class="stat-card" onclick="aplicarFiltroRapido('gestante', this)">
+                <div class="stat-num" id="statGestantes" style="color: #f472b6;">-</div>
+                <div class="stat-lbl">🤰 Gestantes</div>
+            </div>
+            <div class="stat-card" onclick="aplicarFiltroRapido('cirurgia', this)">
+                <div class="stat-num" id="statCirurgias" style="color: #fb923c;">-</div>
+                <div class="stat-lbl">🩹 Com Cirurgias</div>
+            </div>
+            <div class="stat-card" onclick="aplicarFiltroRapido('condicao', this)">
+                <div class="stat-num" id="statCondicoes" style="color: #fcd34d;">-</div>
+                <div class="stat-lbl">🩺 Condição de Saúde</div>
+            </div>
+            <div class="stat-card" onclick="aplicarFiltroRapido('ativa', this)">
+                <div class="stat-num" id="statAtivas" style="color: #6ee7b7;">-</div>
+                <div class="stat-lbl">🏃 Praticam Atividade</div>
+            </div>
+        </section>
+
+        <!-- BARRA DE CONTROLE: PESQUISA E FILTROS -->
+        <section class="controls-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="campoBusca" class="search-input" placeholder="Buscar por aluna, telefone, dor, cirurgia, condição médica..." oninput="filtrarAlunas()">
+            </div>
+            <div class="filters-row">
+                <button class="filter-btn active" onclick="aplicarFiltroRapido('todas', this)">Todas as Alunas (<span id="contTodas">-</span>)</button>
+                <button class="filter-btn" onclick="aplicarFiltroRapido('dor', this)">⚡ Com Dores ou Lesões (<span id="contDores">-</span>)</button>
+                <button class="filter-btn" onclick="aplicarFiltroRapido('gestante', this)">🤰 Gestantes (<span id="contGestantes">-</span>)</button>
+                <button class="filter-btn" onclick="aplicarFiltroRapido('cirurgia', this)">🩹 Com Cirurgia (<span id="contCirurgias">-</span>)</button>
+                <button class="filter-btn" onclick="aplicarFiltroRapido('condicao', this)">🩺 Condições Crônicas (<span id="contCondicoes">-</span>)</button>
+                <button class="filter-btn" onclick="aplicarFiltroRapido('limitacao', this)">⚠️ Com Limitação (<span id="contLimitacoes">-</span>)</button>
+                <button class="filter-btn" onclick="aplicarFiltroRapido('ativa', this)">🏃 Fazem Atividade (<span id="contAtivas">-</span>)</button>
+            </div>
+        </section>
+
+        <!-- CONTAINER DOS CARDS DE FICHAS -->
+        <section class="cards-grid" id="containerCards">
+            <div class="empty-state">
+                <h3>Carregando fichas de anamnese...</h3>
+                <p>Buscando respostas das alunas inscritas...</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- RODAPÉ -->
+    <footer>
+        Comunidade Cristã Curados &copy; 2026 • Outubro Rosa • Saúde da Mulher & Pilates<br>
+        <small style="opacity: 0.7;">Fichas Confidenciais para a Instrutora de Pilates e Liderança da Rede de Mulheres</small>
+    </footer>
+
+    <script>
+        let alunasCache = [];
+        let filtroAtivo = 'todas';
+
+        async function carregarInscricoes(forcarSync = false) {
+            const btn = document.getElementById('btnRecarregar');
+            if (btn) btn.innerHTML = '<span>⏳ Atualizando...</span>';
+
+            try {
+                const url = '/saude-mulher/api/inscritas' + (forcarSync ? '?sync=1' : '');
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.ok && Array.isArray(data.inscricoes)) {
+                    alunasCache = data.inscricoes;
+                    atualizarMetricas(data.stats || {});
+                    filtrarAlunas();
+                } else {
+                    mostrarErro('Não foi possível carregar as inscrições.');
+                }
+            } catch (err) {
+                console.error('Erro ao buscar dados:', err);
+                mostrarErro('Erro de conexão ao carregar as fichas.');
+            } finally {
+                if (btn) btn.innerHTML = '<span>🔄 Atualizar Dados</span>';
+            }
+        }
+
+        function atualizarMetricas(stats) {
+            const total = stats.total !== undefined ? stats.total : alunasCache.length;
+            const comDor = stats.comLesaoDor !== undefined ? stats.comLesaoDor : alunasCache.filter(a => a.lesaoDor === 'Sim').length;
+            const gestantes = stats.gestantes !== undefined ? stats.gestantes : alunasCache.filter(a => a.gravida === 'Sim').length;
+            const comCirurgia = stats.comCirurgia !== undefined ? stats.comCirurgia : alunasCache.filter(a => a.cirurgia === 'Sim').length;
+            const comCondicao = stats.comCondicaoSaude !== undefined ? stats.comCondicaoSaude : alunasCache.filter(a => a.condicoesSaude && a.condicoesSaude !== 'Nenhuma').length;
+            const ativas = stats.praticamAtividade !== undefined ? stats.praticamAtividade : alunasCache.filter(a => a.atividadeFisica === 'Sim').length;
+            const comLimitacao = alunasCache.filter(a => a.limitacao === 'Sim').length;
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statDores').textContent = comDor;
+            document.getElementById('statGestantes').textContent = gestantes;
+            document.getElementById('statCirurgias').textContent = comCirurgia;
+            document.getElementById('statCondicoes').textContent = comCondicao;
+            document.getElementById('statAtivas').textContent = ativas;
+
+            document.getElementById('contTodas').textContent = total;
+            document.getElementById('contDores').textContent = comDor;
+            document.getElementById('contGestantes').textContent = gestantes;
+            document.getElementById('contCirurgias').textContent = comCirurgia;
+            document.getElementById('contCondicoes').textContent = comCondicao;
+            document.getElementById('contLimitacoes').textContent = comLimitacao;
+            document.getElementById('contAtivas').textContent = ativas;
+        }
+
+        function aplicarFiltroRapido(tipo, elemento) {
+            filtroAtivo = tipo;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.stat-card').forEach(card => card.classList.remove('active'));
+
+            if (elemento) {
+                elemento.classList.add('active');
+            }
+
+            filtrarAlunas();
+        }
+
+        function filtrarAlunas() {
+            const termo = (document.getElementById('campoBusca')?.value || '').toLowerCase().trim();
+
+            const filtradas = alunasCache.filter(aluna => {
+                // Filtro por tipo rápido
+                if (filtroAtivo === 'dor' && aluna.lesaoDor !== 'Sim') return false;
+                if (filtroAtivo === 'gestante' && aluna.gravida !== 'Sim') return false;
+                if (filtroAtivo === 'cirurgia' && aluna.cirurgia !== 'Sim') return false;
+                if (filtroAtivo === 'condicao' && (!aluna.condicoesSaude || aluna.condicoesSaude === 'Nenhuma')) return false;
+                if (filtroAtivo === 'limitacao' && aluna.limitacao !== 'Sim') return false;
+                if (filtroAtivo === 'ativa' && aluna.atividadeFisica !== 'Sim') return false;
+
+                // Filtro por texto
+                if (!termo) return true;
+
+                const buscaTexto = [
+                    aluna.nome,
+                    aluna.telefone,
+                    aluna.condicoesSaude,
+                    aluna.tratamentoMedicamento,
+                    aluna.cirurgiaDetalhes,
+                    aluna.lesaoDorDetalhes,
+                    aluna.limitacaoDetalhes,
+                    aluna.atividadeFisicaDetalhes,
+                    aluna.outrasInformacoes
+                ].filter(Boolean).join(' ').toLowerCase();
+
+                return buscaTexto.includes(termo);
+            });
+
+            renderizarCards(filtradas);
+        }
+
+        function formatarTelefone(tel) {
+            const limpo = String(tel || '').replace(/\D/g, '');
+            if (limpo.length === 11) {
+                return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 7)}-${limpo.slice(7)}`;
+            }
+            if (limpo.length === 10) {
+                return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 6)}-${limpo.slice(6)}`;
+            }
+            return tel || 'Não informado';
+        }
+
+        function linkZap(tel) {
+            const limpo = String(tel || '').replace(/\D/g, '');
+            const ddi = limpo.startsWith('55') ? limpo : ('55' + limpo);
+            return `https://wa.me/${ddi}`;
+        }
+
+        function renderizarCards(lista) {
+            const container = document.getElementById('containerCards');
+
+            if (!lista || lista.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Nenhuma aluna encontrada</h3>
+                        <p>Nenhum registro corresponde ao filtro ou busca selecionada.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = lista.map((aluna, idx) => {
+                const ehGestante = aluna.gravida === 'Sim';
+                const temDor = aluna.lesaoDor === 'Sim';
+                const temCirurgia = aluna.cirurgia === 'Sim';
+                const temLimitacao = aluna.limitacao === 'Sim';
+                const fazAtividade = aluna.atividadeFisica === 'Sim';
+                const temCondicao = aluna.condicoesSaude && aluna.condicoesSaude !== 'Nenhuma';
+
+                // Badges de cabeçalho
+                let badgesHtml = '';
+                if (ehGestante) badgesHtml += '<span class="health-badge badge-pregnant">🤰 Gestante</span>';
+                if (temDor) badgesHtml += '<span class="health-badge badge-danger">⚡ Dor / Lesão</span>';
+                if (temCirurgia) badgesHtml += '<span class="health-badge badge-warning">🩹 Cirurgia</span>';
+                if (temLimitacao) badgesHtml += '<span class="health-badge badge-warning">⚠️ Limitação</span>';
+                if (temCondicao) badgesHtml += '<span class="health-badge badge-neutral">🩺 Condição</span>';
+                if (fazAtividade) badgesHtml += '<span class="health-badge badge-success">🏃 Ativa</span>';
+
+                let cardClasses = 'anamnese-card';
+                if (ehGestante) cardClasses += ' is-pregnant';
+                if (temDor) cardClasses += ' has-pain';
+
+                const dataCriado = aluna.criadoEm ? new Date(aluna.criadoEm).toLocaleDateString('pt-BR') : '';
+
+                return `
+                    <article class="${cardClasses}">
+                        <div class="card-header">
+                            <div class="student-title">
+                                <span class="student-num">Aluna #${idx + 1}</span>
+                                <h2 class="student-name">${aluna.nome || 'Sem Nome'}</h2>
+                                <div class="student-meta">
+                                    <span class="badge-age">${aluna.idade ? aluna.idade + ' anos' : 'Idade -'}</span>
+                                    <span>${formatarTelefone(aluna.telefone)}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <a href="${linkZap(aluna.telefone)}" target="_blank" class="btn-whatsapp" title="Abrir conversa no WhatsApp">
+                                    💬 Conversar
+                                </a>
+                            </div>
+                        </div>
+
+                        ${badgesHtml ? `<div class="health-badges">${badgesHtml}</div>` : ''}
+
+                        <div class="anamnese-sections">
+                            <!-- 1. Condições de Saúde & Remédios -->
+                            <div class="anamnese-item">
+                                <div class="item-label">🩺 1. Condições & Medicamentos</div>
+                                <div class="item-value ${temCondicao ? 'highlight-alert' : 'highlight-ok'}">
+                                    ${aluna.condicoesSaude || 'Nenhuma'}
+                                </div>
+                                ${aluna.tratamentoMedicamento && aluna.tratamentoMedicamento !== '-' ? `
+                                    <div style="margin-top: 4px; font-size: 0.8rem; color: #fbcfe8;">
+                                        💊 <strong>Medicamento:</strong> ${aluna.tratamentoMedicamento}
+                                    </div>
+                                ` : ''}
+                            </div>
+
+                            <!-- 2. Cirurgia -->
+                            <div class="anamnese-item">
+                                <div class="item-label">🩹 2. Histórico Cirúrgico</div>
+                                <div class="item-value ${temCirurgia ? 'highlight-alert' : 'highlight-ok'}">
+                                    ${temCirurgia ? `Sim — ${aluna.cirurgiaDetalhes || 'Detalhe não especificado'}` : 'Não'}
+                                </div>
+                            </div>
+
+                            <!-- 3. Lesão ou Dor -->
+                            <div class="anamnese-item">
+                                <div class="item-label">⚡ 3. Dores ou Lesões (Coluna, Joelho, etc.)</div>
+                                <div class="item-value ${temDor ? 'highlight-alert' : 'highlight-ok'}">
+                                    ${temDor ? `Sim — ${aluna.lesaoDorDetalhes || 'Região não especificada'}` : 'Não'}
+                                </div>
+                            </div>
+
+                            <!-- 4. Limitações -->
+                            <div class="anamnese-item">
+                                <div class="item-label">⚠️ 4. Limitações Físicas / Intelectuais</div>
+                                <div class="item-value ${temLimitacao ? 'highlight-alert' : 'highlight-ok'}">
+                                    ${temLimitacao ? `Sim — ${aluna.limitacaoDetalhes || 'Detalhe não especificado'}` : 'Não'}
+                                </div>
+                            </div>
+
+                            <!-- 5. Gestante & 6. Atividade -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <div class="anamnese-item">
+                                    <div class="item-label">🤰 5. Gestante?</div>
+                                    <div class="item-value ${ehGestante ? 'highlight-alert' : 'highlight-ok'}">
+                                        ${ehGestante ? 'Sim' : 'Não'}
+                                    </div>
+                                </div>
+                                <div class="anamnese-item">
+                                    <div class="item-label">🏃 6. Atividade Física?</div>
+                                    <div class="item-value ${fazAtividade ? 'highlight-alert' : 'highlight-ok'}">
+                                        ${fazAtividade ? `Sim (${aluna.atividadeFisicaDetalhes || 'Pratica'})` : 'Não'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 7. Observações Adicionais -->
+                            <div class="anamnese-item">
+                                <div class="item-label">📝 7. Observações de Saúde para a Professora</div>
+                                <div class="item-value">
+                                    ${aluna.outrasInformacoes && aluna.outrasInformacoes !== 'Nenhuma' ? aluna.outrasInformacoes : '<span style="color: #9ca3af; font-weight: normal;">Nenhuma observação informada.</span>'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer">
+                            <span>Inscrita em: ${dataCriado || 'Outubro/2026'}</span>
+                            <button onclick="copiarFichaAluna('${aluna.id || idx}')" class="btn-copy-card" title="Copiar resumo formatado para o WhatsApp">
+                                📋 Copiar Ficha
+                            </button>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
+        function copiarFichaAluna(idOuIdx) {
+            const aluna = alunasCache.find(a => a.id === idOuIdx) || alunasCache[parseInt(idOuIdx, 10)];
+            if (!aluna) return;
+
+            const texto = 
+`📋 *FICHA DE ANAMNESE — PILATES / SAÚDE DA MULHER* 🌸
+👤 *Aluna:* ${aluna.nome} (${aluna.idade ? aluna.idade + ' anos' : '-'})
+📱 *WhatsApp:* ${aluna.telefone}
+
+🩺 *Condições de Saúde:* ${aluna.condicoesSaude || 'Nenhuma'}
+💊 *Medicamentos:* ${aluna.tratamentoMedicamento || '-'}
+🩹 *Cirurgia:* ${aluna.cirurgia === 'Sim' ? 'Sim (' + (aluna.cirurgiaDetalhes || '-') + ')' : 'Não'}
+⚡ *Dor / Lesão:* ${aluna.lesaoDor === 'Sim' ? 'Sim (' + (aluna.lesaoDorDetalhes || '-') + ')' : 'Não'}
+⚠️ *Limitação:* ${aluna.limitacao === 'Sim' ? 'Sim (' + (aluna.limitacaoDetalhes || '-') + ')' : 'Não'}
+🤰 *Gestante:* ${aluna.gravida || 'Não'}
+🏃 *Atividade Física:* ${aluna.atividadeFisica === 'Sim' ? 'Sim (' + (aluna.atividadeFisicaDetalhes || '-') + ')' : 'Não'}
+📝 *Observações:* ${aluna.outrasInformacoes || '-'}`;
+
+            navigator.clipboard.writeText(texto).then(() => {
+                alert(`✅ Ficha de ${aluna.nome} copiada para a área de transferência!`);
+            }).catch(() => {
+                prompt('Copie a ficha abaixo:', texto);
+            });
+        }
+
+        function copiarLinkCompartilhamento() {
+            const url = window.location.href;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('✅ Link das Fichas de Anamnese copiado! Você pode enviar no WhatsApp da Professora ou Líder.');
+            }).catch(() => {
+                prompt('Copie o link abaixo:', url);
+            });
+        }
+
+        function mostrarErro(msg) {
+            const container = document.getElementById('containerCards');
+            container.innerHTML = `
+                <div class="empty-state" style="border-color: #ef4444;">
+                    <h3 style="color: #f87171;">⚠️ ${msg}</h3>
+                    <p>Por favor, recarregue a página ou verifique a conexão com o servidor.</p>
+                </div>
+            `;
+        }
+
+        // Carrega as inscrições logo que a página abre
+        document.addEventListener('DOMContentLoaded', () => carregarInscricoes(false));
+    </script>
+</body>
+</html>

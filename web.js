@@ -573,6 +573,28 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
       }
 
+      // Rota para Líderes & Professora de Pilates: Fichas de Anamnese organizadas (/saude-da-mulher/fichas, /pilates/fichas, /saude-mulher/fichas, /fichas-pilates)
+      if (req.method === 'GET' && (
+        pathname === '/saude-da-mulher/fichas' || pathname === '/saude-da-mulher/fichas/' ||
+        pathname === '/saude-mulher/fichas' || pathname === '/saude-mulher/fichas/' ||
+        pathname === '/pilates/fichas' || pathname === '/pilates/fichas/' ||
+        pathname === '/fichas-pilates' || pathname === '/fichas-pilates.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "fichas-pilates.html"))
+          ? path.join(__dirname, "public", "fichas-pilates.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "fichas-pilates.html")) ? path.join(__dirname, "web", "public", "fichas-pilates.html") : null);
+        if (fileToServe && fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+          });
+          return res.end(content);
+        }
+      }
+
       // API: Processamento de inscrição e anamnese (/saude-mulher/api/inscrever)
       if (req.method === 'POST' && (pathname === '/saude-mulher/api/inscrever' || pathname === '/saude-mulher/inscrever')) {
         try {

@@ -19,8 +19,9 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     usuario: { nome: "Pr. Gabriel", cargos: ["pastor"], departamentos: [] },
     isPastor: true,
   });
-  assert.equal(eventosPastor.length, 2);
+  assert.equal(eventosPastor.length, 3);
   assert.ok(eventosPastor.some((e) => e.id === "culto_mulheres"));
+  assert.ok(eventosPastor.some((e) => e.id === "saude_mulher"));
   assert.ok(eventosPastor.some((e) => e.id === "dia_das_criancas"));
   assert.ok(!eventosPastor.some((e) => e.id === "the_chosen"));
 
@@ -29,9 +30,9 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     usuario: { nome: "Dir. Fernando", cargos: ["diretor"], departamentos: [] },
     isDiretor: true,
   });
-  assert.equal(eventosDiretor.length, 2);
+  assert.equal(eventosDiretor.length, 3);
 
-  // 3. Líder da Rede de Mulheres tem acesso SOMENTE ao Culto de Mulheres
+  // 3. Líder da Rede de Mulheres tem acesso aos eventos de Mulheres (Culto de Mulheres e Saúde da Mulher)
   const eventosLiderMulheres = obterEventosInscricaoParaUsuario({
     usuario: {
       nome: "Líder Ana",
@@ -40,8 +41,9 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     },
     isLider: true,
   });
-  assert.equal(eventosLiderMulheres.length, 1);
-  assert.equal(eventosLiderMulheres[0].id, "culto_mulheres");
+  assert.equal(eventosLiderMulheres.length, 2);
+  assert.ok(eventosLiderMulheres.some((e) => e.id === "culto_mulheres"));
+  assert.ok(eventosLiderMulheres.some((e) => e.id === "saude_mulher"));
 
   // 4. Líder da Rede de Homens NÃO tem acesso a eventos de Mulheres
   const eventosLiderHomens = obterEventosInscricaoParaUsuario({
@@ -63,8 +65,9 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     },
     isLider: true,
   });
-  assert.equal(eventosMultiplos.length, 1);
-  assert.equal(eventosMultiplos[0].id, "culto_mulheres");
+  assert.equal(eventosMultiplos.length, 2);
+  assert.ok(eventosMultiplos.some((e) => e.id === "culto_mulheres"));
+  assert.ok(eventosMultiplos.some((e) => e.id === "saude_mulher"));
 });
 
 test("Consulta Inscrições: geração de resumos em texto", () => {
@@ -84,7 +87,7 @@ test("Consulta Inscrições: geração de PDF com Puppeteer", async () => {
   assert.equal(resultadoChosen.ok, false);
 });
 
-test("Consulta Inscrições: fluxo para líder de mulheres entrega relatório direto", async () => {
+test("Consulta Inscrições: fluxo para líder de mulheres lista eventos e entrega relatório", async () => {
   const etapas = {};
   const replies = [];
   const fakeMsg = {
@@ -112,12 +115,36 @@ test("Consulta Inscrições: fluxo para líder de mulheres entrega relatório di
     origem: "lider",
   });
 
-  // O líder de mulheres tem apenas 1 evento, então entra direto em visualizando_evento
+  // O líder de mulheres tem 2 eventos (Culto de Mulheres e Saúde da Mulher), então entra em escolher_evento
   assert.equal(etapas["5511999990001@c.us"].fluxo, "consulta_inscricoes");
-  assert.equal(etapas["5511999990001@c.us"].etapa, "visualizando_evento");
-  assert.equal(etapas["5511999990001@c.us"].eventoSelecionado, "culto_mulheres");
+  assert.equal(etapas["5511999990001@c.us"].etapa, "escolher_evento");
   assert.ok(replies.length >= 1);
   assert.ok(replies[0].includes("Culto de Mulheres"));
+  assert.ok(replies[0].includes("Saúde da Mulher"));
+
+  // Seleciona a opção Saúde da Mulher
+  const repliesSaude = [];
+  const fakeMsgSaude = {
+    body: "2",
+    reply: (txt) => {
+      repliesSaude.push(txt);
+      return Promise.resolve();
+    },
+  };
+
+  await processarFluxoConsultaInscricoes({
+    msg: fakeMsgSaude,
+    numero: "5511999990001@c.us",
+    info: etapas["5511999990001@c.us"],
+    etapas,
+    client: fakeClient,
+  });
+
+  assert.equal(etapas["5511999990001@c.us"].etapa, "visualizando_evento");
+  assert.equal(etapas["5511999990001@c.us"].eventoSelecionado, "saude_mulher");
+  assert.ok(repliesSaude.length >= 1);
+  assert.ok(repliesSaude[0].includes("Saúde da Mulher (Pilates)"));
+  assert.ok(repliesSaude[0].includes("Fichas Organizadas da Professora"));
 });
 
 test("Consulta Inscrições: fluxo para pastor lista os eventos disponíveis", async () => {

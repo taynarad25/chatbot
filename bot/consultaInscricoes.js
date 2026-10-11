@@ -16,6 +16,7 @@ try {
 
 const cultoMulheres = require("../web/culto_mulheres");
 const diaDasCriancas = require("../web/dia_das_criancas");
+const saudeMulher = require("../web/saude_mulher");
 
 const CATALOGO_EVENTOS = [
   {
@@ -32,6 +33,22 @@ const CATALOGO_EVENTOS = [
           : [usuario?.departamento || ""]
       ).map((d) => String(d || "").toLowerCase().trim());
       return deptos.some((d) => /mulher/i.test(d));
+    },
+  },
+  {
+    id: "saude_mulher",
+    nome: "Saúde da Mulher — Palestra + Aula de Pilates",
+    icone: "🧘‍♀️",
+    dataEvento: "2026-10-31 15:00",
+    departamentos: ["Rede de Mulheres", "Mulheres", "Saúde"],
+    verificarPermissao: (usuario, isPastor, isDiretor) => {
+      if (isPastor || isDiretor) return true;
+      const deptos = (
+        Array.isArray(usuario?.departamentos)
+          ? usuario.departamentos
+          : [usuario?.departamento || ""]
+      ).map((d) => String(d || "").toLowerCase().trim());
+      return deptos.some((d) => /mulher|sa[uú]de|pilates/i.test(d));
     },
   },
   {
@@ -139,6 +156,24 @@ function gerarResumoDiaDasCriancas() {
   );
 }
 
+function gerarResumoSaudeMulher() {
+  const stats = saudeMulher.obterEstatisticasSaudeMulher();
+
+  return (
+    `🧘‍♀️ *Inscrições & Anamnese — Saúde da Mulher (Pilates)*\n\n` +
+    `📊 *Estatísticas das Inscrições:*\n` +
+    `• Total de Alunas Inscritas: *${stats.total}*\n` +
+    `• Com alguma condição de saúde: *${stats.comCondicaoSaude}*\n` +
+    `• Com dores ou lesões: *${stats.comLesaoDor}*\n` +
+    `• Já realizaram cirurgia: *${stats.comCirurgia}*\n` +
+    `• Gestantes: *${stats.gestantes}*\n` +
+    `• Praticam atividade física: *${stats.praticamAtividade}*\n` +
+    `• Confirmações de WhatsApp: *${stats.whatsappConfirmados}*\n\n` +
+    `🗓️ *Data:* Sábado, 31/10/2026 às 15:00\n` +
+    `📍 *Local:* Comunidade Cristã Curados — Templo Principal\n`
+  );
+}
+
 /**
  * Monta lista nominal em texto caso o PDF falhe ou para consulta rápida
  */
@@ -161,6 +196,35 @@ function montarListaInscritosTexto(eventoId) {
     let texto = itens.join("\n\n");
     if (lista.length > maxExibir) {
       texto += `\n\n_... e mais ${lista.length - maxExibir} inscritos (consulte a lista completa no painel da secretaria)._`;
+    }
+    return texto;
+  }
+
+  if (eventoId === "saude_mulher") {
+    const lista =
+      typeof saudeMulher.listarInscricoesSaudeMulher === "function"
+        ? saudeMulher.listarInscricoesSaudeMulher()
+        : [];
+    if (!lista || lista.length === 0) {
+      return "_Nenhuma aluna inscrita até o momento._";
+    }
+    const maxExibir = 40;
+    const itens = lista.slice(0, maxExibir).map((item, idx) => {
+      const idade = item.idade ? ` (${item.idade} anos)` : "";
+      const tel = item.telefone ? `📞 ${item.telefone}` : "";
+      const alertas = [];
+      if (item.gravida === "Sim") alertas.push("🤰 *Gestante*");
+      if (item.lesaoDor === "Sim") alertas.push(`⚡ Dor/Lesão: ${item.lesaoDorDetalhes || "Sim"}`);
+      if (item.cirurgia === "Sim") alertas.push(`🩹 Cirurgia: ${item.cirurgiaDetalhes || "Sim"}`);
+      if (item.limitacao === "Sim") alertas.push(`⚠️ Limitação: ${item.limitacaoDetalhes || "Sim"}`);
+      if (item.condicoesSaude && item.condicoesSaude !== "Nenhuma") alertas.push(`🩺 ${item.condicoesSaude}`);
+
+      const blocoAlerta = alertas.length > 0 ? `\n   ⚠️ _Atenção:_ ${alertas.join(" | ")}` : "\n   ✅ _Sem queixas ou restrições registradas_";
+      return `${idx + 1}. *${item.nome}*${idade}\n   ${tel}${blocoAlerta}`;
+    });
+    let texto = itens.join("\n\n");
+    if (lista.length > maxExibir) {
+      texto += `\n\n_... e mais ${lista.length - maxExibir} alunas (consulte as fichas completas no painel)._`;
     }
     return texto;
   }
@@ -232,6 +296,10 @@ async function gerarPdfEvento({ eventoId, client }) {
   if (eventoId === "culto_mulheres") {
     html = cultoMulheres.renderMulheresPdfHtml();
     filename = "Lista_Inscricoes_Culto_Mulheres.pdf";
+
+  } else if (eventoId === "saude_mulher") {
+    html = saudeMulher.renderSaudeMulherPdfHtml();
+    filename = "Fichas_Anamnese_Pilates_Saude_da_Mulher.pdf";
 
   } else if (eventoId === "dia_das_criancas") {
     html = diaDasCriancas.renderCriancasPdfHtml();
@@ -319,6 +387,18 @@ function obterLinksDocumentos(eventoId) {
 
 
 
+  if (eventoId === "saude_mulher") {
+    const ssId =
+      process.env.SAUDE_MULHER_SPREADSHEET_ID ||
+      "1UzaEVYBZe7NDosUtRS5aT-QJkNFoFu5PJCjicnE5_lg";
+    return {
+      spreadsheetId: ssId,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`,
+      pdfUrl: `/saude-mulher/api/relatorio-pdf`,
+      fichasUrl: `/saude-da-mulher/fichas`,
+    };
+  }
+
   if (eventoId === "dia_das_criancas") {
     const ssId =
       process.env.CRIANCAS_SPREADSHEET_ID ||
@@ -349,6 +429,15 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
 
   } else if (
     process.env.NODE_ENV !== "test" &&
+    eventoId === "saude_mulher" &&
+    typeof saudeMulher.sincronizarInscricoesComNuvemSaudeMulher === "function"
+  ) {
+    try {
+      await saudeMulher.sincronizarInscricoesComNuvemSaudeMulher();
+    } catch {}
+
+  } else if (
+    process.env.NODE_ENV !== "test" &&
     eventoId === "dia_das_criancas"
   ) {
     try {
@@ -360,21 +449,28 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
   if (eventoId === "culto_mulheres") {
     resumoTexto = gerarResumoCultoMulheres();
 
+  } else if (eventoId === "saude_mulher") {
+    resumoTexto = gerarResumoSaudeMulher();
+
   } else if (eventoId === "dia_das_criancas") {
     resumoTexto = gerarResumoDiaDasCriancas();
   }
 
-  // Link oficial da planilha do Google Sheets
+  // Link oficial da planilha e painel de fichas
   const links = obterLinksDocumentos(eventoId);
 
   let blocoLinks = "";
+  if (links.fichasUrl) {
+    blocoLinks += `\n📑 *Ver Fichas Organizadas da Professora (Celular):*\n${links.fichasUrl}\n`;
+  }
   if (links.spreadsheetUrl) {
-    blocoLinks = `\n📊 *Planilha de Inscrições:*\n${links.spreadsheetUrl}\n`;
+    blocoLinks += `\n📊 *Planilha no Google Sheets:*\n${links.spreadsheetUrl}\n`;
   }
 
   const corpoMensagem =
     resumoTexto +
     blocoLinks +
+    `\n💡 *Dica:* Digite *fichas* ou *lista* para ver as alunas com seus alertas de saúde diretamente aqui no WhatsApp.\n` +
     `\nDigite *menu* para voltar ao menu principal.`;
 
   await msg.reply(corpoMensagem);
@@ -508,7 +604,8 @@ async function processarFluxoConsultaInscricoes({
       selecionado = eventos.find(
         (e) =>
           escolha.includes(e.id) ||
-          (/mulher/i.test(escolha) && e.id === "culto_mulheres")
+          (/pilates|sa[uú]de/i.test(escolha) && e.id === "saude_mulher") ||
+          (/culto.*mulher|mulher/i.test(escolha) && !/pilates|sa[uú]de/i.test(escolha) && e.id === "culto_mulheres")
       );
     }
 
@@ -543,6 +640,21 @@ async function processarFluxoConsultaInscricoes({
       });
     }
 
+    if (
+      escolha === "lista" ||
+      escolha === "fichas" ||
+      escolha === "alunas" ||
+      escolha === "anamnese" ||
+      escolha === "nomes"
+    ) {
+      const listaTexto = montarListaInscritosTexto(info.eventoSelecionado);
+      return await msg.reply(
+        `📋 *Lista Nominal & Fichas das Alunas:*\n\n${listaTexto}\n\n` +
+          `• Digite *atualizar* para ver o resumo geral.\n` +
+          `• Digite *voltar* para o menu anterior.`
+      );
+    }
+
     // Se houver mais de um evento e digitar o número do outro evento
     const eventos = info.eventosDisponiveis || [];
     const idx = parseInt(escolha, 10) - 1;
@@ -558,7 +670,8 @@ async function processarFluxoConsultaInscricoes({
 
     return msg.reply(
       `📌 *Inscrições de Eventos*\n\n` +
-        `• Digite *atualizar* para reenviar os dados mais recentes e o PDF.\n` +
+        `• Digite *fichas* ou *lista* para ver as alunas e alertas de saúde.\n` +
+        `• Digite *atualizar* para reenviar os dados mais recentes.\n` +
         (eventos.length > 1
           ? `• Digite o número de outro evento para consultá-lo.\n`
           : "") +

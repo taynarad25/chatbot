@@ -1509,6 +1509,9 @@ function renderIndexHtml() {
             <button onclick="sincronizarComPlanilhaSaudeMulher()" id="btnSyncPlanilhaSaudeMulher" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
               🔄 Puxar da Planilha
             </button>
+            <button onclick="window.open('/saude-da-mulher/fichas', '_blank')" style="background: linear-gradient(135deg, #be185d, #9d174d); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(190, 24, 93, 0.35);" title="Ver fichas individuais organizadas para a Professora de Pilates e Líderes">
+              📑 Fichas da Professora & Líderes
+            </button>
             <button onclick="window.open('/saude-da-mulher', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver formulário e anamnese pública">
               🔗 Abrir Formulário
             </button>

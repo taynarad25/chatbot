@@ -752,10 +752,10 @@
                     <!-- PERGUNTA 7 -->
                     <div class="form-group" id="grupoPergunta7">
                         <label for="campoOutrasInfos" class="form-label">
-                            7- Há alguma outra informação relacionada à sua saúde que você considera importante me informar antes da aula? <span class="required">*</span>
+                            7- Há alguma outra informação relacionada à sua saúde que você considera importante me informar antes da aula? <span style="font-size: 0.82rem; font-weight: normal; color: var(--cor-texto-mutado);">(Opcional)</span>
                         </label>
-                        <textarea id="campoOutrasInfos" class="form-textarea" placeholder="Descreva aqui ou escreva 'Nenhuma' caso não tenha outras observações..."></textarea>
-                        <div class="form-hint">Campo obrigatório. Caso não tenha observações, escreva <strong>"Nenhuma"</strong>.</div>
+                        <textarea id="campoOutrasInfos" class="form-textarea" placeholder="Descreva aqui caso tenha alguma outra observação de saúde, ou deixe em branco..."></textarea>
+                        <div class="form-hint">Opcional. Preencha apenas se houver algum detalhe adicional para a instrutora de Pilates.</div>
                     </div>
 
                     <button type="submit" id="btnEnviar" class="btn-submit">
@@ -1032,13 +1032,9 @@
             }
             const atividadeFisicaDetalhes = atividadeFisica === 'Sim' ? campoAtividadeDet.value.trim() : 'Não';
 
-            // 8. Validação Pergunta 7: Observações adicionais (obrigatório responder)
+            // 8. Pergunta 7: Observações adicionais (opcional)
             const campoOutras = document.getElementById('campoOutrasInfos');
-            const outrasInformacoes = campoOutras.value.trim();
-            if (!outrasInformacoes) {
-                marcarErroNoCampo(campoOutras, '<strong>Pergunta 7 é obrigatória:</strong> Informe se há mais algum detalhe ou escreva <em>"Nenhuma"</em> para continuar.');
-                return;
-            }
+            const outrasInformacoes = (campoOutras && campoOutras.value.trim()) ? campoOutras.value.trim() : 'Nenhuma';
 
             // Payload formatado
             const payload = {
