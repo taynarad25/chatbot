@@ -226,12 +226,16 @@ async function enviarInscricaoPlanilhaSaudeMulher(dados, { url = URL_WEBAPP_SAUD
     };
   }
 
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 7000) : null;
+
   try {
     const res = await fetchFn(webAppUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dados),
       redirect: 'manual',
+      signal: controller ? controller.signal : undefined,
     });
 
     let rawText = '';
@@ -286,6 +290,8 @@ async function enviarInscricaoPlanilhaSaudeMulher(dados, { url = URL_WEBAPP_SAUD
       ok: false,
       message: `Erro ao enviar para a planilha: ${err.message}`,
     };
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
@@ -366,6 +372,42 @@ function montarMensagemConfirmacaoSaudeMulher(inscricao) {
     `📌 *Endereço:* R. Benedicto de Abreu Júnior, 40 - Jd. Nova Itapevi\n\n` +
     `💡 *Dicas para a aula:* Venha com roupas confortáveis para se movimentar e traga sua garrafinha de água!\n\n` +
     `Nossa equipe e a instrutora de Pilates já estão preparando tudo com muito amor para acolher você. Te esperamos! 💕`
+  );
+}
+
+/**
+ * Monta o texto de notificação para o grupo da Secretaria quando o envio para a planilha Google falhar.
+ */
+function montarAlertaErroPlanilhaSecretaria(dados, erroMsg) {
+  const nome = dados.nome || dados.nomeCompleto || 'Participante';
+  const tel = dados.telefone || 'Não informado';
+  const idade = dados.idade || '-';
+  const condicoes = dados.condicoesSaude || dados.condicoes || 'Nenhuma informada';
+  const remedios = dados.tratamentoMedicamento || '-';
+  const cirurgia = dados.cirurgia === 'Sim' ? `Sim (${dados.cirurgiaDetalhes || '-'})` : (dados.cirurgia || 'Não');
+  const lesao = dados.lesaoDor === 'Sim' ? `Sim (${dados.lesaoDorDetalhes || '-'})` : (dados.lesaoDor || 'Não');
+  const limitacao = dados.limitacao === 'Sim' ? `Sim (${dados.limitacaoDetalhes || '-'})` : (dados.limitacao || 'Não');
+  const gravida = dados.gravida || 'Não';
+  const atividade = dados.atividadeFisica === 'Sim' ? `Sim (${dados.atividadeFisicaDetalhes || '-'})` : (dados.atividadeFisica || 'Não');
+  const obs = dados.outrasInformacoes || '-';
+
+  return (
+    `⚠️ *[ALERTA SECRETARIA — SAÚDE DA MULHER / PILATES]*\n\n` +
+    `Uma nova inscrição foi realizada no site, mas *houve falha ao sincronizar com a Planilha Google*.\n\n` +
+    `👤 *Inscrita:* ${nome}\n` +
+    `📱 *WhatsApp:* ${tel}\n` +
+    `🎂 *Idade:* ${idade}\n` +
+    `❌ *Motivo:* ${erroMsg || 'Acesso não autorizado / Erro de comunicação com o Apps Script'}\n\n` +
+    `📋 *Resumo da Anamnese (salva com segurança no sistema):*\n` +
+    `• Condições: ${condicoes}\n` +
+    `• Medicamento: ${remedios}\n` +
+    `• Cirurgia: ${cirurgia}\n` +
+    `• Lesão / Dor: ${lesao}\n` +
+    `• Limitação: ${limitacao}\n` +
+    `• Gestante: ${gravida}\n` +
+    `• Atividade física: ${atividade}\n` +
+    `• Observações: ${obs}\n\n` +
+    `ℹ️ _A inscrição já está salva no banco de dados do sistema e pode ser consultada no painel da Secretaria._`
   );
 }
 
@@ -499,6 +541,7 @@ module.exports = {
   enviarInscricaoPlanilhaSaudeMulher,
   sincronizarInscricoesComNuvemSaudeMulher,
   montarMensagemConfirmacaoSaudeMulher,
+  montarAlertaErroPlanilhaSecretaria,
   renderSaudeMulherPdfHtml,
   obterLinksPlanilhaSaudeMulher,
   atualizarMetadataPlanilhaSaudeMulher,

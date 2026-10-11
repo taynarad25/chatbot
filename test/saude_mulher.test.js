@@ -18,6 +18,7 @@ const {
   marcarConfirmacaoSaudeMulherEnviada,
   enviarInscricaoPlanilhaSaudeMulher,
   montarMensagemConfirmacaoSaudeMulher,
+  montarAlertaErroPlanilhaSecretaria,
   renderSaudeMulherPdfHtml,
 } = require("../web/saude_mulher");
 
@@ -203,3 +204,35 @@ test("Saúde da Mulher: rotas HTTP no web.js", async () => {
     server.close();
   }
 });
+
+test("Saúde da Mulher: montarAlertaErroPlanilhaSecretaria formata mensagem com detalhes e erro para a Secretaria", () => {
+  const alerta = montarAlertaErroPlanilhaSecretaria(
+    {
+      nome: "Mariana Souza",
+      telefone: "11998877665",
+      idade: "38",
+      condicoesSaude: "Problemas na coluna",
+      tratamentoMedicamento: "Anti-inflamatório",
+      cirurgia: "Sim",
+      cirurgiaDetalhes: "Coluna em 2022",
+      lesaoDor: "Sim",
+      lesaoDorDetalhes: "Hérnia de disco",
+      limitacao: "Não",
+      gravida: "Não",
+      atividadeFisica: "Não",
+      outrasInformacoes: "Evitar esforço lombar",
+    },
+    "Acesso negado pelo Google Apps Script (HTTP 403)"
+  );
+
+  assert.match(alerta, /ALERTA SECRETARIA — SAÚDE DA MULHER/);
+  assert.match(alerta, /Mariana Souza/);
+  assert.match(alerta, /11998877665/);
+  assert.match(alerta, /38/);
+  assert.match(alerta, /Acesso negado pelo Google Apps Script/);
+  assert.match(alerta, /Problemas na coluna/);
+  assert.match(alerta, /Coluna em 2022/);
+  assert.match(alerta, /Hérnia de disco/);
+  assert.match(alerta, /painel da Secretaria/);
+});
+

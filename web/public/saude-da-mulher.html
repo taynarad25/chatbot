@@ -1065,7 +1065,6 @@
 
             let sucessoServidor = false;
             let salvoPlanilhaGoogle = false;
-            let avisoPlanilha = '';
 
             try {
                 // Envio 1: Servidor Node / SQLite / Secretaria
@@ -1080,7 +1079,6 @@
                         if (dataServidor.ok) {
                             sucessoServidor = true;
                             if (dataServidor.salvoNaPlanilha) salvoPlanilhaGoogle = true;
-                            if (dataServidor.avisoPlanilha) avisoPlanilha = dataServidor.avisoPlanilha;
                         }
                     } catch (errServ) {
                         console.warn('Aviso ao enviar para o servidor local:', errServ);
@@ -1104,7 +1102,6 @@
                 fTitle.innerHTML = '🎉 Inscrição & Anamnese Confirmadas com Sucesso!';
                 fBody.innerHTML = `Olá, <strong>${nome}</strong>! Sua vaga para o evento <strong>Saúde da Mulher — Palestra + Aula de Pilates</strong> no dia <strong>31/10 às 15:00</strong> está garantida.<br><br>` +
                     `✅ Todas as suas <strong>7 respostas da ficha de Anamnese</strong> foram registradas com sucesso e enviadas para a instrutora de Pilates e para a Secretaria.<br><br>` +
-                    (avisoPlanilha ? `<small style="color: #fde68a;">ℹ️ ${avisoPlanilha}</small><br><br>` : '') +
                     `Venha com roupas confortáveis para se movimentar e traga sua garrafinha de água. Te esperamos com alegria! 💕`;
                 feedback.style.display = 'block';
 

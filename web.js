@@ -13,6 +13,7 @@ const cultoMulheresNotificacoes = require("./web/culto_mulheres_notificacoes");
 const diaDasCriancas = require("./web/dia_das_criancas");
 const saudeMulher = require("./web/saude_mulher");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
+const { notificarSecretaria } = require("./bot/secretaria");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
 const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
@@ -601,6 +602,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
               botClient.sendMessage(chatId, msgZap)
                 .then(() => saudeMulher.marcarConfirmacaoSaudeMulherEnviada(inscricao.id))
                 .catch(errZap => console.warn('[Saúde da Mulher] Aviso no envio WhatsApp:', errZap.message));
+
+              // Se a integração com a planilha falhar, notifica o grupo da Secretaria
+              if (!resultadoPlanilha?.ok) {
+                const msgAlertaSecretaria = saudeMulher.montarAlertaErroPlanilhaSecretaria(body, resultadoPlanilha?.message);
+                notificarSecretaria(botClient, msgAlertaSecretaria)
+                  .catch(errSec => console.warn('[Saúde da Mulher] Erro ao avisar grupo da secretaria:', errSec.message));
+              }
             }
           } catch (errDisparo) {
             console.warn('[Saúde da Mulher] Bot WhatsApp não disponível para confirmação imediata');
@@ -610,7 +618,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             ok: true,
             message: 'Inscrição realizada com sucesso!',
             salvoNaPlanilha: Boolean(resultadoPlanilha?.ok),
-            avisoPlanilha: resultadoPlanilha?.ok ? '' : resultadoPlanilha?.message,
+            avisoPlanilha: '',
             inscricao
           });
         } catch (err) {
