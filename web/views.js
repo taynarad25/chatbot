@@ -2334,7 +2334,7 @@ function renderIndexHtml() {
           '</div>' +
           '<div>' +
             '<label style="font-size:0.75rem; color:#a1a1aa; display:block; margin-bottom:2px;">Obrigatória?</label>' +
-            '<select class="form-input" style="padding:8px 10px; font-size:0.85rem;" onchange="perguntasBuilderLista[' + idx + '].obrigatorio = this.value === \'1\'">' +
+            '<select class="form-input" style="padding:8px 10px; font-size:0.85rem;" onchange="atualizarObrigatorioPerguntaBuilder(' + idx + ', this.value)">' +
               '<option value="1"' + (p.obrigatorio ? ' selected' : '') + '>Sim (Obrigatória)</option>' +
               '<option value="0"' + (!p.obrigatorio ? ' selected' : '') + '>Opcional</option>' +
             '</select>' +
@@ -2344,6 +2344,12 @@ function renderIndexHtml() {
           '</div>' +
         '</div>';
       }).join('');
+    }
+
+    function atualizarObrigatorioPerguntaBuilder(idx, valor) {
+      if (perguntasBuilderLista && perguntasBuilderLista[idx]) {
+        perguntasBuilderLista[idx].obrigatorio = (valor === '1');
+      }
     }
 
     function adicionarPerguntaBuilder(dados) {
@@ -2504,7 +2510,7 @@ function renderIndexHtml() {
         const dataLocal = [ev.dataEvento, ev.horario, ev.local].filter(Boolean).join(' • ');
 
         const botaoInscritos = ev.tipoInscricao === 'formulario'
-          ? '<button onclick="abrirModalInscritosEvento(\'' + ev.id + '\')" style="background: rgba(0, 188, 212, 0.12); color: var(--cor-ciano); border: 1px solid rgba(0, 188, 212, 0.3); padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">' +
+          ? '<button data-id="' + ev.id + '" onclick="abrirModalInscritosEvento(this.dataset.id)" style="background: rgba(0, 188, 212, 0.12); color: var(--cor-ciano); border: 1px solid rgba(0, 188, 212, 0.3); padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">' +
               '👥 Ver ' + (ev.totalInscritos || 0) + ' Inscritos' +
             '</button>'
           : '';
@@ -2519,23 +2525,27 @@ function renderIndexHtml() {
             '<h4 style="color: #fff; font-size: 1.15rem; margin: 2px 0 0; line-height: 1.3;">' + ev.titulo + '</h4>' +
             '<div style="font-size: 0.82rem; color: var(--cor-texto-mutado);">' + (dataLocal || 'Data e local a definir') + '</div>' +
             '<div class="card-evento-dinamico-acoes">' +
-              '<button onclick="copiarLinkEvento(\'' + ev.slug + '\')" style="background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); padding: 7px 11px; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer;" title="Copiar link da página">' +
+              '<button data-slug="' + ev.slug + '" onclick="copiarLinkEvento(this.dataset.slug)" style="background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); padding: 7px 11px; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer;" title="Copiar link da página">' +
                 '🔗 Copiar Link' +
               '</button>' +
-              '<button onclick="window.open(\'/evento/' + ev.slug + '\', \'_blank\')" style="background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); padding: 7px 11px; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer;" title="Abrir página do evento">' +
+              '<button data-slug="' + ev.slug + '" onclick="abrirPaginaEvento(this.dataset.slug)" style="background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); padding: 7px 11px; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer;" title="Abrir página do evento">' +
                 '👁️ Abrir' +
               '</button>' +
               botaoInscritos +
-              '<button onclick="alternarStatusEventoPainel(\'' + ev.id + '\')" style="background: rgba(255, 255, 255, 0.05); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.12); padding: 7px 9px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;" title="' + (ev.ativo ? 'Pausar evento' : 'Ativar evento') + '">' +
+              '<button data-id="' + ev.id + '" onclick="alternarStatusEventoPainel(this.dataset.id)" style="background: rgba(255, 255, 255, 0.05); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.12); padding: 7px 9px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;" title="' + (ev.ativo ? 'Pausar evento' : 'Ativar evento') + '">' +
                 (ev.ativo ? '⏸️' : '▶️') +
               '</button>' +
-              '<button onclick="excluirEventoPainel(\'' + ev.id + '\', \'' + ev.titulo.replace(/'/g, "\\'") + '\')" style="background: rgba(239, 68, 68, 0.12); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.25); padding: 7px 9px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;" title="Excluir evento">' +
+              '<button data-id="' + ev.id + '" onclick="excluirEventoPainel(this.dataset.id)" style="background: rgba(239, 68, 68, 0.12); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.25); padding: 7px 9px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;" title="Excluir evento">' +
                 '🗑️' +
               '</button>' +
             '</div>' +
           '</div>' +
         '</div>';
       }).join('');
+    }
+
+    function abrirPaginaEvento(slug) {
+      if (slug) window.open('/evento/' + slug, '_blank');
     }
 
     function copiarLinkEvento(slug) {
@@ -2559,7 +2569,9 @@ function renderIndexHtml() {
       }
     }
 
-    async function excluirEventoPainel(id, titulo) {
+    async function excluirEventoPainel(id) {
+      const ev = eventosPainelCache.find(e => String(e.id) === String(id));
+      const titulo = ev ? ev.titulo : 'este evento';
       const confirmou = confirm('Tem certeza que deseja excluir o evento "' + titulo + '" e todas as suas inscrições?');
       if (!confirmou) return;
       try {
@@ -2664,7 +2676,7 @@ function renderIndexHtml() {
           '<td style="font-size:0.85rem; color:var(--cor-texto-mutado);">' + (item.email || '-') + '</td>' +
           respCols +
           '<td style="text-align:center;">' +
-            '<button onclick="excluirInscricaoEventoDinamico(\'' + item.id + '\', \'' + (item.nome || '').replace(/'/g, "\\'") + '\', \'' + item.eventoId + '\')" style="background:rgba(239,68,68,0.15); color:#fca5a5; border:1px solid rgba(239,68,68,0.3); padding:5px 9px; border-radius:6px; font-size:0.75rem; cursor:pointer;" title="Excluir inscrição">🗑️</button>' +
+            '<button data-id="' + item.id + '" data-evento="' + item.eventoId + '" onclick="excluirInscricaoEventoDinamico(this.dataset.id, this.dataset.evento)" style="background:rgba(239,68,68,0.15); color:#fca5a5; border:1px solid rgba(239,68,68,0.3); padding:5px 9px; border-radius:6px; font-size:0.75rem; cursor:pointer;" title="Excluir inscrição">🗑️</button>' +
           '</td>' +
         '</tr>';
       }).join('');
@@ -2683,7 +2695,9 @@ function renderIndexHtml() {
       renderTabelaInscritosModal(filtrados);
     }
 
-    async function excluirInscricaoEventoDinamico(id, nome, eventoId) {
+    async function excluirInscricaoEventoDinamico(id, eventoId) {
+      const item = modalInscricoesCache.find(i => String(i.id) === String(id));
+      const nome = item ? item.nome : 'este participante';
       if (!confirm('Excluir inscrição de "' + nome + '"?')) return;
       try {
         const res = await fetch('/secretaria/api/eventos-inscricoes/' + id, { method: 'DELETE' });
