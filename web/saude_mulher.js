@@ -129,14 +129,14 @@ function salvarInscricaoSaudeMulher({
     Array.isArray(condicoesSaude) ? condicoesSaude.join(', ') : String(condicoesSaude || '').trim(),
     String(tratamentoMedicamento || '').trim(),
     String(cirurgia || 'Não').trim(),
-    String(cirurgiaDetalhes || '').trim(),
+    sanitizarDetalhe(cirurgia, cirurgiaDetalhes),
     String(lesaoDor || 'Não').trim(),
-    String(lesaoDorDetalhes || '').trim(),
+    sanitizarDetalhe(lesaoDor, lesaoDorDetalhes),
     String(limitacao || 'Não').trim(),
-    String(limitacaoDetalhes || '').trim(),
+    sanitizarDetalhe(limitacao, limitacaoDetalhes),
     String(gravida || 'Não').trim(),
     String(atividadeFisica || 'Não').trim(),
-    String(atividadeFisicaDetalhes || '').trim(),
+    sanitizarDetalhe(atividadeFisica, atividadeFisicaDetalhes),
     String(outrasInformacoes || '').trim(),
     evento,
     dataEvento,
@@ -178,16 +178,35 @@ function listarInscricoesSaudeMulher() {
   }));
 }
 
+function ehRespostaSim(valor, detalhes) {
+  const v = String(valor || '').trim().toLowerCase();
+  if (v === 'sim') return true;
+  if (v === 'não' || v === 'nao') return false;
+  const d = String(detalhes || '').trim().toLowerCase();
+  return d !== '' && d !== 'não' && d !== 'nao' && d !== 'nenhuma' && d !== 'nenhum' && d !== 'não se aplica' && d !== '-';
+}
+
+function sanitizarDetalhe(valor, detalhes) {
+  const v = String(valor || '').trim().toLowerCase();
+  const d = String(detalhes || '').trim();
+  if (v === 'não' || v === 'nao') return '';
+  if (['não', 'nao', 'nenhuma', 'nenhum', 'não se aplica', '-'].includes(d.toLowerCase())) return '';
+  return d;
+}
+
 function obterEstatisticasSaudeMulher() {
   const lista = listarInscricoesSaudeMulher();
   const total = lista.length;
   const whatsappConfirmados = lista.filter(i => i.whatsappConfirmacaoEnviado).length;
   const pendentesConfirmacao = total - whatsappConfirmados;
-  const comCondicaoSaude = lista.filter(i => i.condicoesSaude && i.condicoesSaude.trim() !== '' && i.condicoesSaude.toLowerCase() !== 'nenhuma').length;
-  const comCirurgia = lista.filter(i => i.cirurgia === 'Sim' || (i.cirurgiaDetalhes && i.cirurgiaDetalhes.trim() !== '')).length;
-  const comLesaoDor = lista.filter(i => i.lesaoDor === 'Sim' || (i.lesaoDorDetalhes && i.lesaoDorDetalhes.trim() !== '')).length;
-  const gestantes = lista.filter(i => i.gravida === 'Sim').length;
-  const praticamAtividade = lista.filter(i => i.atividadeFisica === 'Sim').length;
+  const comCondicaoSaude = lista.filter(i => {
+    const c = String(i.condicoesSaude || '').trim().toLowerCase();
+    return c !== '' && c !== 'não' && c !== 'nao' && c !== 'nenhuma' && c !== 'nenhum' && c !== '-';
+  }).length;
+  const comCirurgia = lista.filter(i => ehRespostaSim(i.cirurgia, i.cirurgiaDetalhes)).length;
+  const comLesaoDor = lista.filter(i => ehRespostaSim(i.lesaoDor, i.lesaoDorDetalhes)).length;
+  const gestantes = lista.filter(i => String(i.gravida || '').trim().toLowerCase() === 'sim').length;
+  const praticamAtividade = lista.filter(i => String(i.atividadeFisica || '').trim().toLowerCase() === 'sim').length;
 
   return {
     total,
@@ -422,20 +441,24 @@ function renderSaudeMulherPdfHtml() {
     const telFormatado = item.telefone ? item.telefone.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') : '-';
     const condicoes = item.condicoesSaude ? `<strong style="color: #be185d;">${item.condicoesSaude}</strong>` : '<span style="color: #6b7280;">Nenhuma</span>';
     const tratamento = item.tratamentoMedicamento ? `<br><small style="color: #374151;">Med: ${item.tratamentoMedicamento}</small>` : '';
-    const cirurgias = item.cirurgia === 'Sim' || item.cirurgiaDetalhes
-      ? `<span style="color: #b91c1c; font-weight: 600;">Sim</span>: ${item.cirurgiaDetalhes || '-'}`
+    const temCirurgia = ehRespostaSim(item.cirurgia, item.cirurgiaDetalhes);
+    const cirurgias = temCirurgia
+      ? `<span style="color: #b91c1c; font-weight: 600;">Sim</span>${item.cirurgiaDetalhes && !['não', 'nao', '-'].includes(item.cirurgiaDetalhes.trim().toLowerCase()) ? `: ${item.cirurgiaDetalhes}` : ''}`
       : '<span style="color: #6b7280;">Não</span>';
-    const lesoes = item.lesaoDor === 'Sim' || item.lesaoDorDetalhes
-      ? `<span style="color: #b91c1c; font-weight: 600;">Sim</span>: ${item.lesaoDorDetalhes || '-'}`
+    const temLesao = ehRespostaSim(item.lesaoDor, item.lesaoDorDetalhes);
+    const lesoes = temLesao
+      ? `<span style="color: #b91c1c; font-weight: 600;">Sim</span>${item.lesaoDorDetalhes && !['não', 'nao', '-'].includes(item.lesaoDorDetalhes.trim().toLowerCase()) ? `: ${item.lesaoDorDetalhes}` : ''}`
       : '<span style="color: #6b7280;">Não</span>';
-    const limitacao = item.limitacao === 'Sim' || item.limitacaoDetalhes
-      ? `<span style="color: #c2410c; font-weight: 600;">Sim</span>: ${item.limitacaoDetalhes || '-'}`
+    const temLimitacao = ehRespostaSim(item.limitacao, item.limitacaoDetalhes);
+    const limitacao = temLimitacao
+      ? `<span style="color: #c2410c; font-weight: 600;">Sim</span>${item.limitacaoDetalhes && !['não', 'nao', '-'].includes(item.limitacaoDetalhes.trim().toLowerCase()) ? `: ${item.limitacaoDetalhes}` : ''}`
       : '<span style="color: #6b7280;">Não</span>';
-    const gravida = item.gravida === 'Sim'
+    const gravida = String(item.gravida || '').trim().toLowerCase() === 'sim'
       ? '<span style="background: #fdf2f8; color: #db2777; font-weight: bold; padding: 2px 6px; border-radius: 4px;">🤰 Sim</span>'
       : '<span style="color: #6b7280;">Não</span>';
-    const atividade = item.atividadeFisica === 'Sim'
-      ? `<span style="color: #047857; font-weight: 600;">Sim</span>${item.atividadeFisicaDetalhes ? ` (${item.atividadeFisicaDetalhes})` : ''}`
+    const temAtividade = String(item.atividadeFisica || '').trim().toLowerCase() === 'sim';
+    const atividade = temAtividade
+      ? `<span style="color: #047857; font-weight: 600;">Sim</span>${item.atividadeFisicaDetalhes && !['não', 'nao', '-'].includes(item.atividadeFisicaDetalhes.trim().toLowerCase()) ? ` (${item.atividadeFisicaDetalhes})` : ''}`
       : '<span style="color: #6b7280;">Não</span>';
 
     return `

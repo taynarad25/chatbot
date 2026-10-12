@@ -980,7 +980,7 @@
                 marcarErroNoCampo(campoCirurgiaDet, 'Você marcou <em>"Sim"</em> na Pergunta 2. Por favor, <strong>informe qual cirurgia e quando realizou</strong>.');
                 return;
             }
-            const cirurgiaDetalhes = cirurgia === 'Sim' ? campoCirurgiaDet.value.trim() : 'Não';
+            const cirurgiaDetalhes = cirurgia === 'Sim' ? campoCirurgiaDet.value.trim() : '';
 
             // 4. Validação Pergunta 3: Lesão / Dor
             const radioLesao = document.querySelector('input[name="lesao_dor"]:checked');
@@ -994,7 +994,7 @@
                 marcarErroNoCampo(campoLesaoDet, 'Você marcou <em>"Sim"</em> na Pergunta 3. Por favor, <strong>informe qual é a lesão, dor ou região afetada</strong>.');
                 return;
             }
-            const lesaoDorDetalhes = lesaoDor === 'Sim' ? campoLesaoDet.value.trim() : 'Não';
+            const lesaoDorDetalhes = lesaoDor === 'Sim' ? campoLesaoDet.value.trim() : '';
 
             // 5. Validação Pergunta 4: Limitação
             const radioLimitacao = document.querySelector('input[name="limitacao"]:checked');
@@ -1008,7 +1008,7 @@
                 marcarErroNoCampo(campoLimitacaoDet, 'Você marcou <em>"Sim"</em> na Pergunta 4. Por favor, <strong>especifique qual é a limitação</strong>.');
                 return;
             }
-            const limitacaoDetalhes = limitacao === 'Sim' ? campoLimitacaoDet.value.trim() : 'Não';
+            const limitacaoDetalhes = limitacao === 'Sim' ? campoLimitacaoDet.value.trim() : '';
 
             // 6. Validação Pergunta 5: Gravidez
             const radioGravidez = document.querySelector('input[name="gravidez"]:checked');
@@ -1030,7 +1030,7 @@
                 marcarErroNoCampo(campoAtividadeDet, 'Você marcou <em>"Sim"</em> na Pergunta 6. Por favor, <strong>informe qual atividade física pratica</strong>.');
                 return;
             }
-            const atividadeFisicaDetalhes = atividadeFisica === 'Sim' ? campoAtividadeDet.value.trim() : 'Não';
+            const atividadeFisicaDetalhes = atividadeFisica === 'Sim' ? campoAtividadeDet.value.trim() : '';
 
             // 8. Pergunta 7: Observações adicionais (opcional)
             const campoOutras = document.getElementById('campoOutrasInfos');

@@ -1260,6 +1260,319 @@ function renderIndexHtml() {
       .lider-card-topo { flex-direction: column; align-items: flex-start; }
       .lider-card-acoes { width: 100%; justify-content: flex-end; }
     }
+
+    /* Header Live WhatsApp Status */
+    .header-whatsapp-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: rgba(34, 197, 94, 0.12);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      transition: all 0.2s ease;
+    }
+    .header-whatsapp-pill.desconectado {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+    .header-whatsapp-pill.aguardando {
+      background: rgba(234, 179, 8, 0.15);
+      color: #fde047;
+      border-color: rgba(234, 179, 8, 0.35);
+    }
+
+    /* Toast Notification Floating */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 999999;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .toast.sucesso {
+      background: #064e3b;
+      color: #a7f3d0;
+      border: 1px solid #059669;
+    }
+    .toast.erro {
+      background: #7f1d1d;
+      color: #fecaca;
+      border: 1px solid #dc2626;
+    }
+    .toast.info {
+      background: #0f172a;
+      color: #38bdf8;
+      border: 1px solid #0284c7;
+    }
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Gerenciador Dinâmico de Eventos */
+    .eventos-dashboard-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 1.8rem;
+    }
+    .stat-card-evento {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .stat-card-evento-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      background: rgba(0, 188, 212, 0.12);
+      color: var(--cor-ciano);
+      border: 1px solid rgba(0, 188, 212, 0.25);
+    }
+    .stat-card-evento-num {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.1;
+    }
+    .stat-card-evento-label {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--cor-texto-mutado);
+      margin-top: 2px;
+    }
+
+    .btn-destaque-novo-evento {
+      background: linear-gradient(135deg, #00bcd4, #7b2cbf);
+      color: #ffffff;
+      padding: 12px 24px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      box-shadow: 0 6px 20px rgba(0, 188, 212, 0.35);
+      transition: all 0.2s ease;
+    }
+    .btn-destaque-novo-evento:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(0, 188, 212, 0.5);
+    }
+
+    .box-editor-evento {
+      background: linear-gradient(145deg, #181822, #14141c);
+      border: 1px solid rgba(0, 188, 212, 0.4);
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 2.2rem;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .modo-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin: 1rem 0 1.5rem;
+    }
+    .modo-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .modo-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .modo-card.selected {
+      background: rgba(0, 188, 212, 0.12);
+      border-color: var(--cor-ciano);
+      box-shadow: 0 0 18px rgba(0, 188, 212, 0.2);
+    }
+    .modo-card-title {
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modo-card-desc {
+      font-size: 0.8rem;
+      color: var(--cor-texto-mutado);
+      line-height: 1.4;
+    }
+
+    .pergunta-row {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: 1fr 180px 140px 40px;
+      gap: 10px;
+      align-items: center;
+    }
+    @media (max-width: 768px) {
+      .pergunta-row { grid-template-columns: 1fr; }
+    }
+
+    .banner-preview-box {
+      width: 100%;
+      height: 180px;
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      background: rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+    .banner-preview-box:hover {
+      border-color: var(--cor-ciano);
+      background: rgba(0, 188, 212, 0.04);
+    }
+    .banner-preview-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .grid-eventos-dinamicos {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 18px;
+      margin-bottom: 2.5rem;
+    }
+    .card-evento-dinamico {
+      background: var(--cor-card-alt);
+      border: 1px solid var(--cor-borda);
+      border-radius: 18px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      transition: all 0.25s ease;
+    }
+    .card-evento-dinamico:hover {
+      border-color: rgba(0, 188, 212, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    }
+    .card-evento-dinamico-thumb {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      background: #111;
+      display: block;
+    }
+    .card-evento-dinamico-body {
+      padding: 1.3rem;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 8px;
+    }
+    .card-evento-dinamico-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .card-evento-dinamico-acoes {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* Modal Gaveta de Inscritos */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      padding: 1.5rem;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .modal-container {
+      background: #16161e;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      max-width: 1100px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+    }
+    .modal-header {
+      padding: 1.5rem 1.8rem;
+      border-bottom: 1px solid var(--cor-borda);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-body {
+      padding: 1.8rem;
+      overflow-y: auto;
+      flex: 1;
+    }
   </style>
 </head>
 <body>
@@ -1272,22 +1585,27 @@ function renderIndexHtml() {
           <p>Secretaria & Painel de Controle</p>
         </div>
       </div>
-      <div class="header-user-badge" id="headerUserBadge" style="display:none;">
-        <img id="headerUserAvatar" src="" class="header-user-avatar" alt="Foto Pastoral" />
-        <div class="header-user-meta">
-          <span class="header-user-greeting">Graça e Paz,</span>
-          <span class="header-user-name" id="headerUserName"></span>
+      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+        <div class="header-whatsapp-pill" id="headerWhatsappPill">
+          <span style="font-size:0.9rem;">●</span> <span id="headerWhatsappText">WhatsApp Conectando...</span>
         </div>
+        <div class="header-user-badge" id="headerUserBadge" style="display:none;">
+          <img id="headerUserAvatar" src="" class="header-user-avatar" alt="Foto Pastoral" />
+          <div class="header-user-meta">
+            <span class="header-user-greeting">Graça e Paz,</span>
+            <span class="header-user-name" id="headerUserName"></span>
+          </div>
+        </div>
+        <button id="logout">Sair do Painel</button>
       </div>
-      <button id="logout">Sair do Painel</button>
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" onclick="openTab(event, 'tab-whatsapp')">WhatsApp</button>
-      <button class="tab-btn" id="btn-tab-eventos" onclick="openTab(event, 'tab-eventos')">Eventos</button>
-      <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">Usuários</button>
-      <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">Líderes e Cargos</button>
-      <button class="tab-btn" id="btn-tab-logs" style="display:none;" onclick="openTab(event, 'tab-logs')">Logs</button>
+      <button class="tab-btn active" onclick="openTab(event, 'tab-whatsapp')">💬 WhatsApp & Bot</button>
+      <button class="tab-btn" id="btn-tab-eventos" onclick="openTab(event, 'tab-eventos')">📅 Gestão de Eventos</button>
+      <button class="tab-btn" id="btn-tab-admin" style="display:none;" onclick="openTab(event, 'tab-admin')">👥 Usuários</button>
+      <button class="tab-btn" id="btn-tab-lideres" style="display:none;" onclick="openTab(event, 'tab-lideres')">👔 Líderes e Cargos</button>
+      <button class="tab-btn" id="btn-tab-logs" style="display:none;" onclick="openTab(event, 'tab-logs')">📋 Logs</button>
     </div>
     
     <div id="tab-whatsapp" class="tab-content active">
@@ -1304,32 +1622,203 @@ function renderIndexHtml() {
 
     <!-- Aba de Gestão de Eventos -->
     <div id="tab-eventos" class="tab-content">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 14px;">
         <div>
-          <h3 class="section-title-tab" style="margin-bottom: 4px;">Gestão de Eventos</h3>
-          <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">Acompanhe os eventos cadastrados, inscrições e relatórios no sistema.</p>
+          <h3 class="section-title-tab" style="margin-bottom: 4px; font-size: 1.4rem;">Gerenciador Completo de Eventos</h3>
+          <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">Cadastre eventos com fotos, crie formulários com perguntas automáticas, mande para a planilha ou direcione direto para o WhatsApp sem complicações.</p>
+        </div>
+        <button type="button" class="btn-destaque-novo-evento" id="btnToggleEditorEvento" onclick="toggleEditorNovoEvento()">
+          <span>✨</span> <span id="btnToggleEditorTexto">+ Criar Novo Evento</span>
+        </button>
+      </div>
+
+      <!-- Métricas Gerais de Eventos -->
+      <div class="eventos-dashboard-bar">
+        <div class="stat-card-evento">
+          <div class="stat-card-evento-icon">📅</div>
+          <div>
+            <div class="stat-card-evento-num" id="statTotalEventosPainel">0</div>
+            <div class="stat-card-evento-label">Eventos Personalizados</div>
+          </div>
+        </div>
+        <div class="stat-card-evento">
+          <div class="stat-card-evento-icon" style="background: rgba(34, 197, 94, 0.12); color: #4ade80; border-color: rgba(34, 197, 94, 0.25);">👥</div>
+          <div>
+            <div class="stat-card-evento-num" id="statTotalInscritosGeral" style="color: #4ade80;">0</div>
+            <div class="stat-card-evento-label">Total de Inscrições</div>
+          </div>
+        </div>
+        <div class="stat-card-evento">
+          <div class="stat-card-evento-icon" style="background: rgba(168, 85, 247, 0.12); color: #c084fc; border-color: rgba(168, 85, 247, 0.25);">📝</div>
+          <div>
+            <div class="stat-card-evento-num" id="statEventosComFormulario" style="color: #c084fc;">0</div>
+            <div class="stat-card-evento-label">Com Inscrição no Site</div>
+          </div>
+        </div>
+        <div class="stat-card-evento">
+          <div class="stat-card-evento-icon" style="background: rgba(37, 211, 102, 0.12); color: #25d366; border-color: rgba(37, 211, 102, 0.25);">💬</div>
+          <div>
+            <div class="stat-card-evento-num" id="statEventosWhatsapp" style="color: #25d366;">0</div>
+            <div class="stat-card-evento-label">Direcionando ao Whats</div>
+          </div>
         </div>
       </div>
 
-      <!-- Lista de Eventos Agendados no Sistema -->
+      <!-- Box Editor / Criador de Novo Evento (Abre/Fecha) -->
+      <div id="boxEditorNovoEvento" class="box-editor-evento" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 12px; margin-bottom: 1.5rem;">
+          <div>
+            <h4 style="font-size: 1.25rem; color: #fff; margin: 0 0 4px;" id="tituloEditorEvento">✨ Cadastrar Novo Evento</h4>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.85rem; margin: 0;">Preencha os dados abaixo e o site gera a página e a rota automaticamente.</p>
+          </div>
+          <button type="button" onclick="toggleEditorNovoEvento(false)" style="background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 12px; font-size: 0.82rem; cursor: pointer;">✕ Fechar</button>
+        </div>
+
+        <form id="formNovoEventoPainel" onsubmit="salvarNovoEventoPainel(event)">
+          <input type="hidden" id="editorEventoId" value="" />
+
+          <!-- 1. Dados Básicos -->
+          <div class="form-group">
+            <label class="form-label" for="editorEventoTitulo">Nome / Título do Evento <span class="req">*</span></label>
+            <input type="text" id="editorEventoTitulo" class="form-input" placeholder="Ex: Conferência de Mulheres 2026, Retiro de Jovens..." required />
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 1.2rem;">
+            <div>
+              <label class="form-label" for="editorEventoData">Data do Evento</label>
+              <input type="text" id="editorEventoData" class="form-input" placeholder="Ex: 15/11/2026 ou Sábado, 15 de Nov" />
+            </div>
+            <div>
+              <label class="form-label" for="editorEventoHorario">Horário de Início</label>
+              <input type="text" id="editorEventoHorario" class="form-input" placeholder="Ex: 19:30" />
+            </div>
+            <div>
+              <label class="form-label" for="editorEventoLocal">Local</label>
+              <input type="text" id="editorEventoLocal" class="form-input" value="Comunidade Cristã Curados" placeholder="Ex: Templo Principal, Sítio..." />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="editorEventoDescricao">Descrição / Detalhes do Evento</label>
+            <textarea id="editorEventoDescricao" class="form-input" rows="3" placeholder="Escreva sobre o evento, convidados, versículo tema ou orientações gerais..."></textarea>
+          </div>
+
+          <!-- 2. Fotos e Banner -->
+          <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label">Foto / Banner do Evento (Upload ou URL)</label>
+            <div style="display: grid; grid-template-columns: 240px 1fr; gap: 16px; align-items: center;">
+              <div class="banner-preview-box" id="bannerPreviewBox" onclick="document.getElementById('editorEventoBannerFile').click()">
+                <div id="bannerPlaceholderText" style="text-align: center; color: var(--cor-texto-mutado); font-size: 0.85rem; padding: 10px;">
+                  <span style="font-size: 2rem; display: block; margin-bottom: 4px;">📸</span>
+                  Clique para subir foto
+                </div>
+                <img id="bannerPreviewImg" class="banner-preview-img" alt="Prévia" />
+              </div>
+              <div>
+                <input type="file" id="editorEventoBannerFile" accept="image/*" style="display: none;" onchange="handleBannerUpload(this)" />
+                <button type="button" onclick="document.getElementById('editorEventoBannerFile').click()" style="background: rgba(0, 188, 212, 0.15); color: var(--cor-ciano); border: 1px solid rgba(0, 188, 212, 0.35); padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                  📁 Escolher Arquivo de Imagem
+                </button>
+                <div style="font-size: 0.78rem; color: var(--cor-texto-mutado); margin-bottom: 6px;">Ou cole a URL direta de uma imagem:</div>
+                <input type="url" id="editorEventoBannerUrl" class="form-input" placeholder="https://exemplo.com/foto.jpg ou /images/..." oninput="atualizarBannerUrlPreview(this.value)" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Modo de Inscrição / Participação -->
+          <div class="form-group" style="margin-top: 1.8rem;">
+            <label class="form-label" style="font-size: 0.95rem;">Modo de Participação / Inscrição <span class="req">*</span></label>
+            <div class="modo-cards-grid">
+              <div class="modo-card selected" id="modoCardFormulario" onclick="selecionarModoInscricao('formulario')">
+                <div class="modo-card-title">📝 Inscrição no Site</div>
+                <div class="modo-card-desc">Cria uma página oficial com ficha de inscrição e envia os dados para a sua planilha Google.</div>
+              </div>
+              <div class="modo-card" id="modoCardWhatsapp" onclick="selecionarModoInscricao('whatsapp')">
+                <div class="modo-card-title">💬 Direto pro WhatsApp</div>
+                <div class="modo-card-desc">Sem formulário. A pessoa vê as fotos e descrição e clica num botão que abre o WhatsApp.</div>
+              </div>
+              <div class="modo-card" id="modoCardExterno" onclick="selecionarModoInscricao('externo')">
+                <div class="modo-card-title">🔗 Inscrição Externa</div>
+                <div class="modo-card-desc">Tipo Dia das Crianças. O botão direciona para link de Google Forms, Sympla ou outro site.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Seção Condicional 1: Inscrição no Site (Planilha + Perguntas) -->
+          <div id="secaoModoFormulario" style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(0, 188, 212, 0.2); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label class="form-label" for="editorEventoPlanilhaUrl">URL da Planilha / Web App Google (Google Apps Script)</label>
+              <input type="url" id="editorEventoPlanilhaUrl" class="form-input" placeholder="https://script.google.com/macros/s/.../exec (opcional - envia automático se preenchido)" />
+              <small style="color: var(--cor-texto-mutado); display: block; margin-top: 4px;">Se preenchida, cada nova inscrição salva no site é enviada instantaneamente para a sua planilha do Google!</small>
+            </div>
+
+            <div style="margin-top: 1.4rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div>
+                  <strong style="color: #fff; font-size: 0.92rem;">Perguntas Personalizadas da Ficha</strong>
+                  <div style="color: var(--cor-texto-mutado); font-size: 0.78rem;">Nome, Telefone e E-mail já estão inclusos por padrão. Adicione quantas perguntas extras quiser!</div>
+                </div>
+                <button type="button" onclick="adicionarPerguntaBuilder()" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35); padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+                  + Adicionar Pergunta
+                </button>
+              </div>
+
+              <div id="containerPerguntasBuilder"></div>
+            </div>
+          </div>
+
+          <!-- Seção Condicional 2: WhatsApp -->
+          <div id="secaoModoWhatsapp" style="display: none; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(37, 211, 102, 0.2); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 220px 1fr; gap: 14px;">
+              <div>
+                <label class="form-label" for="editorEventoWhatsContato">WhatsApp de Atendimento</label>
+                <input type="tel" id="editorEventoWhatsContato" class="form-input" value="11942685501" placeholder="(11) 94268-5501" />
+              </div>
+              <div>
+                <label class="form-label" for="editorEventoWhatsMensagem">Mensagem Pré-definida (opcional)</label>
+                <input type="text" id="editorEventoWhatsMensagem" class="form-input" placeholder="Ex: Olá, gostaria de saber mais sobre o evento..." />
+              </div>
+            </div>
+          </div>
+
+          <!-- Seção Condicional 3: Link Externo -->
+          <div id="secaoModoExterno" style="display: none; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label class="form-label" for="editorEventoLinkExterno">Link do Formulário Externo</label>
+              <input type="url" id="editorEventoLinkExterno" class="form-input" placeholder="https://forms.gle/... ou https://sympla.com.br/..." />
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: flex-end; align-items: center; margin-top: 1.5rem;">
+            <button type="button" onclick="toggleEditorNovoEvento(false)" style="background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 11px 20px; border-radius: 10px; font-weight: 600; cursor: pointer;">Cancelar</button>
+            <button type="submit" id="btnSalvarEventoSubmit" class="primary" style="padding: 11px 26px; font-size: 0.95rem; font-weight: 800; border-radius: 10px; width: auto;">
+              🚀 Salvar e Publicar Evento
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Grid de Eventos Cadastrados no Painel -->
       <div style="margin-bottom: 2.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h4 style="font-size: 1.15rem; color: #fff; margin: 0;">📋 Eventos Cadastrados no Sistema</h4>
-          <button onclick="fetchEventosCadastrados()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 6px 12px; font-size: 0.82rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); cursor: pointer;">🔄 Atualizar Lista</button>
+          <h4 style="font-size: 1.15rem; color: #fff; margin: 0;">📋 Eventos Criados no Sistema</h4>
+          <button onclick="fetchEventosPainel()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 6px 12px; font-size: 0.82rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); cursor: pointer;">🔄 Atualizar Eventos</button>
         </div>
-        <div id="gridEventosCadastrados" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
-          <div style="color: var(--cor-texto-mutado); font-size: 0.88rem; padding: 1rem; background: var(--cor-card-alt); border-radius: 12px; border: 1px solid var(--cor-borda);">
+        <div id="gridEventosPainel" class="grid-eventos-dinamicos">
+          <div style="color: var(--cor-texto-mutado); font-size: 0.88rem; padding: 1.5rem; background: var(--cor-card-alt); border-radius: 14px; border: 1px solid var(--cor-borda); grid-column: 1 / -1;">
             Carregando eventos...
           </div>
         </div>
       </div>
 
-
-
-      <!-- Seção de Eventos com Inscrições Ativas -->
-      <div style="margin-top: 2.5rem; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <h4 style="font-size: 1.2rem; color: #fff; margin: 0 0 4px; font-weight: 800;">📝 Inscrições por Evento</h4>
+      <!-- Seção Histórica: Eventos Especiais & Anamneses Pré-existentes (Colapsável) -->
+      <div style="margin-top: 3rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h4 style="font-size: 1.2rem; color: #fff; margin: 0 0 4px; font-weight: 800;">🏛️ Eventos Fixos & Anamneses</h4>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.85rem; margin: 0;">Consulte as inscrições e relatórios dos eventos históricos e fichas clínicas.</p>
+          </div>
+        </div>
           <p style="color: var(--cor-texto-mutado); font-size: 0.85rem; margin: 0;">Acompanhe em tempo real as listas de participantes, formulários e sincronizações de cada evento ativo.</p>
         </div>
       </div>
@@ -1677,13 +2166,549 @@ function renderIndexHtml() {
     </div>
   </div>
 
+  <!-- Modal Gaveta de Inscritos de Evento Dinâmico -->
+  <div id="modalInscritosEventoDinamico" class="modal-overlay" onclick="fecharModalInscritosEvento(event)">
+    <div class="modal-container" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalInscritosTitulo" style="color: #fff; font-size: 1.3rem; margin: 0 0 4px;">Inscritos do Evento</h3>
+          <span id="modalInscritosSubtitulo" style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Carregando participantes...</span>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button id="btnExportarPdfModal" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
+            📄 Imprimir / PDF
+          </button>
+          <button type="button" onclick="fecharModalInscritosEvento()" style="background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 8px 14px; font-size: 0.9rem; cursor: pointer;">
+            ✕ Fechar
+          </button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 1.2rem;">
+          <input type="text" id="modalBuscaInscritosInput" class="evento-search-input" placeholder="🔍 Filtrar por nome, telefone ou respostas..." oninput="filtrarInscritosEventoDinamico()" />
+        </div>
+        <div style="background: var(--cor-card); border: 1px solid var(--cor-borda); border-radius: 14px; overflow-x: auto;">
+          <table class="evento-table">
+            <thead id="modalInscritosTableThead">
+              <tr>
+                <th style="width: 40px; text-align: center;">Nº</th>
+                <th>Nome</th>
+                <th>Telefone / WhatsApp</th>
+                <th>E-mail</th>
+                <th style="width: 90px; text-align: center;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="modalInscritosTableTbody">
+              <tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--cor-texto-mutado);">Carregando participantes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
   <script>
+    // ==========================================
+    // TOAST NOTIFICATIONS
+    // ==========================================
+    function mostrarToast(mensagem, tipo = 'sucesso') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const t = document.createElement('div');
+      t.className = 'toast ' + tipo;
+      const icon = tipo === 'sucesso' ? '✅' : (tipo === 'erro' ? '❌' : 'ℹ️');
+      t.innerHTML = '<span>' + icon + '</span> <span>' + mensagem + '</span>';
+      container.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transform = 'translateY(10px)';
+        setTimeout(() => t.remove(), 300);
+      }, 3500);
+    }
+
+    // ==========================================
+    // GERENCIADOR DINÂMICO DE EVENTOS
+    // ==========================================
+    let modoInscricaoSelecionado = 'formulario';
+    let perguntasBuilderLista = [];
+    let eventosPainelCache = [];
+    let modalEventoAtualId = null;
+    let modalInscricoesCache = [];
+    let modalEventoAtualObj = null;
+
+    function toggleEditorNovoEvento(forcarAberto) {
+      const box = document.getElementById('boxEditorNovoEvento');
+      const btnTexto = document.getElementById('btnToggleEditorTexto');
+      if (!box) return;
+      const aberto = forcarAberto !== undefined ? forcarAberto : (box.style.display === 'none' || !box.style.display);
+      box.style.display = aberto ? 'block' : 'none';
+      if (btnTexto) btnTexto.textContent = aberto ? '✕ Fechar Criador' : '+ Criar Novo Evento';
+      if (aberto) {
+        box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (perguntasBuilderLista.length === 0) {
+          renderPerguntasBuilder();
+        }
+      }
+    }
+
+    function selecionarModoInscricao(modo) {
+      modoInscricaoSelecionado = modo;
+      document.getElementById('modoCardFormulario')?.classList.toggle('selected', modo === 'formulario');
+      document.getElementById('modoCardWhatsapp')?.classList.toggle('selected', modo === 'whatsapp');
+      document.getElementById('modoCardExterno')?.classList.toggle('selected', modo === 'externo');
+
+      const sForm = document.getElementById('secaoModoFormulario');
+      const sWhats = document.getElementById('secaoModoWhatsapp');
+      const sExt = document.getElementById('secaoModoExterno');
+
+      if (sForm) sForm.style.display = modo === 'formulario' ? 'block' : 'none';
+      if (sWhats) sWhats.style.display = modo === 'whatsapp' ? 'block' : 'none';
+      if (sExt) sExt.style.display = modo === 'externo' ? 'block' : 'none';
+    }
+
+    function atualizarBannerUrlPreview(url) {
+      const img = document.getElementById('bannerPreviewImg');
+      const placeholder = document.getElementById('bannerPlaceholderText');
+      if (!img || !placeholder) return;
+      if (url && url.trim()) {
+        img.src = url.trim();
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+      } else {
+        img.style.display = 'none';
+        placeholder.style.display = 'block';
+      }
+    }
+
+    async function handleBannerUpload(input) {
+      if (!input || !input.files || !input.files[0]) return;
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const base64 = e.target.result;
+        atualizarBannerUrlPreview(base64);
+
+        try {
+          const res = await fetch('/secretaria/api/eventos-painel/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagemBase64: base64, nomeArquivo: file.name })
+          });
+          const data = await res.json();
+          if (res.ok && data.ok && data.url) {
+            document.getElementById('editorEventoBannerUrl').value = data.url;
+            mostrarToast('Foto do evento enviada com sucesso!');
+          }
+        } catch (err) {
+          console.warn('Erro ao fazer upload para servidor, usando data-url:', err);
+          document.getElementById('editorEventoBannerUrl').value = base64;
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function renderPerguntasBuilder() {
+      const container = document.getElementById('containerPerguntasBuilder');
+      if (!container) return;
+
+      if (perguntasBuilderLista.length === 0) {
+        container.innerHTML = '<div style="color: var(--cor-texto-mutado); font-size: 0.82rem; font-style: italic; padding: 8px 0;">Nenhuma pergunta personalizada adicionada ainda. Clique em "+ Adicionar Pergunta" acima para criar campos extras (ex: Sim/Não, texto, restrições).</div>';
+        return;
+      }
+
+      container.innerHTML = perguntasBuilderLista.map((p, idx) => {
+        return '<div class="pergunta-row">' +
+          '<div>' +
+            '<label style="font-size:0.75rem; color:#a1a1aa; display:block; margin-bottom:2px;">Pergunta / Rótulo *</label>' +
+            '<input type="text" class="form-input" style="padding:8px 10px; font-size:0.85rem;" placeholder="Ex: Possui alguma restrição ou alergia?" value="' + (p.label || '').replace(/"/g, '&quot;') + '" oninput="perguntasBuilderLista[' + idx + '].label = this.value" required />' +
+          '</div>' +
+          '<div>' +
+            '<label style="font-size:0.75rem; color:#a1a1aa; display:block; margin-bottom:2px;">Tipo da Resposta</label>' +
+            '<select class="form-input" style="padding:8px 10px; font-size:0.85rem;" onchange="perguntasBuilderLista[' + idx + '].tipo = this.value">' +
+              '<option value="texto"' + (p.tipo === 'texto' ? ' selected' : '') + '>Texto Aberto</option>' +
+              '<option value="sim_nao"' + (p.tipo === 'sim_nao' ? ' selected' : '') + '>Sim / Não (com detalhe)</option>' +
+              '<option value="numero"' + (p.tipo === 'numero' ? ' selected' : '') + '>Número / Idade</option>' +
+            '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label style="font-size:0.75rem; color:#a1a1aa; display:block; margin-bottom:2px;">Obrigatória?</label>' +
+            '<select class="form-input" style="padding:8px 10px; font-size:0.85rem;" onchange="perguntasBuilderLista[' + idx + '].obrigatorio = this.value === \'1\'">' +
+              '<option value="1"' + (p.obrigatorio ? ' selected' : '') + '>Sim (Obrigatória)</option>' +
+              '<option value="0"' + (!p.obrigatorio ? ' selected' : '') + '>Opcional</option>' +
+            '</select>' +
+          '</div>' +
+          '<div style="text-align: right; padding-top: 14px;">' +
+            '<button type="button" onclick="removerPerguntaBuilder(' + idx + ')" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 7px 10px; cursor: pointer;" title="Remover pergunta">✕</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function adicionarPerguntaBuilder(dados) {
+      perguntasBuilderLista.push(dados || {
+        id: 'p_' + Date.now().toString().slice(-6),
+        label: '',
+        tipo: 'texto',
+        obrigatorio: true,
+        detalhePlaceholder: 'Especifique por favor...'
+      });
+      renderPerguntasBuilder();
+    }
+
+    function removerPerguntaBuilder(idx) {
+      perguntasBuilderLista.splice(idx, 1);
+      renderPerguntasBuilder();
+    }
+
+    async function salvarNovoEventoPainel(e) {
+      e.preventDefault();
+      const id = document.getElementById('editorEventoId').value;
+      const titulo = document.getElementById('editorEventoTitulo').value.trim();
+      const dataEvento = document.getElementById('editorEventoData').value.trim();
+      const horario = document.getElementById('editorEventoHorario').value.trim();
+      const local = document.getElementById('editorEventoLocal').value.trim();
+      const descricao = document.getElementById('editorEventoDescricao').value.trim();
+      const bannerUrl = document.getElementById('editorEventoBannerUrl').value.trim();
+      const linkPlanilha = document.getElementById('editorEventoPlanilhaUrl').value.trim();
+      const whatsappContato = document.getElementById('editorEventoWhatsContato').value.trim();
+      const whatsappMensagem = document.getElementById('editorEventoWhatsMensagem').value.trim();
+      const linkExterno = document.getElementById('editorEventoLinkExterno').value.trim();
+
+      if (!titulo) {
+        mostrarToast('Informe o nome do evento.', 'erro');
+        return;
+      }
+
+      const btn = document.getElementById('btnSalvarEventoSubmit');
+      btn.disabled = true;
+      btn.innerHTML = '<span>Gravando evento...</span>';
+
+      const payload = {
+        id: id || null,
+        titulo,
+        dataEvento,
+        horario,
+        local,
+        descricao,
+        bannerUrl,
+        tipoInscricao: modoInscricaoSelecionado,
+        linkPlanilha,
+        whatsappContato,
+        whatsappMensagem,
+        linkExterno,
+        perguntas: perguntasBuilderLista,
+        ativo: 1
+      };
+
+      try {
+        const res = await fetch('/secretaria/api/eventos-painel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          mostrarToast('Evento "' + titulo + '" salvo e publicado com sucesso!');
+          document.getElementById('formNovoEventoPainel').reset();
+          document.getElementById('editorEventoId').value = '';
+          perguntasBuilderLista = [];
+          atualizarBannerUrlPreview('');
+          toggleEditorNovoEvento(false);
+          await fetchEventosPainel();
+        } else {
+          mostrarToast(data.message || 'Erro ao salvar evento.', 'erro');
+        }
+      } catch (err) {
+        console.error('Erro ao salvar evento:', err);
+        mostrarToast('Erro de conexão ao salvar evento.', 'erro');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🚀 Salvar e Publicar Evento';
+      }
+    }
+
+    async function fetchEventosPainel() {
+      const grid = document.getElementById('gridEventosPainel');
+      if (!grid) return;
+      try {
+        const res = await fetch('/secretaria/api/eventos-painel');
+        if (!res.ok) return;
+        const data = await res.json();
+        eventosPainelCache = data.eventos || [];
+        renderEventosPainel(eventosPainelCache);
+        atualizarMetricasGeraisEventos(eventosPainelCache);
+      } catch (err) {
+        console.error('Erro ao buscar eventos do painel:', err);
+        grid.innerHTML = '<div style="color: #fca5a5; padding: 1.5rem; background: var(--cor-card-alt); border-radius: 14px; grid-column: 1 / -1;">Erro ao carregar eventos cadastrados.</div>';
+      }
+    }
+
+    function atualizarMetricasGeraisEventos(eventos) {
+      const total = eventos.length;
+      let totalInscritos = 0;
+      let comForm = 0;
+      let comWhats = 0;
+
+      eventos.forEach(ev => {
+        totalInscritos += (ev.totalInscritos || 0);
+        if (ev.tipoInscricao === 'formulario') comForm++;
+        if (ev.tipoInscricao === 'whatsapp') comWhats++;
+      });
+
+      const elTotal = document.getElementById('statTotalEventosPainel');
+      const elInsc = document.getElementById('statTotalInscritosGeral');
+      const elForm = document.getElementById('statEventosComFormulario');
+      const elZap = document.getElementById('statEventosWhatsapp');
+
+      if (elTotal) elTotal.textContent = total;
+      if (elInsc) elInsc.textContent = totalInscritos;
+      if (elForm) elForm.textContent = comForm;
+      if (elZap) elZap.textContent = comWhats;
+    }
+
+    function renderEventosPainel(eventos) {
+      const grid = document.getElementById('gridEventosPainel');
+      if (!grid) return;
+
+      if (!eventos || eventos.length === 0) {
+        grid.innerHTML = '<div style="color: var(--cor-texto-mutado); font-size: 0.9rem; padding: 2.5rem 1.5rem; text-align: center; background: var(--cor-card-alt); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.15); grid-column: 1 / -1;">' +
+          '<span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">✨</span>' +
+          '<strong>Nenhum evento criado ainda!</strong><br>' +
+          '<span style="font-size: 0.85rem; color: #a1a1aa;">Clique no botão <strong>"+ Criar Novo Evento"</strong> acima para subir fotos, criar ficha de inscrição ou direcionar pro WhatsApp!</span>' +
+        '</div>';
+        return;
+      }
+
+      grid.innerHTML = eventos.map(ev => {
+        let badgeTipo = '📝 Inscrição no Site';
+        let corBadgeTipo = 'background: rgba(0, 188, 212, 0.15); color: #00bcd4; border: 1px solid rgba(0, 188, 212, 0.35);';
+
+        if (ev.tipoInscricao === 'whatsapp') {
+          badgeTipo = '💬 Direto pro Whats';
+          corBadgeTipo = 'background: rgba(37, 211, 102, 0.15); color: #4ade80; border: 1px solid rgba(37, 211, 102, 0.35);';
+        } else if (ev.tipoInscricao === 'externo') {
+          badgeTipo = '🔗 Inscrição Externa';
+          corBadgeTipo = 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35);';
+        }
+
+        const badgeStatus = ev.ativo
+          ? '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(34, 197, 94, 0.35);">🟢 Ativo</span>'
+          : '<span style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.35);">⏸️ Pausado</span>';
+
+        const thumbImg = ev.bannerUrl
+          ? '<img src="' + ev.bannerUrl + '" class="card-evento-dinamico-thumb" alt="' + ev.titulo + '" />'
+          : '<div class="card-evento-dinamico-thumb" style="display: flex; align-items: center; justify-content: center; font-size: 2.2rem; background: linear-gradient(135deg, #1f2937, #111827);">📅</div>';
+
+        const dataLocal = [ev.dataEvento, ev.horario, ev.local].filter(Boolean).join(' • ');
+
+        const botaoInscritos = ev.tipoInscricao === 'formulario'
+          ? '<button onclick="abrirModalInscritosEvento(\'' + ev.id + '\')" style="background: rgba(0, 188, 212, 0.12); color: var(--cor-ciano); border: 1px solid rgba(0, 188, 212, 0.3); padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">' +
+              '👥 Ver ' + (ev.totalInscritos || 0) + ' Inscritos' +
+            '</button>'
+          : '';
+
+        return '<div class="card-evento-dinamico">' +
+          thumbImg +
+          '<div class="card-evento-dinamico-body">' +
+            '<div class="card-evento-dinamico-badges">' +
+              '<span style="' + corBadgeTipo + ' font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;">' + badgeTipo + '</span>' +
+              badgeStatus +
+            '</div>' +
+            '<h4 style="color: #fff; font-size: 1.15rem; margin: 2px 0 0; line-height: 1.3;">' + ev.titulo + '</h4>' +
+            '<div style="font-size: 0.82rem; color: var(--cor-texto-mutado);">' + (dataLocal || 'Data e local a definir') + '</div>' +
+            '<div class="card-evento-dinamico-acoes">' +
+              '<button onclick="copiarLinkEvento(\'' + ev.slug + '\')" style="background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); padding: 7px 11px; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer;" title="Copiar link da página">' +
+                '🔗 Copiar Link' +
+              '</button>' +
+              '<button onclick="window.open(\'/evento/' + ev.slug + '\', \'_blank\')" style="background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); padding: 7px 11px; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer;" title="Abrir página do evento">' +
+                '👁️ Abrir' +
+              '</button>' +
+              botaoInscritos +
+              '<button onclick="alternarStatusEventoPainel(\'' + ev.id + '\')" style="background: rgba(255, 255, 255, 0.05); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.12); padding: 7px 9px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;" title="' + (ev.ativo ? 'Pausar evento' : 'Ativar evento') + '">' +
+                (ev.ativo ? '⏸️' : '▶️') +
+              '</button>' +
+              '<button onclick="excluirEventoPainel(\'' + ev.id + '\', \'' + ev.titulo.replace(/'/g, "\\'") + '\')" style="background: rgba(239, 68, 68, 0.12); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.25); padding: 7px 9px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;" title="Excluir evento">' +
+                '🗑️' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function copiarLinkEvento(slug) {
+      const url = window.location.origin + '/evento/' + slug;
+      navigator.clipboard.writeText(url).then(() => {
+        mostrarToast('Link copiado: /evento/' + slug);
+      }).catch(() => {
+        prompt('Copie o link abaixo:', url);
+      });
+    }
+
+    async function alternarStatusEventoPainel(id) {
+      try {
+        const res = await fetch('/secretaria/api/eventos-painel/' + id + '/toggle', { method: 'POST' });
+        if (res.ok) {
+          mostrarToast('Status do evento alterado.');
+          fetchEventosPainel();
+        }
+      } catch (err) {
+        mostrarToast('Erro ao alternar status do evento.', 'erro');
+      }
+    }
+
+    async function excluirEventoPainel(id, titulo) {
+      const confirmou = confirm('Tem certeza que deseja excluir o evento "' + titulo + '" e todas as suas inscrições?');
+      if (!confirmou) return;
+      try {
+        const res = await fetch('/secretaria/api/eventos-painel/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          mostrarToast('Evento excluído com sucesso!');
+          fetchEventosPainel();
+        } else {
+          mostrarToast(data.message || 'Erro ao excluir evento.', 'erro');
+        }
+      } catch (err) {
+        mostrarToast('Erro de conexão ao excluir evento.', 'erro');
+      }
+    }
+
+    // Modal de Inscritos
+    async function abrirModalInscritosEvento(eventoId) {
+      modalEventoAtualId = eventoId;
+      const modal = document.getElementById('modalInscritosEventoDinamico');
+      const tituloEl = document.getElementById('modalInscritosTitulo');
+      const subtituloEl = document.getElementById('modalInscritosSubtitulo');
+      const thead = document.getElementById('modalInscritosTableThead');
+      const tbody = document.getElementById('modalInscritosTableTbody');
+      const btnPdf = document.getElementById('btnExportarPdfModal');
+
+      if (!modal) return;
+      modal.style.display = 'flex';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--cor-texto-mutado);">Carregando participantes...</td></tr>';
+
+      try {
+        const res = await fetch('/secretaria/api/eventos-painel/' + eventoId + '/inscricoes');
+        if (!res.ok) throw new Error('Falha ao buscar inscritos');
+        const data = await res.json();
+        modalEventoAtualObj = data.evento;
+        modalInscricoesCache = data.inscricoes || [];
+
+        if (tituloEl && modalEventoAtualObj) tituloEl.textContent = 'Inscritos — ' + modalEventoAtualObj.titulo;
+        if (subtituloEl) subtituloEl.textContent = modalInscricoesCache.length + ' participante(s) cadastrado(s)';
+
+        if (btnPdf) {
+          btnPdf.onclick = () => window.open('/secretaria/api/eventos-painel/' + eventoId + '/relatorio-pdf', '_blank');
+        }
+
+        renderTabelaInscritosModal(modalInscricoesCache);
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:#fca5a5;">Erro ao carregar lista de inscritos.</td></tr>';
+      }
+    }
+
+    function fecharModalInscritosEvento(e) {
+      if (e && e.target && e.target.id !== 'modalInscritosEventoDinamico' && e.target.tagName !== 'BUTTON') return;
+      const modal = document.getElementById('modalInscritosEventoDinamico');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function renderTabelaInscritosModal(lista) {
+      const thead = document.getElementById('modalInscritosTableThead');
+      const tbody = document.getElementById('modalInscritosTableTbody');
+      if (!thead || !tbody) return;
+
+      const perguntas = (modalEventoAtualObj && modalEventoAtualObj.perguntas) || [];
+
+      let headersCols = '<th style="width: 40px; text-align: center;">Nº</th>' +
+        '<th>Nome Completo</th>' +
+        '<th>Telefone / WhatsApp</th>' +
+        '<th>E-mail</th>';
+
+      perguntas.forEach(p => {
+        headersCols += '<th>' + (p.label || 'Pergunta') + '</th>';
+      });
+
+      headersCols += '<th style="width: 80px; text-align: center;">Ações</th>';
+      thead.innerHTML = '<tr>' + headersCols + '</tr>';
+
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="' + (5 + perguntas.length) + '" style="text-align: center; color: var(--cor-texto-mutado); padding: 2.5rem;">Nenhum participante inscrito encontrado.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map((item, idx) => {
+        const telFmt = item.telefone ? item.telefone.replace(/^(\\d{2})(\\d{4,5})(\\d{4})$/, '($1) $2-$3') : '-';
+        const respostas = item.respostas || {};
+
+        let respCols = '';
+        perguntas.forEach((p, pIdx) => {
+          const campoId = 'perg_' + (p.id || pIdx);
+          const v = respostas[campoId] || '-';
+          const det = respostas[campoId + '_detalhes'];
+          if (det) {
+            respCols += '<td>' + v + ': <small style="color:var(--cor-ciano);">' + det + '</small></td>';
+          } else {
+            respCols += '<td>' + v + '</td>';
+          }
+        });
+
+        return '<tr>' +
+          '<td style="text-align:center; font-weight:bold; color:var(--cor-texto-mutado);">' + (idx + 1) + '</td>' +
+          '<td><strong style="color:#fff;">' + (item.nome || '-') + '</strong></td>' +
+          '<td>' + telFmt + '</td>' +
+          '<td style="font-size:0.85rem; color:var(--cor-texto-mutado);">' + (item.email || '-') + '</td>' +
+          respCols +
+          '<td style="text-align:center;">' +
+            '<button onclick="excluirInscricaoEventoDinamico(\'' + item.id + '\', \'' + (item.nome || '').replace(/'/g, "\\'") + '\', \'' + item.eventoId + '\')" style="background:rgba(239,68,68,0.15); color:#fca5a5; border:1px solid rgba(239,68,68,0.3); padding:5px 9px; border-radius:6px; font-size:0.75rem; cursor:pointer;" title="Excluir inscrição">🗑️</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function filtrarInscritosEventoDinamico() {
+      const termo = (document.getElementById('modalBuscaInscritosInput')?.value || '').toLowerCase().trim();
+      const filtrados = modalInscricoesCache.filter(item => {
+        if (!termo) return true;
+        const nomeStr = (item.nome || '').toLowerCase();
+        const telStr = (item.telefone || '').toLowerCase();
+        const emailStr = (item.email || '').toLowerCase();
+        const respStr = JSON.stringify(item.respostas || {}).toLowerCase();
+        return nomeStr.includes(termo) || telStr.includes(termo) || emailStr.includes(termo) || respStr.includes(termo);
+      });
+      renderTabelaInscritosModal(filtrados);
+    }
+
+    async function excluirInscricaoEventoDinamico(id, nome, eventoId) {
+      if (!confirm('Excluir inscrição de "' + nome + '"?')) return;
+      try {
+        const res = await fetch('/secretaria/api/eventos-inscricoes/' + id, { method: 'DELETE' });
+        if (res.ok) {
+          mostrarToast('Inscrição removida.');
+          abrirModalInscritosEvento(eventoId);
+          fetchEventosPainel();
+        }
+      } catch (err) {
+        mostrarToast('Erro ao excluir inscrição.', 'erro');
+      }
+    }
+
     function openTab(evt, name) {
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(name).classList.add('active');
       evt.currentTarget.classList.add('active');
-      if(name === 'tab-eventos') { fetchMulheresInscricoes(); fetchCriancasInscricoes(); fetchSaudeMulherInscricoes(); fetchEventosCadastrados(); }
+      if(name === 'tab-eventos') { 
+        fetchMulheresInscricoes(); 
+        fetchCriancasInscricoes(); 
+        fetchSaudeMulherInscricoes(); 
+        fetchEventosCadastrados(); 
+        fetchEventosPainel(); 
+      }
       if(name === 'tab-admin') fetchUsers();
       if(name === 'tab-lideres') fetchLideres();
     }
@@ -2361,20 +3386,28 @@ function renderIndexHtml() {
         const telFormatado = item.telefone ? item.telefone.replace(/^(\\d{2})(\\d{4,5})(\\d{4})$/, '($1) $2-$3') : '-';
         const condicoes = item.condicoesSaude ? '<strong style="color: #fb7185;">' + item.condicoesSaude + '</strong>' : '<span style="color: var(--cor-texto-mutado);">Nenhuma</span>';
         const tratamento = item.tratamentoMedicamento ? '<br><small style="color: #fda4af;">Med: ' + item.tratamentoMedicamento + '</small>' : '';
-        const cirurgia = (item.cirurgia === 'Sim' || item.cirurgiaDetalhes)
-          ? '<span style="color: #f87171; font-weight: 600;">Sim</span>' + (item.cirurgiaDetalhes ? ': <small>' + item.cirurgiaDetalhes + '</small>' : '')
+        const temCirurgia = (item.cirurgia === 'Sim') || (item.cirurgiaDetalhes && !['não', 'nao', 'nenhuma', '-', ''].includes(item.cirurgiaDetalhes.trim().toLowerCase()) && item.cirurgia !== 'Não');
+        const cirurgia = temCirurgia
+          ? '<span style="color: #f87171; font-weight: 600;">Sim</span>' + (item.cirurgiaDetalhes && !['não', 'nao', '-'].includes(item.cirurgiaDetalhes.trim().toLowerCase()) ? ': <small>' + item.cirurgiaDetalhes + '</small>' : '')
           : '<span style="color: var(--cor-texto-mutado);">Não</span>';
-        const lesao = (item.lesaoDor === 'Sim' || item.lesaoDorDetalhes)
-          ? '<span style="color: #f87171; font-weight: 600;">Sim</span>' + (item.lesaoDorDetalhes ? ': <small>' + item.lesaoDorDetalhes + '</small>' : '')
+
+        const temLesao = (item.lesaoDor === 'Sim') || (item.lesaoDorDetalhes && !['não', 'nao', 'nenhuma', '-', ''].includes(item.lesaoDorDetalhes.trim().toLowerCase()) && item.lesaoDor !== 'Não');
+        const lesao = temLesao
+          ? '<span style="color: #f87171; font-weight: 600;">Sim</span>' + (item.lesaoDorDetalhes && !['não', 'nao', '-'].includes(item.lesaoDorDetalhes.trim().toLowerCase()) ? ': <small>' + item.lesaoDorDetalhes + '</small>' : '')
           : '<span style="color: var(--cor-texto-mutado);">Não</span>';
-        const limitacao = (item.limitacao === 'Sim' || item.limitacaoDetalhes)
-          ? '<span style="color: #fb923c; font-weight: 600;">Sim</span>' + (item.limitacaoDetalhes ? ': <small>' + item.limitacaoDetalhes + '</small>' : '')
+
+        const temLimitacao = (item.limitacao === 'Sim') || (item.limitacaoDetalhes && !['não', 'nao', 'nenhuma', '-', ''].includes(item.limitacaoDetalhes.trim().toLowerCase()) && item.limitacao !== 'Não');
+        const limitacao = temLimitacao
+          ? '<span style="color: #fb923c; font-weight: 600;">Sim</span>' + (item.limitacaoDetalhes && !['não', 'nao', '-'].includes(item.limitacaoDetalhes.trim().toLowerCase()) ? ': <small>' + item.limitacaoDetalhes + '</small>' : '')
           : '<span style="color: var(--cor-texto-mutado);">Não</span>';
+
         const gravida = item.gravida === 'Sim'
           ? '<span style="background: rgba(244, 63, 94, 0.2); color: #fda4af; font-weight: bold; padding: 2px 6px; border-radius: 4px;">🤰 Sim</span>'
           : '<span style="color: var(--cor-texto-mutado);">Não</span>';
-        const atividade = item.atividadeFisica === 'Sim'
-          ? '<span style="color: #4ade80; font-weight: 600;">Sim</span>' + (item.atividadeFisicaDetalhes ? ': <small>' + item.atividadeFisicaDetalhes + '</small>' : '')
+
+        const temAtividade = item.atividadeFisica === 'Sim';
+        const atividade = temAtividade
+          ? '<span style="color: #4ade80; font-weight: 600;">Sim</span>' + (item.atividadeFisicaDetalhes && !['não', 'nao', '-'].includes(item.atividadeFisicaDetalhes.trim().toLowerCase()) ? ': <small>' + item.atividadeFisicaDetalhes + '</small>' : '')
           : '<span style="color: var(--cor-texto-mutado);">Não</span>';
 
         return '<tr>' +
@@ -2525,6 +3558,21 @@ function renderIndexHtml() {
         const statusEl = document.getElementById('status');
         if (statusEl) {
           statusEl.innerHTML = '<strong>Status:</strong> ' + statusText;
+        }
+
+        const headerPill = document.getElementById('headerWhatsappPill');
+        const headerText = document.getElementById('headerWhatsappText');
+        if (headerPill && headerText) {
+          if (json.connected) {
+            headerPill.className = 'header-whatsapp-pill';
+            headerText.textContent = 'WhatsApp Conectado';
+          } else if (json.initializing || json.generatingQr || json.hasQr || json.canceling || json.authenticated) {
+            headerPill.className = 'header-whatsapp-pill aguardando';
+            headerText.textContent = 'WhatsApp Conectando...';
+          } else {
+            headerPill.className = 'header-whatsapp-pill desconectado';
+            headerText.textContent = 'WhatsApp Desconectado';
+          }
         }
         
         const qrEl = document.getElementById('qr');
@@ -3099,6 +4147,7 @@ function renderIndexHtml() {
 
     setInterval(refresh, 5000);
     refresh();
+    fetchEventosPainel();
     fetchEventosCadastrados();
     fetchCriancasInscricoes();
     fetchMulheresInscricoes();

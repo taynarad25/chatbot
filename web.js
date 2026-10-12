@@ -12,6 +12,7 @@ const cultoMulheres = require("./web/culto_mulheres");
 const cultoMulheresNotificacoes = require("./web/culto_mulheres_notificacoes");
 const diaDasCriancas = require("./web/dia_das_criancas");
 const saudeMulher = require("./web/saude_mulher");
+const eventosGerenciador = require("./web/eventos_gerenciador");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 const { notificarSecretaria } = require("./bot/secretaria");
 
@@ -317,6 +318,50 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       // APIs legadas de The Chosen respondem como evento encerrado / não encontrado
       if (pathname.startsWith('/the-chosen/')) {
         return sendJson(res, 404, { ok: false, message: 'Evento The Chosen encerrado.' });
+      }
+
+      // Rota pública para páginas dinâmicas de eventos: /evento/:slug
+      if (req.method === 'GET' && pathname.startsWith('/evento/')) {
+        const slug = decodeURIComponent(pathname.replace('/evento/', '')).replace(/\/$/, '');
+        const evento = eventosGerenciador.buscarEventoPainelPorSlug(slug);
+        if (evento && evento.ativo) {
+          const html = eventosGerenciador.renderPaginaEventoHtml(evento);
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline';"
+          });
+          return res.end(html);
+        } else if (evento && !evento.ativo) {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evento Encerrado</title><style>body{background:#09090b;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}</style></head><body><div><h1>Evento Encerrado</h1><p>As inscrições para este evento foram encerradas.</p><p><a href="/" style="color:#00bcd4;">Voltar para a página inicial</a></p></div></body></html>`);
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evento Não Encontrado</title><style>body{background:#09090b;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}</style></head><body><div><h1>Evento não encontrado</h1><p><a href="/" style="color:#00bcd4;">Voltar para o início</a></p></div></body></html>`);
+        }
+      }
+
+      // API pública para inscrição em evento dinâmico: POST /api/eventos/:slug/inscrever
+      if (req.method === 'POST' && pathname.startsWith('/api/eventos/') && pathname.endsWith('/inscrever')) {
+        try {
+          const partes = pathname.split('/');
+          const slug = partes[3];
+          const evento = eventosGerenciador.buscarEventoPainelPorSlug(slug);
+          if (!evento || !evento.ativo) {
+            return sendJson(res, 400, { ok: false, message: 'Evento não disponível para inscrições.' });
+          }
+          const body = await parseRequestBody(req);
+          const inscricao = await eventosGerenciador.salvarInscricaoEventoPainel({
+            eventoId: evento.id,
+            nome: body.nome,
+            telefone: body.telefone,
+            email: body.email,
+            respostas: body.respostas
+          });
+          return sendJson(res, 200, { ok: true, message: 'Inscrição registrada com sucesso!', inscricao });
+        } catch (errIns) {
+          console.error('[Web] Erro ao inscrever em evento:', errIns.message);
+          return sendJson(res, 400, { ok: false, message: errIns.message || 'Erro ao processar inscrição.' });
+        }
       }
 
       // Rota pública: Culto de Mulheres (/mulheres, /culto-mulheres)
@@ -945,6 +990,109 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         } catch (err) {
           console.error('[Web] Erro ao cadastrar evento:', err.message);
           return sendJson(res, 500, { ok: false, message: 'Erro ao cadastrar evento no sistema.' });
+        }
+      }
+
+      // ==========================================
+      // APIs: GERENCIADOR DINÂMICO DE EVENTOS
+      // ==========================================
+
+      // API: Listar eventos dinâmicos do painel da secretaria
+      if (req.method === 'GET' && pathname === '/secretaria/api/eventos-painel') {
+        const eventos = eventosGerenciador.listarEventosPainel();
+        return sendJson(res, 200, { ok: true, eventos });
+      }
+
+      // API: Salvar ou atualizar evento dinâmico
+      if (req.method === 'POST' && pathname === '/secretaria/api/eventos-painel') {
+        try {
+          const body = await parseRequestBody(req);
+          const evSalvo = eventosGerenciador.salvarEventoPainel(body);
+          return sendJson(res, 200, { ok: true, evento: evSalvo, message: 'Evento salvo com sucesso!' });
+        } catch (errSave) {
+          console.error('[Web] Erro ao salvar evento no painel:', errSave.message);
+          return sendJson(res, 400, { ok: false, message: errSave.message });
+        }
+      }
+
+      // API: Excluir evento dinâmico
+      if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/eventos-painel/')) {
+        const evId = decodeURIComponent(pathname.replace('/secretaria/api/eventos-painel/', ''));
+        const ok = eventosGerenciador.excluirEventoPainel(evId);
+        return sendJson(res, ok ? 200 : 404, { ok, message: ok ? 'Evento excluído com sucesso!' : 'Evento não encontrado.' });
+      }
+
+      // API: Alternar status ativo/pausado do evento
+      if (req.method === 'POST' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/toggle')) {
+        const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/toggle', '');
+        const ok = eventosGerenciador.alternarStatusEventoPainel(evId);
+        return sendJson(res, ok ? 200 : 404, { ok });
+      }
+
+      // API: Listar inscrições de um evento específico
+      if (req.method === 'GET' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/inscricoes')) {
+        const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/inscricoes', '');
+        const evento = eventosGerenciador.buscarEventoPainelPorId(evId);
+        const inscricoes = eventosGerenciador.listarInscricoesEventoPainel(evId);
+        return sendJson(res, 200, { ok: true, evento, inscricoes });
+      }
+
+      // API: Excluir uma inscrição de evento dinâmico
+      if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/eventos-inscricoes/')) {
+        const insId = decodeURIComponent(pathname.replace('/secretaria/api/eventos-inscricoes/', ''));
+        const ok = eventosGerenciador.excluirInscricaoEventoPainel(insId);
+        return sendJson(res, ok ? 200 : 404, { ok });
+      }
+
+      // API: Relatório PDF / Impressão de inscritos de um evento dinâmico
+      if (req.method === 'GET' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/relatorio-pdf')) {
+        const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/relatorio-pdf', '');
+        const evento = eventosGerenciador.buscarEventoPainelPorId(evId);
+        if (!evento) return sendJson(res, 404, { ok: false, message: 'Evento não encontrado.' });
+        const inscricoes = eventosGerenciador.listarInscricoesEventoPainel(evId);
+        const html = eventosGerenciador.renderPdfInscritosEventoHtml(evento, inscricoes);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+
+      // API: Upload de Banner / Fotos do Evento
+      if (req.method === 'POST' && pathname === '/secretaria/api/eventos-painel/upload') {
+        try {
+          const body = await parseRequestBody(req);
+          const { imagemBase64, nomeArquivo } = body || {};
+          if (!imagemBase64) {
+            return sendJson(res, 400, { ok: false, message: 'Nenhuma imagem enviada.' });
+          }
+
+          const matches = imagemBase64.match(/^data:image\/([a-zA-Z0-9\+\.]+);base64,(.+)$/);
+          let extensao = 'jpg';
+          let buffer = null;
+
+          if (matches) {
+            extensao = matches[1].replace('jpeg', 'jpg');
+            buffer = Buffer.from(matches[2], 'base64');
+          } else {
+            buffer = Buffer.from(imagemBase64, 'base64');
+          }
+
+          const uploadsDir = path.join(__dirname, 'public', 'images', 'eventos');
+          if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+          }
+
+          const safeNome = (nomeArquivo || 'banner')
+            .replace(/[^a-zA-Z0-9_-]/g, '_')
+            .slice(0, 30);
+          const fileName = `${Date.now()}_${safeNome}.${extensao}`;
+          const filePath = path.join(uploadsDir, fileName);
+
+          fs.writeFileSync(filePath, buffer);
+          const urlRelativa = `/images/eventos/${fileName}`;
+
+          return sendJson(res, 200, { ok: true, url: urlRelativa });
+        } catch (errUp) {
+          console.error('[Web] Erro no upload de imagem:', errUp.message);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao salvar imagem.' });
         }
       }
 

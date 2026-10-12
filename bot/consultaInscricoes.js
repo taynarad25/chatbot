@@ -217,7 +217,7 @@ function montarListaInscritosTexto(eventoId) {
       if (item.lesaoDor === "Sim") alertas.push(`⚡ Dor/Lesão: ${item.lesaoDorDetalhes || "Sim"}`);
       if (item.cirurgia === "Sim") alertas.push(`🩹 Cirurgia: ${item.cirurgiaDetalhes || "Sim"}`);
       if (item.limitacao === "Sim") alertas.push(`⚠️ Limitação: ${item.limitacaoDetalhes || "Sim"}`);
-      if (item.condicoesSaude && item.condicoesSaude !== "Nenhuma") alertas.push(`🩺 ${item.condicoesSaude}`);
+      if (item.condicoesSaude && item.condicoesSaude !== "Nenhuma" && item.condicoesSaude !== "Não" && item.condicoesSaude !== "nao") alertas.push(`🩺 ${item.condicoesSaude}`);
 
       const blocoAlerta = alertas.length > 0 ? `\n   ⚠️ _Atenção:_ ${alertas.join(" | ")}` : "\n   ✅ _Sem queixas ou restrições registradas_";
       return `${idx + 1}. *${item.nome}*${idade}\n   ${tel}${blocoAlerta}`;
