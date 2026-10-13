@@ -23,6 +23,7 @@ if (db) {
         local TEXT,
         tipoInscricao TEXT NOT NULL,
         bannerUrl TEXT,
+        bannerMobileUrl TEXT,
         whatsappContato TEXT,
         whatsappMensagem TEXT,
         linkExterno TEXT,
@@ -32,6 +33,10 @@ if (db) {
         criadoEm TEXT NOT NULL,
         atualizadoEm TEXT NOT NULL
       );
+
+      try {
+        db.exec('ALTER TABLE painel_eventos ADD COLUMN bannerMobileUrl TEXT;');
+      } catch (_) {}
 
       CREATE TABLE IF NOT EXISTS painel_eventos_inscricoes (
         id TEXT PRIMARY KEY,
@@ -144,6 +149,7 @@ function salvarEventoPainel({
   local = 'Comunidade Cristã Curados',
   tipoInscricao = 'formulario', // 'formulario', 'whatsapp', 'externo'
   bannerUrl = '',
+  bannerMobileUrl = '',
   whatsappContato = '11942685501',
   whatsappMensagem = '',
   linkExterno = '',
@@ -175,9 +181,9 @@ function salvarEventoPainel({
     const stmt = db.prepare(`
       INSERT INTO painel_eventos (
         id, slug, titulo, descricao, dataEvento, horario, local,
-        tipoInscricao, bannerUrl, whatsappContato, whatsappMensagem,
+        tipoInscricao, bannerUrl, bannerMobileUrl, whatsappContato, whatsappMensagem,
         linkExterno, linkPlanilha, perguntas, ativo, criadoEm, atualizadoEm
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -190,6 +196,7 @@ function salvarEventoPainel({
       String(local || '').trim(),
       String(tipoInscricao || 'formulario').trim(),
       String(bannerUrl || '').trim(),
+      String(bannerMobileUrl || '').trim(),
       normalizarTelefone(whatsappContato) || '11942685501',
       String(whatsappMensagem || '').trim(),
       String(linkExterno || '').trim(),
@@ -210,6 +217,7 @@ function salvarEventoPainel({
         local = ?,
         tipoInscricao = ?,
         bannerUrl = ?,
+        bannerMobileUrl = ?,
         whatsappContato = ?,
         whatsappMensagem = ?,
         linkExterno = ?,
@@ -228,6 +236,7 @@ function salvarEventoPainel({
       String(local || '').trim(),
       String(tipoInscricao || 'formulario').trim(),
       String(bannerUrl || '').trim(),
+      String(bannerMobileUrl || '').trim(),
       normalizarTelefone(whatsappContato) || '11942685501',
       String(whatsappMensagem || '').trim(),
       String(linkExterno || '').trim(),
@@ -418,9 +427,17 @@ async function enviarInscricaoParaPlanilhaGoogle(dados, urlWebapp, fetchFn = glo
  * Renderiza página pública do evento (/evento/:slug)
  */
 function renderPaginaEventoHtml(evento) {
-  const banner = evento.bannerUrl
-    ? `<div class="event-hero-banner"><img src="${evento.bannerUrl}" alt="${evento.titulo}" /></div>`
-    : '';
+  let banner = '';
+  if (evento.bannerUrl || evento.bannerMobileUrl) {
+    banner = `
+      <div class="event-hero-banner">
+        <picture>
+          ${evento.bannerMobileUrl ? `<source media="(max-width: 680px)" srcset="${evento.bannerMobileUrl}">` : ''}
+          <img src="${evento.bannerUrl || evento.bannerMobileUrl}" alt="${evento.titulo}" />
+        </picture>
+      </div>
+    `;
+  }
 
   const dataFmt = evento.dataEvento || 'A definir';
   const horarioFmt = evento.horario ? ` às ${evento.horario}` : '';
@@ -488,15 +505,30 @@ function renderPaginaEventoHtml(evento) {
             </div>
           </div>
         `;
-      } else if (p.tipo === 'numero') {
+      } else if (p.tipo === 'sim_nao_simples') {
         camposHtml += `
           <div class="form-group">
-            <label class="form-label" for="${campoId}">${p.label || 'Informe o número'} ${asterisco}</label>
-            <input type="number" id="${campoId}" name="${campoId}" class="form-input" placeholder="${p.placeholder || 'Digite o número'}" ${obrigatorio} />
+            <label class="form-label">${p.label || 'Pergunta'} ${asterisco}</label>
+            <div class="radio-options">
+              <label class="radio-label">
+                <input type="radio" name="${campoId}" value="Não" checked />
+                <span>Não</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="${campoId}" value="Sim" ${obrigatorio} />
+                <span>Sim</span>
+              </label>
+            </div>
           </div>
         `;
-      } else if (p.tipo === 'selecao' && Array.isArray(p.opcoes) && p.opcoes.length > 0) {
-        const opts = p.opcoes.map(o => `<option value="${o}">${o}</option>`).join('');
+      } else if (p.tipo === 'escolha' || p.tipo === 'selecao') {
+        let opcoesList = [];
+        if (Array.isArray(p.opcoes)) {
+          opcoesList = p.opcoes;
+        } else if (typeof p.opcoes === 'string') {
+          opcoesList = p.opcoes.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        const opts = opcoesList.map(o => `<option value="${o}">${o}</option>`).join('');
         camposHtml += `
           <div class="form-group">
             <label class="form-label" for="${campoId}">${p.label || 'Selecione'} ${asterisco}</label>
@@ -504,6 +536,34 @@ function renderPaginaEventoHtml(evento) {
               <option value="">Selecione uma opção...</option>
               ${opts}
             </select>
+          </div>
+        `;
+      } else if (p.tipo === 'telefone') {
+        camposHtml += `
+          <div class="form-group">
+            <label class="form-label" for="${campoId}">${p.label || 'Telefone / WhatsApp'} ${asterisco}</label>
+            <input type="tel" id="${campoId}" name="${campoId}" class="form-input" placeholder="(11) 99999-9999" ${obrigatorio} />
+          </div>
+        `;
+      } else if (p.tipo === 'texto_longo') {
+        camposHtml += `
+          <div class="form-group">
+            <label class="form-label" for="${campoId}">${p.label || 'Observações'} ${asterisco}</label>
+            <textarea id="${campoId}" name="${campoId}" class="form-input" rows="3" placeholder="${p.placeholder || 'Digite sua resposta...'}" ${obrigatorio}></textarea>
+          </div>
+        `;
+      } else if (p.tipo === 'numero') {
+        camposHtml += `
+          <div class="form-group">
+            <label class="form-label" for="${campoId}">${p.label || 'Informe o número'} ${asterisco}</label>
+            <input type="number" id="${campoId}" name="${campoId}" class="form-input" placeholder="${p.placeholder || 'Digite o número'}" ${obrigatorio} />
+          </div>
+        `;
+      } else if (p.tipo === 'data') {
+        camposHtml += `
+          <div class="form-group">
+            <label class="form-label" for="${campoId}">${p.label || 'Data'} ${asterisco}</label>
+            <input type="date" id="${campoId}" name="${campoId}" class="form-input" ${obrigatorio} />
           </div>
         `;
       } else {
@@ -872,11 +932,10 @@ function renderPaginaEventoHtml(evento) {
   </div>
 
   <script>
-    // Máscara de Telefone
-    const telInput = document.getElementById('inscricaoTelefone');
-    if (telInput) {
-      telInput.addEventListener('input', function(e) {
-        let v = e.target.value.replace(/\\D/g, '');
+    // Máscara de Telefone em todos os campos de telefone
+    document.querySelectorAll('input[type="tel"]').forEach(function(el) {
+      el.addEventListener('input', function(e) {
+        let v = e.target.value.replace(/\D/g, '');
         if (v.length > 11) v = v.slice(0, 11);
         if (v.length > 10) {
           e.target.value = '(' + v.slice(0, 2) + ') ' + v.slice(2, 7) + '-' + v.slice(7);
@@ -888,7 +947,7 @@ function renderPaginaEventoHtml(evento) {
           e.target.value = '(' + v;
         }
       });
-    }
+    });
 
     async function enviarInscricaoEvento(e) {
       e.preventDefault();
@@ -911,7 +970,7 @@ function renderPaginaEventoHtml(evento) {
       }
 
       const respostas = {};
-      const inputs = form.querySelectorAll('input:not([type=hidden]):not(#inscricaoNome):not(#inscricaoTelefone):not(#inscricaoEmail), select');
+      const inputs = form.querySelectorAll('input:not([type=hidden]):not(#inscricaoNome):not(#inscricaoTelefone):not(#inscricaoEmail), select, textarea');
       inputs.forEach(input => {
         if (input.type === 'radio') {
           if (input.checked) {

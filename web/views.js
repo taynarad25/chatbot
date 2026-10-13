@@ -1703,24 +1703,60 @@ function renderIndexHtml() {
             <textarea id="editorEventoDescricao" class="form-input" rows="3" placeholder="Escreva sobre o evento, convidados, versículo tema ou orientações gerais..."></textarea>
           </div>
 
-          <!-- 2. Fotos e Banner -->
+          <!-- 2. Fotos e Banners (PC e Celular) -->
           <div class="form-group" style="margin-top: 1.5rem;">
-            <label class="form-label">Foto / Banner do Evento (Upload ou URL)</label>
-            <div style="display: grid; grid-template-columns: 240px 1fr; gap: 16px; align-items: center;">
-              <div class="banner-preview-box" id="bannerPreviewBox" onclick="document.getElementById('editorEventoBannerFile').click()">
-                <div id="bannerPlaceholderText" style="text-align: center; color: var(--cor-texto-mutado); font-size: 0.85rem; padding: 10px;">
-                  <span style="font-size: 2rem; display: block; margin-bottom: 4px;">📸</span>
-                  Clique para subir foto
+            <label class="form-label" style="font-size: 0.95rem; margin-bottom: 4px;">Fotos / Banners do Evento (PC & Celular)</label>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.8rem; margin-bottom: 12px;">Faça upload de duas versões do banner para garantir visual perfeito tanto no computador quanto no celular!</p>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+              <!-- Banner Desktop / PC -->
+              <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(0, 188, 212, 0.25); border-radius: 14px; padding: 1.1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <strong style="color: #fff; font-size: 0.88rem;">🖥️ Banner para PC / Computador</strong>
+                  <span style="font-size: 0.72rem; color: var(--cor-ciano); font-weight: 600;">Horizontal (ex: 1200x500)</span>
                 </div>
-                <img id="bannerPreviewImg" class="banner-preview-img" alt="Prévia" />
+                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 8px;">
+                  <div class="banner-preview-box" id="bannerPreviewBox" onclick="document.getElementById('editorEventoBannerFile').click()" style="width: 120px; height: 75px; flex-shrink: 0;">
+                    <div id="bannerPlaceholderText" style="text-align: center; color: var(--cor-texto-mutado); font-size: 0.72rem;">
+                      <span style="font-size: 1.3rem; display: block;">📸</span>
+                      Subir PC
+                    </div>
+                    <img id="bannerPreviewImg" class="banner-preview-img" alt="Prévia PC" style="display: none; width: 100%; height: 100%; object-fit: cover;" />
+                  </div>
+                  <div style="flex: 1;">
+                    <input type="file" id="editorEventoBannerFile" accept="image/*" style="display: none;" onchange="handleBannerUpload(this, 'desktop')" />
+                    <button type="button" onclick="document.getElementById('editorEventoBannerFile').click()" style="background: rgba(0, 188, 212, 0.15); color: var(--cor-ciano); border: 1px solid rgba(0, 188, 212, 0.35); padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; margin-bottom: 6px;">
+                      📁 Escolher Imagem PC
+                    </button>
+                    <div style="font-size: 0.74rem; color: var(--cor-texto-mutado);">Ou URL direta:</div>
+                  </div>
+                </div>
+                <input type="text" id="editorEventoBannerUrl" class="form-input" placeholder="https://exemplo.com/pc.jpg ou /images/..." oninput="atualizarBannerUrlPreview(this.value, 'desktop')" style="font-size: 0.82rem; padding: 7px 10px;" />
               </div>
-              <div>
-                <input type="file" id="editorEventoBannerFile" accept="image/*" style="display: none;" onchange="handleBannerUpload(this)" />
-                <button type="button" onclick="document.getElementById('editorEventoBannerFile').click()" style="background: rgba(0, 188, 212, 0.15); color: var(--cor-ciano); border: 1px solid rgba(0, 188, 212, 0.35); padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;">
-                  📁 Escolher Arquivo de Imagem
-                </button>
-                <div style="font-size: 0.78rem; color: var(--cor-texto-mutado); margin-bottom: 6px;">Ou cole a URL direta de uma imagem:</div>
-                <input type="url" id="editorEventoBannerUrl" class="form-input" placeholder="https://exemplo.com/foto.jpg ou /images/..." oninput="atualizarBannerUrlPreview(this.value)" />
+
+              <!-- Banner Mobile / Celular -->
+              <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 14px; padding: 1.1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <strong style="color: #fff; font-size: 0.88rem;">📱 Banner para Celular / Mobile</strong>
+                  <span style="font-size: 0.72rem; color: #c084fc; font-weight: 600;">Vertical ou Quadrado</span>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 8px;">
+                  <div class="banner-preview-box" id="bannerMobilePreviewBox" onclick="document.getElementById('editorEventoBannerMobileFile').click()" style="width: 75px; height: 75px; flex-shrink: 0;">
+                    <div id="bannerMobilePlaceholderText" style="text-align: center; color: var(--cor-texto-mutado); font-size: 0.72rem;">
+                      <span style="font-size: 1.3rem; display: block;">📱</span>
+                      Subir Celular
+                    </div>
+                    <img id="bannerMobilePreviewImg" class="banner-preview-img" alt="Prévia Mobile" style="display: none; width: 100%; height: 100%; object-fit: cover;" />
+                  </div>
+                  <div style="flex: 1;">
+                    <input type="file" id="editorEventoBannerMobileFile" accept="image/*" style="display: none;" onchange="handleBannerUpload(this, 'mobile')" />
+                    <button type="button" onclick="document.getElementById('editorEventoBannerMobileFile').click()" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; margin-bottom: 6px;">
+                      📁 Escolher Imagem Celular
+                    </button>
+                    <div style="font-size: 0.74rem; color: var(--cor-texto-mutado);">Ou URL direta:</div>
+                  </div>
+                </div>
+                <input type="text" id="editorEventoBannerMobileUrl" class="form-input" placeholder="https://exemplo.com/celular.jpg ou /images/..." oninput="atualizarBannerUrlPreview(this.value, 'mobile')" style="font-size: 0.82rem; padding: 7px 10px;" />
               </div>
             </div>
           </div>
@@ -1748,7 +1784,7 @@ function renderIndexHtml() {
           <div id="secaoModoFormulario" style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(0, 188, 212, 0.2); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem;">
             <div class="form-group">
               <label class="form-label" for="editorEventoPlanilhaUrl">URL da Planilha / Web App Google (Google Apps Script)</label>
-              <input type="url" id="editorEventoPlanilhaUrl" class="form-input" placeholder="https://script.google.com/macros/s/.../exec (opcional - envia automático se preenchido)" />
+              <input type="text" id="editorEventoPlanilhaUrl" class="form-input" placeholder="https://script.google.com/macros/s/.../exec (opcional - envia automático se preenchido)" />
               <small style="color: var(--cor-texto-mutado); display: block; margin-top: 4px;">Se preenchida, cada nova inscrição salva no site é enviada instantaneamente para a sua planilha do Google!</small>
             </div>
 
@@ -1785,7 +1821,7 @@ function renderIndexHtml() {
           <div id="secaoModoExterno" style="display: none; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem;">
             <div class="form-group">
               <label class="form-label" for="editorEventoLinkExterno">Link do Formulário Externo</label>
-              <input type="url" id="editorEventoLinkExterno" class="form-input" placeholder="https://forms.gle/... ou https://sympla.com.br/..." />
+              <input type="text" id="editorEventoLinkExterno" class="form-input" placeholder="https://forms.gle/... ou https://sympla.com.br/..." />
             </div>
           </div>
 
@@ -1819,9 +1855,6 @@ function renderIndexHtml() {
             <p style="color: var(--cor-texto-mutado); font-size: 0.85rem; margin: 0;">Consulte as inscrições e relatórios dos eventos históricos e fichas clínicas.</p>
           </div>
         </div>
-          <p style="color: var(--cor-texto-mutado); font-size: 0.85rem; margin: 0;">Acompanhe em tempo real as listas de participantes, formulários e sincronizações de cada evento ativo.</p>
-        </div>
-      </div>
 
       <!-- Card do Evento Especial Dia das Crianças -->
       <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(2, 132, 199, 0.45); background: linear-gradient(135deg, rgba(2, 132, 199, 0.14), rgba(245, 158, 11, 0.08));">
@@ -2069,6 +2102,7 @@ function renderIndexHtml() {
           </div>
         </div>
       </div>
+      </div>
     </div>
 
     <div id="tab-admin" class="tab-content">
@@ -2268,9 +2302,11 @@ function renderIndexHtml() {
       if (sExt) sExt.style.display = modo === 'externo' ? 'block' : 'none';
     }
 
-    function atualizarBannerUrlPreview(url) {
-      const img = document.getElementById('bannerPreviewImg');
-      const placeholder = document.getElementById('bannerPlaceholderText');
+    function atualizarBannerUrlPreview(url, tipo = 'desktop') {
+      const imgId = tipo === 'mobile' ? 'bannerMobilePreviewImg' : 'bannerPreviewImg';
+      const phId = tipo === 'mobile' ? 'bannerMobilePlaceholderText' : 'bannerPlaceholderText';
+      const img = document.getElementById(imgId);
+      const placeholder = document.getElementById(phId);
       if (!img || !placeholder) return;
       if (url && url.trim()) {
         img.src = url.trim();
@@ -2282,13 +2318,14 @@ function renderIndexHtml() {
       }
     }
 
-    async function handleBannerUpload(input) {
+    async function handleBannerUpload(input, tipo = 'desktop') {
       if (!input || !input.files || !input.files[0]) return;
       const file = input.files[0];
+      const urlInputId = tipo === 'mobile' ? 'editorEventoBannerMobileUrl' : 'editorEventoBannerUrl';
       const reader = new FileReader();
       reader.onload = async function(e) {
         const base64 = e.target.result;
-        atualizarBannerUrlPreview(base64);
+        atualizarBannerUrlPreview(base64, tipo);
 
         try {
           const res = await fetch('/secretaria/api/eventos-painel/upload', {
@@ -2298,12 +2335,12 @@ function renderIndexHtml() {
           });
           const data = await res.json();
           if (res.ok && data.ok && data.url) {
-            document.getElementById('editorEventoBannerUrl').value = data.url;
-            mostrarToast('Foto do evento enviada com sucesso!');
+            document.getElementById(urlInputId).value = data.url;
+            mostrarToast((tipo === 'mobile' ? 'Banner Celular' : 'Banner PC') + ' enviado com sucesso!');
           }
         } catch (err) {
           console.warn('Erro ao fazer upload para servidor, usando data-url:', err);
-          document.getElementById('editorEventoBannerUrl').value = base64;
+          document.getElementById(urlInputId).value = base64;
         }
       };
       reader.readAsDataURL(file);
@@ -2314,22 +2351,42 @@ function renderIndexHtml() {
       if (!container) return;
 
       if (perguntasBuilderLista.length === 0) {
-        container.innerHTML = '<div style="color: var(--cor-texto-mutado); font-size: 0.82rem; font-style: italic; padding: 8px 0;">Nenhuma pergunta personalizada adicionada ainda. Clique em "+ Adicionar Pergunta" acima para criar campos extras (ex: Sim/Não, texto, restrições).</div>';
+        container.innerHTML = '<div style="color: var(--cor-texto-mutado); font-size: 0.82rem; font-style: italic; padding: 8px 0;">Nenhuma pergunta personalizada adicionada ainda. Clique em "+ Adicionar Pergunta" acima para criar campos extras (ex: opções personalizadas, WhatsApp adicional, Sim/Não, texto, restrições).</div>';
         return;
       }
 
       container.innerHTML = perguntasBuilderLista.map((p, idx) => {
-        return '<div class="pergunta-row">' +
+        let campoExtraHtml = '';
+
+        if (p.tipo === 'escolha') {
+          campoExtraHtml = '<div style="grid-column: 1 / -1; margin-top: 4px; background: rgba(0, 188, 212, 0.08); border: 1px dashed rgba(0, 188, 212, 0.35); border-radius: 10px; padding: 10px 12px;">' +
+            '<label style="font-size:0.75rem; color:var(--cor-ciano); font-weight:700; display:block; margin-bottom:4px;">🎯 Opções de Resposta (digite as opções separadas por vírgula):</label>' +
+            '<input type="text" class="form-input" style="padding:7px 10px; font-size:0.85rem;" placeholder="Ex: Opção 1, Opção 2, Opção 3 (ou: Manhã, Tarde, Noite)" value="' + (p.opcoes || '').replace(/"/g, '&quot;') + '" oninput="atualizarOpcoesPerguntaBuilder(' + idx + ', this.value)" />' +
+            '<small style="color:#94a3b8; font-size:0.73rem; display:block; margin-top:3px;">O participante verá um menu para escolher uma dessas opções.</small>' +
+          '</div>';
+        } else if (p.tipo === 'sim_nao') {
+          campoExtraHtml = '<div style="grid-column: 1 / -1; margin-top: 4px;">' +
+            '<label style="font-size:0.73rem; color:#a1a1aa; display:block; margin-bottom:2px;">Rótulo da caixa de detalhes (quando marcar Sim):</label>' +
+            '<input type="text" class="form-input" style="padding:6px 10px; font-size:0.82rem;" placeholder="Ex: Qual cirurgia, dor ou restrição? (opcional)" value="' + (p.detalhePlaceholder || '').replace(/"/g, '&quot;') + '" oninput="atualizarDetalhePlaceholderPerguntaBuilder(' + idx + ', this.value)" />' +
+          '</div>';
+        }
+
+        return '<div class="pergunta-row" style="display:grid; grid-template-columns: 1fr 180px 130px 40px; gap:10px; align-items:center; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:12px 14px; margin-bottom:10px;">' +
           '<div>' +
             '<label style="font-size:0.75rem; color:#a1a1aa; display:block; margin-bottom:2px;">Pergunta / Rótulo *</label>' +
-            '<input type="text" class="form-input" style="padding:8px 10px; font-size:0.85rem;" placeholder="Ex: Possui alguma restrição ou alergia?" value="' + (p.label || '').replace(/"/g, '&quot;') + '" oninput="perguntasBuilderLista[' + idx + '].label = this.value" required />' +
+            '<input type="text" class="form-input" style="padding:8px 10px; font-size:0.85rem;" placeholder="Ex: Tamanho da camiseta, Vai almoçar no local?..." value="' + (p.label || '').replace(/"/g, '&quot;') + '" oninput="atualizarLabelPerguntaBuilder(' + idx + ', this.value)" required />' +
           '</div>' +
           '<div>' +
             '<label style="font-size:0.75rem; color:#a1a1aa; display:block; margin-bottom:2px;">Tipo da Resposta</label>' +
-            '<select class="form-input" style="padding:8px 10px; font-size:0.85rem;" onchange="perguntasBuilderLista[' + idx + '].tipo = this.value">' +
-              '<option value="texto"' + (p.tipo === 'texto' ? ' selected' : '') + '>Texto Aberto</option>' +
+            '<select class="form-input" style="padding:8px 10px; font-size:0.85rem;" onchange="atualizarTipoPerguntaBuilder(' + idx + ', this.value)">' +
+              '<option value="texto"' + (p.tipo === 'texto' ? ' selected' : '') + '>Texto Aberto (Curto)</option>' +
+              '<option value="escolha"' + (p.tipo === 'escolha' ? ' selected' : '') + '>🎯 Múltipla Escolha (Opções)</option>' +
+              '<option value="telefone"' + (p.tipo === 'telefone' ? ' selected' : '') + '>📞 Telefone / WhatsApp</option>' +
               '<option value="sim_nao"' + (p.tipo === 'sim_nao' ? ' selected' : '') + '>Sim / Não (com detalhe)</option>' +
+              '<option value="sim_nao_simples"' + (p.tipo === 'sim_nao_simples' ? ' selected' : '') + '>Sim / Não (Simples)</option>' +
+              '<option value="texto_longo"' + (p.tipo === 'texto_longo' ? ' selected' : '') + '>Texto Longo (Observações)</option>' +
               '<option value="numero"' + (p.tipo === 'numero' ? ' selected' : '') + '>Número / Idade</option>' +
+              '<option value="data"' + (p.tipo === 'data' ? ' selected' : '') + '>Data</option>' +
             '</select>' +
           '</div>' +
           '<div>' +
@@ -2342,8 +2399,37 @@ function renderIndexHtml() {
           '<div style="text-align: right; padding-top: 14px;">' +
             '<button type="button" onclick="removerPerguntaBuilder(' + idx + ')" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 7px 10px; cursor: pointer;" title="Remover pergunta">✕</button>' +
           '</div>' +
+          campoExtraHtml +
         '</div>';
       }).join('');
+    }
+
+    function atualizarLabelPerguntaBuilder(idx, valor) {
+      if (perguntasBuilderLista && perguntasBuilderLista[idx]) {
+        perguntasBuilderLista[idx].label = valor;
+      }
+    }
+
+    function atualizarTipoPerguntaBuilder(idx, tipo) {
+      if (perguntasBuilderLista && perguntasBuilderLista[idx]) {
+        perguntasBuilderLista[idx].tipo = tipo;
+        if (tipo === 'escolha' && !perguntasBuilderLista[idx].opcoes) {
+          perguntasBuilderLista[idx].opcoes = 'Opção 1, Opção 2, Opção 3';
+        }
+        renderPerguntasBuilder();
+      }
+    }
+
+    function atualizarOpcoesPerguntaBuilder(idx, valor) {
+      if (perguntasBuilderLista && perguntasBuilderLista[idx]) {
+        perguntasBuilderLista[idx].opcoes = valor;
+      }
+    }
+
+    function atualizarDetalhePlaceholderPerguntaBuilder(idx, valor) {
+      if (perguntasBuilderLista && perguntasBuilderLista[idx]) {
+        perguntasBuilderLista[idx].detalhePlaceholder = valor;
+      }
     }
 
     function atualizarObrigatorioPerguntaBuilder(idx, valor) {
@@ -2357,8 +2443,9 @@ function renderIndexHtml() {
         id: 'p_' + Date.now().toString().slice(-6),
         label: '',
         tipo: 'texto',
+        opcoes: '',
         obrigatorio: true,
-        detalhePlaceholder: 'Especifique por favor...'
+        detalhePlaceholder: 'Por favor, detalhe...'
       });
       renderPerguntasBuilder();
     }
@@ -2377,6 +2464,7 @@ function renderIndexHtml() {
       const local = document.getElementById('editorEventoLocal').value.trim();
       const descricao = document.getElementById('editorEventoDescricao').value.trim();
       const bannerUrl = document.getElementById('editorEventoBannerUrl').value.trim();
+      const bannerMobileUrl = document.getElementById('editorEventoBannerMobileUrl') ? document.getElementById('editorEventoBannerMobileUrl').value.trim() : '';
       const linkPlanilha = document.getElementById('editorEventoPlanilhaUrl').value.trim();
       const whatsappContato = document.getElementById('editorEventoWhatsContato').value.trim();
       const whatsappMensagem = document.getElementById('editorEventoWhatsMensagem').value.trim();
@@ -2399,6 +2487,7 @@ function renderIndexHtml() {
         local,
         descricao,
         bannerUrl,
+        bannerMobileUrl,
         tipoInscricao: modoInscricaoSelecionado,
         linkPlanilha,
         whatsappContato,
@@ -2420,7 +2509,8 @@ function renderIndexHtml() {
           document.getElementById('formNovoEventoPainel').reset();
           document.getElementById('editorEventoId').value = '';
           perguntasBuilderLista = [];
-          atualizarBannerUrlPreview('');
+          atualizarBannerUrlPreview('', 'desktop');
+          atualizarBannerUrlPreview('', 'mobile');
           toggleEditorNovoEvento(false);
           await fetchEventosPainel();
         } else {
