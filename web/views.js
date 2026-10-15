@@ -2102,6 +2102,91 @@ function renderIndexHtml() {
           </div>
         </div>
       </div>
+
+      <!-- Card do Evento Treinamento de Intercessão -->
+      <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(249, 115, 22, 0.45); background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(168, 85, 247, 0.08));">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(249, 115, 22, 0.2); color: #fdba74; border: 1px solid rgba(249, 115, 22, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
+              🙏 Ministério de Intercessão
+            </div>
+            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Treinamento de Intercessão</h4>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
+              🗓️ <strong>15/11/2026 às 16:00 (Todos os Domingos)</strong> &nbsp;•&nbsp; 📍 <strong>Comunidade Cristã Curados (Templo Principal)</strong> &nbsp;•&nbsp; <em>"e serás chamado reparador de brechas e restaurador de veredas"</em>
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn-gaveta-toggle" id="btnToggleIntercessao" onclick="toggleGavetaEvento('intercessao')" title="Recolher ou expandir inscrições (engavetar)">
+              <span class="gaveta-toggle-text">Recolher</span>
+              <span class="gaveta-arrow" id="arrow-intercessao">▲</span>
+            </button>
+            <button onclick="sincronizarComPlanilhaIntercessao()" id="btnSyncPlanilhaIntercessao" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
+              🔄 Puxar da Planilha
+            </button>
+            <button onclick="window.open('/intercessao/fichas', '_blank')" style="background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);" title="Ver fichas individuais organizadas para os Líderes de Intercessão">
+              📑 Fichas & Líderes
+            </button>
+            <button onclick="window.open('/treinamento-de-intercessao', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver formulário público de inscrição">
+              🔗 Abrir Formulário
+            </button>
+            <button onclick="window.open('/intercessao/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #a855f7, #9333ea); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);">
+              📄 Exportar Lista (PDF)
+            </button>
+            <button onclick="fetchIntercessaoInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+              🔄 Atualizar
+            </button>
+          </div>
+        </div>
+
+        <div class="evento-gaveta-body" id="gaveta-intercessao">
+          <div class="evento-metric-grid" id="intercessaoMetrics">
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="intercessaoTotal" style="color: #fdba74;">-</div>
+              <div class="evento-metric-lbl">Total de Inscritos</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="intercessaoComExperiencia" style="color: #d8b4fe;">-</div>
+              <div class="evento-metric-lbl">Já Fez Curso / Atuou</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="intercessaoSemExperiencia" style="color: #93c5fd;">-</div>
+              <div class="evento-metric-lbl">Primeira Vez</div>
+            </div>
+            <div class="evento-metric-box">
+              <div class="evento-metric-val" id="intercessaoZapConfirmados" style="color: #4ade80;">-</div>
+              <div class="evento-metric-lbl">Confirmação WhatsApp</div>
+            </div>
+          </div>
+
+          <!-- Barra de Filtros e Busca de Intercessão -->
+          <div class="evento-toolbar" style="margin-top: 1.2rem;">
+            <input type="text" id="intercessaoSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, telefone, e-mail ou experiência..." oninput="filtrarIntercessaoInscricoes()" />
+          </div>
+
+          <!-- Tabela de Inscritos de Intercessão -->
+          <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto; margin-bottom: 0.5rem;">
+            <table class="evento-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px; text-align: center;">Nº</th>
+                  <th>Nome do Participante</th>
+                  <th>Telefone / WhatsApp</th>
+                  <th>E-mail</th>
+                  <th style="width: 140px; text-align: center;">Já participou / curso?</th>
+                  <th>Detalhes da Experiência</th>
+                  <th style="width: 130px; text-align: center;">Data Inscrição</th>
+                  <th style="width: 100px; text-align: center;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="intercessaoTbodyInscritos">
+                <tr>
+                  <td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando participantes inscritos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -3159,6 +3244,7 @@ function renderIndexHtml() {
       if (nomeEvento === 'criancas') return document.getElementById('btnToggleCriancas');
       if (nomeEvento === 'theChosen') return document.getElementById('btnToggleTheChosen');
       if (nomeEvento === 'saude_mulher') return document.getElementById('btnToggleSaudeMulher');
+      if (nomeEvento === 'intercessao') return document.getElementById('btnToggleIntercessao');
       return document.getElementById('btnToggleMulheres');
     }
 
@@ -3187,7 +3273,7 @@ function renderIndexHtml() {
     }
 
     function restaurarEstadoGavetas() {
-      ['criancas', 'mulheres', 'saude_mulher'].forEach(nomeEvento => {
+      ['criancas', 'mulheres', 'saude_mulher', 'intercessao'].forEach(nomeEvento => {
         const salvo = localStorage.getItem('gaveta_' + nomeEvento);
         if (salvo === 'fechada') {
           const gaveta = document.getElementById('gaveta-' + nomeEvento);
@@ -3571,6 +3657,141 @@ function renderIndexHtml() {
         if (res.ok && data.ok) {
           alert('✅ Sincronização concluída com sucesso!\\n' + (data.message || (data.total || 0) + ' inscrições'));
           await fetchSaudeMulherInscricoes();
+        } else {
+          alert('⚠️ Aviso ao sincronizar: ' + (data.message || 'Verifique se a planilha está configurada.'));
+        }
+      } catch (err) {
+        alert('Erro ao sincronizar com a planilha: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText || '🔄 Puxar da Planilha';
+        }
+      }
+    }
+
+    /* =========================================================================
+       FRONTEND: Treinamento de Intercessão
+       ========================================================================= */
+    let intercessaoInscricoesCache = [];
+
+    async function fetchIntercessaoInscricoes() {
+      try {
+        const res = await fetch('/intercessao/api/inscritos');
+        if (res.status === 401) { window.location.href = '/secretaria/login'; return; }
+        if (!res.ok) return;
+        const data = await res.json();
+        intercessaoInscricoesCache = data.inscricoes || [];
+
+        const stats = data.stats || {};
+        const elTotal = document.getElementById('intercessaoTotal');
+        const elExp = document.getElementById('intercessaoComExperiencia');
+        const elSemExp = document.getElementById('intercessaoSemExperiencia');
+        const elZap = document.getElementById('intercessaoZapConfirmados');
+
+        if (elTotal) elTotal.textContent = stats.total !== undefined ? stats.total : intercessaoInscricoesCache.length;
+        if (elExp) elExp.textContent = stats.comExperiencia || 0;
+        if (elSemExp) elSemExp.textContent = stats.semExperiencia || 0;
+        if (elZap) elZap.textContent = stats.whatsappConfirmado || 0;
+
+        filtrarIntercessaoInscricoes();
+      } catch (err) {
+        console.error('Erro ao buscar inscritos de Treinamento de Intercessão:', err);
+      }
+    }
+
+    function filtrarIntercessaoInscricoes() {
+      const termo = (document.getElementById('intercessaoSearchInput')?.value || '').toLowerCase().trim();
+      const filtrados = intercessaoInscricoesCache.filter(item => {
+        if (!termo) return true;
+        const nomeStr = (item.nome || '').toLowerCase();
+        const telStr = (item.telefone || '').toLowerCase();
+        const emailStr = (item.email || '').toLowerCase();
+        const expStr = (item.experienciaDetalhes || '').toLowerCase();
+        return nomeStr.includes(termo) || telStr.includes(termo) || emailStr.includes(termo) || expStr.includes(termo);
+      });
+      renderIntercessaoTable(filtrados);
+    }
+
+    function renderIntercessaoTable(lista) {
+      const tbody = document.getElementById('intercessaoTbodyInscritos');
+      if (!tbody) return;
+
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Nenhum participante inscrito encontrado.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map((item, idx) => {
+        const telFormatado = item.telefone ? item.telefone.replace(/^(\\d{2})(\\d{4,5})(\\d{4})$/, '($1) $2-$3') : '-';
+        const numLimpo = String(item.telefone || '').replace(/\\D/g, '');
+        const ddi = numLimpo.startsWith('55') ? numLimpo : ('55' + numLimpo);
+        const zapLink = numLimpo ? '<a href="https://wa.me/' + ddi + '" target="_blank" style="color: #4ade80; text-decoration: none; font-weight: 600;">' + telFormatado + '</a>' : '-';
+        
+        const ehSim = /^sim/i.test(item.experienciaIntercessao || '');
+        const badgeExp = ehSim
+          ? '<span style="background: rgba(168, 85, 247, 0.2); color: #d8b4fe; font-weight: 700; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem;">🛡️ Sim</span>'
+          : '<span style="background: rgba(59, 130, 246, 0.15); color: #93c5fd; font-weight: 600; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem;">🌱 Primeira Vez</span>';
+
+        const detalhes = item.experienciaDetalhes && item.experienciaDetalhes !== '-'
+          ? '<small style="color: #cbd5e1;">' + item.experienciaDetalhes + '</small>'
+          : '<span style="color: var(--cor-texto-mutado);">-</span>';
+
+        const dataStr = item.criadoEm ? item.criadoEm.slice(0, 10) : '-';
+
+        return '<tr>' +
+          '<td style="text-align: center; font-weight: bold; color: var(--cor-texto-mutado);">' + (idx + 1) + '</td>' +
+          '<td><strong style="color: #fff; font-size: 0.95rem;">' + (item.nome || '-') + '</strong></td>' +
+          '<td style="font-size: 0.88rem;">' + zapLink + '</td>' +
+          '<td style="font-size: 0.85rem; color: #cbd5e1;">' + (item.email || '-') + '</td>' +
+          '<td style="text-align: center;">' + badgeExp + '</td>' +
+          '<td style="font-size: 0.85rem;">' + detalhes + '</td>' +
+          '<td style="text-align: center; font-size: 0.82rem; color: var(--cor-texto-mutado);">' + dataStr + '</td>' +
+          '<td style="text-align: center;">' +
+            '<button data-id="' + (item.id || '') + '" data-nome="' + (item.nome || '').replace(/"/g, '&quot;') + '" onclick="excluirIntercessaoInscricao(this.dataset.id, this.dataset.nome)" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">' +
+              '🗑️ Excluir' +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    async function excluirIntercessaoInscricao(id, nome) {
+      if (!id) return;
+      const confirmou = confirm('Tem certeza que deseja excluir a inscrição de "' + (nome || 'Participante') + '"?');
+      if (!confirmou) return;
+
+      try {
+        const res = await fetch('/intercessao/api/excluir-inscricao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          fetchIntercessaoInscricoes();
+        } else {
+          alert(data.message || 'Erro ao excluir inscrição.');
+        }
+      } catch (err) {
+        console.error('Erro ao excluir inscrição de Intercessão:', err);
+        alert('Erro ao conectar com o servidor.');
+      }
+    }
+
+    async function sincronizarComPlanilhaIntercessao() {
+      const btn = document.getElementById('btnSyncPlanilhaIntercessao');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Sincronizando...';
+      }
+      try {
+        const res = await fetch('/intercessao/api/sincronizar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          alert('✅ Sincronização concluída com sucesso!\\n' + (data.message || (data.total || 0) + ' inscrições sincronizadas.'));
+          await fetchIntercessaoInscricoes();
         } else {
           alert('⚠️ Aviso ao sincronizar: ' + (data.message || 'Verifique se a planilha está configurada.'));
         }
@@ -4256,6 +4477,7 @@ function renderIndexHtml() {
     fetchCriancasInscricoes();
     fetchMulheresInscricoes();
     fetchSaudeMulherInscricoes();
+    fetchIntercessaoInscricoes();
     restaurarEstadoGavetas();
   </script>
 </body></html>`;

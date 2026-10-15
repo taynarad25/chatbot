@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscrições — Treinamento de Intercessão | Comunidade Cristã Curados</title>
+    <meta name="description" content="Painel oficial de inscrições do Treinamento de Intercessão para líderes e ministério.">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --cor-primaria: #f97316;
+            --cor-primaria-dark: #ea580c;
+            --cor-secundaria: #a855f7;
+            --cor-fundo: #090c15;
+            --cor-card: #121826;
+            --cor-card-alt: #1a2336;
+            --cor-borda: rgba(249, 115, 22, 0.22);
+            --cor-texto: #f8fafc;
+            --cor-texto-mutado: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        header {
+            background: rgba(9, 12, 21, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--cor-borda);
+            padding: 14px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .logo-badge {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: rgba(249, 115, 22, 0.18);
+            border: 1px solid rgba(249, 115, 22, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .logo-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .logo-sub {
+            font-size: 0.78rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 15px;
+            border-radius: 10px;
+            font-size: 0.86rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(249, 115, 22, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+            flex: 1;
+            width: 100%;
+        }
+
+        .banner-info {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(168, 85, 247, 0.08));
+            border: 1px solid var(--cor-borda);
+            border-radius: 16px;
+            padding: 22px 26px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .banner-info h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .banner-info p {
+            color: var(--cor-texto-mutado);
+            font-size: 0.9rem;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--cor-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 16px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover, .stat-card.active {
+            border-color: var(--cor-primaria);
+            background: var(--cor-card-alt);
+            transform: translateY(-2px);
+        }
+
+        .stat-num {
+            font-size: 1.8rem;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .stat-lbl {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--cor-texto-mutado);
+        }
+
+        /* Controls */
+        .controls-bar {
+            background: var(--cor-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--cor-card-alt);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 11px 16px 11px 40px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.92rem;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--cor-primaria);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0.5;
+        }
+
+        .filters-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--cor-texto-mutado);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover, .filter-btn.active {
+            background: rgba(249, 115, 22, 0.2);
+            color: #fdba74;
+            border-color: rgba(249, 115, 22, 0.4);
+        }
+
+        /* Cards Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 18px;
+        }
+
+        @media (max-width: 600px) {
+            .cards-grid { grid-template-columns: 1fr; }
+        }
+
+        .person-card {
+            background: var(--cor-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .person-card:hover {
+            border-color: var(--cor-primaria);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .person-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .person-num {
+            font-size: 0.76rem;
+            font-weight: 800;
+            color: var(--cor-primaria);
+            background: rgba(249, 115, 22, 0.15);
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        .person-name {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #fff;
+            margin-top: 4px;
+        }
+
+        .person-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+
+        .badge-sim {
+            background: rgba(168, 85, 247, 0.2);
+            color: #d8b4fe;
+            border: 1px solid rgba(168, 85, 247, 0.4);
+        }
+
+        .badge-nao {
+            background: rgba(59, 130, 246, 0.18);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+        }
+
+        .person-info-item {
+            font-size: 0.88rem;
+            color: var(--cor-texto-mutado);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .person-info-item a {
+            color: #fdba74;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .person-info-item a:hover {
+            text-decoration: underline;
+        }
+
+        .person-details-box {
+            background: var(--cor-card-alt);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            border-left: 3px solid var(--cor-secundaria);
+        }
+
+        .person-actions {
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-zap {
+            background: #25d366;
+            color: #fff;
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-zap:hover {
+            background: #20bd5a;
+        }
+
+        .date-tag {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--cor-texto-mutado);
+            grid-column: 1 / -1;
+        }
+
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 24px;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        @media print {
+            header, .controls-bar, .header-actions, .banner-info button, .btn-zap { display: none !important; }
+            body { background: #fff; color: #000; }
+            .person-card { border: 1px solid #ccc; break-inside: avoid; background: #fff; color: #000; }
+            .person-name { color: #000; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-container">
+            <a href="/treinamento-de-intercessao" class="logo-area">
+                <div class="logo-badge">🙏</div>
+                <div>
+                    <div class="logo-title">Treinamento de Intercessão</div>
+                    <div class="logo-sub">Comunidade Cristã Curados • Painel do Líder</div>
+                </div>
+            </a>
+            <div class="header-actions">
+                <button onclick="window.print()" class="btn-action btn-secondary" title="Imprimir lista">
+                    🖨️ Imprimir
+                </button>
+                <button onclick="copiarLinkCompartilhamento()" class="btn-action btn-secondary" title="Copiar link para líderes">
+                    📋 Copiar Link
+                </button>
+                <a href="/intercessao/api/relatorio-pdf" target="_blank" class="btn-action btn-primary" title="Exportar tabela oficial em PDF">
+                    📄 Exportar PDF
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="banner-info">
+            <div>
+                <h1>Inscrições Confirmadas</h1>
+                <p>
+                    <span>🗓️ Início: <strong>15/11/2026 às 16h</strong></span>
+                    <span>📍 <strong>Templo Principal (CCC)</strong></span>
+                    <span>📖 <em>"e serás chamado reparador de brechas e restaurador de veredas"</em></span>
+                </p>
+            </div>
+            <div>
+                <button onclick="carregarInscricoes(true)" class="btn-action btn-secondary" id="btnRecarregar">
+                    🔄 Atualizar Dados
+                </button>
+            </div>
+        </section>
+
+        <!-- CARDS DE ESTATÍSTICAS -->
+        <section class="stats-grid">
+            <div class="stat-card active" onclick="aplicarFiltroRapido('todos', this)">
+                <div class="stat-num" id="statTotal" style="color: #fdba74;">-</div>
+                <div class="stat-lbl">Total Inscritos</div>
+            </div>
+            <div class="stat-card" onclick="aplicarFiltroRapido('experiencia', this)">
+                <div class="stat-num" id="statExperiencia" style="color: #d8b4fe;">-</div>
+                <div class="stat-lbl">Já Fez Curso / Atuou</div>
+            </div>
+            <div class="stat-card" onclick="aplicarFiltroRapido('primeira_vez', this)">
+                <div class="stat-num" id="statPrimeiraVez" style="color: #93c5fd;">-</div>
+                <div class="stat-lbl">Primeira Vez</div>
+            </div>
+            <div class="stat-card" onclick="aplicarFiltroRapido('zap_confirmado', this)">
+                <div class="stat-num" id="statZapConfirmado" style="color: #86efac;">-</div>
+                <div class="stat-lbl">WhatsApp Enviado</div>
+            </div>
+        </section>
+
+        <!-- BARRA DE CONTROLE -->
+        <section class="controls-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="campoBusca" class="search-input" placeholder="Buscar por nome, telefone, e-mail ou experiência..." oninput="filtrarInscritos()">
+            </div>
+            <div class="filters-row">
+                <button class="filter-btn active" onclick="aplicarFiltroRapido('todos', this)">Todos (<span id="contTodos">-</span>)</button>
+                <button class="filter-btn" onclick="aplicarFiltroRapido('experiencia', this)">Com Experiência / Curso (<span id="contExperiencia">-</span>)</button>
+                <button class="filter-btn" onclick="aplicarFiltroRapido('primeira_vez', this)">Primeira Vez (<span id="contPrimeiraVez">-</span>)</button>
+            </div>
+        </section>
+
+        <!-- GRID DE CARDS -->
+        <section class="cards-grid" id="containerCards">
+            <div class="empty-state">
+                <h3>Carregando inscrições...</h3>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        Comunidade Cristã Curados &copy; 2026 • Ministério de Intercessão<br>
+        <small style="opacity: 0.7;">Painel Oficial para Líderes de Intercessão e Pastoral</small>
+    </footer>
+
+    <script>
+        let inscritosCache = [];
+        let filtroAtivo = 'todos';
+
+        async function carregarInscricoes(forcarSync = false) {
+            const btn = document.getElementById('btnRecarregar');
+            if (btn) btn.innerHTML = '⏳ Carregando...';
+
+            try {
+                const url = '/intercessao/api/inscritos' + (forcarSync ? '?sync=1' : '');
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.ok && Array.isArray(data.inscricoes)) {
+                    inscritosCache = data.inscricoes;
+                    atualizarMetricas(data.stats || {});
+                    filtrarInscritos();
+                } else {
+                    document.getElementById('containerCards').innerHTML = `
+                        <div class="empty-state">
+                            <h3>Nenhuma inscrição encontrada</h3>
+                            <p>Assim que os irmãos se inscreverem, eles aparecerão aqui automaticamente.</p>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error('Erro ao buscar dados:', err);
+                document.getElementById('containerCards').innerHTML = `
+                    <div class="empty-state">
+                        <h3>Erro ao carregar dados</h3>
+                        <p>Verifique sua conexão ou tente recarregar.</p>
+                    </div>
+                `;
+            } finally {
+                if (btn) btn.innerHTML = '🔄 Atualizar Dados';
+            }
+        }
+
+        function atualizarMetricas(stats) {
+            const total = stats.total !== undefined ? stats.total : inscritosCache.length;
+            const comExp = stats.comExperiencia !== undefined ? stats.comExperiencia : inscritosCache.filter(i => /^sim/i.test(i.experienciaIntercessao || '')).length;
+            const semExp = stats.semExperiencia !== undefined ? stats.semExperiencia : (total - comExp);
+            const zap = stats.whatsappConfirmado !== undefined ? stats.whatsappConfirmado : inscritosCache.filter(i => i.whatsappConfirmacaoEnviado === 1).length;
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statExperiencia').textContent = comExp;
+            document.getElementById('statPrimeiraVez').textContent = semExp;
+            document.getElementById('statZapConfirmado').textContent = zap;
+
+            document.getElementById('contTodos').textContent = total;
+            document.getElementById('contExperiencia').textContent = comExp;
+            document.getElementById('contPrimeiraVez').textContent = semExp;
+        }
+
+        function aplicarFiltroRapido(tipo, el) {
+            filtroAtivo = tipo;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+            if (el) el.classList.add('active');
+            filtrarInscritos();
+        }
+
+        function filtrarInscritos() {
+            const termo = (document.getElementById('campoBusca')?.value || '').toLowerCase().trim();
+
+            const filtrados = inscritosCache.filter(item => {
+                const ehSim = /^sim/i.test(item.experienciaIntercessao || '');
+                if (filtroAtivo === 'experiencia' && !ehSim) return false;
+                if (filtroAtivo === 'primeira_vez' && ehSim) return false;
+                if (filtroAtivo === 'zap_confirmado' && item.whatsappConfirmacaoEnviado !== 1) return false;
+
+                if (!termo) return true;
+                const texto = [item.nome, item.telefone, item.email, item.experienciaDetalhes].filter(Boolean).join(' ').toLowerCase();
+                return texto.includes(termo);
+            });
+
+            renderizarCards(filtrados);
+        }
+
+        function formatarTelefone(tel) {
+            const limpo = String(tel || '').replace(/\D/g, '');
+            if (limpo.length === 11) return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 7)}-${limpo.slice(7)}`;
+            if (limpo.length === 10) return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 6)}-${limpo.slice(6)}`;
+            return tel || 'Não informado';
+        }
+
+        function linkZap(tel) {
+            const limpo = String(tel || '').replace(/\D/g, '');
+            const ddi = limpo.startsWith('55') ? limpo : ('55' + limpo);
+            return `https://wa.me/${ddi}`;
+        }
+
+        function renderizarCards(lista) {
+            const container = document.getElementById('containerCards');
+            if (!lista || lista.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Nenhum participante encontrado</h3>
+                        <p>Nenhum registro corresponde ao filtro ou busca selecionada.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = lista.map((item, idx) => {
+                const ehSim = /^sim/i.test(item.experienciaIntercessao || '');
+                return `
+                    <div class="person-card">
+                        <div class="person-header">
+                            <div>
+                                <span class="person-num">#${idx + 1}</span>
+                                <h3 class="person-name">${item.nome}</h3>
+                            </div>
+                            <span class="person-badge ${ehSim ? 'badge-sim' : 'badge-nao'}">
+                                ${ehSim ? '🛡️ Já atuou / curso' : '🌱 Primeira Vez'}
+                            </span>
+                        </div>
+
+                        <div class="person-info-item">
+                            <span>📱</span>
+                            <a href="${linkZap(item.telefone)}" target="_blank">${formatarTelefone(item.telefone)}</a>
+                        </div>
+
+                        ${item.email ? `
+                            <div class="person-info-item">
+                                <span>✉️</span>
+                                <a href="mailto:${item.email}">${item.email}</a>
+                            </div>
+                        ` : ''}
+
+                        ${item.experienciaDetalhes && item.experienciaDetalhes !== '-' ? `
+                            <div class="person-details-box">
+                                <strong>Detalhes informados:</strong><br>
+                                "${item.experienciaDetalhes}"
+                            </div>
+                        ` : ''}
+
+                        <div class="person-actions">
+                            <span class="date-tag">Inscrito em: ${item.criadoEm ? item.criadoEm.slice(0, 10) : '-'}</span>
+                            <a href="${linkZap(item.telefone)}" target="_blank" class="btn-zap">
+                                <span>💬 WhatsApp</span>
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function copiarLinkCompartilhamento() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert('✅ Link das Inscrições copiado com sucesso!');
+            }).catch(() => {
+                prompt('Copie o link abaixo:', window.location.href);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarInscricoes(false);
+        });
+    </script>
+</body>
+</html>

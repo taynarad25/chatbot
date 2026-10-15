@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscrições — Especial Dia das Crianças | Comunidade Cristã Curados</title>
+    <meta name="description" content="Painel oficial de crianças inscritas para líderes do Ministério Infantil e Pastoral.">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --cor-primaria: #0284c7;
+            --cor-primaria-dark: #0369a1;
+            --cor-secundaria: #38bdf8;
+            --cor-fundo: #070d14;
+            --cor-card: #0f1924;
+            --cor-card-alt: #162434;
+            --cor-borda: rgba(2, 132, 199, 0.25);
+            --cor-texto: #f0f9ff;
+            --cor-texto-mutado: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        header {
+            background: rgba(7, 13, 20, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--cor-borda);
+            padding: 14px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .logo-badge {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: rgba(2, 132, 199, 0.18);
+            border: 1px solid rgba(2, 132, 199, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .logo-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .logo-sub {
+            font-size: 0.78rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 15px;
+            border-radius: 10px;
+            font-size: 0.86rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(2, 132, 199, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+            flex: 1;
+            width: 100%;
+        }
+
+        .banner-info {
+            background: linear-gradient(135deg, rgba(2, 132, 199, 0.14), rgba(245, 158, 11, 0.08));
+            border: 1px solid var(--cor-borda);
+            border-radius: 16px;
+            padding: 22px 26px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .banner-info h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .banner-info p {
+            color: var(--cor-texto-mutado);
+            font-size: 0.9rem;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--cor-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 16px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover, .stat-card.active {
+            border-color: var(--cor-primaria);
+            background: var(--cor-card-alt);
+            transform: translateY(-2px);
+        }
+
+        .stat-num {
+            font-size: 1.8rem;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 6px;
+            color: #38bdf8;
+        }
+
+        .stat-lbl {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--cor-texto-mutado);
+        }
+
+        /* Controls */
+        .controls-bar {
+            background: var(--cor-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--cor-card-alt);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 11px 16px 11px 40px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.92rem;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--cor-primaria);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0.5;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 18px;
+        }
+
+        @media (max-width: 600px) {
+            .cards-grid { grid-template-columns: 1fr; }
+        }
+
+        .person-card {
+            background: var(--cor-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .person-card:hover {
+            border-color: var(--cor-primaria);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .person-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .person-num {
+            font-size: 0.76rem;
+            font-weight: 800;
+            color: var(--cor-primaria);
+            background: rgba(2, 132, 199, 0.15);
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        .person-name {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #fff;
+            margin-top: 4px;
+        }
+
+        .person-age {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #facc15;
+            background: rgba(250, 204, 21, 0.15);
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .person-info-item {
+            font-size: 0.88rem;
+            color: var(--cor-texto-mutado);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .person-info-item a {
+            color: #38bdf8;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .person-info-item a:hover {
+            text-decoration: underline;
+        }
+
+        .alert-box {
+            background: rgba(239, 68, 68, 0.12);
+            border-left: 3px solid #ef4444;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            color: #fca5a5;
+        }
+
+        .person-actions {
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-zap {
+            background: #25d366;
+            color: #fff;
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-zap:hover {
+            background: #20bd5a;
+        }
+
+        .date-tag {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--cor-texto-mutado);
+            grid-column: 1 / -1;
+        }
+
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 24px;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        @media print {
+            header, .controls-bar, .header-actions, .banner-info button, .btn-zap { display: none !important; }
+            body { background: #fff; color: #000; }
+            .person-card { border: 1px solid #ccc; break-inside: avoid; background: #fff; color: #000; }
+            .person-name { color: #000; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-container">
+            <a href="/criancas" class="logo-area">
+                <div class="logo-badge">🎈</div>
+                <div>
+                    <div class="logo-title">Especial Dia das Crianças</div>
+                    <div class="logo-sub">Ministério Infantil • Painel dos Líderes</div>
+                </div>
+            </a>
+            <div class="header-actions">
+                <button onclick="window.print()" class="btn-action btn-secondary" title="Imprimir lista">
+                    🖨️ Imprimir
+                </button>
+                <button onclick="copiarLinkCompartilhamento()" class="btn-action btn-secondary" title="Copiar link para líderes">
+                    📋 Copiar Link
+                </button>
+                <a href="/criancas/api/relatorio-pdf" target="_blank" class="btn-action btn-primary" title="Exportar tabela oficial em PDF">
+                    📄 Exportar PDF
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="banner-info">
+            <div>
+                <h1>Lista de Crianças Inscritas</h1>
+                <p>
+                    <span>🗓️ Data: <strong>17/10/2026 às 14:00</strong></span>
+                    <span>📍 <strong>R. Benedicto de Abreu Júnior, 40</strong></span>
+                    <span>🎈 <em>Ministério Infantil — Comunidade Cristã Curados</em></span>
+                </p>
+            </div>
+            <div>
+                <button onclick="carregarInscricoes(true)" class="btn-action btn-secondary" id="btnRecarregar">
+                    🔄 Atualizar Dados
+                </button>
+            </div>
+        </section>
+
+        <!-- CARDS DE ESTATÍSTICAS -->
+        <section class="stats-grid">
+            <div class="stat-card active">
+                <div class="stat-num" id="statTotal">-</div>
+                <div class="stat-lbl">Total de Crianças</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="statComAlergia" style="color: #f87171;">-</div>
+                <div class="stat-lbl">Com Alergia / Restrição</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="statZapConfirmado" style="color: #86efac;">-</div>
+                <div class="stat-lbl">Confirmação WhatsApp</div>
+            </div>
+        </section>
+
+        <!-- BARRA DE CONTROLE -->
+        <section class="controls-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="campoBusca" class="search-input" placeholder="Buscar por criança, responsável, telefone ou alergia..." oninput="filtrarInscritos()">
+            </div>
+        </section>
+
+        <!-- GRID DE CARDS -->
+        <section class="cards-grid" id="containerCards">
+            <div class="empty-state">
+                <h3>Carregando inscrições...</h3>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        Comunidade Cristã Curados &copy; 2026 • Ministério Infantil<br>
+        <small style="opacity: 0.7;">Painel Oficial para Líderes do Ministério Infantil e Pastoral</small>
+    </footer>
+
+    <script>
+        let criancasCache = [];
+
+        async function carregarInscricoes(forcarSync = false) {
+            const btn = document.getElementById('btnRecarregar');
+            if (btn) btn.innerHTML = '⏳ Carregando...';
+
+            try {
+                const url = '/criancas/api/inscritas' + (forcarSync ? '?sync=1' : '');
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.ok && Array.isArray(data.inscricoes)) {
+                    criancasCache = data.inscricoes;
+                    atualizarMetricas(data.stats || {});
+                    filtrarInscritos();
+                } else {
+                    document.getElementById('containerCards').innerHTML = `
+                        <div class="empty-state">
+                            <h3>Nenhuma criança encontrada</h3>
+                            <p>Assim que houver novas inscrições, elas aparecerão aqui.</p>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error('Erro ao buscar dados:', err);
+                document.getElementById('containerCards').innerHTML = `
+                    <div class="empty-state">
+                        <h3>Erro ao carregar inscrições</h3>
+                        <p>Verifique sua conexão e tente novamente.</p>
+                    </div>
+                `;
+            } finally {
+                if (btn) btn.innerHTML = '🔄 Atualizar Dados';
+            }
+        }
+
+        function atualizarMetricas(stats) {
+            const total = stats.total !== undefined ? stats.total : criancasCache.length;
+            const comAlergia = criancasCache.filter(c => (c.alergiaAlimentos && c.alergiaAlimentos !== 'Não' && c.alergiaAlimentos !== 'Nenhuma') || (c.alergiaMedicamentos && c.alergiaMedicamentos !== 'Não' && c.alergiaMedicamentos !== 'Nenhuma')).length;
+            const zap = stats.whatsappConfirmado !== undefined ? stats.whatsappConfirmado : criancasCache.filter(c => c.whatsappConfirmacaoEnviado === 1).length;
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statComAlergia').textContent = comAlergia;
+            document.getElementById('statZapConfirmado').textContent = zap;
+        }
+
+        function filtrarInscritos() {
+            const termo = (document.getElementById('campoBusca')?.value || '').toLowerCase().trim();
+
+            const filtradas = criancasCache.filter(item => {
+                if (!termo) return true;
+                const texto = [item.nomeCrianca, item.nomeResponsavel, item.telefone, item.alergiaAlimentos, item.alergiaMedicamentos].filter(Boolean).join(' ').toLowerCase();
+                return texto.includes(termo);
+            });
+
+            renderizarCards(filtradas);
+        }
+
+        function formatarTelefone(tel) {
+            const limpo = String(tel || '').replace(/\D/g, '');
+            if (limpo.length === 11) return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 7)}-${limpo.slice(7)}`;
+            if (limpo.length === 10) return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 6)}-${limpo.slice(6)}`;
+            return tel || 'Não informado';
+        }
+
+        function linkZap(tel) {
+            const limpo = String(tel || '').replace(/\D/g, '');
+            const ddi = limpo.startsWith('55') ? limpo : ('55' + limpo);
+            return `https://wa.me/${ddi}`;
+        }
+
+        function renderizarCards(lista) {
+            const container = document.getElementById('containerCards');
+            if (!lista || lista.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Nenhuma criança encontrada</h3>
+                        <p>Nenhum registro corresponde à busca.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = lista.map((item, idx) => {
+                const temAlergia = (item.alergiaAlimentos && item.alergiaAlimentos !== 'Não' && item.alergiaAlimentos !== 'Nenhuma') ||
+                                   (item.alergiaMedicamentos && item.alergiaMedicamentos !== 'Não' && item.alergiaMedicamentos !== 'Nenhuma');
+                return `
+                    <div class="person-card">
+                        <div class="person-header">
+                            <div>
+                                <span class="person-num">#${idx + 1}</span>
+                                <h3 class="person-name">${item.nomeCrianca}</h3>
+                            </div>
+                            ${item.idade ? `<span class="person-age">${item.idade} anos</span>` : ''}
+                        </div>
+
+                        ${item.nomeResponsavel ? `
+                            <div class="person-info-item">
+                                <span>👩‍👧 Responsável:</span>
+                                <strong>${item.nomeResponsavel}</strong>
+                            </div>
+                        ` : ''}
+
+                        <div class="person-info-item">
+                            <span>📱</span>
+                            <a href="${linkZap(item.telefone)}" target="_blank">${formatarTelefone(item.telefone)}</a>
+                        </div>
+
+                        ${temAlergia ? `
+                            <div class="alert-box">
+                                ⚠️ <strong>Alergias / Restrições:</strong><br>
+                                ${item.alergiaAlimentos && item.alergiaAlimentos !== 'Não' ? `Alimentos: ${item.alergiaAlimentos}<br>` : ''}
+                                ${item.alergiaMedicamentos && item.alergiaMedicamentos !== 'Não' ? `Medicamentos: ${item.alergiaMedicamentos}` : ''}
+                            </div>
+                        ` : ''}
+
+                        <div class="person-actions">
+                            <span class="date-tag">Inscrito em: ${item.criadoEm ? item.criadoEm.slice(0, 10) : '-'}</span>
+                            <a href="${linkZap(item.telefone)}" target="_blank" class="btn-zap">
+                                <span>💬 WhatsApp</span>
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function copiarLinkCompartilhamento() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert('✅ Link das Inscrições copiado com sucesso!');
+            }).catch(() => {
+                prompt('Copie o link abaixo:', window.location.href);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarInscricoes(false);
+        });
+    </script>
+</body>
+</html>

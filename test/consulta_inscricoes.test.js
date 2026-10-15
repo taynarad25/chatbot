@@ -19,10 +19,11 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     usuario: { nome: "Pr. Gabriel", cargos: ["pastor"], departamentos: [] },
     isPastor: true,
   });
-  assert.equal(eventosPastor.length, 3);
+  assert.equal(eventosPastor.length, 4);
   assert.ok(eventosPastor.some((e) => e.id === "culto_mulheres"));
   assert.ok(eventosPastor.some((e) => e.id === "saude_mulher"));
   assert.ok(eventosPastor.some((e) => e.id === "dia_das_criancas"));
+  assert.ok(eventosPastor.some((e) => e.id === "treinamento_intercessao"));
   assert.ok(!eventosPastor.some((e) => e.id === "the_chosen"));
 
   // 2. Diretor tem acesso a todos os eventos
@@ -30,7 +31,7 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     usuario: { nome: "Dir. Fernando", cargos: ["diretor"], departamentos: [] },
     isDiretor: true,
   });
-  assert.equal(eventosDiretor.length, 3);
+  assert.equal(eventosDiretor.length, 4);
 
   // 3. Líder da Rede de Mulheres tem acesso aos eventos de Mulheres (Culto de Mulheres e Saúde da Mulher)
   const eventosLiderMulheres = obterEventosInscricaoParaUsuario({
@@ -45,7 +46,7 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
   assert.ok(eventosLiderMulheres.some((e) => e.id === "culto_mulheres"));
   assert.ok(eventosLiderMulheres.some((e) => e.id === "saude_mulher"));
 
-  // 4. Líder da Rede de Homens NÃO tem acesso a eventos de Mulheres
+  // 4. Líder da Rede de Homens NÃO tem acesso a eventos de Mulheres ou Intercessão
   const eventosLiderHomens = obterEventosInscricaoParaUsuario({
     usuario: {
       nome: "Líder Carlos",
@@ -65,9 +66,22 @@ test("Consulta Inscrições: regras de acesso por cargo e departamento", () => {
     },
     isLider: true,
   });
-  assert.equal(eventosMultiplos.length, 2);
+  assert.equal(eventosMultiplos.length, 3);
   assert.ok(eventosMultiplos.some((e) => e.id === "culto_mulheres"));
   assert.ok(eventosMultiplos.some((e) => e.id === "saude_mulher"));
+  assert.ok(eventosMultiplos.some((e) => e.id === "treinamento_intercessao"));
+
+  // 6. Líder exclusivo de Intercessão
+  const eventosLiderIntercessao = obterEventosInscricaoParaUsuario({
+    usuario: {
+      nome: "Líder Marcos",
+      cargos: ["lider"],
+      departamentos: ["Intercessão"],
+    },
+    isLider: true,
+  });
+  assert.equal(eventosLiderIntercessao.length, 1);
+  assert.ok(eventosLiderIntercessao.some((e) => e.id === "treinamento_intercessao"));
 });
 
 test("Consulta Inscrições: geração de resumos em texto", () => {
@@ -82,6 +96,11 @@ test("Consulta Inscrições: geração de PDF com Puppeteer", async () => {
   assert.ok(resultadoMulheres.buffer instanceof Buffer);
   assert.ok(resultadoMulheres.buffer.length > 1000);
   assert.equal(resultadoMulheres.filename, "Lista_Inscricoes_Culto_Mulheres.pdf");
+
+  const resultadoIntercessao = await gerarPdfEvento({ eventoId: "treinamento_intercessao" });
+  assert.equal(resultadoIntercessao.ok, true);
+  assert.ok(resultadoIntercessao.buffer instanceof Buffer);
+  assert.equal(resultadoIntercessao.filename, "Lista_Inscritos_Treinamento_Intercessao.pdf");
 
   const resultadoChosen = await gerarPdfEvento({ eventoId: "the_chosen" });
   assert.equal(resultadoChosen.ok, false);

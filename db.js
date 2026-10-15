@@ -188,6 +188,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_saude_mulher_telefone ON saude_mulher_inscricoes(telefone);
   CREATE INDEX IF NOT EXISTS idx_saude_mulher_nome ON saude_mulher_inscricoes(nome);
 
+  CREATE TABLE IF NOT EXISTS intercessao_inscricoes (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    telefone TEXT NOT NULL,
+    email TEXT,
+    experienciaIntercessao TEXT NOT NULL DEFAULT 'Não',
+    experienciaDetalhes TEXT,
+    evento TEXT NOT NULL DEFAULT 'Treinamento de Intercessão',
+    dataEvento TEXT NOT NULL DEFAULT '2026-11-15 16:00',
+    whatsappConfirmacaoEnviado INTEGER NOT NULL DEFAULT 0,
+    criadoEm TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_intercessao_telefone ON intercessao_inscricoes(telefone);
+  CREATE INDEX IF NOT EXISTS idx_intercessao_nome ON intercessao_inscricoes(nome);
+
   CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,

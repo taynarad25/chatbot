@@ -17,6 +17,7 @@ try {
 const cultoMulheres = require("../web/culto_mulheres");
 const diaDasCriancas = require("../web/dia_das_criancas");
 const saudeMulher = require("../web/saude_mulher");
+const treinamentoIntercessao = require("../web/treinamento_intercessao");
 
 const CATALOGO_EVENTOS = [
   {
@@ -71,6 +72,28 @@ const CATALOGO_EVENTOS = [
       ).map((d) => String(d || "").toLowerCase().trim());
       return deptos.some((d) =>
         /infantil|crian[cç]a|kids/i.test(d)
+      );
+    },
+  },
+  {
+    id: "treinamento_intercessao",
+    nome: "Treinamento de Intercessão",
+    icone: "🙏",
+    dataEvento: "2026-11-15 16:00",
+    departamentos: [
+      "Intercessão",
+      "Oração",
+      "Ministério de Intercessão",
+    ],
+    verificarPermissao: (usuario, isPastor, isDiretor) => {
+      if (isPastor || isDiretor) return true;
+      const deptos = (
+        Array.isArray(usuario?.departamentos)
+          ? usuario.departamentos
+          : [usuario?.departamento || ""]
+      ).map((d) => String(d || "").toLowerCase().trim());
+      return deptos.some((d) =>
+        /intercess[aã]o|ora[cç][aã]o/i.test(d)
       );
     },
   },
@@ -174,6 +197,22 @@ function gerarResumoSaudeMulher() {
   );
 }
 
+function gerarResumoIntercessao() {
+  const stats = treinamentoIntercessao.obterEstatisticasIntercessao();
+
+  return (
+    `🙏 *Treinamento de Intercessão*\n\n` +
+    `📊 *Estatísticas das Inscrições:*\n` +
+    `• Total de Inscritos: *${stats.total}*\n` +
+    `• Já têm experiência / curso: *${stats.comExperiencia}*\n` +
+    `• Primeira vez no ministério: *${stats.semExperiencia}*\n` +
+    `• Confirmações de WhatsApp: *${stats.whatsappConfirmado}*\n\n` +
+    `🗓️ *Início:* Domingo, 15/11/2026 às 16:00 (Todos os Domingos)\n` +
+    `📍 *Local:* Comunidade Cristã Curados — Templo Principal\n` +
+    `📖 _"e serás chamado reparador de brechas e restaurador de veredas"_ (Isaías 58:12)\n`
+  );
+}
+
 /**
  * Monta lista nominal em texto caso o PDF falhe ou para consulta rápida
  */
@@ -252,6 +291,29 @@ function montarListaInscritosTexto(eventoId) {
     return texto;
   }
 
+  if (eventoId === "treinamento_intercessao") {
+    const lista =
+      typeof treinamentoIntercessao.listarInscricoesIntercessao === "function"
+        ? treinamentoIntercessao.listarInscricoesIntercessao()
+        : [];
+    if (!lista || lista.length === 0) {
+      return "_Nenhum participante inscrito no momento._";
+    }
+    const maxExibir = 40;
+    const itens = lista.slice(0, maxExibir).map((item, idx) => {
+      const tel = item.telefone ? `📞 ${item.telefone}` : "";
+      const ehSim = /^sim/i.test(item.experienciaIntercessao || "");
+      const expTag = ehSim ? " [🛡️ Já atuou/curso]" : " [🌱 1ª Vez]";
+      const detalhes = item.experienciaDetalhes && item.experienciaDetalhes !== "-" ? `\n   📝 _${item.experienciaDetalhes}_` : "";
+      return `${idx + 1}. *${item.nome}*${expTag}\n   ${tel}${detalhes}`;
+    });
+    let texto = itens.join("\n\n");
+    if (lista.length > maxExibir) {
+      texto += `\n\n_... e mais ${lista.length - maxExibir} participantes (consulte no site)._`;
+    }
+    return texto;
+  }
+
   return "";
 }
 
@@ -304,6 +366,10 @@ async function gerarPdfEvento({ eventoId, client }) {
   } else if (eventoId === "dia_das_criancas") {
     html = diaDasCriancas.renderCriancasPdfHtml();
     filename = "Lista_Inscricoes_Dia_das_Criancas.pdf";
+
+  } else if (eventoId === "treinamento_intercessao") {
+    html = treinamentoIntercessao.renderIntercessaoPdfHtml();
+    filename = "Lista_Inscritos_Treinamento_Intercessao.pdf";
   } else {
     return { ok: false, error: "Evento não reconhecido." };
   }
@@ -370,54 +436,57 @@ async function gerarPdfEvento({ eventoId, client }) {
   }
 }
 
+function formatarLinkSite(caminho) {
+  const base = (process.env.SITE_URL || process.env.BASE_URL || "").replace(/\/$/, "");
+  if (!base) return caminho;
+  return `${base}${caminho.startsWith("/") ? "" : "/"}${caminho}`;
+}
+
 /**
- * Retorna os links oficiais do Google Sheets / Google Docs / PDF para o evento
+ * Retorna os links oficiais no site / fichas / PDF para o evento
+ * (Substitui links crus de planilhas por páginas organizadas do site)
  */
 function obterLinksDocumentos(eventoId) {
   if (eventoId === "culto_mulheres") {
-    const ssId =
-      process.env.MULHERES_SPREADSHEET_ID ||
-      "12OfRGFDbMYxUdxJ9WJJ7LlsfdqRbWOvI8n13cULIMd4";
     return {
-      spreadsheetId: ssId,
-      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`,
-      pdfUrl: `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`,
+      siteUrl: formatarLinkSite("/mulheres/fichas"),
+      fichasUrl: formatarLinkSite("/mulheres/fichas"),
+      pdfUrl: `/mulheres/api/relatorio-pdf`,
     };
   }
 
-
-
   if (eventoId === "saude_mulher") {
-    const ssId =
-      process.env.SAUDE_MULHER_SPREADSHEET_ID ||
-      "1UzaEVYBZe7NDosUtRS5aT-QJkNFoFu5PJCjicnE5_lg";
     return {
-      spreadsheetId: ssId,
-      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`,
+      siteUrl: formatarLinkSite("/saude-da-mulher/fichas"),
+      fichasUrl: formatarLinkSite("/saude-da-mulher/fichas"),
       pdfUrl: `/saude-mulher/api/relatorio-pdf`,
-      fichasUrl: `/saude-da-mulher/fichas`,
     };
   }
 
   if (eventoId === "dia_das_criancas") {
-    const ssId =
-      process.env.CRIANCAS_SPREADSHEET_ID ||
-      "11-WWQL2485gSCcM5N4XnWX8sfIj-knQCBUi5koGG6F8";
     return {
-      spreadsheetId: ssId,
-      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${ssId}/edit?usp=sharing`,
-      pdfUrl: `https://docs.google.com/spreadsheets/d/${ssId}/export?format=pdf&portrait=true&size=a4&gridlines=true`,
+      siteUrl: formatarLinkSite("/criancas/fichas"),
+      fichasUrl: formatarLinkSite("/criancas/fichas"),
+      pdfUrl: `/criancas/api/relatorio-pdf`,
     };
   }
 
-  return { spreadsheetId: null, spreadsheetUrl: null, pdfUrl: null };
+  if (eventoId === "treinamento_intercessao") {
+    return {
+      siteUrl: formatarLinkSite("/intercessao/fichas"),
+      fichasUrl: formatarLinkSite("/intercessao/fichas"),
+      pdfUrl: `/intercessao/api/relatorio-pdf`,
+    };
+  }
+
+  return { siteUrl: null, fichasUrl: null, pdfUrl: null };
 }
 
 /**
- * Envia o resumo conciso (cabeçalho, estatísticas e links oficiais da planilha)
+ * Envia o resumo conciso (cabeçalho, estatísticas e link do site com fichas)
  */
 async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
-  // Sincroniza com o Google Sheets em produção para garantir dados frescos
+  // Sincroniza com a nuvem / Google Sheets em produção para garantir dados frescos
   if (
     process.env.NODE_ENV !== "test" &&
     eventoId === "culto_mulheres" &&
@@ -443,6 +512,15 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
     try {
       await sincronizarInscricoesCriancas();
     } catch {}
+
+  } else if (
+    process.env.NODE_ENV !== "test" &&
+    eventoId === "treinamento_intercessao" &&
+    typeof treinamentoIntercessao.sincronizarInscricoesComNuvemIntercessao === "function"
+  ) {
+    try {
+      await treinamentoIntercessao.sincronizarInscricoesComNuvemIntercessao();
+    } catch {}
   }
 
   let resumoTexto = "";
@@ -454,23 +532,26 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
 
   } else if (eventoId === "dia_das_criancas") {
     resumoTexto = gerarResumoDiaDasCriancas();
+
+  } else if (eventoId === "treinamento_intercessao") {
+    resumoTexto = gerarResumoIntercessao();
   }
 
-  // Link oficial da planilha e painel de fichas
+  // Link oficial do painel no site com fichas organizadas (ao invés de mandar a planilha Google)
   const links = obterLinksDocumentos(eventoId);
 
   let blocoLinks = "";
-  if (links.fichasUrl) {
-    blocoLinks += `\n📑 *Ver Fichas Organizadas da Professora (Celular):*\n${links.fichasUrl}\n`;
-  }
-  if (links.spreadsheetUrl) {
-    blocoLinks += `\n📊 *Planilha no Google Sheets:*\n${links.spreadsheetUrl}\n`;
+  if (eventoId === "saude_mulher") {
+    blocoLinks += `\n📑 *Ver Fichas Organizadas da Professora (Celular):*\n${links.fichasUrl || links.siteUrl}\n`;
+  } else if (links.siteUrl) {
+    blocoLinks += `\n🌐 *Ver Inscrições no Site (Celular):*\n${links.siteUrl}\n`;
   }
 
+  const dicaTipo = eventoId === "saude_mulher" ? "as alunas com seus alertas de saúde" : "os inscritos";
   const corpoMensagem =
     resumoTexto +
     blocoLinks +
-    `\n💡 *Dica:* Digite *fichas* ou *lista* para ver as alunas com seus alertas de saúde diretamente aqui no WhatsApp.\n` +
+    `\n💡 *Dica:* Digite *fichas* ou *lista* para ver ${dicaTipo} diretamente aqui no WhatsApp.\n` +
     `\nDigite *menu* para voltar ao menu principal.`;
 
   await msg.reply(corpoMensagem);
@@ -605,7 +686,9 @@ async function processarFluxoConsultaInscricoes({
         (e) =>
           escolha.includes(e.id) ||
           (/pilates|sa[uú]de/i.test(escolha) && e.id === "saude_mulher") ||
-          (/culto.*mulher|mulher/i.test(escolha) && !/pilates|sa[uú]de/i.test(escolha) && e.id === "culto_mulheres")
+          (/culto.*mulher|mulher/i.test(escolha) && !/pilates|sa[uú]de/i.test(escolha) && e.id === "culto_mulheres") ||
+          (/crian[cç]|infantil|kids/i.test(escolha) && e.id === "dia_das_criancas") ||
+          (/intercess[aã]o|ora[cç][aã]o/i.test(escolha) && e.id === "treinamento_intercessao")
       );
     }
 

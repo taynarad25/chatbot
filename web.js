@@ -12,6 +12,7 @@ const cultoMulheres = require("./web/culto_mulheres");
 const cultoMulheresNotificacoes = require("./web/culto_mulheres_notificacoes");
 const diaDasCriancas = require("./web/dia_das_criancas");
 const saudeMulher = require("./web/saude_mulher");
+const treinamentoIntercessao = require("./web/treinamento_intercessao");
 const eventosGerenciador = require("./web/eventos_gerenciador");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 const { notificarSecretaria } = require("./bot/secretaria");
@@ -44,6 +45,18 @@ const MULHERES_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "culto-m
 const SAUDE_MULHER_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "saude-da-mulher.html"))
   ? path.join(__dirname, "public", "saude-da-mulher.html")
   : path.join(__dirname, "web", "public", "saude-da-mulher.html");
+const INTERCESSAO_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "treinamento-de-intercessao.html"))
+  ? path.join(__dirname, "public", "treinamento-de-intercessao.html")
+  : path.join(__dirname, "web", "public", "treinamento-de-intercessao.html");
+const FICHAS_INTERCESSAO_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "fichas-intercessao.html"))
+  ? path.join(__dirname, "public", "fichas-intercessao.html")
+  : path.join(__dirname, "web", "public", "fichas-intercessao.html");
+const FICHAS_MULHERES_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "fichas-mulheres.html"))
+  ? path.join(__dirname, "public", "fichas-mulheres.html")
+  : path.join(__dirname, "web", "public", "fichas-mulheres.html");
+const FICHAS_CRIANCAS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "fichas-criancas.html"))
+  ? path.join(__dirname, "public", "fichas-criancas.html")
+  : path.join(__dirname, "web", "public", "fichas-criancas.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -770,6 +783,214 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
       }
 
+      // Rota para Líderes: Fichas do Culto de Mulheres (/mulheres/fichas, /mulheres/inscritas, /culto-mulheres/fichas)
+      if (req.method === 'GET' && (
+        pathname === '/mulheres/fichas' || pathname === '/mulheres/fichas/' ||
+        pathname === '/mulheres/inscritas' || pathname === '/mulheres/inscritas/' ||
+        pathname === '/culto-mulheres/fichas' || pathname === '/culto-mulheres/fichas/' ||
+        pathname === '/fichas-mulheres' || pathname === '/fichas-mulheres.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "fichas-mulheres.html"))
+          ? path.join(__dirname, "public", "fichas-mulheres.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "fichas-mulheres.html")) ? path.join(__dirname, "web", "public", "fichas-mulheres.html") : FICHAS_MULHERES_HTML_FILE);
+        if (fileToServe && fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // Rota para Líderes: Fichas do Especial Dia das Crianças (/criancas/fichas, /criancas/inscritos)
+      if (req.method === 'GET' && (
+        pathname === '/criancas/fichas' || pathname === '/criancas/fichas/' ||
+        pathname === '/criancas/inscritos' || pathname === '/criancas/inscritos/' ||
+        pathname === '/dia-das-criancas/fichas' || pathname === '/dia-das-criancas/fichas/' ||
+        pathname === '/fichas-criancas' || pathname === '/fichas-criancas.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "fichas-criancas.html"))
+          ? path.join(__dirname, "public", "fichas-criancas.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "fichas-criancas.html")) ? path.join(__dirname, "web", "public", "fichas-criancas.html") : FICHAS_CRIANCAS_HTML_FILE);
+        if (fileToServe && fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // Rota pública: Treinamento de Intercessão (/treinamento-de-intercessao, /treinamento-intercessao, /intercessao)
+      if (req.method === 'GET' && (
+        pathname === '/treinamento-de-intercessao' || pathname === '/treinamento-de-intercessao/' || pathname === '/treinamento-de-intercessao.html' ||
+        pathname === '/treinamento-intercessao' || pathname === '/treinamento-intercessao/' || pathname === '/treinamento-intercessao.html' ||
+        pathname === '/intercessao' || pathname === '/intercessao/' || pathname === '/intercessao.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "treinamento-de-intercessao.html"))
+          ? path.join(__dirname, "public", "treinamento-de-intercessao.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "treinamento-de-intercessao.html")) ? path.join(__dirname, "web", "public", "treinamento-de-intercessao.html") : INTERCESSAO_HTML_FILE);
+        if (fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://script.google.com https://script.googleusercontent.com"
+          });
+          return res.end(content);
+        }
+      }
+
+      // Rota para Líderes: Fichas do Treinamento de Intercessão (/intercessao/fichas, /intercessao/inscritos)
+      if (req.method === 'GET' && (
+        pathname === '/intercessao/fichas' || pathname === '/intercessao/fichas/' ||
+        pathname === '/intercessao/inscritos' || pathname === '/intercessao/inscritos/' ||
+        pathname === '/fichas-intercessao' || pathname === '/fichas-intercessao.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "fichas-intercessao.html"))
+          ? path.join(__dirname, "public", "fichas-intercessao.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "fichas-intercessao.html")) ? path.join(__dirname, "web", "public", "fichas-intercessao.html") : FICHAS_INTERCESSAO_HTML_FILE);
+        if (fileToServe && fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // API: Inscrição Treinamento de Intercessão (/intercessao/api/inscrever)
+      if (req.method === 'POST' && (pathname === '/intercessao/api/inscrever' || pathname === '/intercessao/inscrever')) {
+        try {
+          const body = await parseRequestBody(req);
+          const { nome, telefone } = body || {};
+          if (!nome || !telefone) {
+            return sendJson(res, 400, { ok: false, message: 'Nome e telefone são obrigatórios.' });
+          }
+
+          const inscricao = treinamentoIntercessao.salvarInscricaoIntercessao(body);
+
+          // Sincroniza com Google Apps Script
+          let resultadoPlanilha = { ok: false };
+          try {
+            resultadoPlanilha = await treinamentoIntercessao.enviarInscricaoPlanilhaIntercessao(body);
+          } catch (errSheet) {
+            console.warn('[Treinamento Intercessão] Aviso ao salvar na planilha:', errSheet.message);
+          }
+
+          // Disparo de confirmação no WhatsApp se o bot estiver conectado
+          try {
+            const botClient = typeof getClient === 'function' ? getClient() : null;
+            if (botClient && botClient.info) {
+              const msgZap = treinamentoIntercessao.montarMensagemConfirmacaoIntercessao(body);
+              const numLimpo = String(telefone).replace(/\D/g, '');
+              const chatId = numLimpo.includes('@') ? numLimpo : `${numLimpo.startsWith('55') ? numLimpo : '55' + numLimpo}@c.us`;
+              botClient.sendMessage(chatId, msgZap)
+                .then(() => treinamentoIntercessao.marcarConfirmacaoIntercessaoEnviada(inscricao.id))
+                .catch(errZap => console.warn('[Treinamento Intercessão] Aviso no envio WhatsApp:', errZap.message));
+            }
+          } catch (errDisparo) {
+            console.warn('[Treinamento Intercessão] Bot WhatsApp não disponível para confirmação imediata');
+          }
+
+          return sendJson(res, 200, {
+            ok: true,
+            message: 'Inscrição realizada com sucesso!',
+            salvoNaPlanilha: Boolean(resultadoPlanilha?.ok),
+            inscricao
+          });
+        } catch (err) {
+          console.error('[Treinamento Intercessão] Erro ao processar inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro interno ao processar inscrição.' });
+        }
+      }
+
+      // API: Listagem de inscritos (/intercessao/api/inscritos)
+      if (req.method === 'GET' && pathname === '/intercessao/api/inscritos') {
+        try {
+          const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+          const shouldSync = parsedUrl.searchParams.get('sync') === '1' || treinamentoIntercessao.listarInscricoesIntercessao().length === 0;
+          if (shouldSync && typeof treinamentoIntercessao.sincronizarInscricoesComNuvemIntercessao === 'function') {
+            await treinamentoIntercessao.sincronizarInscricoesComNuvemIntercessao().catch(err => {
+              console.warn('[Web] Aviso ao sincronizar com planilha em /intercessao/api/inscritos:', err.message);
+            });
+          }
+
+          const inscricoes = treinamentoIntercessao.listarInscricoesIntercessao();
+          const stats = treinamentoIntercessao.obterEstatisticasIntercessao();
+          return sendJson(res, 200, { ok: true, inscricoes, stats });
+        } catch (err) {
+          console.error('[Treinamento Intercessão] Erro ao listar inscritos:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao listar inscritos.' });
+        }
+      }
+
+      // API: Sincronização manual com a planilha do Google (Secretaria - Intercessão)
+      if (req.method === 'POST' && pathname === '/intercessao/api/sincronizar') {
+        if (!isAuthenticated(req)) {
+          return sendJson(res, 401, { ok: false, message: 'Não autorizado.' });
+        }
+        try {
+          const resultado = await treinamentoIntercessao.sincronizarInscricoesComNuvemIntercessao();
+          return sendJson(res, resultado.ok ? 200 : 500, resultado);
+        } catch (err) {
+          console.error('[Web] Erro ao sincronizar Intercessão com Google Sheets:', err.message);
+          return sendJson(res, 500, { ok: false, message: err.message });
+        }
+      }
+
+      // API: Relatório / Exportação PDF (/intercessao/api/relatorio-pdf)
+      if (req.method === 'GET' && (pathname === '/intercessao/api/relatorio-pdf' || pathname === '/intercessao/relatorio-pdf')) {
+        try {
+          const html = treinamentoIntercessao.renderIntercessaoPdfHtml();
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+          });
+          return res.end(html);
+        } catch (errPdf) {
+          console.error('[Treinamento Intercessão] Erro ao gerar PDF:', errPdf);
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          return res.end('Erro ao gerar relatório PDF.');
+        }
+      }
+
+      // API: Excluir inscrição (/intercessao/api/excluir-inscricao ou DELETE /intercessao/api/inscricoes/:id)
+      if ((req.method === 'POST' && pathname === '/intercessao/api/excluir-inscricao') ||
+          (req.method === 'DELETE' && pathname.startsWith('/intercessao/api/inscricoes/'))) {
+        try {
+          let termo = null;
+          if (req.method === 'DELETE') {
+            termo = decodeURIComponent(pathname.replace('/intercessao/api/inscricoes/', ''));
+          } else {
+            const body = await parseRequestBody(req);
+            termo = body?.id;
+          }
+          if (!termo) {
+            return sendJson(res, 400, { ok: false, message: 'ID da inscrição não informado.' });
+          }
+          const removido = treinamentoIntercessao.excluirInscricaoIntercessao(termo);
+          if (removido) {
+            return sendJson(res, 200, { ok: true, message: 'Inscrição removida com sucesso.' });
+          } else {
+            return sendJson(res, 404, { ok: false, message: 'Inscrição não encontrada.' });
+          }
+        } catch (err) {
+          console.error('[Treinamento Intercessão] Erro ao excluir inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
+        }
+      }
+
       if (req.method === 'GET' && pathname === '/secretaria/login') {
         return sendHtml(res, renderLoginHtml());
       }
@@ -1233,6 +1454,16 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
     if (typeof cultoMulheres.sincronizarInscricoesComNuvem === 'function' && process.env.NODE_ENV !== 'test') {
       cultoMulheres.sincronizarInscricoesComNuvem().catch(err => {
         console.warn('[Web] Aviso na sincronização inicial de Mulheres com a planilha Google:', err.message);
+      });
+    }
+    if (typeof saudeMulher.sincronizarInscricoesComNuvemSaudeMulher === 'function' && process.env.NODE_ENV !== 'test') {
+      saudeMulher.sincronizarInscricoesComNuvemSaudeMulher().catch(err => {
+        console.warn('[Web] Aviso na sincronização inicial de Saúde da Mulher com a planilha Google:', err.message);
+      });
+    }
+    if (typeof treinamentoIntercessao.sincronizarInscricoesComNuvemIntercessao === 'function' && process.env.NODE_ENV !== 'test') {
+      treinamentoIntercessao.sincronizarInscricoesComNuvemIntercessao().catch(err => {
+        console.warn('[Web] Aviso na sincronização inicial de Intercessão com a planilha Google:', err.message);
       });
     }
   });
