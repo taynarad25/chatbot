@@ -816,6 +816,47 @@ function montarMenuEventos() {
   );
 }
 
+function montarTextoMenuPrincipal({
+  isMembro = false,
+  isPastor = false,
+  isDiretor = false,
+  isLider = false,
+  incluirPalavraMenu = false,
+} = {}) {
+  let menu = `Olá! 👋
+Secretaria da Comunidade Cristã Curados.
+
+Escolha uma opção:
+
+1️⃣ Quem somos
+2️⃣ Horário dos cultos
+3️⃣ Ver agenda da igreja
+4️⃣ Atendimento pastoral`;
+
+  if (isMembro) {
+    menu += `\n5️⃣ Solicitar uso do salão`;
+    menu += `\n6️⃣ Falar com a secretaria`;
+  } else {
+    menu += `\n5️⃣ Falar com a secretaria`;
+  }
+
+  if (isPastor) {
+    menu += `\n7️⃣ Área Pastoral`;
+  } else if (isDiretor) {
+    menu += `\n7️⃣ Área da Direção`;
+  } else if (isLider) {
+    menu += `\n7️⃣ Área do Líder`;
+  }
+
+  if (incluirPalavraMenu) {
+    menu += `\n\nDigite *menu* a qualquer momento para voltar ao menu principal.`;
+  } else {
+    menu += `\n\n_Envie o número correspondente à opção desejada._`;
+  }
+
+  return menu;
+}
+
 /**
  * Monta o handler de mensagens do bot (menu principal + fluxos de conversa).
  * Todas as dependências que envolvem I/O real (WhatsApp, Google Calendar) são
@@ -844,7 +885,14 @@ function createMessageHandler({
   listLideres = () => [],
   enviarWebhook = enviarWebhookGoogleDocs,
   enviarWebhookExterno = enviarWebhookGoogleDocsExternos,
+  tempoEsperaSaudacaoMs,
 }) {
+  const pendentesSaudacao = new Map();
+  const tempoEsperaConfigurado = typeof tempoEsperaSaudacaoMs !== "undefined"
+    ? tempoEsperaSaudacaoMs
+    : (typeof process.env.TEMPO_ESPERA_SAUDACAO_MS !== "undefined"
+        ? parseInt(process.env.TEMPO_ESPERA_SAUDACAO_MS, 10)
+        : (process.env.NODE_ENV === "test" ? 0 : 10000));
   function resolverUsuario(numeroComDdi) {
     const numeroDigitos = String(numeroComDdi || "").replace(/\D/g, "");
     const cadastrados = (typeof listLideres === "function" ? listLideres() : []) || [];
@@ -2221,9 +2269,10 @@ function createMessageHandler({
 
       // Se há um lembrete de evento pendente aguardando resposta desse número (em memória ou no banco SQLite)
       const telDigitos = String(numero).replace(/\D/g, "");
+      let lembreteDb = null;
+      let isQuotedLembrete = false;
+      let eventoQuoted = "";
       if (!etapas[numero] && !etapas[telDigitos]) {
-        let isQuotedLembrete = false;
-        let eventoQuoted = "";
         if (msg.hasQuotedMsg) {
           try {
             const quoted = await comRetry(() => msg.getQuotedMessage());
@@ -2235,7 +2284,7 @@ function createMessageHandler({
           } catch (_) { }
         }
 
-        const lembreteDb = buscarLembreteAguardandoResposta(telDigitos);
+        lembreteDb = buscarLembreteAguardandoResposta(telDigitos);
         if (lembreteDb || isQuotedLembrete) {
           if (texto !== "menu" && !(texto.length <= 50 && SAUDACOES_REGEX.test(texto))) {
             const infoLembrete = {
@@ -2266,37 +2315,166 @@ function createMessageHandler({
         }
       }
 
-      const ehSaudacao = texto.length <= 50 && SAUDACOES_REGEX.test(texto);
+      // Se a mensagem está respondendo uma mensagem que enviamos anteriormente (quoted message)
+      // fora de qualquer fluxo automático ou lembrete:
+      // "as vzes ela esta mandando msg respondendo uma msg que mandamos"
+      if (!etapas[numero] && !etapas[telDigitos] && msg.hasQuotedMsg && !lembreteDb && !isQuotedLembrete) {
+        let textoCitado = "";
+        try {
+          const quoted = await comRetry(() => msg.getQuotedMessage());
+          if (quoted && quoted.body) {
+            textoCitado = `\n📌 *Em resposta a:* "${quoted.body.slice(0, 100).replace(/[\r\n]+/g, ' ')}..."`;
+          }
+        } catch (_) {}
+
+        console.log(`[Mensagem Quoted] De: ${identificarUsuario(contato, numero, isLider, usuario)} | Resposta a mensagem da equipe: "${msg.body}"`);
+
+        const avisoSecretaria =
+          `🔔 *RESPOSTA RECEBIDA A MENSAGEM ENVIADA*\n\n` +
+          `👤 *Contato:* ${nomeContato(contato, numero)}\n` +
+          `📞 *WhatsApp:* ${mascararTelefone(numero)}\n` +
+          `💬 *Resposta do usuário:* "${msg.body}"${textoCitado}\n\n` +
+          `⚠️ _O usuário respondeu a uma mensagem nossa. O menu automático foi silenciado para atendimento pela equipe._`;
+
+        if (typeof notificarSecretaria === "function") {
+          try {
+            await notificarSecretaria(client, avisoSecretaria);
+          } catch (err) {
+            console.error("[Quoted] Erro ao notificar secretaria:", err);
+          }
+        }
+        return;
+      }
+
+      // Se já havia uma saudação recente pendente aguardando para ver se o usuário enviava mais mensagens
+      if (pendentesSaudacao.has(numero)) {
+        const pendente = pendentesSaudacao.get(numero);
+        clearTimeout(pendente.timer);
+        pendentesSaudacao.delete(numero);
+
+        const ehOutraSaudacao = texto !== "menu" && texto.length <= 50 && SAUDACOES_REGEX.test(texto);
+        if (ehOutraSaudacao) {
+          pendente.textos.push(msg.body);
+          const tempoEspera = tempoEsperaConfigurado;
+
+          if (tempoEspera > 0) {
+            pendente.timer = setTimeout(async () => {
+              pendentesSaudacao.delete(numero);
+              try {
+                delete etapas[numero];
+                const menu = montarTextoMenuPrincipal({
+                  isMembro: pendente.isMembro,
+                  isPastor: pendente.isPastor,
+                  isDiretor: pendente.isDiretor,
+                  isLider: pendente.isLider,
+                  incluirPalavraMenu: false,
+                });
+                await pendente.msg.reply(menu);
+              } catch (err) {
+                console.error("[Saudação] Erro ao enviar menu após espera:", err);
+              }
+            }, tempoEspera);
+            pendentesSaudacao.set(numero, pendente);
+            return;
+          } else {
+            delete etapas[numero];
+            const menu = montarTextoMenuPrincipal({
+              isMembro: pendente.isMembro,
+              isPastor: pendente.isPastor,
+              isDiretor: pendente.isDiretor,
+              isLider: pendente.isLider,
+              incluirPalavraMenu: false,
+            });
+            return msg.reply(menu);
+          }
+        }
+
+        // Se for uma das opções numéricas do menu que o usuário já enviou
+        if (/^[1-7]$/.test(texto)) {
+          // Deixa fluir normalmente para a opção escolhida abaixo
+        } else {
+          // "se mandar algo que seja outro contexto vc ignora a mensagem e avisa a gente"
+          const todasMsgs = [...pendente.textos, msg.body].filter(Boolean).join("\n↳ ");
+          console.log(`[Saudação -> Outro Contexto] De: ${identificarUsuario(contato, numero, isLider, usuario)} | Mensagens: "${todasMsgs}"`);
+
+          const avisoSecretaria =
+            `🔔 *NOVA MENSAGEM RECEBIDA (ATENDIMENTO HUMANO)*\n\n` +
+            `👤 *Contato:* ${nomeContato(contato, numero)}\n` +
+            `📞 *WhatsApp:* ${mascararTelefone(numero)}\n` +
+            `💬 *Mensagem do usuário:*\n↳ ${todasMsgs}\n\n` +
+            `⚠️ _O usuário enviou uma mensagem em outro contexto após a saudação. O menu automático foi cancelado para atendimento pela equipe._`;
+
+          if (typeof notificarSecretaria === "function") {
+            try {
+              await notificarSecretaria(client, avisoSecretaria);
+            } catch (err) {
+              console.error("[Saudação] Erro ao notificar secretaria:", err);
+            }
+          }
+          return;
+        }
+      }
+
+      const ehComandoMenu = texto === "menu";
+      const ehSaudacao = !ehComandoMenu && texto.length <= 50 && SAUDACOES_REGEX.test(texto);
+
+      if (ehComandoMenu) {
+        delete etapas[numero];
+        const menu = montarTextoMenuPrincipal({
+          isMembro,
+          isPastor,
+          isDiretor,
+          isLider,
+          incluirPalavraMenu: false,
+        });
+        return msg.reply(menu);
+      }
 
       if (ehSaudacao) {
         delete etapas[numero];
-        let menu = `Olá! 👋
-Secretaria da Comunidade Cristã Curados.
 
-Escolha uma opção:
+        const tempoEspera = tempoEsperaConfigurado;
 
-1️⃣ Quem somos
-2️⃣ Horário dos cultos
-3️⃣ Ver agenda da igreja
-4️⃣ Atendimento pastoral`;
-
-        if (isMembro) {
-          menu += `\n5️⃣ Solicitar uso do salão`;
-          menu += `\n6️⃣ Falar com a secretaria`;
-        } else {
-          menu += `\n5️⃣ Falar com a secretaria`;
+        if (tempoEspera <= 0) {
+          const menu = montarTextoMenuPrincipal({
+            isMembro,
+            isPastor,
+            isDiretor,
+            isLider,
+            incluirPalavraMenu: false,
+          });
+          return msg.reply(menu);
         }
 
-        if (isPastor) {
-          menu += `\n7️⃣ Área Pastoral`;
-        } else if (isDiretor) {
-          menu += `\n7️⃣ Área da Direção`;
-        } else if (isLider) {
-          menu += `\n7️⃣ Área do Líder`;
-        }
+        const timer = setTimeout(async () => {
+          pendentesSaudacao.delete(numero);
+          try {
+            delete etapas[numero];
+            const menu = montarTextoMenuPrincipal({
+              isMembro,
+              isPastor,
+              isDiretor,
+              isLider,
+              incluirPalavraMenu: false,
+            });
+            await msg.reply(menu);
+          } catch (err) {
+            console.error("[Saudação] Erro ao enviar menu após espera:", err);
+          }
+        }, tempoEspera);
 
-        menu += `\n\nDigite *menu* a qualquer momento para voltar ao menu principal.`;
-        return msg.reply(menu);
+        pendentesSaudacao.set(numero, {
+          timer,
+          msg,
+          contato,
+          usuario,
+          isMembro,
+          isPastor,
+          isDiretor,
+          isLider,
+          textos: [msg.body],
+        });
+        return;
       }
 
       if (etapas[numero]) {
@@ -3625,7 +3803,7 @@ Escolha uma opção:
               return msg.reply(montarSubmenuLiderComunicacao());
             }
 
-            if (escolha === "3" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+            if (/inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
               return await iniciarFluxoConsultaInscricoes({
                 msg,
                 numero,
@@ -3640,7 +3818,7 @@ Escolha uma opção:
             }
 
             // Atalhos diretos preservados
-            if (escolha === "4" || /artes|flyers/i.test(escolha)) {
+            if (escolha === "3" || /artes|flyers/i.test(escolha)) {
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
@@ -5439,6 +5617,7 @@ module.exports = {
   montarSubmenuDiretorAgenda,
   montarSubmenuDiretorComunicacao,
   montarMenuEventos,
+  montarTextoMenuPrincipal,
   iniciarFluxoConsultaInscricoes,
   processarFluxoConsultaInscricoes,
 };

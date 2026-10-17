@@ -437,9 +437,12 @@ async function gerarPdfEvento({ eventoId, client }) {
 }
 
 function formatarLinkSite(caminho) {
-  const base = (process.env.SITE_URL || process.env.BASE_URL || "").replace(/\/$/, "");
-  if (!base) return caminho;
-  return `${base}${caminho.startsWith("/") ? "" : "/"}${caminho}`;
+  let base = (process.env.SITE_URL || process.env.BASE_URL || "https://www.comunidadecristacurados.com.br").trim().replace(/\/$/, "");
+  if (!base.startsWith("http://") && !base.startsWith("https://")) {
+    base = `https://${base}`;
+  }
+  const rota = (caminho || "").startsWith("/") ? caminho : `/${caminho || ""}`;
+  return `${base}${rota}`;
 }
 
 /**
@@ -476,6 +479,14 @@ function obterLinksDocumentos(eventoId) {
       siteUrl: formatarLinkSite("/intercessao/fichas"),
       fichasUrl: formatarLinkSite("/intercessao/fichas"),
       pdfUrl: `/intercessao/api/relatorio-pdf`,
+    };
+  }
+
+  if (eventoId === "the_chosen" || eventoId === "thechosen") {
+    return {
+      siteUrl: formatarLinkSite("/thechosen/fichas"),
+      fichasUrl: formatarLinkSite("/thechosen/fichas"),
+      pdfUrl: `/thechosen/api/relatorio-pdf`,
     };
   }
 
@@ -523,38 +534,68 @@ async function enviarInscricoesComPdf({ client, msg, numero, eventoId }) {
     } catch {}
   }
 
-  let resumoTexto = "";
+  const links = obterLinksDocumentos(eventoId);
+  const linkDireto = links.fichasUrl || links.siteUrl;
+
+  let mensagemCurta = "";
+
   if (eventoId === "culto_mulheres") {
-    resumoTexto = gerarResumoCultoMulheres();
+    const stats = typeof cultoMulheres.obterEstatisticasMulheres === "function"
+      ? cultoMulheres.obterEstatisticasMulheres()
+      : { total: 0 };
+    mensagemCurta =
+      `🌸 *Inscrições — Culto de Mulheres*\n\n` +
+      `👥 *Total de Inscritas:* ${stats.total}\n\n` +
+      `📲 *Link direto para abrir no celular:*\n` +
+      `${linkDireto}\n\n` +
+      `_💡 Dica: Digite *lista* para ver os nomes aqui no WhatsApp._`;
 
   } else if (eventoId === "saude_mulher") {
-    resumoTexto = gerarResumoSaudeMulher();
+    const stats = typeof saudeMulher.obterEstatisticasSaudeMulher === "function"
+      ? saudeMulher.obterEstatisticasSaudeMulher()
+      : { total: 0, comCondicaoSaude: 0 };
+    const condicaoInfo = stats.comCondicaoSaude > 0 ? `⚠️ *Com alertas de saúde:* ${stats.comCondicaoSaude}\n` : "";
+    mensagemCurta =
+      `🧘‍♀️ *Inscrições — Saúde da Mulher (Pilates)*\n\n` +
+      `👥 *Total de Alunas:* ${stats.total}\n` +
+      condicaoInfo +
+      `\n📑 *Fichas Organizadas da Professora (Celular):*\n` +
+      `${linkDireto}\n\n` +
+      `_💡 Dica: Digite *fichas* para ver as alunas aqui no WhatsApp._`;
 
   } else if (eventoId === "dia_das_criancas") {
-    resumoTexto = gerarResumoDiaDasCriancas();
+    const stats = typeof diaDasCriancas.obterEstatisticasCriancas === "function"
+      ? diaDasCriancas.obterEstatisticasCriancas()
+      : { total: 0 };
+    const total = stats.total || cacheCriancas.total || 0;
+    mensagemCurta =
+      `🎈 *Inscrições — Especial Dia das Crianças*\n\n` +
+      `👥 *Total de Crianças:* ${total}\n\n` +
+      `📲 *Link direto para abrir no celular:*\n` +
+      `${linkDireto}\n\n` +
+      `_💡 Dica: Digite *lista* para ver os nomes aqui no WhatsApp._`;
 
   } else if (eventoId === "treinamento_intercessao") {
-    resumoTexto = gerarResumoIntercessao();
+    const stats = typeof treinamentoIntercessao.obterEstatisticasIntercessao === "function"
+      ? treinamentoIntercessao.obterEstatisticasIntercessao()
+      : { total: 0, comExperiencia: 0 };
+    const expInfo = stats.comExperiencia > 0 ? `🛡️ *Já têm experiência/curso:* ${stats.comExperiencia}\n` : "";
+    mensagemCurta =
+      `🙏 *Inscrições — Treinamento de Intercessão*\n\n` +
+      `👥 *Total de Inscritos:* ${stats.total}\n` +
+      expInfo +
+      `\n📲 *Link direto para abrir no celular:*\n` +
+      `${linkDireto}\n\n` +
+      `_💡 Dica: Digite *lista* para ver os nomes aqui no WhatsApp._`;
+
+  } else {
+    mensagemCurta =
+      `📋 *Inscrições do Evento*\n\n` +
+      `📲 *Link direto para abrir no celular:*\n` +
+      `${linkDireto}\n`;
   }
 
-  // Link oficial do painel no site com fichas organizadas (ao invés de mandar a planilha Google)
-  const links = obterLinksDocumentos(eventoId);
-
-  let blocoLinks = "";
-  if (eventoId === "saude_mulher") {
-    blocoLinks += `\n📑 *Ver Fichas Organizadas da Professora (Celular):*\n${links.fichasUrl || links.siteUrl}\n`;
-  } else if (links.siteUrl) {
-    blocoLinks += `\n🌐 *Ver Inscrições no Site (Celular):*\n${links.siteUrl}\n`;
-  }
-
-  const dicaTipo = eventoId === "saude_mulher" ? "as alunas com seus alertas de saúde" : "os inscritos";
-  const corpoMensagem =
-    resumoTexto +
-    blocoLinks +
-    `\n💡 *Dica:* Digite *fichas* ou *lista* para ver ${dicaTipo} diretamente aqui no WhatsApp.\n` +
-    `\nDigite *menu* para voltar ao menu principal.`;
-
-  await msg.reply(corpoMensagem);
+  await msg.reply(mensagemCurta);
 }
 
 /**

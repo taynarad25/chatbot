@@ -12,6 +12,7 @@ const path = require("path");
 const fs = require("fs");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-messagehandler-test-"));
 process.env.DB_PATH = path.join(tmpDir, "dados.db");
+process.env.NODE_ENV = "test";
 
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
@@ -59,7 +60,7 @@ const JID_GRUPO_MULTIMIDIA = "333333333333333@g.us";
 
 // Monta um novo "servidor" de teste: handler + espiões de tudo que ele chamaria
 // de verdade (mensagens de grupo, mensagens diretas, gravação na Google Agenda).
-function criarContexto({ eventos = [], lideresCadastrados = [], enviarWebhookExterno } = {}) {
+function criarContexto({ eventos = [], lideresCadastrados = [], enviarWebhookExterno, tempoEsperaSaudacaoMs } = {}) {
   const etapas = {};
   const gruposEnviados = []; // mensagens que o bot mandou para os grupos
   const multimidiaEnviados = []; // mensagens que o bot mandou para MULTIMÍDIAS
@@ -134,10 +135,12 @@ function criarContexto({ eventos = [], lideresCadastrados = [], enviarWebhookExt
     client, calendar, agendasParaLer: AGENDAS, lideres: LIDERES, etapas, buscarEventos,
     listLideres: () => lideresCadastrados,
     enviarWebhookExterno,
+    tempoEsperaSaudacaoMs,
   });
 
   return {
     handleMessage,
+    client,
     etapas,
     gruposEnviados,
     multimidiaEnviados,
@@ -556,7 +559,8 @@ test("opção 6: eventos das agendas internas não impedem o agendamento de even
 
 test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agendamento de novo evento", async () => {
   const agora = moment.tz("America/Sao_Paulo");
-  const dataAlvo = agora.clone().add(2, "days");
+  let dataAlvo = agora.clone().add(2, "days");
+  if (dataAlvo.day() === 0) dataAlvo = dataAlvo.add(1, "day");
   const mesAlvo = dataAlvo.month() + 1;
   const anoAlvo = dataAlvo.year();
   const diaAlvo = dataAlvo.date();
@@ -586,7 +590,8 @@ test("opção 6: evento da agenda 'Eventos Externos' conta como conflito no agen
 
 test("opção 6: líder pode agendar evento escolhendo departamento 'Outros' (opção 13)", async () => {
   const agora = moment.tz("America/Sao_Paulo");
-  const dataAlvo = agora.clone().add(2, "days");
+  let dataAlvo = agora.clone().add(2, "days");
+  if (dataAlvo.day() === 0) dataAlvo = dataAlvo.add(1, "day");
   const mesAlvo = dataAlvo.month() + 1;
   const diaAlvo = dataAlvo.date();
 
@@ -1974,6 +1979,92 @@ test("Atalho Líder: digitar 'preparação' ou 'decoração' aciona registro de 
   assert.match(rAtalho, /Uso do Salão Antes \/ Montagem \/ Decoração/);
   assert.equal(etapas[NUMERO_LIDER].fluxo, "agendamento");
   assert.equal(etapas[NUMERO_LIDER].etapa, "preparacao_informar_horarios");
+});
+
+test("saudação com debounce: espera um pouco e responde com menu sem a palavra 'menu'", async () => {
+  const respostas = [];
+  const fakeMsg = {
+    from: NUMERO_COMUM,
+    fromMe: false,
+    body: "boa noite",
+    hasQuotedMsg: false,
+    reply: async (txt) => { respostas.push(txt); return txt; },
+    getContact: async () => ({ id: { _serialized: NUMERO_COMUM }, pushname: "Visitante", name: undefined }),
+  };
+
+  const { handleMessage } = criarContexto({ tempoEsperaSaudacaoMs: 50 });
+
+  await handleMessage(fakeMsg);
+  // Imediatamente após a mensagem, não deve ter respondido ainda (está aguardando)
+  assert.equal(respostas.length, 0);
+
+  // Aguarda o timer disparar
+  await new Promise((r) => setTimeout(r, 70));
+  assert.equal(respostas.length, 1);
+  assert.match(respostas[0], /1️⃣ Quem somos/);
+  assert.doesNotMatch(respostas[0], /\bmenu\b/i, "Menu de saudação não deve conter a palavra 'menu'");
+});
+
+test("saudação seguida de outro contexto: ignora menu automático e alerta secretaria", async () => {
+  const respostas = [];
+  const fakeMsg1 = {
+    from: NUMERO_COMUM,
+    fromMe: false,
+    body: "olá",
+    hasQuotedMsg: false,
+    reply: async (txt) => { respostas.push(txt); return txt; },
+    getContact: async () => ({ id: { _serialized: NUMERO_COMUM }, pushname: "Irmão Carlos", name: undefined }),
+  };
+  const fakeMsg2 = {
+    from: NUMERO_COMUM,
+    fromMe: false,
+    body: "gostaria de saber sobre o batismo desse mês",
+    hasQuotedMsg: false,
+    reply: async (txt) => { respostas.push(txt); return txt; },
+    getContact: async () => ({ id: { _serialized: NUMERO_COMUM }, pushname: "Irmão Carlos", name: undefined }),
+  };
+
+  const { handleMessage, gruposEnviados } = criarContexto({ tempoEsperaSaudacaoMs: 100 });
+
+  await handleMessage(fakeMsg1);
+  // Antes de expirar, manda a segunda mensagem
+  await handleMessage(fakeMsg2);
+
+  // Espera tempo suficiente para o timer original ter disparado
+  await new Promise((r) => setTimeout(r, 120));
+
+  // Não enviou menu ao usuário
+  assert.equal(respostas.length, 0);
+
+  // Avisou a secretaria
+  assert.ok(gruposEnviados.length >= 1);
+  assert.match(gruposEnviados[0], /NOVA MENSAGEM RECEBIDA/);
+  assert.match(gruposEnviados[0], /batismo/);
+});
+
+test("mensagem respondendo a uma mensagem enviada (quoted msg): ignora menu e avisa secretaria", async () => {
+  const respostas = [];
+  const fakeMsg = {
+    from: NUMERO_COMUM,
+    fromMe: false,
+    body: "Boa noite! Estarei presente sim",
+    hasQuotedMsg: true,
+    getQuotedMessage: async () => ({ body: "Olá! Confirmando sua participação no ensaio." }),
+    reply: async (txt) => { respostas.push(txt); return txt; },
+    getContact: async () => ({ id: { _serialized: NUMERO_COMUM }, pushname: "Maria", name: undefined }),
+  };
+
+  const { handleMessage, gruposEnviados } = criarContexto({ tempoEsperaSaudacaoMs: 50 });
+
+  await handleMessage(fakeMsg);
+
+  // Não mandou menu automático
+  assert.equal(respostas.length, 0);
+
+  // Avisou a secretaria sobre a resposta
+  assert.ok(gruposEnviados.length >= 1);
+  assert.match(gruposEnviados[0], /RESPOSTA RECEBIDA/);
+  assert.match(gruposEnviados[0], /Estarei presente sim/);
 });
 
 
