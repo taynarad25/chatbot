@@ -337,16 +337,28 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       if (req.method === 'GET' && pathname.startsWith('/evento/')) {
         const slug = decodeURIComponent(pathname.replace('/evento/', '')).replace(/\/$/, '');
         const evento = eventosGerenciador.buscarEventoPainelPorSlug(slug);
-        if (evento && evento.ativo) {
+        let eventoJaPassou = false;
+        if (evento && evento.dataEvento) {
+          const partes = evento.dataEvento.trim().split(/[\/\-]/);
+          if (partes.length === 3) {
+            const dEv = partes[0].length === 4
+              ? new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10), 23, 59, 59)
+              : new Date(parseInt(partes[2], 10), parseInt(partes[1], 10) - 1, parseInt(partes[0], 10), 23, 59, 59);
+            if (!isNaN(dEv.getTime()) && dEv < new Date()) {
+              eventoJaPassou = true;
+            }
+          }
+        }
+        if (evento && evento.ativo && !eventoJaPassou) {
           const html = eventosGerenciador.renderPaginaEventoHtml(evento);
           res.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
             'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline';"
           });
           return res.end(html);
-        } else if (evento && !evento.ativo) {
+        } else if (evento && (!evento.ativo || eventoJaPassou)) {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evento Encerrado</title><style>body{background:#09090b;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}</style></head><body><div><h1>Evento Encerrado</h1><p>As inscrições para este evento foram encerradas.</p><p><a href="/" style="color:#00bcd4;">Voltar para a página inicial</a></p></div></body></html>`);
+          return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evento Encerrado</title><style>body{background:#09090b;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}</style></head><body><div><h1>Evento Encerrado</h1><p>${eventoJaPassou ? 'Este evento já foi realizado e suas inscrições foram encerradas.' : 'As inscrições para este evento foram encerradas.'}</p><p><a href="/" style="color:#00bcd4;">Voltar para a página inicial</a></p></div></body></html>`);
         } else {
           res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evento Não Encontrado</title><style>body{background:#09090b;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}</style></head><body><div><h1>Evento não encontrado</h1><p><a href="/" style="color:#00bcd4;">Voltar para o início</a></p></div></body></html>`);
@@ -359,8 +371,18 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           const partes = pathname.split('/');
           const slug = partes[3];
           const evento = eventosGerenciador.buscarEventoPainelPorSlug(slug);
-          if (!evento || !evento.ativo) {
-            return sendJson(res, 400, { ok: false, message: 'Evento não disponível para inscrições.' });
+          let eventoPassouPost = false;
+          if (evento && evento.dataEvento) {
+            const p = evento.dataEvento.trim().split(/[\/\-]/);
+            if (p.length === 3) {
+              const d = p[0].length === 4
+                ? new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10), 23, 59, 59)
+                : new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10), 23, 59, 59);
+              if (!isNaN(d.getTime()) && d < new Date()) eventoPassouPost = true;
+            }
+          }
+          if (!evento || !evento.ativo || eventoPassouPost) {
+            return sendJson(res, 400, { ok: false, message: 'Evento já realizado ou encerrado para novas inscrições.' });
           }
           const body = await parseRequestBody(req);
           const inscricao = await eventosGerenciador.salvarInscricaoEventoPainel({

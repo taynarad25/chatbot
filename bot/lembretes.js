@@ -2,7 +2,7 @@ const db = require("../db");
 const { REDES } = require("./redes");
 const { obterFormularioEvento } = require("./formularioEvento");
 const { notificarMultimidia, notificarSecretaria } = require("./secretaria");
-const { unificarEventosPreparacaoLimpeza } = require("./agenda");
+const { unificarEventosPreparacaoLimpeza, identificarInfoPreparacaoLimpeza, extrairFaixaHorarioTexto } = require("./agenda");
 const { obterUsuarioPorTelefone, obterLideresPorDepartamento } = require("../web/lideres");
 const {
   verificarEnvioRemoto,
@@ -295,6 +295,7 @@ function montarMensagemLembrete({
   departamento = "",
   docUrl = "",
   diasRestantes = 5,
+  itensADefinir = [],
 } = {}) {
   const saudacao = nomeLider ? `Olá, *${nomeLider}*! Tudo bem?` : "Olá! Tudo bem?";
   const dataFormatada = formatarDataBrasil(data);
@@ -322,6 +323,14 @@ function montarMensagemLembrete({
     `\nEstá tudo certo com os preparativos e alinhamentos?\n` +
     `Gostaria de adicionar mais alguma informação ao evento ou realizar alguma alteração? Se precisar de ajustes, basta nos responder por aqui ou falar com a secretaria.\n`;
 
+  if (itensADefinir && itensADefinir.length > 0) {
+    msg += `\n⚠️ *Itens que ficaram a definir/decidir no agendamento:*\n`;
+    for (const item of itensADefinir) {
+      msg += `• *${item.campo}:* _${item.valor}_\n`;
+    }
+    msg += `Por favor, nos informe por aqui o que ficou decidido sobre esses itens para mantermos tudo alinhado! 🙏\n`;
+  }
+
   if (docUrl) {
     msg +=
       `\n📄 *Formulário de Agendamento Preenchido!*\n` +
@@ -331,6 +340,50 @@ function montarMensagemLembrete({
   msg += `\n_Que Deus abençoe!_ 🙏✨`;
   return msg;
 }
+
+function montarMensagemPreparacaoLimpeza({
+  faixas = [],
+  horarioPreparacaoLimpeza = "",
+  horarioTotal = "",
+} = {}) {
+  let faixa = null;
+  if (Array.isArray(faixas) && faixas.length > 0) {
+    faixa = faixas[0].faixa;
+  }
+  let textoHorario = "";
+  if (faixa && faixa.inicio && faixa.fim) {
+    textoHorario = `A preparação do evento está programada para começar às *${faixa.inicio}* e finalização e limpeza até às *${faixa.fim}*.`;
+  } else if (faixa && faixa.inicio) {
+    textoHorario = `A preparação do evento está programada para começar a partir das *${faixa.inicio}*.`;
+  } else if (horarioTotal && !/^(não|nao|nenhum|nenhuma|nada|zero)$/i.test(String(horarioTotal).trim())) {
+    const extraida = extrairFaixaHorarioTexto(String(horarioTotal));
+    if (extraida && extraida.inicio && extraida.fim) {
+      textoHorario = `A preparação do evento está programada para começar às *${extraida.inicio}* e finalização e limpeza até às *${extraida.fim}*.`;
+    } else if (extraida && extraida.inicio) {
+      textoHorario = `A preparação do evento está programada para começar a partir das *${extraida.inicio}*.`;
+    } else {
+      textoHorario = `A preparação do evento está programada para: *${String(horarioTotal).trim()}*.`;
+    }
+  } else if (horarioPreparacaoLimpeza) {
+    const extraida = extrairFaixaHorarioTexto(horarioPreparacaoLimpeza);
+    if (extraida && extraida.inicio && extraida.fim) {
+      textoHorario = `A preparação do evento está programada para começar às *${extraida.inicio}* e finalização e limpeza até às *${extraida.fim}*.`;
+    } else if (extraida && extraida.inicio) {
+      textoHorario = `A preparação do evento está programada para começar a partir das *${extraida.inicio}*.`;
+    } else {
+      textoHorario = `A preparação do evento está programada para: *${horarioPreparacaoLimpeza}*.`;
+    }
+  }
+
+  if (!textoHorario) return "";
+
+  return (
+    `🧹 *Preparação e Limpeza do Salão*\n\n` +
+    `${textoHorario}\n\n` +
+    `Lembrando que o salão e as dependências da igreja devem ser entregues após o evento nas mesmas condições em que foram encontrados (organização das cadeiras, lixo recolhido e limpeza geral). 🙏✨`
+  );
+}
+
 
 function montarMensagemLembreteMultimidia({
   evento = "",
@@ -600,6 +653,11 @@ async function processarLembretesEventos({
     return { processados: 0, enviados: 0 };
   }
 
+  // Unifica blocos de preparação e limpeza com os eventos principais correspondentes
+  if (typeof unificarEventosPreparacaoLimpeza === "function") {
+    eventos = unificarEventosPreparacaoLimpeza(eventos);
+  }
+
   let totalEnviados = 0;
   const tipoLembrete = `${diasAntecedencia}_dias_antes`;
 
@@ -607,6 +665,12 @@ async function processarLembretesEventos({
     const isEnsaio = ehEnsaio(ev);
     if (isEnsaio) {
       // Ensaios não devem receber mensagens de confirmação
+      continue;
+    }
+
+    const infoPrep = identificarInfoPreparacaoLimpeza ? identificarInfoPreparacaoLimpeza(ev) : { isPrep: false };
+    if (infoPrep.isPrep) {
+      // Blocos de preparação/decoração não devem gerar lembretes isolados (já unificados com o principal)
       continue;
     }
 
@@ -649,7 +713,11 @@ async function processarLembretesEventos({
     const local = ev.location || "";
 
     // 1. Tenta buscar formulário no banco SQLite
-    const form = obterFormularioEvento(titulo);
+    let form = obterFormularioEvento(titulo);
+    if (!form && tituloBase !== titulo) {
+      form = obterFormularioEvento(tituloBase);
+    }
+    const itensADefinir = extrairItensADefinirFormulario(form?.payload);
     const destinatarios = [];
 
     if (form && form.solicitanteId) {
@@ -861,6 +929,7 @@ async function processarLembretesEventos({
           departamento: dest.departamento,
           docUrl: diasAntecedencia === 5 ? dest.docUrl : "",
           diasRestantes: diasAntecedencia,
+          itensADefinir,
         });
       }
 
@@ -876,6 +945,27 @@ async function processarLembretesEventos({
       } else {
         console.log(`[Lembretes] [Simulação] Mensagem para ${dest.telefone} sobre "${titulo}":\n${msg}`);
         totalEnviados++;
+      }
+
+      // Envia aviso separado de preparação e limpeza do salão se houver horários definidos
+      if (!isPastoral && !isReuniao) {
+        const msgPrep = montarMensagemPreparacaoLimpeza({
+          faixas: ev._faixasPrep,
+          horarioPreparacaoLimpeza: ev.horarioPreparacaoLimpeza,
+          horarioTotal: form?.payload?.horario_total,
+        });
+        if (msgPrep) {
+          if (client && typeof client.sendMessage === "function") {
+            try {
+              await client.sendMessage(jid, msgPrep);
+              console.log(`[Lembretes] Mensagem de preparação enviada para ${dest.nome} (${dest.telefone}) sobre "${titulo}".`);
+            } catch (errPrep) {
+              console.error(`[Lembretes] Falha ao enviar mensagem de preparação para ${dest.telefone}:`, errPrep.message);
+            }
+          } else {
+            console.log(`[Lembretes] [Simulação] Mensagem de preparação para ${dest.telefone} sobre "${titulo}":\n${msgPrep}`);
+          }
+        }
       }
       registrarLembreteEnviado(eventoId, tipoLembrete, dest.telefone);
 
@@ -1450,17 +1540,25 @@ async function processarAniversariantesDoDia({
   return { processados: membros.length, aniversariantes: aniversariantes.length, enviados: totalEnviados };
 }
 
-const REGEX_A_DEFINIR = /\b(a\s*definir|em\s*defini[çc][ãa]o|ser[áa]\s*definid[oa]s?|vai\s*definir|ainda\s*n[ãa]o\s*definid[oa]s?|n[ãa]o\s*definid[oa]s?|indefinid[oa]s?|a\s*confirmar|pendente|ainda\s*vamos?\s*definir)\b/i;
+const REGEX_A_DEFINIR = /\b(a\s*definir|em\s*defini[çc][ãa]o|ser[áa]\s*definid[oa]s?|vai\s*definir|ainda\s*n[ãa]o\s*definid[oa]s?|n[ãa]o\s*definid[oa]s?|indefinid[oa]s?|a\s*confirmar|pendente|ainda\s*vamos?\s*definir|a\s*decidir|ainda\s*a\s*decidir|em\s*decis[ãa]o|vai\s*decidir|ainda\s*n[ãa]o\s*decidid[oa]s?|n[ãa]o\s*decidid[oa]s?|indecis[oa]s?|a\s*combinar|ainda\s*a\s*combinar)\b/i;
 
 const LABELS_CAMPOS_FORM = {
+  nome_evento: "Nome do Evento",
   tema: "Tema",
   versiculo: "Versículo",
   horario_inicio: "Horário de Início",
   horario_termino: "Horário de Término",
   horario_inicio_termino: "Horário",
+  horario_total: "Horário de Preparação / Limpeza",
   local: "Local",
   preletor: "Preletor(a)",
+  responsavel_geral: "Responsável Geral",
+  convidado: "Convidado Especial",
   louvor: "Equipe de Louvor",
+  decoracao: "Decoração",
+  alimentacao: "Alimentação",
+  equipe: "Equipe",
+  materiais: "Materiais Necessários",
   intercessao: "Intercessão",
   copa: "Copa / Recepção",
   estacionamento: "Estacionamento",
@@ -1471,8 +1569,38 @@ const LABELS_CAMPOS_FORM = {
   paleta: "Paleta de Cores",
   divulgacao: "Canais de Divulgação",
   prazo_imagem: "Prazo para Imagem",
+  data_maxima_divulgacao: "Data Máxima de Divulgação",
+  som: "Sonorização / Multimídia",
+  sonorizacao: "Sonorização",
+  equipe_apoio: "Equipe de Apoio",
+  voluntarios: "Voluntários",
   observacoes: "Observações Gerais",
 };
+
+function extrairItensADefinirFormulario(payload) {
+  if (!payload) return [];
+  let p = payload;
+  if (typeof p === "string") {
+    try {
+      p = JSON.parse(p);
+    } catch {
+      return [];
+    }
+  }
+  if (!p || typeof p !== "object") return [];
+
+  const itens = [];
+  for (const [k, v] of Object.entries(p)) {
+    if (typeof v === "string" && REGEX_A_DEFINIR.test(v.trim())) {
+      itens.push({
+        campo: LABELS_CAMPOS_FORM[k] || k,
+        valor: v.trim(),
+      });
+    }
+  }
+  return itens;
+}
+
 
 function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens = [] } = {}) {
   const saudacao = nome ? `Olá, *${nome}*! Tudo bem?` : "Olá! Tudo bem?";
@@ -1874,6 +2002,10 @@ module.exports = {
   iniciarAgendadorLembretes,
   extrairDatasEvento,
   normalizarDataParaIso,
+  unificarEventosPreparacaoLimpeza,
+  identificarInfoPreparacaoLimpeza,
+  montarMensagemPreparacaoLimpeza,
+  extrairItensADefinirFormulario,
   REGEX_A_DEFINIR,
   LABELS_CAMPOS_FORM,
 };

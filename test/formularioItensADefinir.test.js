@@ -118,11 +118,11 @@ test("processarLembretesItensADefinir: envia lembrete 7 dias antes para itens a 
   });
 
   assert.equal(res1.enviados, 1);
-  assert.equal(mensagensEnviadas.length, 1);
-  assert.match(mensagensEnviadas[0].jid, /5511977771234/);
-  assert.match(mensagensEnviadas[0].texto, /Conferência Vinde 2026/);
-  assert.match(mensagensEnviadas[0].texto, /Preletor\(a\):/);
-  assert.match(mensagensEnviadas[0].texto, /Copa \/ Recepção:/);
+  const msgLider = mensagensEnviadas.find((m) => m.jid.includes("5511977771234"));
+  assert.ok(msgLider, "mensagem para o líder deve ser enviada");
+  assert.match(msgLider.texto, /Conferência Vinde 2026/);
+  assert.match(msgLider.texto, /Preletor\(a\):/);
+  assert.match(msgLider.texto, /Copa \/ Recepção:/);
 
   // 2. Segunda execução: não deve reenviar
   const res2 = await processarLembretesItensADefinir({
@@ -133,5 +133,5 @@ test("processarLembretesItensADefinir: envia lembrete 7 dias antes para itens a 
   });
 
   assert.equal(res2.enviados, 0);
-  assert.equal(mensagensEnviadas.length, 1);
+  assert.equal(mensagensEnviadas.length, 2, "não deve enviar novas mensagens na segunda execução");
 });

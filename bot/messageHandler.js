@@ -30,7 +30,7 @@ const {
   isAgendaInterna,
   AGENDAS_INTERNAS,
 } = require("./redes");
-const { notificarSecretaria, notificarPastoral, notificarMultimidia, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
+const { notificarSecretaria: notificarSecretariaDefault, notificarPastoral, notificarMultimidia, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { executarBroadcast, BROADCAST_CONFIG } = require("./broadcast");
 const { baixarMidiaComRetry } = require("./mediaStorage");
 const { montarResourceEvento, montarResourcesMultiplosBlocos, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
@@ -41,6 +41,9 @@ const {
   buscarPastorAgendamento,
   buscarLembreteAguardandoResposta,
   removerLembreteAguardandoResposta,
+  formatarDataBrasil,
+  extrairItensADefinirFormulario,
+  REGEX_A_DEFINIR,
 } = require("./lembretes");
 const {
   iniciarFormularioEvento,
@@ -577,6 +580,50 @@ async function processarRespostaEventoExterno({
   return msg.reply("❌ Etapa desconhecida. Digite *menu* para reiniciar.");
 }
 
+const pendentesRetornoLembrete = new Map();
+
+async function finalizarEnvioRetornoLembrete({
+  telDigitos,
+  info,
+  nomeResp,
+  tipoDesc,
+  eventoNome,
+  dataEv,
+  infoHorario,
+  numero,
+  client,
+  notificarSecretaria,
+  etapas,
+}) {
+  const pend = pendentesRetornoLembrete.get(telDigitos);
+  pendentesRetornoLembrete.delete(telDigitos);
+  delete etapas[numero];
+  delete etapas[telDigitos];
+  delete etapas[`${telDigitos}@c.us`];
+  delete etapas[`${telDigitos}@s.whatsapp.net`];
+  removerLembreteAguardandoResposta(telDigitos);
+
+  const textoCompleto = (pend?.textos || []).filter(Boolean).join("\n").trim();
+  if (!textoCompleto) return;
+
+  // Regra: NÃO enviar nenhuma mensagem ao líder dizendo que foi recebida ou confirmada.
+  // Apenas notificar a secretaria com o retorno do líder!
+  if (info.tipoLembrete !== "atendimento" && notificarSecretaria && typeof notificarSecretaria === "function") {
+    const msgSec =
+      `🔔 *Retorno do Líder sobre ${tipoDesc}*\n\n` +
+      `👤 *Líder:* ${nomeResp} (${mascararTelefone(numero)})\n` +
+      `📅 *${tipoDesc}:* ${eventoNome}\n` +
+      `📆 *Data:* ${dataEv}${infoHorario}\n` +
+      `💬 *Mensagem recebida:*\n"${textoCompleto}"\n\n` +
+      `_Favor verificar com o líder e providenciar os alinhamentos ou ajustes necessários._`;
+    try {
+      await notificarSecretaria(client, msgSec);
+    } catch (errSec) {
+      console.error(`[Lembretes] Erro ao notificar secretaria sobre retorno do líder:`, errSec.message);
+    }
+  }
+}
+
 async function processarRetornoLembrete({
   msg,
   numero,
@@ -586,6 +633,7 @@ async function processarRetornoLembrete({
   etapas,
   usuario,
   contato,
+  tempoEsperaConfigurado = (process.env.NODE_ENV === "test" ? 0 : 3500),
 }) {
   const telDigitos = String(numero).replace(/\D/g, "");
   const textoLimpo = (msg.body || "").trim();
@@ -593,18 +641,15 @@ async function processarRetornoLembrete({
 
   // Se o usuário digitou "menu", cancela o estado de lembrete e deixa exibir o menu
   if (textoLower === "menu" || textoLower === "sair" || textoLower === "cancelar") {
+    if (pendentesRetornoLembrete.has(telDigitos)) {
+      clearTimeout(pendentesRetornoLembrete.get(telDigitos).timer);
+      pendentesRetornoLembrete.delete(telDigitos);
+    }
     delete etapas[numero];
     delete etapas[telDigitos];
     removerLembreteAguardandoResposta(telDigitos);
     return null;
   }
-
-  const ehConfirmacao =
-    /^(sim|confirmado|confirmada|confirmo|confirmar|tudo certo|tudo ok|ok|está confirmado|esta confirmado|confirmad[ií]ssimo|de pé|está de pé|com certeza|positivo|vamos sim|estaremos presentes|pode confirmar)\b/i.test(textoLower) ||
-    textoLower === "1" ||
-    textoLower === "sim" ||
-    textoLower === "confirmado" ||
-    textoLower === "confirmada";
 
   const nomeResp = usuario?.nome || info.destinatarioNome || nomeContato(contato, numero);
   const tipoDesc = info.tipoLembrete === "atendimento"
@@ -614,66 +659,248 @@ async function processarRetornoLembrete({
   const dataEv = info.dataEvento || "";
   const infoHorario = info.horarioEvento ? ` às ${info.horarioEvento}` : "";
 
-  // Remove o estado de espera para este contato
-  delete etapas[numero];
-  delete etapas[telDigitos];
-  removerLembreteAguardandoResposta(telDigitos);
-
-  if (ehConfirmacao) {
-    let respostaAoLider = "";
-    if (info.tipoLembrete === "atendimento") {
-      respostaAoLider = `✅ *Atendimento Pastoral Confirmado!*\n\nObrigado pelo retorno, Pastor! A confirmação do atendimento foi registrada com sucesso. 🙏`;
-    } else if (info.tipoLembrete === "reuniao") {
-      respostaAoLider = `✅ *Reunião Confirmada!*\n\nObrigado pela confirmação, *${nomeResp}*! Que vocês tenham uma excelente e abençoada reunião. 🙏`;
-    } else if (info.tipoLembrete === "itens_a_definir") {
-      respostaAoLider = `✅ *Definições Confirmadas!*\n\nMuito obrigado pelo retorno, *${nomeResp}*! Registramos que os itens do evento *${eventoNome}* estão alinhados e encaminhamos para a secretaria. 🙏✨`;
-    } else {
-      respostaAoLider = `✅ *Evento Confirmado!*\n\nMuito obrigado pelo retorno, *${nomeResp}*! A confirmação para o evento *${eventoNome}* foi registrada com sucesso. Que o Senhor abençoe ricamente toda a programação! 🙏✨`;
-    }
-
-    await msg.reply(respostaAoLider);
-
-    // Notifica secretaria sobre a confirmação (exceto atendimento pastoral que é privado)
-    if (info.tipoLembrete !== "atendimento" && notificarSecretaria && typeof notificarSecretaria === "function") {
-      const msgSec =
-        `📋 *Confirmação de ${tipoDesc} Recebida*\n\n` +
-        `👤 *Responsável:* ${nomeResp} (${mascararTelefone(numero)})\n` +
-        `📅 *${tipoDesc}:* ${eventoNome}\n` +
-        `📆 *Data:* ${dataEv}${infoHorario}\n` +
-        `💬 *Resposta do Líder:* "${textoLimpo}"\n\n` +
-        `_A confirmação foi registrada com sucesso no sistema._`;
-      try {
-        await notificarSecretaria(client, msgSec);
-      } catch (errSec) {
-        console.error(`[Lembretes] Erro ao notificar secretaria sobre confirmação:`, errSec.message);
-      }
-    }
-
+  // Confirmação de atendimento pastoral (pastor no privado)
+  if (info.tipoLembrete === "atendimento") {
+    delete etapas[numero];
+    delete etapas[telDigitos];
+    removerLembreteAguardandoResposta(telDigitos);
+    await msg.reply(`✅ *Atendimento Pastoral Confirmado!*\n\nObrigado pelo retorno, Pastor! A confirmação do atendimento foi registrada com sucesso. 🙏`);
     return;
   }
 
-  // Caso seja qualquer outra mensagem de texto (ajustes, dúvidas, alteração de horário, observações):
-  const respostaFeedback =
-    `Recebemos sua mensagem sobre o evento *${eventoNome}*, *${nomeResp}*! 📝\n\n` +
-    `Já registramos o seu retorno e encaminhamos diretamente para a equipe da secretaria para os devidos alinhamentos e ajustes. Caso precise de mais alguma alteração, estamos à disposição! 🙏\n\n` +
-    `Digite *menu* se desejar ver as opções disponíveis.`;
+  // Para eventos e reuniões de líderes:
+  // NÃO responder ao líder com nenhuma mensagem dizendo que foi recebida ou confirmada.
+  // Agrupa mensagens consecutivas enviadas pelo líder dentro do tempo de espera e notifica a secretaria!
+  if (pendentesRetornoLembrete.has(telDigitos)) {
+    const pend = pendentesRetornoLembrete.get(telDigitos);
+    if (pend.timer) clearTimeout(pend.timer);
+    pend.textos.push(textoLimpo);
 
-  await msg.reply(respostaFeedback);
-
-  // Encaminha a mensagem diretamente à Secretaria
-  if (notificarSecretaria && typeof notificarSecretaria === "function") {
-    const msgSec =
-      `🔔 *Retorno do Líder sobre ${tipoDesc}*\n\n` +
-      `👤 *Líder:* ${nomeResp} (${mascararTelefone(numero)})\n` +
-      `📅 *${tipoDesc}:* ${eventoNome}\n` +
-      `📆 *Data:* ${dataEv}${infoHorario}\n` +
-      `💬 *Mensagem recebida:*\n"${textoLimpo}"\n\n` +
-      `_Favor verificar com o líder e providenciar os alinhamentos ou ajustes necessários._`;
-    try {
-      await notificarSecretaria(client, msgSec);
-    } catch (errSec) {
-      console.error(`[Lembretes] Erro ao notificar secretaria sobre retorno do líder:`, errSec.message);
+    if (tempoEsperaConfigurado > 0) {
+      pend.timer = setTimeout(async () => {
+        await finalizarEnvioRetornoLembrete({
+          telDigitos,
+          info,
+          nomeResp,
+          tipoDesc,
+          eventoNome,
+          dataEv,
+          infoHorario,
+          numero,
+          client,
+          notificarSecretaria,
+          etapas,
+        });
+      }, tempoEsperaConfigurado);
+      return;
     }
+  }
+
+  const pendenteInfo = {
+    textos: [textoLimpo],
+    timer: null,
+  };
+
+  if (tempoEsperaConfigurado > 0) {
+    pendenteInfo.timer = setTimeout(async () => {
+      await finalizarEnvioRetornoLembrete({
+        telDigitos,
+        info,
+        nomeResp,
+        tipoDesc,
+        eventoNome,
+        dataEv,
+        infoHorario,
+        numero,
+        client,
+        notificarSecretaria,
+        etapas,
+      });
+    }, tempoEsperaConfigurado);
+    pendentesRetornoLembrete.set(telDigitos, pendenteInfo);
+    return;
+  }
+
+  // Execução imediata (tempoEsperaConfigurado <= 0)
+  pendentesRetornoLembrete.set(telDigitos, pendenteInfo);
+  await finalizarEnvioRetornoLembrete({
+    telDigitos,
+    info,
+    nomeResp,
+    tipoDesc,
+    eventoNome,
+    dataEv,
+    infoHorario,
+    numero,
+    client,
+    notificarSecretaria,
+    etapas,
+  });
+}
+
+function formatarDetalhesFichaEvento(formRow) {
+  if (!formRow) return "Ficha não encontrada.";
+  let payload = {};
+  if (typeof formRow.payload === "string") {
+    try {
+      payload = JSON.parse(formRow.payload);
+    } catch {}
+  } else if (typeof formRow.payload === "object" && formRow.payload !== null) {
+    payload = formRow.payload;
+  }
+
+  const dataFmt = formatarDataBrasil(formRow.data || payload.data);
+  let txt = `📄 *Ficha do Evento: ${formRow.evento}*\n\n`;
+  if (formRow.departamento || payload.departamento) {
+    txt += `🏢 *Departamento/Ministério:* ${formRow.departamento || payload.departamento}\n`;
+  }
+  if (dataFmt) {
+    txt += `📆 *Data:* ${dataFmt}\n`;
+  }
+  const hInicio = payload.horario_inicio || payload.horario_inicio_termino || "";
+  const hFim = payload.horario_termino || "";
+  if (hInicio || hFim) {
+    txt += `⏰ *Horário:* ${hInicio}${hFim ? " às " + hFim : ""}\n`;
+  }
+  if (payload.local) {
+    txt += `📍 *Local:* ${payload.local}\n`;
+  }
+  const lider = payload.nome_lider || payload.nomeSolicitante || "";
+  if (lider) {
+    txt += `👤 *Líder Responsável:* ${lider}\n`;
+  }
+  if (payload.horario_total && !/^(não|nao|nenhum|nenhuma|nada)$/i.test(String(payload.horario_total).trim())) {
+    txt += `🧹 *Preparação/Limpeza:* ${payload.horario_total}\n`;
+  }
+
+  // Itens a definir destacados
+  const itensADefinir = extrairItensADefinirFormulario(payload);
+  if (itensADefinir.length > 0) {
+    txt += `\n⚠️ *Itens a Definir / Decidir:*\n`;
+    for (const it of itensADefinir) {
+      txt += `• *${it.campo}:* _${it.valor}_\n`;
+    }
+  }
+
+  // Demais detalhes preenchidos
+  const detalhes = [];
+  if (payload.tema && !REGEX_A_DEFINIR.test(payload.tema)) detalhes.push(`• *Tema:* ${payload.tema}`);
+  if (payload.versiculo && !REGEX_A_DEFINIR.test(payload.versiculo)) detalhes.push(`• *Versículo:* ${payload.versiculo}`);
+  if (payload.preletor && !REGEX_A_DEFINIR.test(payload.preletor)) detalhes.push(`• *Preletor(a):* ${payload.preletor}`);
+  if (payload.louvor && !REGEX_A_DEFINIR.test(payload.louvor)) detalhes.push(`• *Louvor:* ${payload.louvor}`);
+  if (payload.decoracao && !REGEX_A_DEFINIR.test(payload.decoracao)) detalhes.push(`• *Decoração:* ${payload.decoracao}`);
+  if (payload.alimentacao && !REGEX_A_DEFINIR.test(payload.alimentacao)) detalhes.push(`• *Alimentação:* ${payload.alimentacao}`);
+  if (payload.equipe && !REGEX_A_DEFINIR.test(payload.equipe)) detalhes.push(`• *Equipe:* ${payload.equipe}`);
+  if (payload.materiais && !REGEX_A_DEFINIR.test(payload.materiais)) detalhes.push(`• *Materiais:* ${payload.materiais}`);
+  if (payload.midias && !REGEX_A_DEFINIR.test(payload.midias)) detalhes.push(`• *Mídias:* ${payload.midias}`);
+  if (payload.observacoes && !REGEX_A_DEFINIR.test(payload.observacoes)) detalhes.push(`• *Observações:* ${payload.observacoes}`);
+
+  if (detalhes.length > 0) {
+    txt += `\n📋 *Informações do Evento:*\n` + detalhes.join("\n") + `\n`;
+  }
+
+  if (formRow.docUrl) {
+    txt += `\n📄 *Documento Oficial (Google Docs):*\n${formRow.docUrl}\n`;
+  }
+
+  txt += `\nDigite *voltar* para a lista de fichas ou *menu* para o início.`;
+  return txt;
+}
+
+async function iniciarFluxoConsultaFichasEventos({
+  msg,
+  numero,
+  etapas,
+  origem = "pastoral",
+}) {
+  let rows = [];
+  try {
+    rows = db.prepare("SELECT * FROM formularios_eventos ORDER BY id DESC LIMIT 25").all();
+  } catch (err) {
+    console.error("[Fichas Eventos] Erro ao consultar banco:", err.message);
+  }
+
+  if (!rows || rows.length === 0) {
+    return msg.reply(
+      "ℹ️ Não há fichas de eventos registradas no momento.\n\n" +
+      `Digite *voltar* para o menu anterior ou *menu* para o início.`
+    );
+  }
+
+  etapas[numero] = {
+    fluxo: "consulta_fichas_eventos",
+    etapa: "selecionar_evento",
+    origem,
+    fichas: rows,
+  };
+
+  let texto = "📄 *Fichas dos Eventos Cadastrados*\n\nEscolha o evento que deseja visualizar:\n\n";
+  rows.forEach((r, idx) => {
+    const dataFmt = formatarDataBrasil(r.data);
+    const deptoStr = r.departamento ? ` (${r.departamento})` : "";
+    const dataStr = dataFmt ? `[${dataFmt}] ` : "";
+    texto += `${idx + 1}️⃣ *${dataStr}${r.evento}*${deptoStr}\n`;
+  });
+  texto += "\nDigite o número da opção desejada.\nDigite *voltar* para o menu anterior ou *menu* para o início.";
+
+  return msg.reply(texto);
+}
+
+async function processarFluxoConsultaFichasEventos({
+  msg,
+  numero,
+  info,
+  etapas,
+  isPastor,
+  isDiretor,
+}) {
+  const texto = (msg.body || "").trim();
+  const lower = texto.toLowerCase();
+
+  if (lower === "voltar") {
+    if (info.etapa === "ver_detalhes") {
+      return await iniciarFluxoConsultaFichasEventos({
+        msg,
+        numero,
+        etapas,
+        origem: info.origem,
+      });
+    }
+
+    delete etapas[numero];
+    if (info.origem === "diretor") {
+      etapas[numero] = { fluxo: "area_diretor", etapa: "diretor_sub_agenda" };
+      return msg.reply(montarSubmenuDiretorAgenda());
+    } else {
+      etapas[numero] = { fluxo: "area_pastoral", etapa: "pastoral_sub_agenda" };
+      return msg.reply(montarSubmenuPastoralAgenda());
+    }
+  }
+
+  if (info.etapa === "selecionar_evento") {
+    const idx = parseInt(texto, 10) - 1;
+    if (isNaN(idx) || !info.fichas || !info.fichas[idx]) {
+      return msg.reply("❌ Opção inválida. Digite o número correspondente ao evento da lista, *voltar* para o menu anterior ou *menu* para o início.");
+    }
+
+    const fichaSelecionada = info.fichas[idx];
+    info.etapa = "ver_detalhes";
+    info.fichaSelecionada = fichaSelecionada;
+
+    const textoFicha = formatarDetalhesFichaEvento(fichaSelecionada);
+    return msg.reply(textoFicha);
+  }
+
+  if (info.etapa === "ver_detalhes") {
+    if (lower === "voltar") {
+      return await iniciarFluxoConsultaFichasEventos({
+        msg,
+        numero,
+        etapas,
+        origem: info.origem,
+      });
+    }
+    return msg.reply("Digite *voltar* para retornar à lista de fichas de eventos ou *menu* para o início.");
   }
 }
 
@@ -735,7 +962,8 @@ function montarSubmenuPastoralAgenda() {
     "3️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar)\n" +
     "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
     "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n" +
-    "6️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n\n" +
+    "6️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n" +
+    "7️⃣ 📄 *Fichas dos Eventos* (Ver formulários preenchidos e links dos documentos)\n\n" +
     "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu pastoral ou *menu* para o início."
   );
@@ -785,7 +1013,8 @@ function montarSubmenuDiretorAgenda() {
     "3️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar)\n" +
     "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
     "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n" +
-    "6️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n\n" +
+    "6️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n" +
+    "7️⃣ 📄 *Fichas dos Eventos* (Ver formulários preenchidos e links dos documentos)\n\n" +
     "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu da direção ou *menu* para o início."
   );
@@ -886,6 +1115,8 @@ function createMessageHandler({
   enviarWebhook = enviarWebhookGoogleDocs,
   enviarWebhookExterno = enviarWebhookGoogleDocsExternos,
   tempoEsperaSaudacaoMs,
+  tempoEsperaRetornoMs,
+  notificarSecretaria = notificarSecretariaDefault,
 }) {
   const pendentesSaudacao = new Map();
   const tempoEsperaConfigurado = typeof tempoEsperaSaudacaoMs !== "undefined"
@@ -893,6 +1124,9 @@ function createMessageHandler({
     : (typeof process.env.TEMPO_ESPERA_SAUDACAO_MS !== "undefined"
         ? parseInt(process.env.TEMPO_ESPERA_SAUDACAO_MS, 10)
         : (process.env.NODE_ENV === "test" ? 0 : 10000));
+  const tempoEsperaRetornoConfigurado = typeof tempoEsperaRetornoMs !== "undefined"
+    ? tempoEsperaRetornoMs
+    : 0;
   function resolverUsuario(numeroComDdi) {
     const numeroDigitos = String(numeroComDdi || "").replace(/\D/g, "");
     const cadastrados = (typeof listLideres === "function" ? listLideres() : []) || [];
@@ -2305,6 +2539,7 @@ function createMessageHandler({
               etapas,
               usuario,
               contato,
+              tempoEsperaConfigurado: tempoEsperaRetornoConfigurado,
             });
             if (resRetorno !== null) {
               return resRetorno;
@@ -2491,6 +2726,7 @@ function createMessageHandler({
             etapas,
             usuario,
             contato,
+            tempoEsperaConfigurado: tempoEsperaRetornoConfigurado,
           });
           if (resRetorno !== null) {
             return resRetorno;
@@ -2521,6 +2757,17 @@ function createMessageHandler({
             menuLiderFn: montarMenuLider,
             menuPastoralFn: montarMenuPastoral,
             menuDiretorFn: montarMenuDiretor,
+          });
+        }
+
+        if (info.fluxo === "consulta_fichas_eventos") {
+          return await processarFluxoConsultaFichasEventos({
+            msg,
+            numero,
+            info,
+            etapas,
+            isPastor,
+            isDiretor,
           });
         }
 
@@ -4062,7 +4309,15 @@ function createMessageHandler({
                 origem: "pastoral",
               });
             }
-            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 6, digite *voltar* para o menu anterior ou *menu* para o início.");
+            if (escolha === "7" || /fichas?(\s+dos?\s+eventos?)?|formul[aá]rios?/i.test(escolha)) {
+              return await iniciarFluxoConsultaFichasEventos({
+                msg,
+                numero,
+                etapas,
+                origem: "pastoral",
+              });
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 7, digite *voltar* para o menu anterior ou *menu* para o início.");
           }
 
           if (info.etapa === "pastoral_sub_comunicacao") {
@@ -4678,7 +4933,15 @@ function createMessageHandler({
                 origem: "diretor",
               });
             }
-            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 6, digite *voltar* para o menu anterior ou *menu* para o início.");
+            if (escolha === "7" || /fichas?(\s+dos?\s+eventos?)?|formul[aá]rios?/i.test(escolha)) {
+              return await iniciarFluxoConsultaFichasEventos({
+                msg,
+                numero,
+                etapas,
+                origem: "diretor",
+              });
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 7, digite *voltar* para o menu anterior ou *menu* para o início.");
           }
 
           if (info.etapa === "diretor_sub_comunicacao") {
@@ -5620,4 +5883,7 @@ module.exports = {
   montarTextoMenuPrincipal,
   iniciarFluxoConsultaInscricoes,
   processarFluxoConsultaInscricoes,
+  iniciarFluxoConsultaFichasEventos,
+  processarFluxoConsultaFichasEventos,
+  formatarDetalhesFichaEvento,
 };

@@ -1775,7 +1775,7 @@ function renderIndexHtml() {
               </div>
               <div class="modo-card" id="modoCardExterno" onclick="selecionarModoInscricao('externo')">
                 <div class="modo-card-title">🔗 Inscrição Externa</div>
-                <div class="modo-card-desc">Tipo Dia das Crianças. O botão direciona para link de Google Forms, Sympla ou outro site.</div>
+                <div class="modo-card-desc">O botão direciona para link de Google Forms, Sympla ou outro site externo.</div>
               </div>
             </div>
           </div>
@@ -1856,86 +1856,8 @@ function renderIndexHtml() {
           </div>
         </div>
 
-      <!-- Card do Evento Especial Dia das Crianças -->
-      <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(2, 132, 199, 0.45); background: linear-gradient(135deg, rgba(2, 132, 199, 0.14), rgba(245, 158, 11, 0.08));">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
-              🎈 Ministério Infantil
-            </div>
-            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Especial Dia das Crianças</h4>
-            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
-              🗓️ <strong>17/10/2026 às 14:00</strong> &nbsp;•&nbsp; 📍 <strong>R. Benedicto de Abreu Júnior, 40</strong> &nbsp;•&nbsp; <em>Inscrições via Formulário Oficial</em>
-            </p>
-          </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-            <button type="button" class="btn-gaveta-toggle" id="btnToggleCriancas" onclick="toggleGavetaEvento('criancas')" title="Recolher ou expandir inscrições (engavetar)">
-              <span class="gaveta-toggle-text">Recolher</span>
-              <span class="gaveta-arrow" id="arrow-criancas">▲</span>
-            </button>
-            <button onclick="sincronizarComPlanilhaCriancas()" id="btnSyncPlanilhaCriancas" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
-              🔄 Puxar da Planilha
-            </button>
-            <button onclick="window.open('https://forms.gle/jb3ytK348u3keMi8A', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver formulário público de inscrição">
-              🔗 Abrir Formulário
-            </button>
-            <button onclick="window.open('/criancas/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);">
-              📄 Exportar Lista (PDF)
-            </button>
-            <button onclick="fetchCriancasInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
-              🔄 Atualizar
-            </button>
-          </div>
-        </div>
-
-        <div class="evento-gaveta-body" id="gaveta-criancas">
-          <div class="evento-metric-grid" id="criancasMetrics">
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="criancasTotal" style="color: #38bdf8;">-</div>
-              <div class="evento-metric-lbl">Total de Crianças</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="criancasConfirmadosZap" style="color: #4ade80;">-</div>
-              <div class="evento-metric-lbl">Confirmação WhatsApp</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="criancasPendentesZap" style="color: #facc15;">-</div>
-              <div class="evento-metric-lbl">Pendentes de WhatsApp</div>
-            </div>
-          </div>
-
-          <!-- Barra de Filtros e Busca do Especial Dia das Crianças -->
-          <div class="evento-toolbar" style="margin-top: 1.2rem;">
-            <input type="text" id="criancasSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por criança, mãe/responsável, alergia ou telefone..." oninput="filtrarCriancasInscricoes()" />
-          </div>
-
-          <!-- Tabela de Inscritos do Especial Dia das Crianças -->
-          <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto; margin-bottom: 0.5rem;">
-            <table class="evento-table">
-              <thead>
-                <tr>
-                  <th style="width: 50px; text-align: center;">Nº</th>
-                  <th>Nome da Criança</th>
-                  <th style="width: 80px; text-align: center;">Idade</th>
-                  <th>Mãe / Responsável</th>
-                  <th>Telefone / Contato</th>
-                  <th>Alergias / Restrições</th>
-                  <th style="width: 140px; text-align: center;">Data Inscrição</th>
-                  <th style="width: 100px; text-align: center;">Ações</th>
-                </tr>
-              </thead>
-              <tbody id="criancasTbodyInscritos">
-                <tr>
-                  <td colspan="8" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando crianças inscritas...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <!-- Card do Evento Culto de Mulheres -->
-      <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(200, 100, 82, 0.35);">
+      <div class="evento-card-item" data-event-date="2026-10-24" style="margin-top: 2rem; border-color: rgba(200, 100, 82, 0.35);">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(200, 100, 82, 0.2); color: #f4a290; border: 1px solid rgba(200, 100, 82, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
@@ -2012,7 +1934,7 @@ function renderIndexHtml() {
       </div>
 
       <!-- Card do Evento Saúde da Mulher — Palestra + Pilates -->
-      <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(225, 29, 72, 0.45); background: linear-gradient(135deg, rgba(225, 29, 72, 0.12), rgba(219, 39, 119, 0.06));">
+      <div class="evento-card-item" data-event-date="2026-10-31" style="margin-top: 2rem; border-color: rgba(225, 29, 72, 0.45); background: linear-gradient(135deg, rgba(225, 29, 72, 0.12), rgba(219, 39, 119, 0.06));">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(225, 29, 72, 0.2); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
@@ -2104,7 +2026,7 @@ function renderIndexHtml() {
       </div>
 
       <!-- Card do Evento Treinamento de Intercessão -->
-      <div class="evento-card-item" style="margin-top: 2rem; border-color: rgba(249, 115, 22, 0.45); background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(168, 85, 247, 0.08));">
+      <div class="evento-card-item" data-event-date="2026-11-15" style="margin-top: 2rem; border-color: rgba(249, 115, 22, 0.45); background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(168, 85, 247, 0.08));">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(249, 115, 22, 0.2); color: #fdba74; border: 1px solid rgba(249, 115, 22, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
@@ -2674,9 +2596,22 @@ function renderIndexHtml() {
           corBadgeTipo = 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35);';
         }
 
-        const badgeStatus = ev.ativo
-          ? '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(34, 197, 94, 0.35);">🟢 Ativo</span>'
-          : '<span style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.35);">⏸️ Pausado</span>';
+        let isPassado = false;
+        if (ev.dataEvento) {
+          const p = ev.dataEvento.trim().split(/[\/\-]/);
+          if (p.length === 3) {
+            const d = p[0].length === 4
+              ? new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10), 23, 59, 59)
+              : new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10), 23, 59, 59);
+            if (!isNaN(d.getTime()) && d < new Date()) isPassado = true;
+          }
+        }
+
+        const badgeStatus = isPassado
+          ? '<span style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.35);">🏁 Já Realizado</span>'
+          : (ev.ativo
+            ? '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(34, 197, 94, 0.35);">🟢 Ativo</span>'
+            : '<span style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.35);">⏸️ Pausado</span>');
 
         const thumbImg = ev.bannerUrl
           ? '<img src="' + ev.bannerUrl + '" class="card-evento-dinamico-thumb" alt="' + ev.titulo + '" />'
@@ -4470,14 +4405,33 @@ function renderIndexHtml() {
       }
     };
 
+    function removerEventosPassadosSecretaria() {
+      try {
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        document.querySelectorAll('.evento-card-item[data-event-date]').forEach(el => {
+          const raw = el.getAttribute('data-event-date');
+          if (raw) {
+            const partes = raw.split('-');
+            if (partes.length === 3) {
+              const dataEv = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10), 23, 59, 59);
+              if (!isNaN(dataEv.getTime()) && dataEv < hoje) {
+                el.remove();
+              }
+            }
+          }
+        });
+      } catch (_) {}
+    }
+
     setInterval(refresh, 5000);
     refresh();
     fetchEventosPainel();
     fetchEventosCadastrados();
-    fetchCriancasInscricoes();
     fetchMulheresInscricoes();
     fetchSaudeMulherInscricoes();
     fetchIntercessaoInscricoes();
+    removerEventosPassadosSecretaria();
     restaurarEstadoGavetas();
   </script>
 </body></html>`;

@@ -4,6 +4,7 @@ const fs = require("fs");
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-lembretes-test-"));
 process.env.DB_PATH = path.join(tmpDir, "lembretes.db");
+process.env.NODE_ENV = "test";
 
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");

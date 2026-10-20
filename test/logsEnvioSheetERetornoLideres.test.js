@@ -196,13 +196,14 @@ test("Lembretes de líderes: deixa o bot aberto para receber mensagens e process
   });
 
   const etapas = {};
-  const dataBase = new Date("2026-10-01T10:00:00.000Z");
+  const dataBase = new Date();
+  const dEvIso = new Date(dataBase.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const idEv = "ev-teste-retiro-" + Date.now();
   const eventos = [
     {
       id: idEv,
       summary: "Retiro Homens de Honra 2026",
-      start: { dateTime: "2026-10-06T08:00:00-03:00" },
+      start: { dateTime: `${dEvIso}T08:00:00-03:00` },
       location: "Templo",
       calendarId: "cal-homens",
     },
@@ -259,9 +260,8 @@ test("Lembretes de líderes: deixa o bot aberto para receber mensagens e process
     },
   });
 
-  assert.equal(respostasBot.length, 1);
-  assert.match(respostasBot[0], /Evento Confirmado/i);
-  assert.match(respostasBot[0], /Retiro Homens de Honra 2026/);
+  // NÃO deve responder ao líder
+  assert.equal(respostasBot.length, 0);
 
   // O estado deve ser removido após a resposta
   assert.equal(etapas[JID_LIDER], undefined);
@@ -282,13 +282,14 @@ test("Lembretes de líderes: líder responde solicitando alterações e bot avis
   });
 
   const etapas = {};
-  const dataBase = new Date("2026-10-01T10:00:00.000Z");
+  const dataBase = new Date();
+  const dEvIsoDebora = new Date(dataBase.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const idEvDebora = "ev-teste-debora-" + Date.now();
   const eventos = [
     {
       id: idEvDebora,
       summary: "Noite de Louvor Epifania",
-      start: { dateTime: "2026-10-06T19:30:00-03:00" },
+      start: { dateTime: `${dEvIsoDebora}T19:30:00-03:00` },
       location: "Templo Sede",
       calendarId: "cal-louvor",
     },
@@ -314,6 +315,7 @@ test("Lembretes de líderes: líder responde solicitando alterações e bot avis
   assert.ok(buscarLembreteAguardandoResposta(TEL_LIDER));
 
   const respostasBot = [];
+  const avisosSecretaria = [];
   const handleMessage = createMessageHandler({
     client: fakeClient,
     calendar: {},
@@ -322,6 +324,9 @@ test("Lembretes de líderes: líder responde solicitando alterações e bot avis
     etapas,
     buscarEventos: async () => [],
     listLideres: () => [{ nome: "Débora Louvor", telefone: TEL_LIDER, cargos: ["lider"], departamento: "Epifania" }],
+    notificarSecretaria: async (c, txt) => {
+      avisosSecretaria.push(txt);
+    },
   });
 
   // Líder envia observação/ajuste
@@ -336,9 +341,13 @@ test("Lembretes de líderes: líder responde solicitando alterações e bot avis
     },
   });
 
-  assert.equal(respostasBot.length, 1);
-  assert.match(respostasBot[0], /Recebemos sua mensagem sobre o evento \*Noite de Louvor Epifania\*/);
-  assert.match(respostasBot[0], /encaminhamos diretamente para a equipe da secretaria/);
+  // NÃO deve responder ao líder, apenas registrar e encaminhar à secretaria
+  assert.equal(respostasBot.length, 0);
+  assert.ok(avisosSecretaria.length >= 1);
+  const ultimoAviso = avisosSecretaria[avisosSecretaria.length - 1];
+  assert.match(ultimoAviso, /Retorno do Líder sobre Evento/);
+  assert.match(ultimoAviso, /Noite de Louvor Epifania/);
+  assert.match(ultimoAviso, /precisamos alterar o horário de início/);
 
   // Registro no SQLite deve ter sido limpo após o recebimento
   assert.equal(buscarLembreteAguardandoResposta(TEL_LIDER), null);
@@ -348,6 +357,8 @@ test("Lembretes de líderes: líder responde solicitando alterações e bot avis
 
 test("processarLembretesEventos: deduplicação via planilha e mensagem enxuta à secretaria", async () => {
   const TEL_LIDER = "5511977775555";
+  try { removeLider("5511977776666"); } catch {}
+  try { removeLider(TEL_LIDER); } catch {}
   addLider({
     nome: "Gustavo Louvor",
     telefone: TEL_LIDER,
@@ -355,13 +366,14 @@ test("processarLembretesEventos: deduplicação via planilha e mensagem enxuta �
     departamento: "Epifania",
   });
 
-  const dataBase = new Date("2026-10-01T10:00:00.000Z");
+  const dataBase = new Date();
+  const dEvIsoGustavo = new Date(dataBase.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const idEv = "ev-dedup-teste-1";
   const eventos = [
     {
       id: idEv,
       summary: "Noite de Louvor Epifania",
-      start: { dateTime: "2026-10-06T19:30:00-03:00" },
+      start: { dateTime: `${dEvIsoGustavo}T19:30:00-03:00` },
       location: "Templo",
       calendarId: "cal-louvor",
     },
@@ -418,12 +430,12 @@ test("processarLembretesEventos: deduplicação via planilha e mensagem enxuta �
   assert.ok(verifica, "deve fazer POST verificar_envio");
   assert.equal(verifica.tipo, "lembrete_evento_5_dias");
   assert.match(verifica.destinatario, /Gustavo Louvor/);
-  assert.equal(verifica.periodo, "2026-10-06");
+  assert.equal(verifica.periodo, dEvIsoGustavo);
 
   assert.ok(registra, "deve fazer POST registrar_envio");
   assert.equal(registra.tipo, "lembrete_evento_5_dias");
   assert.match(registra.destinatario, /Gustavo Louvor/);
-  assert.equal(registra.periodo, "2026-10-06");
+  assert.equal(registra.periodo, dEvIsoGustavo);
 
   // 2. Se a planilha retornar enviado: true, ignora o envio (mesmo se o banco reiniciar)
   try {

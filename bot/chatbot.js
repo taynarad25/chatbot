@@ -495,6 +495,7 @@ function criarClient() {
     etapas,
     buscarEventos,
     listLideres,
+    tempoEsperaRetornoMs: 3500,
   });
   client.on("message", handleMessage);
 }
