@@ -32,12 +32,35 @@ function extrairFaixaHorarioTexto(texto = "") {
   return null;
 }
 
+function ehEventoPreparacaoLimpeza(ev = {}) {
+  const summary = (ev.summary || "").trim();
+  const description = (ev.description || "").trim();
+
+  // Prefixo com colchetes: [Preparação/Decoração], [Preparação / Decoração], [Preparação], [Decoração], [Limpeza], [Montagem]
+  if (/\[[^\]]*(?:preparaç[aã]o|decoraç[aã]o|limpeza|montagem)[^\]]*\]/i.test(summary)) {
+    return true;
+  }
+  // Prefixo com hífen ou dois pontos: Preparação - ..., Montagem: ...
+  if (/^(?:preparaç[aã]o(?:\/decoraç[aã]o)?|decoraç[aã]o|limpeza|montagem)\s*[-:]/i.test(summary)) {
+    return true;
+  }
+  // Menção explícita de preparação/decoração de salão no título
+  if (/\b(?:preparaç[aã]o\/decoraç[aã]o|preparaç[aã]o\s+e\s+decoraç[aã]o|limpeza\s+do\s+sal[ãa]o)\b/i.test(summary)) {
+    return true;
+  }
+  // Descrição indicando preparação/limpeza de salão
+  if (/montagem, preparação, decoração ou limpeza/i.test(description)) {
+    return true;
+  }
+  return false;
+}
+
 function identificarInfoPreparacaoLimpeza(ev = {}) {
   const summary = (ev.summary || "").trim();
   const description = (ev.description || "").trim();
 
   const matchPrefixo =
-    summary.match(/^\[(?:preparaç[aã]o(?:\/decoraç[aã]o)?|decoraç[aã]o|limpeza|montagem)\]\s*(.*)$/i) ||
+    summary.match(/^\[[^\]]*(?:preparaç[aã]o|decoraç[aã]o|limpeza|montagem)[^\]]*\]\s*(.*)$/i) ||
     summary.match(/^(?:preparaç[aã]o(?:\/decoraç[aã]o)?|decoraç[aã]o|limpeza|montagem)\s*[-:]\s*(.*)$/i);
 
   let nomePrincipal = matchPrefixo ? matchPrefixo[1].trim() : "";
@@ -47,12 +70,7 @@ function identificarInfoPreparacaoLimpeza(ev = {}) {
     nomePrincipal = matchDesc[1].trim();
   }
 
-  const isPrep = Boolean(
-    matchPrefixo ||
-    matchDesc ||
-    /\[preparação\]|\[preparacao\]|\[decoração\]|\[decoracao\]|\[limpeza\]|\[montagem\]/i.test(summary) ||
-    /montagem, preparação, decoração ou limpeza/i.test(description)
-  );
+  const isPrep = Boolean(matchPrefixo || matchDesc || ehEventoPreparacaoLimpeza(ev));
 
   return { isPrep, nomePrincipal };
 }
@@ -69,7 +87,7 @@ function formatarLinhaPreparacaoLimpeza(faixa, isVespera = false) {
   return "";
 }
 
-function unificarEventosPreparacaoLimpeza(eventos = []) {
+function unificarEventosPreparacaoLimpeza(eventos = [], opcoes = {}) {
   if (!Array.isArray(eventos) || eventos.length === 0) return eventos;
 
   const preps = [];
@@ -102,6 +120,7 @@ function unificarEventosPreparacaoLimpeza(eventos = []) {
     const normNome = normalizarTextoComparacao(nomePrincipal);
     const datePrep = moment.tz(evPrep.start?.dateTime || evPrep.start?.date, "America/Sao_Paulo");
 
+    // 1. Tenta correspondência exata por nome
     let alvo = principais.find(p => {
       const normP = normalizarTextoComparacao(p.summary);
       const matchNome = (normNome && (normP === normNome || normP.includes(normNome) || normNome.includes(normP)));
@@ -110,6 +129,25 @@ function unificarEventosPreparacaoLimpeza(eventos = []) {
       const diffDias = Math.abs(dateP.diff(datePrep, "days", true));
       return diffDias <= 1.5;
     });
+
+    // 2. Se não encontrou por nome, vincula ao evento oficial no mesmo dia
+    if (!alvo) {
+      alvo = principais.find(p => {
+        const dateP = moment.tz(p.start?.dateTime || p.start?.date, "America/Sao_Paulo");
+        const diffDias = Math.abs(dateP.diff(datePrep, "days", true));
+        if (diffDias > 1.2) return false;
+        // Se houver mesmo calendário ou se for do mesmo tema
+        if (evPrep.calendarId && p.calendarId && evPrep.calendarId === p.calendarId) return true;
+        const normP = normalizarTextoComparacao(p.summary);
+        if (normNome && (normP.includes("mulher") && normNome.includes("mulher"))) return true;
+        // Se for o único evento oficial no mesmo dia, associa a ele
+        const oficiaisNoDia = principais.filter(cand => {
+          const dCand = moment.tz(cand.start?.dateTime || cand.start?.date, "America/Sao_Paulo");
+          return Math.abs(dCand.diff(datePrep, "days", true)) <= 0.8;
+        });
+        return oficiaisNoDia.length === 1;
+      });
+    }
 
     if (alvo) {
       const dateP = moment.tz(alvo.start?.dateTime || alvo.start?.date, "America/Sao_Paulo");
@@ -152,16 +190,151 @@ function unificarEventosPreparacaoLimpeza(eventos = []) {
     }
   });
 
-  return [...principais, ...prepsNaoVinculados];
+  // Em agendas públicas abertas para todos, blocos de preparação/decoração avulsos NUNCA devem aparecer
+  const incluirNaoVinculados = Boolean(opcoes && opcoes.incluirNaoVinculados);
+  if (incluirNaoVinculados) {
+    return [...principais, ...prepsNaoVinculados];
+  }
+  return principais;
 }
 
-// Agrupa eventos em itens numerados para exibição: 3+ ocorrências do mesmo
-// nome/horário/dia da semana viram um único item "recorrente" (ex: "Todas as Quintas");
-// o restante vira um item "único" por evento, preservando o comportamento já existente.
-function agruparEventosAgenda(eventosRaw = []) {
-  const eventos = unificarEventosPreparacaoLimpeza(eventosRaw);
-  const porChave = {};
+function extrairNomeBaseEvento(summary = "") {
+  return String(summary || "")
+    .replace(/\s*[-–—:]\s*(?:Sess[ãa]o|Dia|Parte|M[óo]dulo|Etapa)\s*\d+[a-z]?\s*$/i, "")
+    .replace(/\s*\((?:Sess[ãa]o|Dia|Parte|M[óo]dulo|Etapa)\s*\d+[a-z]?\)\s*$/i, "")
+    .trim();
+}
+
+function formatarResumoDatas(eventos = []) {
+  if (!Array.isArray(eventos) || eventos.length === 0) return "";
+  const datas = eventos.map(ev => {
+    const d = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo");
+    return d.format("DD/MM");
+  });
+  const datasUnicas = [...new Set(datas)];
+  if (datasUnicas.length === 1) return datasUnicas[0];
+  if (datasUnicas.length === 2) return `${datasUnicas[0]} e ${datasUnicas[1]}`;
+  if (datasUnicas.length <= 4) return `${datasUnicas.slice(0, -1).join(", ")} e ${datasUnicas[datasUnicas.length - 1]}`;
+  return `${datasUnicas[0]} a ${datasUnicas[datasUnicas.length - 1]} (${datasUnicas.length} datas)`;
+}
+
+function agruparEventosPorNomeBase(eventos = []) {
+  const grupos = {};
+
   eventos.forEach(ev => {
+    const rawSum = ev.summary || "Evento sem título";
+    const nomeBase = extrairNomeBaseEvento(rawSum);
+    const chave = `${nomeBase.toLowerCase()}|${ev.calendarId || ""}`;
+
+    if (!grupos[chave]) {
+      grupos[chave] = {
+        nomeBase,
+        calendarId: ev.calendarId,
+        location: ev.location,
+        description: ev.description,
+        eventos: [],
+      };
+    }
+    grupos[chave].eventos.push(ev);
+  });
+
+  return Object.values(grupos).map(g => {
+    g.eventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
+    const resumoDatas = formatarResumoDatas(g.eventos);
+    const ehMultiplo = g.eventos.length > 1;
+    const primeiroEv = g.eventos[0];
+
+    return {
+      nomeBase: g.nomeBase,
+      summary: g.nomeBase,
+      resumoDatas,
+      ehMultiplo,
+      totalSessoes: g.eventos.length,
+      eventos: g.eventos,
+      id: primeiroEv.id,
+      start: primeiroEv.start,
+      end: primeiroEv.end,
+      location: g.location || primeiroEv.location,
+      description: g.description || primeiroEv.description,
+      calendarId: g.calendarId || primeiroEv.calendarId,
+    };
+  }).sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
+}
+
+// Agrupa eventos em itens numerados para exibição:
+// 1. Eventos com múltiplas sessões/dias do mesmo evento viram um único item unificado.
+// 2. Cultos e reuniões semanais regulares (3+ ocorrências idênticas) viram um único item recorrente.
+// 3. Demais eventos viram itens únicos por data.
+function agruparEventosAgenda(eventosRaw = [], opcoes = {}) {
+  const eventos = unificarEventosPreparacaoLimpeza(eventosRaw, opcoes);
+
+  // 1. Primeiro separa eventos que são sessões/dias de um evento maior
+  const gruposMultiplos = {};
+  const eventosRestantes = [];
+
+  eventos.forEach(ev => {
+    const rawSum = ev.summary || "Evento sem título";
+    const nomeBase = extrairNomeBaseEvento(rawSum);
+    const temSufixoSessao = /(?:Sess[ãa]o|Dia|Parte|M[óo]dulo|Etapa)\s*\d+/i.test(rawSum);
+
+    if (temSufixoSessao) {
+      const chave = `${nomeBase.toLowerCase()}|${ev.calendarId || ""}`;
+      if (!gruposMultiplos[chave]) {
+        gruposMultiplos[chave] = { nomeBase, eventos: [] };
+      }
+      gruposMultiplos[chave].eventos.push(ev);
+    } else {
+      eventosRestantes.push(ev);
+    }
+  });
+
+  // Também agrupa se houver eventos restantes com o mesmo nome base no mesmo calendário (ex: conferência em 2 dias)
+  const contagemNomeBase = {};
+  eventosRestantes.forEach(ev => {
+    const n = extrairNomeBaseEvento(ev.summary || "").toLowerCase();
+    contagemNomeBase[n] = (contagemNomeBase[n] || 0) + 1;
+  });
+
+  const eventosFinais = [];
+  eventosRestantes.forEach(ev => {
+    const n = extrairNomeBaseEvento(ev.summary || "").toLowerCase();
+    const ehCursoOuTreinamento = /treinamento|curso|semin[áa]rio|workshop|congresso|confer[êe]ncia|retiro|acampamento/i.test(ev.summary || "");
+    if (contagemNomeBase[n] > 1 && (ehCursoOuTreinamento || contagemNomeBase[n] < 3)) {
+      const chave = `${n}|${ev.calendarId || ""}`;
+      if (!gruposMultiplos[chave]) {
+        gruposMultiplos[chave] = { nomeBase: extrairNomeBaseEvento(ev.summary || ""), eventos: [] };
+      }
+      gruposMultiplos[chave].eventos.push(ev);
+    } else {
+      eventosFinais.push(ev);
+    }
+  });
+
+  const itens = [];
+
+  // Adiciona os eventos múltiplos unificados
+  Object.values(gruposMultiplos).forEach(g => {
+    g.eventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
+    const primeiro = g.eventos[0];
+    const dIni = moment.tz(primeiro.start.dateTime || primeiro.start.date, "America/Sao_Paulo");
+    const horaFmt = primeiro.start.dateTime ? dIni.format("HH:mm") : "";
+    const prepLimpeza = g.eventos.find(e => e.horarioPreparacaoLimpeza)?.horarioPreparacaoLimpeza || null;
+
+    itens.push({
+      tipo: "multiplo",
+      summary: g.nomeBase,
+      nomeBase: g.nomeBase,
+      horaFmt,
+      dataFmt: formatarResumoDatas(g.eventos),
+      eventos: g.eventos,
+      primeiraData: dIni.toDate(),
+      horarioPreparacaoLimpeza: prepLimpeza,
+    });
+  });
+
+  // Processa os eventos restantes (recorrentes vs únicos)
+  const porChave = {};
+  eventosFinais.forEach(ev => {
     const startStr = ev.start.dateTime || ev.start.date;
     const d = moment.tz(startStr, "America/Sao_Paulo");
     const weekday = d.day();
@@ -172,7 +345,6 @@ function agruparEventosAgenda(eventosRaw = []) {
     porChave[chave].eventos.push(ev);
   });
 
-  const itens = [];
   Object.values(porChave).forEach(grupo => {
     grupo.eventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
     const prepLimpeza = grupo.eventos.find(e => e.horarioPreparacaoLimpeza)?.horarioPreparacaoLimpeza || null;
@@ -227,7 +399,9 @@ function montarMensagemAgenda(itens, tituloPeriodo) {
     }
   });
 
-  msgAgenda += `\nQuer o endereço ou mais detalhes de algum evento? Digite o número dele.\nDigite *menu* para voltar ao menu principal.`;
+  msgAgenda += `\nQuer o endereço ou mais detalhes de algum evento? Digite o número dele.\n`;
+  msgAgenda += `Para consultar outro mês, digite o *nome do mês* (ex: Novembro, Dezembro) ou o número correspondente.\n`;
+  msgAgenda += `Digite *menu* para voltar ao menu principal.`;
   return msgAgenda;
 }
 
@@ -379,6 +553,75 @@ function montarMensagemAgendaCompletaPorSecoes(itensRaw, tituloPeriodo, agendasI
   return msgAgenda;
 }
 
+function obterLinkInscricaoEvento(evento = {}, item = {}) {
+  const sum = (evento.summary || item.summary || "").trim();
+  const desc = (evento.description || "").trim();
+
+  // Se o evento já encerrou (data de término no passado), não há inscrições abertas
+  const startRaw = evento.start?.dateTime || evento.start?.date;
+  if (startRaw) {
+    const agora = moment.tz("America/Sao_Paulo");
+    const fimRaw = evento.end?.dateTime || evento.end?.date || startRaw;
+    const mFim = moment.tz(fimRaw, "America/Sao_Paulo");
+    if (mFim.isBefore(agora)) {
+      return "";
+    }
+  }
+
+  // Evento The Chosen (18/10/2026) já foi realizado e encerrado
+  if (/the chosen/i.test(sum)) {
+    return "";
+  }
+
+  // 1. Link explícito na descrição do evento (Google Calendar)
+  const matchInscricao = desc.match(/(?:inscriç[aã]o|inscrições|link de inscrição|inscreva-se)[\s:]+(https?:\/\/[^\s\n\r]+)/i);
+  if (matchInscricao) {
+    return matchInscricao[1].trim();
+  }
+
+  // 2. Link http(s) na descrição caso contenha palavras de inscrição
+  if (/inscriç|inscreva/i.test(desc)) {
+    const matchHttp = desc.match(/https?:\/\/[^\s\n\r]+/i);
+    if (matchHttp) {
+      return matchHttp[0].trim();
+    }
+  }
+
+  // 3. Consulta banco de dados SQLite (gerenciador de eventos)
+  try {
+    const db = require("../db");
+    const termo = sum.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (termo.length >= 3) {
+      const rows = db.prepare("SELECT slug, titulo, url_formulario, status, dataEvento FROM eventos WHERE status != 'cancelado'").all();
+      for (const r of rows) {
+        const titClean = (r.titulo || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (titClean && (titClean.includes(termo) || termo.includes(titClean))) {
+          if (r.url_formulario && /^https?:\/\//i.test(r.url_formulario)) {
+            return r.url_formulario;
+          }
+          if (r.slug) {
+            return `https://www.comunidadecristacurados.com.br/evento/${r.slug}`;
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // 4. Mapeamento das páginas oficiais dos ministérios e eventos futuros do site
+  const sumNorm = sum.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/pilates|saude da mulher/i.test(sumNorm)) {
+    return "https://www.comunidadecristacurados.com.br/saude-mulher";
+  }
+  if (/culto de mulheres|vaso e o oleiro|mesa posta/i.test(sumNorm)) {
+    return "https://www.comunidadecristacurados.com.br/mulheres";
+  }
+  if (/intercessao|treinamento de intercessao/i.test(sumNorm)) {
+    return "https://www.comunidadecristacurados.com.br/intercessao";
+  }
+
+  return "";
+}
+
 // Monta o detalhe de um item da agenda. Para itens recorrentes, mostra a
 // próxima ocorrência a partir de hoje (ou a última, se todas já passaram).
 function montarDetalheEvento(item, opcoes = {}) {
@@ -415,14 +658,41 @@ function montarDetalheEvento(item, opcoes = {}) {
   }
 
   let detalhe = `📌 *${tituloExibicao}*\n\n`;
-  detalhe += `📆 *Data:* ${dataFmt}\n`;
-  detalhe += `⏰ *Horário:* ${horarioFmt}\n`;
+
+  // Se for evento de múltiplos dias/sessões, exibe a programação completa
+  if (item.tipo === "multiplo" && item.eventos && item.eventos.length > 1) {
+    detalhe += `📆 *Programação dos Dias / Sessões:*\n`;
+    item.eventos.forEach((ev, idx) => {
+      const dEv = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo");
+      const dFmt = `${dEv.format("DD/MM")} (${DIAS_SEMANA[dEv.day()]})`;
+      let hEv = "";
+      if (ev.start.dateTime) {
+        const dFim = moment.tz(ev.end.dateTime || ev.end.date, "America/Sao_Paulo");
+        hEv = ` das ${dEv.format("HH:mm")} às ${dFim.format("HH:mm")}`;
+      } else {
+        hEv = " (Dia todo)";
+      }
+      const rotulo = ev.summary && ev.summary.includes("-") ? ev.summary.split("-").pop().trim() : `${idx + 1}ª Sessão`;
+      detalhe += `  • *${rotulo}:* ${dFmt}${hEv}\n`;
+    });
+    detalhe += "\n";
+  } else {
+    detalhe += `📆 *Data:* ${dataFmt}\n`;
+    detalhe += `⏰ *Horário:* ${horarioFmt}\n`;
+  }
   if (item.horarioPreparacaoLimpeza) {
     detalhe += `🧹 *Preparação e Limpeza:* ${item.horarioPreparacaoLimpeza}\n`;
   }
   if (evento.location) {
     detalhe += `📍 *Local:* ${evento.location}\n`;
   }
+
+  // Link de inscrição se o evento possuir
+  const linkInscricao = obterLinkInscricaoEvento(evento, item);
+  if (linkInscricao) {
+    detalhe += `\n🔗 *Link de Inscrição:*\n${linkInscricao}\n`;
+  }
+
   if (evento.description) {
     let desc = evento.description.trim();
     if (esconderNome) {
@@ -430,10 +700,10 @@ function montarDetalheEvento(item, opcoes = {}) {
     } else if (desc.length > 500) {
       desc = desc.slice(0, 500).trim() + "…";
     }
-    detalhe += `📝 *Descrição:* ${desc}\n`;
+    detalhe += `\n📝 *Descrição:* ${desc}\n`;
   }
 
-  detalhe += `\nDigite outro número para ver mais detalhes, ou *menu* para voltar.`;
+  detalhe += `\nDigite outro número para ver mais detalhes, o nome de outro mês, ou *menu* para voltar.`;
   return detalhe;
 }
 
@@ -531,7 +801,12 @@ module.exports = {
   isEventoFuturo,
   extrairFaixaHorarioTexto,
   identificarInfoPreparacaoLimpeza,
+  ehEventoPreparacaoLimpeza,
   unificarEventosPreparacaoLimpeza,
   unificarItensAgendaPreparacao,
+  obterLinkInscricaoEvento,
+  extrairNomeBaseEvento,
+  formatarResumoDatas,
+  agruparEventosPorNomeBase,
 };
 

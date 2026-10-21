@@ -7,7 +7,26 @@ try {
   MessageMedia = null;
 }
 const moment = require("moment-timezone");
-const { agruparEventosAgenda, montarMensagemAgenda, montarMensagemAgendaCompletaPorSecoes, montarDetalheEvento, interpretarPeriodoPersonalizado, isEventoFuturo } = require("./agenda");
+const {
+  agruparEventosAgenda,
+  montarMensagemAgenda,
+  montarMensagemAgendaCompletaPorSecoes,
+  montarDetalheEvento,
+  interpretarPeriodoPersonalizado,
+  isEventoFuturo,
+  ehEventoPreparacaoLimpeza,
+  obterLinkInscricaoEvento,
+  extrairNomeBaseEvento,
+  agruparEventosPorNomeBase,
+} = require("./agenda");
+const {
+  interpretarMesesRecorrencia,
+  interpretarDiaSemana,
+  gerarDatasRecorrentes,
+  removerDatasRecorrentes,
+  formatarListaDatasInterativa,
+  NOMES_DIAS_SEMANA,
+} = require("./recorrencia");
 const {
   calcularDisponibilidade,
   montarMensagemConflito,
@@ -827,15 +846,26 @@ async function iniciarFluxoConsultaFichasEventos({
     );
   }
 
+  const fichasUnificadas = [];
+  const chavesVistas = new Set();
+  for (const r of rows) {
+    const nomeBase = extrairNomeBaseEvento(r.evento || "");
+    const chave = `${nomeBase.toLowerCase()}|${(r.departamento || "").toLowerCase()}`;
+    if (!chavesVistas.has(chave)) {
+      chavesVistas.add(chave);
+      fichasUnificadas.push({ ...r, evento: nomeBase });
+    }
+  }
+
   etapas[numero] = {
     fluxo: "consulta_fichas_eventos",
     etapa: "selecionar_evento",
     origem,
-    fichas: rows,
+    fichas: fichasUnificadas,
   };
 
   let texto = "📄 *Fichas dos Eventos Cadastrados*\n\nEscolha o evento que deseja visualizar:\n\n";
-  rows.forEach((r, idx) => {
+  fichasUnificadas.forEach((r, idx) => {
     const dataFmt = formatarDataBrasil(r.data);
     const deptoStr = r.departamento ? ` (${r.departamento})` : "";
     const dataStr = dataFmt ? `[${dataFmt}] ` : "";
@@ -917,13 +947,12 @@ function montarMenuLider() {
 
 function montarSubmenuLiderAgenda() {
   return (
-    "📅 *Agenda, Eventos e Reuniões*\n\n" +
+    "📅 *Agenda e Eventos*\n\n" +
     "Escolha o que deseja fazer:\n\n" +
-    "1️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
+    "1️⃣ 🎪 *Gestão de Eventos* (Agendar, alterar datas/sessões, cancelar, formulário e montagem)\n" +
     "2️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar reunião)\n" +
-    "3️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
-    "4️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n" +
-    "5️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n\n" +
+    "3️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres do salão)\n" +
+    "4️⃣ 📋 *Inscrições & Fichas* (Ver inscritos, lista em PDF e formulários preenchidos)\n\n" +
     "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu anterior ou *menu* para o início."
   );
@@ -948,22 +977,20 @@ function montarMenuPastoral() {
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
     "2️⃣ 🤝 *Atendimento Pastoral*\n" +
     "3️⃣ 📢 *Comunicação e Mídia*\n" +
-    "4️⃣ 📋 *Inscrições de Eventos*\n\n" +
+    "4️⃣ 📋 *Inscrições & Fichas de Eventos*\n\n" +
     "Digite *menu* para voltar ao menu principal."
   );
 }
 
 function montarSubmenuPastoralAgenda() {
   return (
-    "📅 *Agenda, Eventos e Reuniões (Pastoral)*\n\n" +
+    "📅 *Agenda e Eventos (Pastoral)*\n\n" +
     "Escolha o que deseja fazer:\n\n" +
     "1️⃣ 📖 *Ver Agenda Completa da Igreja*\n" +
-    "2️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
+    "2️⃣ 🎪 *Gestão de Eventos* (Agendar, alterar datas/sessões, cancelar, formulário e montagem)\n" +
     "3️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar)\n" +
-    "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
-    "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n" +
-    "6️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n" +
-    "7️⃣ 📄 *Fichas dos Eventos* (Ver formulários preenchidos e links dos documentos)\n\n" +
+    "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres do salão)\n" +
+    "5️⃣ 📋 *Inscrições & Fichas* (Ver inscritos, lista em PDF e formulários preenchidos)\n\n" +
     "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu pastoral ou *menu* para o início."
   );
@@ -999,22 +1026,20 @@ function montarMenuDiretor() {
     "Escolha um subgrupo:\n\n" +
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
     "2️⃣ 📢 *Comunicação e Mídia*\n" +
-    "3️⃣ 📋 *Inscrições de Eventos*\n\n" +
+    "3️⃣ 📋 *Inscrições & Fichas de Eventos*\n\n" +
     "Digite *menu* para voltar ao menu principal."
   );
 }
 
 function montarSubmenuDiretorAgenda() {
   return (
-    "📅 *Agenda, Eventos e Reuniões (Direção)*\n\n" +
+    "📅 *Agenda e Eventos (Direção)*\n\n" +
     "Escolha o que deseja fazer:\n\n" +
     "1️⃣ 📖 *Ver Todos os Eventos da Igreja* (Agenda completa)\n" +
-    "2️⃣ 🎪 *Eventos da Igreja* (Agendar novo, alterar, cancelar ou evento externo)\n" +
+    "2️⃣ 🎪 *Gestão de Eventos* (Agendar, alterar datas/sessões, cancelar, formulário e montagem)\n" +
     "3️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar)\n" +
-    "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres)\n" +
-    "5️⃣ 🏢 *Montagem e Decoração* (Informar uso prévio do salão)\n" +
-    "6️⃣ 📋 *Inscrições de Eventos* (Ver inscritos e lista em PDF)\n" +
-    "7️⃣ 📄 *Fichas dos Eventos* (Ver formulários preenchidos e links dos documentos)\n\n" +
+    "4️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres do salão)\n" +
+    "5️⃣ 📋 *Inscrições & Fichas* (Ver inscritos, lista em PDF e formulários preenchidos)\n\n" +
     "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu da direção ou *menu* para o início."
   );
@@ -1033,15 +1058,26 @@ function montarSubmenuDiretorComunicacao() {
 
 function montarMenuEventos() {
   return (
-    "📅 *Menu de Eventos*\n\n" +
-    "Escolha o que deseja fazer:\n\n" +
-    "1 - Agendar novo evento\n" +
-    "2 - Alterar evento existente\n" +
-    "3 - Cancelar evento existente\n" +
-    "4 - Alterar ou atualizar dados do formulário do evento\n" +
-    "5 - Agendar evento externo\n" +
-    "6 - Informar uso do salão antes ou no dia anterior (montagem/decoração)\n\n" +
+    "🎪 *Gestão de Eventos da Igreja*\n\n" +
+    "Escolha o que você deseja fazer:\n\n" +
+    "1 - 📅 *Agendar novo evento* (Dia único, repetição semanal/quinzenal ou vários dias)\n" +
+    "2 - 🔄 *Alterar evento existente* (Mudar datas, horários, sessões ou adicionar dias)\n" +
+    "3 - 🗑️ *Cancelar evento existente* (Cancelar sessão específica ou evento todo)\n" +
+    "4 - 📝 *Atualizar dados do formulário do evento* (Tema, verba, valores e detalhes)\n" +
+    "5 - 🌐 *Agendar evento externo*\n" +
+    "6 - 🏛️ *Informar uso do salão antes ou dia anterior* (Montagem/decoração/limpeza)\n\n" +
+    "Digite o número da opção desejada.\n" +
     "Digite *voltar* para o menu anterior ou *menu* para o início."
+  );
+}
+
+function montarMenuInscricoesOuFichas() {
+  return (
+    "📋 *Inscrições & Fichas de Eventos*\n\n" +
+    "Escolha o que deseja consultar:\n\n" +
+    "1️⃣ 👥 *Lista de Inscritos* (Ver pessoas inscritas e gerar lista em PDF)\n" +
+    "2️⃣ 📄 *Fichas dos Eventos* (Ver formulários preenchidos e links de documentos)\n\n" +
+    "Digite *1* ou *2* (ou digite *voltar* para o menu anterior):"
   );
 }
 
@@ -1191,8 +1227,31 @@ function createMessageHandler({
     return index >= 11;
   }
 
+  function identificarMesEntrada(texto) {
+    if (!texto) return null;
+    const t = String(texto).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const mapa = {
+      "janeiro": 1, "jan": 1,
+      "fevereiro": 2, "fev": 2,
+      "marco": 3, "mar": 3,
+      "abril": 4, "abr": 4,
+      "maio": 5, "mai": 5,
+      "junho": 6, "jun": 6,
+      "julho": 7, "jul": 7,
+      "agosto": 8, "ago": 8,
+      "setembro": 9, "set": 9,
+      "outubro": 10, "out": 10,
+      "novembro": 11, "nov": 11,
+      "dezembro": 12, "dez": 12,
+    };
+    if (mapa[t]) return mapa[t];
+    const match = t.match(/\b(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/);
+    if (match && mapa[match[1]]) return mapa[match[1]];
+    return null;
+  }
+
   // Busca, filtra e entrega a listagem de agenda para um período, deixando o
-  // fluxo pronto para receber o número de um item na próxima mensagem.
+  // fluxo pronto para receber o número de um item ou outro mês na próxima mensagem.
   async function entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg) {
     try {
       const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
@@ -1201,7 +1260,7 @@ function createMessageHandler({
         Boolean(calendarIdExternos && ev.calendarId === calendarIdExternos) ||
         ev.calendarId === "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com" ||
         isAgendaOcultaOuInterna(ev.calendarId) ||
-        /\[preparação\]|\[preparacao\]|\[decoração\]|\[decoracao\]|\[limpeza\]|\[montagem\]/i.test(ev.summary || "");
+        ehEventoPreparacaoLimpeza(ev);
 
       const deveIncluirInternas = Boolean(info && info.agendaCompleta);
       const agora = moment.tz("America/Sao_Paulo");
@@ -1219,11 +1278,16 @@ function createMessageHandler({
       });
 
       if (todosEventos.length === 0) {
-        delete etapas[numero];
-        return msg.reply(`📅 Não há eventos programados para ${tituloPeriodo}.\n\nDigite *menu* para voltar ao menu principal.`);
+        info.itensAgenda = [];
+        info.etapa = "detalhe_evento";
+        return msg.reply(
+          `📅 Não há eventos abertos ao público programados para *${tituloPeriodo}*.\n\n` +
+          `Para consultar outro mês, digite o *nome do mês* (ex: Novembro, Dezembro) ou o número correspondente.\n` +
+          `Digite *menu* para voltar ao menu principal.`
+        );
       }
 
-      const itens = agruparEventosAgenda(todosEventos);
+      const itens = agruparEventosAgenda(todosEventos, { abertoAoPublico: !deveIncluirInternas });
       info.itensAgenda = itens;
       info.etapa = "detalhe_evento";
 
@@ -2126,6 +2190,44 @@ function createMessageHandler({
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
 
+              if (dados.tipo === "adicionar_sessao") {
+                const { solicitanteId } = dados;
+                if (isAlterar) {
+                  try {
+                    const resource = {
+                      summary: dados.tituloSessao || `${dados.evento} - Sessão ${dados.numeroSessao}`,
+                      description: dados.description || `Sessão adicional do evento ${dados.evento}\nSolicitante: ${dados.solicitanteNome || ""}`,
+                      location: dados.local || ENDERECO_IGREJA,
+                      start: { dateTime: dados.startIso, timeZone: "America/Sao_Paulo" },
+                      end: { dateTime: dados.endIso, timeZone: "America/Sao_Paulo" }
+                    };
+                    if (calendar && calendar.events && typeof calendar.events.insert === "function") {
+                      await calendar.events.insert({ calendarId: dados.calendarId, resource });
+                    }
+                    removerPendente(codigo);
+                    const feedback = `✅ *Novo Dia/Sessão Aprovado e Adicionado!*\n\nO novo dia para o evento "*${dados.evento}*" (${dados.dataFormatada} das ${dados.horarioInicio} às ${dados.horarioFim}) foi aprovado pela secretaria e adicionado à agenda oficial! 🙏\n\nDigite *menu* para voltar ao menu principal.`;
+                    try {
+                      await client.sendMessage(solicitanteId, feedback);
+                    } catch (eSend) {
+                      console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de nova sessão:`, eSend.message);
+                    }
+                    return msg.reply(`✅ Novo dia/sessão adicionado à agenda e líder notificado.`);
+                  } catch (err) {
+                    console.error("[ALERTA:google-calendar] Erro ao adicionar nova sessão:", err);
+                    return msg.reply("❌ Erro ao adicionar o novo dia na agenda do Google. Responda de novo a esta mesma mensagem depois de resolvido.");
+                  }
+                } else {
+                  removerPendente(codigo);
+                  const feedback = `❌ *Solicitação de Novo Dia Não Aprovada*\n\nInfelizmente sua solicitação de adicionar um novo dia ao evento "*${dados.evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria.\n\nDigite *menu* para voltar ao menu principal.`;
+                  try {
+                    await client.sendMessage(solicitanteId, feedback);
+                  } catch (eSend) {
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de recusa de nova sessão:`, eSend.message);
+                  }
+                  return msg.reply(`✅ Solicitante notificado sobre a recusa do novo dia.`);
+                }
+              }
+
               if (dados.tipo === "reuniao_alterar") {
                 const { solicitanteId, evento } = dados;
 
@@ -2247,11 +2349,21 @@ function createMessageHandler({
                 }
               }
 
-              const { solicitanteId, evento, calendarId, eventId } = dados;
+              const { solicitanteId, evento, calendarId, eventId, eventIds } = dados;
 
               if (isCancelar) {
                 try {
-                  await calendar.events.delete({ calendarId, eventId });
+                  if (eventIds && Array.isArray(eventIds) && eventIds.length > 0) {
+                    for (const idSess of eventIds) {
+                      try {
+                        await calendar.events.delete({ calendarId, eventId: idSess });
+                      } catch (errDel) {
+                        console.warn(`[Secretaria] Erro ao cancelar sessao ${idSess}:`, errDel.message);
+                      }
+                    }
+                  } else {
+                    await calendar.events.delete({ calendarId, eventId });
+                  }
                   removerPendente(codigo);
 
                   const feedback = `❌ *Evento Cancelado*\n\nSua solicitação de cancelamento do evento "*${evento}*" foi aprovada e o evento foi removido da agenda oficial.\n\nDigite *menu* para voltar ao menu principal.`;
@@ -2374,7 +2486,7 @@ function createMessageHandler({
       }
 
       const contato = await msg.getContact();
-      const numero = contato.id._serialized;
+      const numero = (contato && contato.id && (contato.id._serialized || contato.id.user)) || msg.from || "";
       const texto = (msg.body || "").toLowerCase().trim();
       const usuario = resolverUsuario(numero);
       const isLider = temPermissao(usuario, "lider") || lideres.some((l) => numero.includes(l));
@@ -2818,36 +2930,36 @@ function createMessageHandler({
                 return msg.reply(montarSubmenuLiderAgenda());
               }
             }
-            if (msg.body === "1") {
+            if (msg.body === "1" || /agendar|novo/i.test(entradaAcao)) {
               info.etapa = "evento_nome";
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou novo agendamento.`);
               return msg.reply("📅 *Novo Agendamento*\nQual o nome do evento?");
-            } else if (msg.body === "2") {
+            } else if (msg.body === "2" || /alterar/i.test(entradaAcao)) {
               info.acaoEvento = "alterar";
               info.etapa = "alterar_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
               info.redesDisponiveis = redesUsuario;
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou alteração de evento.`);
               return msg.reply(`🏢 De qual departamento é o evento que deseja alterar?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
-            } else if (msg.body === "3") {
+            } else if (msg.body === "3" || /cancelar/i.test(entradaAcao)) {
               info.acaoEvento = "cancelar";
               info.etapa = "alterar_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
               info.redesDisponiveis = redesUsuario;
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou cancelamento de evento.`);
               return msg.reply(`🏢 De qual departamento é o evento que deseja cancelar?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
-            } else if (msg.body === "4") {
+            } else if (msg.body === "4" || /formul[aá]rio|atualizar/i.test(entradaAcao)) {
               info.acaoEvento = "atualizar_formulario";
               info.etapa = "form_alterar_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
               info.redesDisponiveis = redesUsuario;
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou alteração de formulário de evento.`);
               return msg.reply(`📝 *Atualizar Formulário de Evento*\n\n🏢 De qual departamento é o evento que você deseja alterar o formulário?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
-            } else if (msg.body === "5") {
+            } else if (msg.body === "5" || /externo/i.test(entradaAcao)) {
               info.fluxo = "evento_externo";
               info.etapa = "evento_externo_nome";
               return msg.reply("🌐 *Agendamento de Evento Externo*\n\n1️⃣ Qual é o *nome do evento*?\n\n_Digite *menu* a qualquer momento para cancelar._");
-            } else if (msg.body === "6") {
+            } else if (msg.body === "6" || /montagem|decora|sal[aã]o|limpeza/i.test(entradaAcao)) {
               info.acaoEvento = "preparacao_espaco";
               info.etapa = "alterar_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
@@ -2855,7 +2967,7 @@ function createMessageHandler({
               console.log(`[Fluxo] ${identificarUsuario(contato, numero, isLider)} iniciou informe de preparação/decoração de evento.`);
               return msg.reply(`🏢 De qual departamento é o evento que você precisa de horários para montagem/decoração?\n\n${montarListaRedesParaUsuario(redesUsuario)}`);
             } else {
-              return msg.reply("❌ Opção inválida. Digite 1 para Agendar, 2 para Alterar, 3 para Cancelar, 4 para Atualizar Formulário, 5 para Evento Externo, 6 para Informar montagem/decoração ou *voltar*.");
+              return msg.reply("❌ Opção inválida. Digite:\n1 - Agendar novo evento\n2 - Alterar evento existente\n3 - Cancelar evento existente\n4 - Atualizar formulário\n5 - Agendar evento externo\n6 - Informar montagem/decoração\n(Ou digite *voltar*):");
             }
           }
 
@@ -2886,7 +2998,8 @@ function createMessageHandler({
                 return msg.reply(`📅 Não encontrei eventos futuros para o departamento ${info.departamento}.`);
               }
 
-              info.eventosEncontrados = filtrados.slice(0, 15); // Limita a 15 para não travar o zap
+              const gruposUnificados = agruparEventosPorNomeBase(filtrados);
+              info.eventosEncontrados = gruposUnificados.slice(0, 15); // Limita a 15 para não travar o zap
               info.etapa = "alterar_selecionar_evento";
 
               const acaoLabel = info.acaoEvento === "cancelar"
@@ -2895,9 +3008,9 @@ function createMessageHandler({
                   ? "informar montagem/decoração"
                   : "alterar";
               let lista = `📋 *Eventos de ${info.departamento}*\nQual você deseja ${acaoLabel}?\n\n`;
-              info.eventosEncontrados.forEach((ev, i) => {
-                const d = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo");
-                lista += `${i + 1} - ${d.format("DD/MM")}: ${ev.summary}\n`;
+              info.eventosEncontrados.forEach((item, i) => {
+                const sufixoSessoes = item.ehMultiplo ? ` (${item.totalSessoes} sessões)` : "";
+                lista += `${i + 1} - ${item.resumoDatas}: ${item.nomeBase || item.summary}${sufixoSessoes}\n`;
               });
               return msg.reply(lista);
             } catch (e) {
@@ -2914,6 +3027,18 @@ function createMessageHandler({
             info.eventoParaAlterar = info.eventosEncontrados[index];
 
             if (info.acaoEvento === "cancelar") {
+              if (info.eventoParaAlterar.ehMultiplo) {
+                info.etapa = "cancelar_multiplo_escolha";
+                let txt = `⚠️ *Cancelar Sessão ou Evento Completo*\n\nVocê selecionou: *${info.eventoParaAlterar.nomeBase}*\n\nQual sessão você deseja cancelar?\n\n`;
+                info.eventoParaAlterar.eventos.forEach((evSess, idxSess) => {
+                  const dSess = moment.tz(evSess.start.dateTime || evSess.start.date, "America/Sao_Paulo");
+                  const hSess = evSess.start.dateTime ? ` às ${dSess.format("HH:mm")}` : "";
+                  txt += `${idxSess + 1} - ${dSess.format("DD/MM")}${hSess} (${evSess.summary})\n`;
+                });
+                txt += `${info.eventoParaAlterar.eventos.length + 1} - 🗑️ Cancelar o evento TODO (todas as ${info.eventoParaAlterar.totalSessoes} sessões)\n\nDigite o número desejado ou *menu* para desistir:`;
+                return msg.reply(txt);
+              }
+
               info.etapa = "cancelar_confirmar";
               const d = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
               return msg.reply(`⚠️ Tem certeza que deseja *cancelar* o evento *${info.eventoParaAlterar.summary}* do dia ${d.format("DD/MM")}?\n\nDigite *SIM* para confirmar, ou *menu* para desistir.`);
@@ -2923,15 +3048,151 @@ function createMessageHandler({
               info.etapa = "preparacao_informar_horarios";
               return msg.reply(
                 `🏛️ *Uso do salão antes, depois ou no dia anterior:*\n\n` +
-                `Você selecionou: *${info.eventoParaAlterar.summary}*\n\n` +
+                `Você selecionou: *${info.eventoParaAlterar.nomeBase || info.eventoParaAlterar.summary}*\n\n` +
                 `Por favor, informe os horários adicionais que precisará do espaço:\n` +
                 `(Ex: *Dia anterior das 18h às 21h para decoração, e no dia das 17h às 19h para montagem e 22h às 23h para limpeza*)\n\n` +
                 `Digite os horários necessários ou *menu* para desistir:`
               );
             }
 
+            if (info.eventoParaAlterar.ehMultiplo) {
+              info.etapa = "alterar_multiplo_menu";
+              let txt = `📝 *${info.eventoParaAlterar.nomeBase}* (${info.eventoParaAlterar.resumoDatas})\n\n`;
+              txt += `📆 *Sessões/Dias programados:*\n`;
+              info.eventoParaAlterar.eventos.forEach((evSess, idxSess) => {
+                const dSess = moment.tz(evSess.start.dateTime || evSess.start.date, "America/Sao_Paulo");
+                const hSess = evSess.start.dateTime ? ` às ${dSess.format("HH:mm")}` : "";
+                txt += `• *Sessão ${idxSess + 1}:* ${dSess.format("DD/MM")}${hSess}\n`;
+              });
+              txt += `\nO que você deseja fazer?\n\n`;
+              txt += `1 - Alterar data/horário de uma sessão específica\n`;
+              txt += `2 - Adicionar mais um dia/sessão ao evento\n`;
+              txt += `3 - Alterar dados gerais (Nome ou Local)\n`;
+              txt += `4 - Outra alteração (descreva em texto livre)`;
+              return msg.reply(txt);
+            }
+
             info.etapa = "alterar_o_que";
-            return msg.reply(`📝 Você selecionou: *${info.eventoParaAlterar.summary}*\n\nO que você deseja alterar?\n\n1 - Horário\n2 - Data\n3 - Nome do evento\n4 - Local\n5 - Outra alteração (descreva em texto livre)`);
+            return msg.reply(
+              `📝 Você selecionou: *${info.eventoParaAlterar.summary}*\n\n` +
+              `O que você deseja alterar?\n\n` +
+              `1 - Horário\n` +
+              `2 - Data\n` +
+              `3 - Adicionar mais um dia/sessão ao evento\n` +
+              `4 - Nome do evento\n` +
+              `5 - Local\n` +
+              `6 - Outra alteração (descreva em texto livre)`
+            );
+          }
+
+          if (info.etapa === "cancelar_multiplo_escolha") {
+            const num = parseInt(msg.body.trim(), 10);
+            const total = info.eventoParaAlterar.eventos ? info.eventoParaAlterar.eventos.length : 0;
+            if (isNaN(num) || num < 1 || num > total + 1) {
+              return msg.reply(`❌ Escolha uma opção válida de 1 a ${total + 1}.`);
+            }
+
+            if (num === total + 1) {
+              info.cancelarTodasSessoes = true;
+              info.etapa = "cancelar_confirmar";
+              return msg.reply(
+                `⚠️ Tem certeza que deseja cancelar *TODAS AS ${total} SESSÕES* do evento *${info.eventoParaAlterar.nomeBase}*?\n\nDigite *SIM* para confirmar, ou *menu* para desistir.`
+              );
+            }
+
+            const sessao = info.eventoParaAlterar.eventos[num - 1];
+            info.eventoParaAlterar = sessao;
+            info.cancelarTodasSessoes = false;
+            info.etapa = "cancelar_confirmar";
+            const d = moment.tz(sessao.start.dateTime || sessao.start.date, "America/Sao_Paulo");
+            return msg.reply(`⚠️ Tem certeza que deseja *cancelar* a sessão *${sessao.summary}* do dia ${d.format("DD/MM")}?\n\nDigite *SIM* para confirmar, ou *menu* para desistir.`);
+          }
+
+          if (info.etapa === "alterar_multiplo_menu") {
+            const opcao = msg.body.trim();
+
+            if (opcao === "1") {
+              info.etapa = "alterar_multiplo_escolher_sessao";
+              let txt = `📅 *Escolha a sessão que deseja alterar a data ou horário:*\n\n`;
+              info.eventoParaAlterar.eventos.forEach((evSess, idxSess) => {
+                const dSess = moment.tz(evSess.start.dateTime || evSess.start.date, "America/Sao_Paulo");
+                const hSess = evSess.start.dateTime ? ` às ${dSess.format("HH:mm")}` : "";
+                txt += `${idxSess + 1} - ${dSess.format("DD/MM")}${hSess} (${evSess.summary})\n`;
+              });
+              txt += `\nDigite o número da sessão desejada ou *menu* para desistir:`;
+              return msg.reply(txt);
+            }
+
+            if (opcao === "2") {
+              info.etapa = "alterar_adicionar_data";
+              return msg.reply(`📅 Qual a *data* do novo dia/sessão que deseja adicionar? (Use DD/MM, ex: 06/12)`);
+            }
+
+            if (opcao === "3") {
+              info.etapa = "alterar_multiplo_dados_gerais";
+              return msg.reply(`📝 Qual dado geral você deseja alterar?\n\n1 - Nome do evento\n2 - Local`);
+            }
+
+            if (opcao === "4") {
+              info.etapa = "alterar_detalhes";
+              return msg.reply(`📝 Descreva a alteração que você precisa no evento *${info.eventoParaAlterar.nomeBase}*:`);
+            }
+
+            return msg.reply("❌ Opção inválida. Escolha um número de 1 a 4.");
+          }
+
+          if (info.etapa === "alterar_multiplo_escolher_sessao") {
+            const sessaoIdx = parseInt(msg.body.trim(), 10) - 1;
+            if (isNaN(sessaoIdx) || !info.eventoParaAlterar.eventos || !info.eventoParaAlterar.eventos[sessaoIdx]) {
+              return msg.reply(`❌ Escolha um número válido da lista de sessões.`);
+            }
+
+            const sessao = info.eventoParaAlterar.eventos[sessaoIdx];
+            info.sessaoOriginal = sessao;
+            info.eventoParaAlterar = sessao;
+            info.etapa = "alterar_o_que_sessao";
+
+            const dSess = moment.tz(sessao.start.dateTime || sessao.start.date, "America/Sao_Paulo");
+            const hSess = sessao.start.dateTime ? ` às ${dSess.format("HH:mm")}` : "";
+            return msg.reply(
+              `📝 Você selecionou: *${sessao.summary}* (${dSess.format("DD/MM")}${hSess})\n\n` +
+              `O que deseja alterar nesta sessão?\n\n` +
+              `1 - Horário\n` +
+              `2 - Data`
+            );
+          }
+
+          if (info.etapa === "alterar_o_que_sessao") {
+            const opcao = msg.body.trim();
+            const eventoEhDiaInteiro = !info.eventoParaAlterar.start.dateTime;
+
+            if (opcao === "1") {
+              if (eventoEhDiaInteiro) return msg.reply("❌ Essa sessão é de dia inteiro (sem horário definido). Escolha *2* para mudar a data.");
+              info.campoAlterado = "horario";
+              info.etapa = "alterar_novo_horario_inicio";
+              return msg.reply("⏰ Qual o novo *horário de início* dessa sessão? (Ex: 19:30)");
+            }
+            if (opcao === "2") {
+              info.campoAlterado = "data";
+              info.etapa = "alterar_nova_data";
+              return msg.reply("📅 Qual a nova *data* dessa sessão? (Ex: 25/12)");
+            }
+            return msg.reply("❌ Opção inválida. Escolha 1 para Horário ou 2 para Data.");
+          }
+
+          if (info.etapa === "alterar_multiplo_dados_gerais") {
+            const opcao = msg.body.trim();
+            if (opcao === "1") {
+              info.campoAlterado = "nome";
+              info.etapa = "alterar_novo_nome";
+              return msg.reply("📝 Qual o novo *nome* do evento?");
+            }
+            if (opcao === "2") {
+              info.campoAlterado = "local";
+              info.etapa = "alterar_novo_local";
+              return msg.reply("📍 Qual o novo *local*? Digite o endereço, ou apenas *igreja* se for no templo.");
+            }
+            return msg.reply("❌ Opção inválida. Digite 1 para Nome ou 2 para Local.");
           }
 
           if (info.etapa === "preparacao_informar_horarios") {
@@ -2988,6 +3249,25 @@ function createMessageHandler({
             }
 
             try {
+              if (info.cancelarTodasSessoes && info.eventoParaAlterar.ehMultiplo) {
+                const dadosCancelamento = {
+                  solicitanteId: numero,
+                  evento: info.eventoParaAlterar.nomeBase,
+                  calendarId: info.calendarIdBusca,
+                  eventIds: info.eventoParaAlterar.eventos.map(e => e.id),
+                };
+
+                const resumo = `🗑️ *Solicitação de Cancelamento Total*\n\n*Evento:* ${info.eventoParaAlterar.nomeBase} (todas as ${info.eventoParaAlterar.totalSessoes} sessões)\n*Datas:* ${info.eventoParaAlterar.resumoDatas}\n\nAguarde a confirmação da secretaria!\n\nDigite *menu* para voltar ao menu principal.`;
+                const codigoCancelamento = salvarPendente(dadosCancelamento);
+                const resumoGrupo = `🗑️ *PEDIDO DE CANCELAMENTO TOTAL*\n\n👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n🏢 *Depto:* ${info.departamento}\n📅 *Evento:* ${info.eventoParaAlterar.nomeBase} (todas as ${info.eventoParaAlterar.totalSessoes} sessões)\n📆 *Datas:* ${info.eventoParaAlterar.resumoDatas}\n\n_Responda a este resumo com "cancelar evento" para confirmar o cancelamento, ou "manter evento" para negar._\n\n_Código: ${codigoCancelamento}_`;
+                await notificarSecretaria(client, resumoGrupo);
+
+                console.log(`Cancelamento total solicitado por ${identificarUsuario(contato, numero, isLider)}: ${resumo.replace(/\n/g, ' | ')}`);
+                await msg.reply(resumo);
+                delete etapas[numero];
+                return;
+              }
+
               const dataOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo");
               const dadosCancelamento = {
                 solicitanteId: numero,
@@ -3016,7 +3296,7 @@ function createMessageHandler({
             const opcao = msg.body.trim();
 
             if (opcao === "1") {
-              if (eventoEhDiaInteiro) return msg.reply("❌ Esse evento é de dia inteiro (sem horário definido). Escolha *2* para mudar a data, ou *5* para descrever outra alteração.");
+              if (eventoEhDiaInteiro) return msg.reply("❌ Esse evento é de dia inteiro (sem horário definido). Escolha *2* para mudar a data, ou *6* para descrever outra alteração.");
               info.campoAlterado = "horario";
               info.etapa = "alterar_novo_horario_inicio";
               return msg.reply("⏰ Qual o novo *horário de início*? (Ex: 19:30)");
@@ -3027,20 +3307,122 @@ function createMessageHandler({
               return msg.reply("📅 Qual a nova *data*? (Ex: 25/12)");
             }
             if (opcao === "3") {
+              info.etapa = "alterar_adicionar_data";
+              return msg.reply("📅 Qual a *data* do novo dia/sessão que deseja adicionar? (Use DD/MM, ex: 06/12)");
+            }
+            if (opcao === "4") {
               info.campoAlterado = "nome";
               info.etapa = "alterar_novo_nome";
               return msg.reply("📝 Qual o novo *nome* do evento?");
             }
-            if (opcao === "4") {
+            if (opcao === "5") {
               info.campoAlterado = "local";
               info.etapa = "alterar_novo_local";
               return msg.reply("📍 Qual o novo *local*? Digite o endereço, ou apenas *igreja* se for no templo.");
             }
-            if (opcao === "5") {
+            if (opcao === "6") {
               info.etapa = "alterar_detalhes";
               return msg.reply(`📝 Descreva a alteração que você precisa (Ex: Mudar horário para 20h, alterar data para o dia seguinte, etc):`);
             }
-            return msg.reply("❌ Opção inválida. Escolha um número de 1 a 5.");
+            return msg.reply("❌ Opção inválida. Escolha um número de 1 a 6.");
+          }
+
+          if (info.etapa === "alterar_adicionar_data") {
+            const match = msg.body.trim().match(DATA_REGEX);
+            if (!match) return msg.reply("❌ Formato inválido. Use DD/MM (ex: 06/12).");
+
+            const novoDia = parseInt(match[1]);
+            const novoMes = parseInt(match[2]);
+            const anoOriginal = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo").year();
+            const novaDataTeste = moment.tz(`${novoDia}/${novoMes}/${anoOriginal}`, "D/M/YYYY", "America/Sao_Paulo");
+
+            if (!novaDataTeste.isValid() || novaDataTeste.date() !== novoDia) {
+              return msg.reply("❌ Data inválida. Use DD/MM (ex: 06/12).");
+            }
+            if (novaDataTeste.isBefore(moment.tz("America/Sao_Paulo").startOf("day"))) {
+              return msg.reply("❌ Data inválida: esse dia já passou. Escolha uma data a partir de hoje.");
+            }
+
+            info.novoDiaAdicionar = novoDia;
+            info.novoMesAdicionar = novoMes;
+            info.etapa = "alterar_adicionar_horario_inicio";
+            return msg.reply("⏰ Qual o *horário de início* deste novo dia? (Ex: 19:30)");
+          }
+
+          if (info.etapa === "alterar_adicionar_horario_inicio") {
+            const entrada = msg.body.trim();
+            if (!HORARIO_REGEX.test(entrada)) return msg.reply("❌ Formato inválido. Use HH:MM (ex: 19:30).");
+            info.novoHorarioInicioAdicionar = entrada;
+            info.etapa = "alterar_adicionar_horario_fim";
+            return msg.reply("⏰ E o *horário de término* deste novo dia? (Ex: 21:30)");
+          }
+
+          if (info.etapa === "alterar_adicionar_horario_fim") {
+            const entrada = msg.body.trim();
+            if (!HORARIO_REGEX.test(entrada)) return msg.reply("❌ Formato inválido. Use HH:MM (ex: 21:30).");
+
+            const [hInicio, mInicio] = info.novoHorarioInicioAdicionar.split(":").map(Number);
+            const [hFim, mFim] = entrada.split(":").map(Number);
+            const tempInicio = moment.tz("America/Sao_Paulo").set({ hour: hInicio, minute: mInicio, second: 0, millisecond: 0 });
+            const tempFim = moment.tz("America/Sao_Paulo").set({ hour: hFim, minute: mFim, second: 0, millisecond: 0 });
+            if (tempFim.isSameOrBefore(tempInicio)) return msg.reply("❌ O horário de término deve ser depois do horário de início.");
+
+            info.novoHorarioFimAdicionar = entrada;
+
+            try {
+              const nomeBase = info.eventoParaAlterar.nomeBase || extrairNomeBaseEvento(info.eventoParaAlterar.summary);
+              const totalExistente = info.eventoParaAlterar.eventos ? info.eventoParaAlterar.eventos.length : 1;
+              const proximaSessao = totalExistente + 1;
+              const ano = moment.tz(info.eventoParaAlterar.start.dateTime || info.eventoParaAlterar.start.date, "America/Sao_Paulo").year();
+              const dataFmt = `${String(info.novoDiaAdicionar).padStart(2, "0")}/${String(info.novoMesAdicionar).padStart(2, "0")}`;
+
+              const startIso = moment.tz(`${dataFmt}/${ano} ${info.novoHorarioInicioAdicionar}`, "DD/MM/YYYY HH:mm", "America/Sao_Paulo").format();
+              const endIso = moment.tz(`${dataFmt}/${ano} ${info.novoHorarioFimAdicionar}`, "DD/MM/YYYY HH:mm", "America/Sao_Paulo").format();
+
+              const dadosNovaSessao = {
+                tipo: "adicionar_sessao",
+                solicitanteId: numero,
+                solicitanteNome: nomeSolicitante(contato, numero),
+                departamento: info.departamento,
+                evento: nomeBase,
+                calendarId: info.calendarIdBusca,
+                numeroSessao: proximaSessao,
+                tituloSessao: `${nomeBase} - Sessão ${proximaSessao}`,
+                dataFormatada: dataFmt,
+                horarioInicio: info.novoHorarioInicioAdicionar,
+                horarioFim: info.novoHorarioFimAdicionar,
+                startIso,
+                endIso,
+                local: info.eventoParaAlterar.location || ENDERECO_IGREJA,
+                description: `Sessão ${proximaSessao} de ${nomeBase}\nSolicitante: ${nomeSolicitante(contato, numero)}`,
+              };
+
+              const codigoSessao = salvarPendente(dadosNovaSessao);
+              const resumoSecretaria =
+                `⚠️ *PEDIDO DE NOVO DIA / SESSÃO DE EVENTO*\n\n` +
+                `👤 *Solicitante:* ${nomeSolicitante(contato, numero)}\n` +
+                `🏢 *Depto:* ${info.departamento}\n` +
+                `📅 *Evento:* ${nomeBase}\n` +
+                `📆 *Novo Dia Adicional:* ${dataFmt} (Sessão ${proximaSessao})\n` +
+                `⏰ *Horário:* ${info.novoHorarioInicioAdicionar} às ${info.novoHorarioFimAdicionar}\n` +
+                `📍 *Local:* ${dadosNovaSessao.local}\n\n` +
+                `_Responda a este resumo com "alterar evento" para adicionar automaticamente à agenda, ou "não alterar" para recusar._\n\n` +
+                `_Código: ${codigoSessao}_`;
+              await notificarSecretaria(client, resumoSecretaria);
+
+              const resumoUsuario =
+                `➕ *Solicitação de Novo Dia / Sessão Enviada!*\n\n` +
+                `*Evento:* ${nomeBase}\n` +
+                `*Nova Sessão:* ${dataFmt} das ${info.novoHorarioInicioAdicionar} às ${info.novoHorarioFimAdicionar} (Sessão ${proximaSessao})\n\n` +
+                `Aguarde a confirmação da secretaria!\n\n` +
+                `Digite *menu* para voltar ao menu principal.`;
+              await msg.reply(resumoUsuario);
+            } catch (errAdd) {
+              console.error("[Agendamento] Erro ao registrar novo dia de evento:", errAdd);
+              await msg.reply("⚠️ Não consegui registrar sua solicitação agora. Tente novamente em instantes.");
+            }
+            delete etapas[numero];
+            return;
           }
 
           if (info.etapa === "alterar_novo_horario_inicio") {
@@ -3199,13 +3581,14 @@ function createMessageHandler({
                 return msg.reply(`📅 Não encontrei eventos futuros para o departamento ${info.departamento}. Digite *menu* para voltar.`);
               }
 
-              info.eventosEncontrados = filtrados.slice(0, 15);
+              const gruposUnificados = agruparEventosPorNomeBase(filtrados);
+              info.eventosEncontrados = gruposUnificados.slice(0, 15);
               info.etapa = "form_alterar_selecionar_evento";
 
               let lista = `📋 *Eventos de ${info.departamento}*\nQual evento você deseja alterar o formulário?\n\n`;
-              info.eventosEncontrados.forEach((ev, i) => {
-                const d = moment.tz(ev.start.dateTime || ev.start.date, "America/Sao_Paulo");
-                lista += `${i + 1} - ${d.format("DD/MM")}: ${ev.summary}\n`;
+              info.eventosEncontrados.forEach((item, i) => {
+                const sufixoSessoes = item.ehMultiplo ? ` (${item.totalSessoes} sessões)` : "";
+                lista += `${i + 1} - ${item.resumoDatas}: ${item.nomeBase || item.summary}${sufixoSessoes}\n`;
               });
               lista += `\nDigite o número do evento desejado:`;
               return msg.reply(lista);
@@ -3511,8 +3894,26 @@ function createMessageHandler({
           }
 
           if (info.etapa === "evento_mes") {
-            const mes = parseInt(msg.body);
-            if (isNaN(mes) || mes < 1 || mes > 12) return msg.reply("❌ Mês inválido. Digite um número de 1 a 12.");
+            const textoMes = msg.body.trim();
+            const mesesRecorrentes = interpretarMesesRecorrencia(textoMes, moment().tz("America/Sao_Paulo"));
+            if (mesesRecorrentes && mesesRecorrentes.length > 0 && (mesesRecorrentes.length > 1 || /repet|seman|quinzen|recorren/i.test(textoMes))) {
+              info.tipoDuracao = "multiplo";
+              info.repeteMesesInfo = mesesRecorrentes;
+              info.etapa = "evento_repete_frequencia";
+              return msg.reply(
+                "🔄 *Evento que se repete*\n\n" +
+                "Qual é a frequência de repetição do evento?\n\n" +
+                "1️⃣ *Toda semana* (ex: todo domingo, toda sexta)\n" +
+                "2️⃣ *A cada 15 dias (Quinzenal)*\n" +
+                "3️⃣ *Uma vez por mês* (ex: todo 2º sábado)\n\n" +
+                "Digite o número da opção (ou digite direto, ex: *todo domingo* ou *todas as sextas*):"
+              );
+            }
+
+            const mes = parseInt(textoMes);
+            if (isNaN(mes) || mes < 1 || mes > 12) {
+              return msg.reply("❌ Mês inválido. Digite um número de 1 a 12 (ou os meses de repetição, ex: *11 e 1*).");
+            }
             console.log(`[Agendamento] Mês: ${mes}`);
             info.mes = mes;
             info.etapa = "evento_modo_busca";
@@ -3520,13 +3921,14 @@ function createMessageHandler({
               "📅 *Qual o formato e duração do evento?*\n\n" +
               "1 - Evento de 1 dia\n" +
               "2 - Evento consecutivo de vários dias (ex: retiro de Sexta a Domingo)\n" +
-              "3 - Evento não consecutivo (múltiplos dias/horários espalhados - ex: conferência)"
+              "3 - Evento não consecutivo (múltiplos dias/horários espalhados - ex: conferência)\n" +
+              "4 - Evento que se repete (ex: todas as sextas, todos os domingos, quinzenal)"
             );
           }
 
           if (info.etapa === "evento_modo_busca") {
-            const opcao = msg.body.trim();
-            if (opcao === "1") {
+            const opcao = msg.body.trim().toLowerCase();
+            if (opcao === "1" || /1\s*dia|[\u00faun]nico/i.test(opcao)) {
               info.tipoDuracao = "unico";
               info.etapa = "evento_tipo_data_unico";
               return msg.reply(
@@ -3536,19 +3938,304 @@ function createMessageHandler({
                 "_Digite 1 ou 2:_"
               );
             }
-            if (opcao === "2") {
+            if (opcao === "2" || /consecutivo/i.test(opcao)) {
               info.tipoDuracao = "consecutivo";
               info.etapa = "evento_consecutivo_data_inicio";
               return msg.reply(`📅 Qual a *data de início* do evento? (Ex: 10/${String(info.mes).padStart(2, "0")} ou 10/${String(info.mes).padStart(2, "0")}/${moment().tz("America/Sao_Paulo").year()})`);
             }
-            if (opcao === "3") {
+            if (opcao === "3" || /n[aã]o\s+consecutivo|m[uú]ltiplo/i.test(opcao)) {
               info.tipoDuracao = "multiplo";
               info.blocosHorarios = [];
               info.etapa = "evento_multiplo_data";
               return msg.reply(`📅 Vamos cadastrar o *1º dia/bloco* do evento.\n\nQual a *data* deste primeiro dia? (Ex: 16/${String(info.mes).padStart(2, "0")})`);
             }
-            return msg.reply("❌ Opção inválida. Digite:\n1 - Evento de 1 dia\n2 - Evento consecutivo de vários dias\n3 - Evento não consecutivo (múltiplos dias/horários espalhados)");
+            if (opcao === "4" || /repet|seman|quinzen|recorren/i.test(opcao)) {
+              info.tipoDuracao = "multiplo";
+              info.etapa = "evento_repete_frequencia";
+              return msg.reply(
+                "🔄 *Evento que se repete*\n\n" +
+                "Qual é a frequência de repetição do evento?\n\n" +
+                "1️⃣ *Toda semana* (ex: todo domingo, toda sexta)\n" +
+                "2️⃣ *A cada 15 dias (Quinzenal)*\n" +
+                "3️⃣ *Uma vez por mês* (ex: todo 2º sábado)\n\n" +
+                "Digite o número da opção (ou digite direto, ex: *todo domingo* ou *todas as sextas*):"
+              );
+            }
+            return msg.reply("❌ Opção inválida. Digite:\n1 - Evento de 1 dia\n2 - Evento consecutivo de vários dias\n3 - Evento não consecutivo (múltiplos dias/horários espalhados)\n4 - Evento que se repete");
           }
+
+          // Fluxo de evento que se repete (Recorrência flexível com múltiplos meses e exclusões)
+          if (info.etapa === "evento_repete_frequencia") {
+            const texto = msg.body.trim().toLowerCase();
+            const diaInfo = interpretarDiaSemana(texto);
+            const isQuinzenal = /quinzen|15\s*dias?/i.test(texto) || texto === "2";
+            const isMensal = /mensal|uma\s+vez\s+por\s+m[eê]s/i.test(texto) || texto === "3";
+            info.repeteFrequencia = isQuinzenal ? "quinzenal" : (isMensal ? "mensal" : "semanal");
+
+            if (diaInfo) {
+              info.repeteDiaSemana = diaInfo.diaSemana;
+              info.repeteDiaSemanaNome = diaInfo.nome;
+
+              if (info.repeteFrequencia === "quinzenal") {
+                info.etapa = "evento_repete_quinzenal_inicio";
+                return msg.reply(`📅 Para a repetição quinzenal (${diaInfo.nome}), qual a data da *primeira sessão*? (Ex: 08/11 ou 08/11/2026):`);
+              }
+
+              if (info.repeteMesesInfo && info.repeteMesesInfo.length > 0) {
+                info.datasRecorrentes = gerarDatasRecorrentes({
+                  diaSemana: info.repeteDiaSemana,
+                  mesesInfo: info.repeteMesesInfo,
+                  quinzenal: false
+                });
+                info.etapa = "evento_repete_excecoes";
+                const listaFormatada = formatarListaDatasInterativa(info.datasRecorrentes);
+                return msg.reply(
+                  `🗓️ *Datas encontradas para o evento (${info.datasRecorrentes.length} sessões):*\n\n` +
+                  `${listaFormatada}\n\n` +
+                  `❓ *Tem alguma data em que NÃO vai ter evento?* (Ex: primeiro domingo do mês, feriado ou recesso)\n\n` +
+                  `• Para remover datas: digite os números separados por vírgula (ex: *1, 5* ou digite *primeiro domingo*).\n` +
+                  `• Para adicionar uma data avulsa: digite *adicionar DD/MM* (ex: *adicionar 15/12*).\n` +
+                  `• Se todas as datas estiverem certas, digite *confirmar* (ou *ok*).`
+                );
+              }
+
+              info.etapa = "evento_repete_periodo";
+              return msg.reply(
+                "📆 *Em quais meses o evento vai acontecer?*\n\n" +
+                "Você pode informar um único mês ou mais de um mês.\n_Exemplos de resposta:_\n• *Novembro e Janeiro* (ou *11 e 1*)\n• *11 a 1* (de Novembro até Janeiro)\n• *11* (apenas Novembro)\n\nDigite os meses desejados:"
+              );
+            }
+
+            if (texto === "1" || /semana/i.test(texto) || isQuinzenal || isMensal) {
+              info.etapa = "evento_repete_dia_semana";
+              return msg.reply(
+                "📅 Em qual *dia da semana* o evento vai acontecer?\n\n" +
+                "1 - Domingo\n" +
+                "2 - Segunda-feira\n" +
+                "3 - Terça-feira\n" +
+                "4 - Quarta-feira\n" +
+                "5 - Quinta-feira\n" +
+                "6 - Sexta-feira\n" +
+                "7 - Sábado\n\n" +
+                "Digite o número ou o nome do dia:"
+              );
+            }
+
+            return msg.reply(
+              "❌ Opção não reconhecida. Escolha:\n1 - Toda semana (ex: todo domingo)\n2 - A cada 15 dias (Quinzenal)\n3 - Uma vez por mês\n(Ou digite direto, ex: *todo domingo* ou *todas as sextas*):"
+            );
+          }
+
+          if (info.etapa === "evento_repete_dia_semana") {
+            const diaInfo = interpretarDiaSemana(msg.body.trim());
+            if (!diaInfo) {
+              return msg.reply("❌ Dia da semana inválido. Digite um número de 1 a 7 (1=Domingo, 6=Sexta, 7=Sábado) ou o nome do dia.");
+            }
+            info.repeteDiaSemana = diaInfo.diaSemana;
+            info.repeteDiaSemanaNome = diaInfo.nome;
+
+            if (info.repeteFrequencia === "quinzenal") {
+              info.etapa = "evento_repete_quinzenal_inicio";
+              return msg.reply(`📅 Para a repetição quinzenal (${diaInfo.nome}), qual a data da *primeira sessão*? (Ex: 08/11 ou 08/11/2026):`);
+            }
+
+            if (info.repeteMesesInfo && info.repeteMesesInfo.length > 0) {
+              info.datasRecorrentes = gerarDatasRecorrentes({
+                diaSemana: info.repeteDiaSemana,
+                mesesInfo: info.repeteMesesInfo,
+                quinzenal: false
+              });
+              info.etapa = "evento_repete_excecoes";
+              const listaFormatada = formatarListaDatasInterativa(info.datasRecorrentes);
+              return msg.reply(
+                `🗓️ *Datas encontradas para o evento (${info.datasRecorrentes.length} sessões):*\n\n` +
+                `${listaFormatada}\n\n` +
+                `❓ *Tem alguma data em que NÃO vai ter evento?* (Ex: primeiro domingo do mês, feriado ou recesso)\n\n` +
+                `• Para remover datas: digite os números separados por vírgula (ex: *1, 5* ou digite *primeiro domingo*).\n` +
+                `• Para adicionar uma data avulsa: digite *adicionar DD/MM* (ex: *adicionar 15/12*).\n` +
+                `• Se todas as datas estiverem certas, digite *confirmar* (ou *ok*).`
+              );
+            }
+
+            info.etapa = "evento_repete_periodo";
+            return msg.reply(
+              "📆 *Em quais meses o evento vai acontecer?*\n\n" +
+              "Você pode informar um único mês ou mais de um mês.\n_Exemplos de resposta:_\n• *Novembro e Janeiro* (ou *11 e 1*)\n• *11 a 1* (de Novembro até Janeiro)\n• *11* (apenas Novembro)\n\nDigite os meses desejados:"
+            );
+          }
+
+          if (info.etapa === "evento_repete_quinzenal_inicio") {
+            const agoraMom = moment().tz("America/Sao_Paulo");
+            const anoPadrao = agoraMom.year();
+            const m = moment.tz(msg.body.trim(), ["DD/MM/YYYY", "D/M/YYYY", "DD/MM", "D/M"], "America/Sao_Paulo");
+            if (!m.isValid()) {
+              return msg.reply("❌ Data inválida. Por favor digite no formato DD/MM ou DD/MM/AAAA (ex: 08/11 ou 08/11/2026):");
+            }
+            if (!msg.body.trim().match(/\d{4}/)) {
+              m.year(anoPadrao);
+            }
+            info.dataInicioQuinzenal = m.format("DD/MM/YYYY");
+
+            if (info.repeteMesesInfo && info.repeteMesesInfo.length > 0) {
+              info.datasRecorrentes = gerarDatasRecorrentes({
+                diaSemana: info.repeteDiaSemana,
+                mesesInfo: info.repeteMesesInfo,
+                quinzenal: true,
+                dataInicioQuinzenal: info.dataInicioQuinzenal
+              });
+              info.etapa = "evento_repete_excecoes";
+              const listaFormatada = formatarListaDatasInterativa(info.datasRecorrentes);
+              return msg.reply(
+                `🗓️ *Datas encontradas para o evento (${info.datasRecorrentes.length} sessões):*\n\n` +
+                `${listaFormatada}\n\n` +
+                `❓ *Tem alguma data em que NÃO vai ter evento?* (Ex: primeiro domingo do mês, feriado ou recesso)\n\n` +
+                `• Para remover datas: digite os números separados por vírgula (ex: *1, 5* ou digite *primeiro domingo*).\n` +
+                `• Para adicionar uma data avulsa: digite *adicionar DD/MM* (ex: *adicionar 15/12*).\n` +
+                `• Se todas as datas estiverem certas, digite *confirmar* (ou *ok*).`
+              );
+            }
+
+            info.etapa = "evento_repete_periodo";
+            return msg.reply(
+              "📆 *Em quais meses o evento vai acontecer?*\n\n" +
+              "Você pode informar um único mês ou mais de um mês.\n_Exemplos de resposta:_\n• *Novembro e Janeiro* (ou *11 e 1*)\n• *11 a 1* (de Novembro até Janeiro)\n• *11* (apenas Novembro)\n\nDigite os meses desejados:"
+            );
+          }
+
+          if (info.etapa === "evento_repete_periodo") {
+            const mesesInfo = interpretarMesesRecorrencia(msg.body.trim(), moment().tz("America/Sao_Paulo"));
+            if (!mesesInfo || mesesInfo.length === 0) {
+              return msg.reply("❌ Não consegui identificar os meses. Por favor digite os números ou nomes dos meses (ex: *11 e 1* ou *Novembro e Janeiro*).");
+            }
+            info.repeteMesesInfo = mesesInfo;
+            info.datasRecorrentes = gerarDatasRecorrentes({
+              diaSemana: info.repeteDiaSemana,
+              mesesInfo: info.repeteMesesInfo,
+              quinzenal: (info.repeteFrequencia === "quinzenal"),
+              dataInicioQuinzenal: info.dataInicioQuinzenal
+            });
+
+            if (!info.datasRecorrentes || info.datasRecorrentes.length === 0) {
+              return msg.reply("⚠️ Nenhuma data foi encontrada para os critérios informados. Digite outros meses ou digite *voltar*.");
+            }
+
+            info.etapa = "evento_repete_excecoes";
+            const listaFormatada = formatarListaDatasInterativa(info.datasRecorrentes);
+            return msg.reply(
+              `🗓️ *Datas encontradas para o evento (${info.datasRecorrentes.length} sessões):*\n\n` +
+              `${listaFormatada}\n\n` +
+              `❓ *Tem alguma data em que NÃO vai ter evento?* (Ex: primeiro domingo do mês, feriado ou recesso)\n\n` +
+              `• Para remover datas: digite os números separados por vírgula (ex: *1, 5* ou digite *primeiro domingo*).\n` +
+              `• Para adicionar uma data avulsa: digite *adicionar DD/MM* (ex: *adicionar 15/12*).\n` +
+              `• Se todas as datas estiverem certas, digite *confirmar* (ou *ok*).`
+            );
+          }
+
+          if (info.etapa === "evento_repete_excecoes") {
+            const texto = msg.body.trim();
+
+            if (/^(confirmar|ok|sim|pronto|prosseguir|certo|nenhuma|nenhum|todas|seguir)$/i.test(texto)) {
+              if (!info.datasRecorrentes || info.datasRecorrentes.length === 0) {
+                return msg.reply("❌ Não há nenhuma data na lista. Digite *adicionar DD/MM* para incluir ao menos uma data, ou digite *voltar*.");
+              }
+              info.etapa = "evento_repete_horario_inicio";
+              return msg.reply(`⏰ Qual o *horário de início* das sessões? (Ex: 16:00)`);
+            }
+
+            const matchAdd = texto.match(/^adicionar\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
+            if (matchAdd) {
+              const strData = matchAdd[1];
+              const agoraMom = moment().tz("America/Sao_Paulo");
+              const mAdd = moment.tz(strData, ["DD/MM/YYYY", "D/M/YYYY", "DD/MM", "D/M"], "America/Sao_Paulo");
+              if (!mAdd.isValid()) {
+                return msg.reply("❌ Data para adicionar inválida. Use o formato *adicionar DD/MM* ou *adicionar DD/MM/AAAA*.");
+              }
+              if (!strData.match(/\d{4}/)) {
+                mAdd.year(agoraMom.year());
+              }
+              const dataFormatada = mAdd.format("DD/MM/YYYY");
+              const diaSemanaNome = NOMES_DIAS_SEMANA[mAdd.day()];
+              info.datasRecorrentes.push({
+                data: dataFormatada,
+                diaSemana: mAdd.day(),
+                diaSemanaNome,
+                ordemNoMes: "avulso",
+                timestamp: mAdd.valueOf()
+              });
+              info.datasRecorrentes.sort((a, b) => a.timestamp - b.timestamp);
+              return msg.reply(
+                `✅ Data *${dataFormatada}* adicionada com sucesso!\n\n` +
+                `🗓️ *Lista atualizada (${info.datasRecorrentes.length} sessões):*\n\n` +
+                `${formatarListaDatasInterativa(info.datasRecorrentes)}\n\n` +
+                `Mais alguma data para remover ou adicionar? Se estiver tudo pronto, digite *confirmar*.`
+              );
+            }
+
+            const novaLista = removerDatasRecorrentes(info.datasRecorrentes, texto);
+            if (novaLista.length < info.datasRecorrentes.length) {
+              const qtdRemovidas = info.datasRecorrentes.length - novaLista.length;
+              info.datasRecorrentes = novaLista;
+              return msg.reply(
+                `✅ ${qtdRemovidas} data(s) removida(s) com sucesso!\n\n` +
+                `🗓️ *Lista atualizada (${info.datasRecorrentes.length} sessões):*\n\n` +
+                `${formatarListaDatasInterativa(info.datasRecorrentes)}\n\n` +
+                `Mais alguma data para remover ou adicionar? Se estiver tudo pronto, digite *confirmar*.`
+              );
+            }
+
+            return msg.reply(
+              "❓ Não identifiquei o que fazer. Você pode:\n" +
+              "• Remover datas digitando os números (ex: *1, 5* ou *primeiro domingo*)\n" +
+              "• Adicionar uma data avulsa (ex: *adicionar 15/12*)\n" +
+              "• Ou confirmar todas as datas digitando *confirmar*:"
+            );
+          }
+
+          if (info.etapa === "evento_repete_horario_inicio") {
+            const entrada = msg.body.toUpperCase().trim();
+            if (/dia\s*(todo|inteiro)/i.test(entrada)) {
+              return msg.reply("❌ O horário de início é obrigatório. Por favor, use HH:MM (ex: 16:00).");
+            }
+            if (!HORARIO_REGEX.test(entrada)) {
+              return msg.reply("❌ Formato de horário inválido. Por favor, use HH:MM (ex: 16:00).");
+            }
+            info.horarioInicio = entrada;
+            info.etapa = "evento_repete_horario_fim";
+            return msg.reply(`⏰ Qual o *horário de término* das sessões? (Ex: 18:00)`);
+          }
+
+          if (info.etapa === "evento_repete_horario_fim") {
+            const entrada = msg.body.toUpperCase().trim();
+            if (!HORARIO_REGEX.test(entrada)) {
+              return msg.reply("❌ Formato de horário inválido. Por favor, use HH:MM (ex: 18:00).");
+            }
+            const [hIni, mIni] = info.horarioInicio.split(":").map(Number);
+            const [hFim, mFim] = entrada.split(":").map(Number);
+            if (hFim < hIni || (hFim === hIni && mFim <= mIni)) {
+              return msg.reply("❌ O horário de término deve ser posterior ao horário de início.");
+            }
+            info.horarioFim = entrada;
+            info.tipoDuracao = "multiplo";
+            info.blocosHorarios = info.datasRecorrentes.map((d, idx) => ({
+              data: d.data,
+              inicio: info.horarioInicio,
+              fim: info.horarioFim,
+              titulo: `Sessão ${idx + 1}`
+            }));
+            const dataPrimeiroBloco = moment.tz(info.blocosHorarios[0].data, "DD/MM/YYYY", "America/Sao_Paulo").toDate();
+
+            await finalizarNovoAgendamento({
+              msg,
+              numero,
+              contato,
+              info,
+              dataFinal: dataPrimeiroBloco,
+              isLider
+            });
+            delete etapas[numero];
+            return;
+          }
+
 
           if (info.etapa === "evento_tipo_data_unico") {
             const opcao = msg.body.trim();
@@ -3973,33 +4660,63 @@ function createMessageHandler({
           }
         } else if (info.fluxo === "ver_agenda") {
           // Lógica de consulta de agenda (Opção 2)
-          if (info.etapa === "escolha_mes") {
-            const escolhaRaw = msg.body.trim();
+          if (info.etapa === "escolha_mes" || info.etapa === "detalhe_evento") {
+            const corpoRaw = msg.body.trim();
+            const agora = moment.tz("America/Sao_Paulo");
 
-            if (escolhaRaw === "0") {
+            if (corpoRaw === "0") {
               info.etapa = "periodo_personalizado";
               return msg.reply("🗓️ Digite as datas de início e fim que deseja consultar.\n\nExemplo: *10/07 a 20/07*");
             }
 
-            const agora = moment.tz("America/Sao_Paulo");
-            const mesAtual = agora.month() + 1;
-            const escolha = parseInt(escolhaRaw);
+            // 1. Tenta identificar se o usuário digitou o nome de um mês (ex: "novembro", "dezembro")
+            const mesPorNome = identificarMesEntrada(corpoRaw);
+            if (mesPorNome) {
+              const mesNome = MESES[mesPorNome - 1];
+              const anoAtual = agora.year();
+              const mesAtualNum = agora.month() + 1;
+              const anoAlvo = mesPorNome < mesAtualNum ? anoAtual + 1 : anoAtual;
 
-            if (isNaN(escolha) || escolha < mesAtual || escolha > 12) {
-              return msg.reply(`❌ Opção inválida. Escolha um mês de ${mesAtual} a 12, ou 0 para um período específico.`);
+              const inicioBusca = moment.tz([anoAlvo, mesPorNome - 1], "America/Sao_Paulo").startOf("month").subtract(1, "minute").format();
+              const fimBusca = moment.tz([anoAlvo, mesPorNome - 1], "America/Sao_Paulo").endOf("month").format();
+
+              console.log(`[Agenda] Buscando eventos para ${identificarUsuario(contato, numero, isLider)} em ${mesNome}`);
+              await msg.reply(`🔍 Consultando eventos de *${mesNome}*...`);
+              return await entregarAgenda(numero, info, inicioBusca, fimBusca, mesNome, msg);
             }
 
-            const mesNome = MESES[escolha - 1];
-            const ano = agora.year();
+            // 2. Se for um número correspondente a um dos eventos da lista atual
+            const itens = info.itensAgenda || [];
+            const index = parseInt(corpoRaw) - 1;
+            if (!isNaN(index) && itens[index]) {
+              return msg.reply(montarDetalheEvento(itens[index], {
+                isPastor: Boolean(info && info.isPastor),
+                agendasInternas: AGENDAS_INTERNAS
+              }));
+            }
 
-            // Define o início e fim do mês usando format() para manter o offset -03:00, garantindo que o Google entenda o horário local
-            const inicioBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
-            const fimBusca = moment.tz([ano, escolha - 1], "America/Sao_Paulo").endOf('month').format();
+            // 3. Se for um número de mês de 1 a 12
+            const numMes = parseInt(corpoRaw);
+            if (!isNaN(numMes) && numMes >= 1 && numMes <= 12) {
+              const mesNome = MESES[numMes - 1];
+              const anoAtual = agora.year();
+              const mesAtualNum = agora.month() + 1;
+              const anoAlvo = numMes < mesAtualNum ? anoAtual + 1 : anoAtual;
 
-            console.log(`[Agenda] Buscando eventos para ${identificarUsuario(contato, numero, isLider)} em ${mesNome}`);
-            await msg.reply(`🔍 Consultando eventos de ${mesNome}...`);
+              const inicioBusca = moment.tz([anoAlvo, numMes - 1], "America/Sao_Paulo").startOf("month").subtract(1, "minute").format();
+              const fimBusca = moment.tz([anoAlvo, numMes - 1], "America/Sao_Paulo").endOf("month").format();
 
-            return await entregarAgenda(numero, info, inicioBusca, fimBusca, mesNome, msg);
+              console.log(`[Agenda] Buscando eventos para ${identificarUsuario(contato, numero, isLider)} em ${mesNome}`);
+              await msg.reply(`🔍 Consultando eventos de *${mesNome}*...`);
+              return await entregarAgenda(numero, info, inicioBusca, fimBusca, mesNome, msg);
+            }
+
+            return msg.reply(
+              "❌ Opção não reconhecida.\n\n" +
+              "• Digite o *número* de um dos eventos para ver detalhes e o link de inscrição.\n" +
+              "• Digite o *nome do mês* (ex: Novembro, Dezembro) para consultar os próximos meses.\n" +
+              "• Digite *menu* para voltar ao menu principal."
+            );
           }
 
           if (info.etapa === "periodo_personalizado") {
@@ -4016,23 +4733,9 @@ function createMessageHandler({
             const tituloPeriodo = `${inicio.format("DD/MM")} a ${fim.format("DD/MM")}`;
 
             console.log(`[Agenda] Buscando eventos para ${identificarUsuario(contato, numero, isLider)} no período ${tituloPeriodo}`);
-            await msg.reply(`🔍 Consultando eventos de ${tituloPeriodo}...`);
+            await msg.reply(`🔍 Consultando eventos de *${tituloPeriodo}*...`);
 
             return await entregarAgenda(numero, info, inicioBusca, fimBusca, tituloPeriodo, msg);
-          }
-
-          if (info.etapa === "detalhe_evento") {
-            const index = parseInt(msg.body.trim()) - 1;
-            const itens = info.itensAgenda || [];
-
-            if (isNaN(index) || !itens[index]) {
-              return msg.reply("❌ Número inválido. Digite o número de um dos eventos da lista, ou *menu* para voltar.");
-            }
-
-            return msg.reply(montarDetalheEvento(itens[index], {
-              isPastor: Boolean(info && info.isPastor),
-              agendasInternas: AGENDAS_INTERNAS
-            }));
           }
         } else if (info.fluxo === "area_lider") {
           const escolha = msg.body.trim().toLowerCase();
@@ -4123,19 +4826,12 @@ function createMessageHandler({
               }
               return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
             }
-            if (escolha === "4" || /montagem|decora/i.test(escolha)) {
-              info.fluxo = "agendamento";
-              info.etapa = "preparacao_informar_horarios";
-              info.departamento = usuario?.departamento || "Evento";
-              return msg.reply(
-                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
-                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
-                "• *Nome do evento e departamento*\n" +
-                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
-                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
-              );
+            if (escolha === "4" || /inscri[cç][õo]es|inscritos|inscritas|fichas?|formul[aá]rios?/i.test(escolha)) {
+              info.etapa = "escolha_inscricoes_ou_fichas";
+              info.origemInscricoesOuFichas = "lider";
+              return msg.reply(montarMenuInscricoesOuFichas());
             }
-            if (escolha === "5" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+            if (escolha === "5") {
               return await iniciarFluxoConsultaInscricoes({
                 msg,
                 numero,
@@ -4148,7 +4844,65 @@ function createMessageHandler({
                 origem: "lider",
               });
             }
-            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, digite *voltar* para o menu anterior ou *menu* para o início.");
+            if (/montagem|decora/i.test(escolha)) {
+              info.fluxo = "agendamento";
+              info.etapa = "preparacao_informar_horarios";
+              info.departamento = usuario?.departamento || "Evento";
+              return msg.reply(
+                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
+                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
+                "• *Nome do evento e departamento*\n" +
+                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
+                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
+              );
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 4, digite *voltar* para o menu anterior ou *menu* para o início.");
+          }
+
+          if (info.etapa === "escolha_inscricoes_ou_fichas") {
+            const escolhaOp = msg.body.trim().toLowerCase();
+            const origem = info.origemInscricoesOuFichas || (isPastor ? "pastoral" : (isDiretor ? "diretor" : "lider"));
+
+            if (escolhaOp === "voltar") {
+              if (origem === "pastoral") {
+                info.fluxo = "area_pastoral";
+                info.etapa = "pastoral_sub_agenda";
+                return msg.reply(montarSubmenuPastoralAgenda());
+              } else if (origem === "diretor") {
+                info.fluxo = "area_diretor";
+                info.etapa = "diretor_sub_agenda";
+                return msg.reply(montarSubmenuDiretorAgenda());
+              } else {
+                info.fluxo = "area_lider";
+                info.etapa = "lider_sub_agenda";
+                return msg.reply(montarSubmenuLiderAgenda());
+              }
+            }
+
+            if (escolhaOp === "1" || /inscri[cç][õo]es|inscritos|inscritas|lista|pdf/i.test(escolhaOp)) {
+              return await iniciarFluxoConsultaInscricoes({
+                msg,
+                numero,
+                etapas,
+                usuario,
+                isPastor,
+                isDiretor,
+                isLider,
+                client,
+                origem,
+              });
+            }
+
+            if (escolhaOp === "2" || /fichas?|formul[aá]rios?/i.test(escolhaOp)) {
+              return await iniciarFluxoConsultaFichasEventos({
+                msg,
+                numero,
+                etapas,
+                origem,
+              });
+            }
+
+            return msg.reply("❌ Opção inválida. Digite:\n1 - Lista de Inscritos (PDF)\n2 - Fichas dos Eventos (Formulários)\nOu digite *voltar*.");
           }
 
           if (info.etapa === "lider_sub_comunicacao") {
@@ -4284,19 +5038,12 @@ function createMessageHandler({
               }
               return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
             }
-            if (escolha === "5" || /montagem|decora/i.test(escolha)) {
-              info.fluxo = "agendamento";
-              info.etapa = "preparacao_informar_horarios";
-              info.departamento = usuario?.departamento || "Evento";
-              return msg.reply(
-                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
-                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
-                "• *Nome do evento e departamento*\n" +
-                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
-                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
-              );
+            if (escolha === "5" || /inscri[cç][õo]es|inscritos|inscritas|fichas?|formul[aá]rios?/i.test(escolha)) {
+              info.etapa = "escolha_inscricoes_ou_fichas";
+              info.origemInscricoesOuFichas = "pastoral";
+              return msg.reply(montarMenuInscricoesOuFichas());
             }
-            if (escolha === "6" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+            if (escolha === "6") {
               return await iniciarFluxoConsultaInscricoes({
                 msg,
                 numero,
@@ -4309,7 +5056,7 @@ function createMessageHandler({
                 origem: "pastoral",
               });
             }
-            if (escolha === "7" || /fichas?(\s+dos?\s+eventos?)?|formul[aá]rios?/i.test(escolha)) {
+            if (escolha === "7") {
               return await iniciarFluxoConsultaFichasEventos({
                 msg,
                 numero,
@@ -4317,7 +5064,19 @@ function createMessageHandler({
                 origem: "pastoral",
               });
             }
-            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 7, digite *voltar* para o menu anterior ou *menu* para o início.");
+            if (/montagem|decora/i.test(escolha)) {
+              info.fluxo = "agendamento";
+              info.etapa = "preparacao_informar_horarios";
+              info.departamento = usuario?.departamento || "Evento";
+              return msg.reply(
+                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
+                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
+                "• *Nome do evento e departamento*\n" +
+                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
+                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
+              );
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, digite *voltar* para o menu pastoral ou *menu* para o início.");
           }
 
           if (info.etapa === "pastoral_sub_comunicacao") {
@@ -4908,19 +5667,12 @@ function createMessageHandler({
               }
               return msg.reply(listaMeses + "\nDigite o número do mês desejado:");
             }
-            if (escolha === "5" || /montagem|decora/i.test(escolha)) {
-              info.fluxo = "agendamento";
-              info.etapa = "preparacao_informar_horarios";
-              info.departamento = usuario?.departamento || "Evento";
-              return msg.reply(
-                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
-                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
-                "• *Nome do evento e departamento*\n" +
-                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
-                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
-              );
+            if (escolha === "5" || /inscri[cç][õo]es|inscritos|inscritas|fichas?|formul[aá]rios?/i.test(escolha)) {
+              info.etapa = "escolha_inscricoes_ou_fichas";
+              info.origemInscricoesOuFichas = "diretor";
+              return msg.reply(montarMenuInscricoesOuFichas());
             }
-            if (escolha === "6" || /inscri[cç][õo]es|inscritos|inscritas/i.test(escolha)) {
+            if (escolha === "6") {
               return await iniciarFluxoConsultaInscricoes({
                 msg,
                 numero,
@@ -4933,7 +5685,7 @@ function createMessageHandler({
                 origem: "diretor",
               });
             }
-            if (escolha === "7" || /fichas?(\s+dos?\s+eventos?)?|formul[aá]rios?/i.test(escolha)) {
+            if (escolha === "7") {
               return await iniciarFluxoConsultaFichasEventos({
                 msg,
                 numero,
@@ -4941,7 +5693,19 @@ function createMessageHandler({
                 origem: "diretor",
               });
             }
-            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 7, digite *voltar* para o menu anterior ou *menu* para o início.");
+            if (/montagem|decora/i.test(escolha)) {
+              info.fluxo = "agendamento";
+              info.etapa = "preparacao_informar_horarios";
+              info.departamento = usuario?.departamento || "Evento";
+              return msg.reply(
+                "🏢 *Uso do Salão Antes / Montagem / Decoração*\n\n" +
+                "Caso precise do salão horas antes do evento ou no dia anterior para montagem, decoração ou limpeza, por favor informe:\n\n" +
+                "• *Nome do evento e departamento*\n" +
+                "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
+                "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
+              );
+            }
+            return msg.reply("❌ Opção inválida. Escolha uma opção de 1 a 5, digite *voltar* para o menu da direção ou *menu* para o início.");
           }
 
           if (info.etapa === "diretor_sub_comunicacao") {
@@ -5717,19 +6481,19 @@ Digite *menu* para voltar ao menu principal.`;
 
 
 
-      if (texto === "3" || texto === "agenda" || texto === "ver agenda") {
-        console.log(`Opção 3 (Ver agenda) selecionada por ${identificarUsuario(contato, numero, isLider)}`);
-        const hoje = new Date();
-        const mesAtual = hoje.getMonth();
+      if (texto === "3" || texto === "agenda" || texto === "ver agenda" || texto === "ver eventos" || texto === "eventos") {
+        console.log(`Opção 3 (Ver agenda/eventos) selecionada por ${identificarUsuario(contato, numero, isLider)}`);
+        const agora = moment.tz("America/Sao_Paulo");
+        const mesIndex = agora.month();
+        const mesNome = MESES[mesIndex];
+        const ano = agora.year();
 
-        let listaMeses = "📅 *Ver Agenda*\n\nPara qual mês você deseja consultar?\n\n";
-        for (let i = mesAtual; i < 12; i++) {
-          listaMeses += `${i + 1} - ${MESES[i]}\n`;
-        }
-        listaMeses += "\n0 - Escolher um período específico";
+        const inicioBusca = moment.tz([ano, mesIndex], "America/Sao_Paulo").startOf("month").subtract(1, "minute").format();
+        const fimBusca = moment.tz([ano, mesIndex], "America/Sao_Paulo").endOf("month").format();
 
-        etapas[numero] = { fluxo: "ver_agenda", etapa: "escolha_mes", isPastor };
-        return msg.reply(listaMeses + "\n\nDigite o número do mês desejado, ou 0 para outro período:");
+        etapas[numero] = { fluxo: "ver_agenda", etapa: "detalhe_evento", isPastor };
+        await msg.reply(`🔍 Consultando eventos de *${mesNome}*...`);
+        return await entregarAgenda(numero, etapas[numero], inicioBusca, fimBusca, mesNome, msg);
       }
 
       if (texto === "4" || texto === "atendimento pastoral" || texto === "pastoral") {
@@ -5880,6 +6644,7 @@ module.exports = {
   montarSubmenuDiretorAgenda,
   montarSubmenuDiretorComunicacao,
   montarMenuEventos,
+  montarMenuInscricoesOuFichas,
   montarTextoMenuPrincipal,
   iniciarFluxoConsultaInscricoes,
   processarFluxoConsultaInscricoes,

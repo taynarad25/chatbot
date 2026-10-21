@@ -1,3 +1,4 @@
+const moment = require("moment-timezone");
 const db = require("../db");
 const { REDES } = require("./redes");
 const { obterFormularioEvento } = require("./formularioEvento");
@@ -11,6 +12,13 @@ const {
   obterPeriodoDia,
   URL_PLANILHA_LOGS_PADRAO,
 } = require("./logsEnvioSheet");
+
+function ehHorarioComercialEnvio(data = new Date(), ignorarEnv = false) {
+  if (!ignorarEnv && process.env.NODE_ENV === "test") return true;
+  const m = moment.tz(data, "America/Sao_Paulo");
+  const hora = m.hour();
+  return hora >= 8 && hora < 18;
+}
 
 function formatarDataBrasil(isoOrDateStr) {
   if (!isoOrDateStr) return "";
@@ -1847,9 +1855,15 @@ function iniciarAgendadorLembretes({
 
   async function checarExecutar(forcar = false) {
     if (executando) return;
-    const agora = new Date();
-    const diaHoje = agora.toISOString().slice(0, 10);
+    const agora = moment.tz("America/Sao_Paulo");
+    const diaHoje = agora.format("YYYY-MM-DD");
+    const horaSp = agora.hour();
+
     if (!forcar) {
+      if (!ehHorarioComercialEnvio(agora.toDate()) || horaSp < horaExecucao) {
+        console.log(`[Agendador Lembretes] Bloqueio: fora do horário comercial de envio (08:00 às 18:00). Hora atual: ${horaSp}h.`);
+        return;
+      }
       const ultimaData = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
       if (ultimaData === diaHoje) {
         console.log(`[Agendador Lembretes] Rotina diária de lembretes já executada hoje (${diaHoje}). Pulando execução.`);
@@ -1939,27 +1953,29 @@ function iniciarAgendadorLembretes({
     }
   }
 
-  // Executa uma vez após 1 minuto da inicialização SE ainda não executou hoje
+  // Executa uma vez após 1 minuto da inicialização SE estiver no horário comercial e ainda não executou hoje
   const timeoutInicial = setTimeout(() => {
     limparLembretesEventosPassados();
-    const agora = new Date();
-    const diaHoje = agora.toISOString().slice(0, 10);
+    const agora = moment.tz("America/Sao_Paulo");
+    const diaHoje = agora.format("YYYY-MM-DD");
+    const horaSp = agora.hour();
     const ultimaData = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
-    if (agora.getHours() >= horaExecucao && ultimaData !== diaHoje) {
+    if (horaSp >= horaExecucao && horaSp < 18 && ultimaData !== diaHoje) {
       checarExecutar();
     } else {
-      console.log(`[Agendador Lembretes] Inicialização: rotina já executada hoje (${ultimaData}) ou antes do horário (${agora.getHours()}h < ${horaExecucao}h).`);
+      console.log(`[Agendador Lembretes] Inicialização: fora do horário comercial (08:00 às 18:00) ou rotina já executada hoje (${ultimaData}). Hora atual: ${horaSp}h.`);
     }
   }, 60 * 1000);
 
-  // Executa periodicamente (a cada 30 min) checando rotina diária e horários específicos
+  // Executa periodicamente (a cada 15 min) checando rotina diária e horários específicos
   const timer = setInterval(() => {
-    const agora = new Date();
-    const diaHoje = agora.toISOString().slice(0, 10);
-    if (agora.getHours() >= horaExecucao && ultimoDiaExecutado !== diaHoje) {
+    const agora = moment.tz("America/Sao_Paulo");
+    const diaHoje = agora.format("YYYY-MM-DD");
+    const horaSp = agora.hour();
+    if (horaSp >= horaExecucao && horaSp < 18 && ultimoDiaExecutado !== diaHoje) {
       checarExecutar();
     }
-  }, 30 * 60 * 1000);
+  }, 15 * 60 * 1000);
 
   return { timer, timeoutInicial, checarExecutar };
 }
@@ -2008,4 +2024,5 @@ module.exports = {
   extrairItensADefinirFormulario,
   REGEX_A_DEFINIR,
   LABELS_CAMPOS_FORM,
+  ehHorarioComercialEnvio,
 };
