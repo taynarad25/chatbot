@@ -3067,8 +3067,9 @@ function createMessageHandler({
               txt += `\nO que você deseja fazer?\n\n`;
               txt += `1 - Alterar data/horário de uma sessão específica\n`;
               txt += `2 - Adicionar mais um dia/sessão ao evento\n`;
-              txt += `3 - Alterar dados gerais (Nome ou Local)\n`;
-              txt += `4 - Outra alteração (descreva em texto livre)`;
+              txt += `3 - Cancelar uma sessão/semana específica deste evento\n`;
+              txt += `4 - Alterar dados gerais (Nome ou Local)\n`;
+              txt += `5 - Outra alteração (descreva em texto livre)`;
               return msg.reply(txt);
             }
 
@@ -3129,16 +3130,29 @@ function createMessageHandler({
             }
 
             if (opcao === "3") {
+              info.acaoEvento = "cancelar";
+              info.etapa = "cancelar_multiplo_escolha";
+              let txt = `⚠️ *Cancelar Sessão ou Semana Específica*\n\nVocê selecionou: *${info.eventoParaAlterar.nomeBase}*\n\nQual sessão/semana você deseja cancelar?\n\n`;
+              info.eventoParaAlterar.eventos.forEach((evSess, idxSess) => {
+                const dSess = moment.tz(evSess.start.dateTime || evSess.start.date, "America/Sao_Paulo");
+                const hSess = evSess.start.dateTime ? ` às ${dSess.format("HH:mm")}` : "";
+                txt += `${idxSess + 1} - ${dSess.format("DD/MM")}${hSess} (${evSess.summary})\n`;
+              });
+              txt += `${info.eventoParaAlterar.eventos.length + 1} - 🗑️ Cancelar o evento TODO (todas as ${info.eventoParaAlterar.totalSessoes} sessões)\n\nDigite o número da sessão que deseja cancelar (ou digite *menu* para desistir):`;
+              return msg.reply(txt);
+            }
+
+            if (opcao === "4") {
               info.etapa = "alterar_multiplo_dados_gerais";
               return msg.reply(`📝 Qual dado geral você deseja alterar?\n\n1 - Nome do evento\n2 - Local`);
             }
 
-            if (opcao === "4") {
+            if (opcao === "5") {
               info.etapa = "alterar_detalhes";
               return msg.reply(`📝 Descreva a alteração que você precisa no evento *${info.eventoParaAlterar.nomeBase}*:`);
             }
 
-            return msg.reply("❌ Opção inválida. Escolha um número de 1 a 4.");
+            return msg.reply("❌ Opção inválida. Escolha um número de 1 a 5.");
           }
 
           if (info.etapa === "alterar_multiplo_escolher_sessao") {
@@ -3820,9 +3834,11 @@ function createMessageHandler({
 
             await notificarSecretaria(client, notifSecretaria);
 
-            // Notifica o grupo MULTIMÍDIAS quando a alteração envolver demandas de comunicação/mídia
+            // Notifica o grupo MULTIMÍDIAS quando a alteração envolver demandas de comunicação/mídia (desde que a arte não tenha sido feita previamente)
             const camposMidia = ["midias", "cores", "divulgacao", "tema", "versiculo", "paleta", "estilo", "prazo_imagem", "data_maxima_divulgacao"];
-            if (camposMidia.includes(campo.chave) || midiasVal || divulgacaoVal) {
+            const { isMidiaJaFeita: checkMidiaJaFeita } = require("./formularioEvento");
+            const midiaJaPronta = typeof checkMidiaJaFeita === "function" ? checkMidiaJaFeita(payload) : false;
+            if (!midiaJaPronta && (camposMidia.includes(campo.chave) || midiasVal || divulgacaoVal)) {
               const notifMultimidia =
                 `📢 *ATUALIZAÇÃO DE MÍDIA / FORMULÁRIO DE EVENTO*\n\n` +
                 `👤 *Líder:* ${nomeSolicitante(contato, numero)}\n` +
@@ -3890,29 +3906,29 @@ function createMessageHandler({
             info.rede = rede.nome;
             console.log(`[Agendamento] Rede selecionada: ${info.rede}`);
             info.etapa = "evento_mes";
-            return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio)");
+            return msg.reply("📅 Para qual *mês* você quer agendar?\nDigite o número (ex: 5 para Maio, meses como *11 e 1*, ou digite *contínuo* para o ano todo):");
           }
 
           if (info.etapa === "evento_mes") {
             const textoMes = msg.body.trim();
             const mesesRecorrentes = interpretarMesesRecorrencia(textoMes, moment().tz("America/Sao_Paulo"));
-            if (mesesRecorrentes && mesesRecorrentes.length > 0 && (mesesRecorrentes.length > 1 || /repet|seman|quinzen|recorren/i.test(textoMes))) {
+            if (mesesRecorrentes && mesesRecorrentes.length > 0 && (mesesRecorrentes.length > 1 || mesesRecorrentes.isContinuo || /repet|seman|quinzen|recorren|cont[ií]nuo|ano\s*todo/i.test(textoMes))) {
               info.tipoDuracao = "multiplo";
               info.repeteMesesInfo = mesesRecorrentes;
               info.etapa = "evento_repete_frequencia";
               return msg.reply(
                 "🔄 *Evento que se repete*\n\n" +
                 "Qual é a frequência de repetição do evento?\n\n" +
-                "1️⃣ *Toda semana* (ex: todo domingo, toda sexta)\n" +
+                "1️⃣ *Toda semana* (ex: toda segunda, todo domingo)\n" +
                 "2️⃣ *A cada 15 dias (Quinzenal)*\n" +
                 "3️⃣ *Uma vez por mês* (ex: todo 2º sábado)\n\n" +
-                "Digite o número da opção (ou digite direto, ex: *todo domingo* ou *todas as sextas*):"
+                "Digite o número da opção (ou digite direto, ex: *toda segunda* ou *todas as sextas*):"
               );
             }
 
             const mes = parseInt(textoMes);
             if (isNaN(mes) || mes < 1 || mes > 12) {
-              return msg.reply("❌ Mês inválido. Digite um número de 1 a 12 (ou os meses de repetição, ex: *11 e 1*).");
+              return msg.reply("❌ Mês inválido. Digite um número de 1 a 12 (ou os meses de repetição, ex: *11 e 1*, ou *contínuo* para o ano todo).");
             }
             console.log(`[Agendamento] Mês: ${mes}`);
             info.mes = mes;
@@ -3967,7 +3983,8 @@ function createMessageHandler({
           // Fluxo de evento que se repete (Recorrência flexível com múltiplos meses e exclusões)
           if (info.etapa === "evento_repete_frequencia") {
             const texto = msg.body.trim().toLowerCase();
-            const diaInfo = interpretarDiaSemana(texto);
+            const apenasNumeroOpcao = /^[123]$/.test(texto);
+            const diaInfo = apenasNumeroOpcao ? null : interpretarDiaSemana(texto);
             const isQuinzenal = /quinzen|15\s*dias?/i.test(texto) || texto === "2";
             const isMensal = /mensal|uma\s+vez\s+por\s+m[eê]s/i.test(texto) || texto === "3";
             info.repeteFrequencia = isQuinzenal ? "quinzenal" : (isMensal ? "mensal" : "semanal");
@@ -4002,7 +4019,10 @@ function createMessageHandler({
               info.etapa = "evento_repete_periodo";
               return msg.reply(
                 "📆 *Em quais meses o evento vai acontecer?*\n\n" +
-                "Você pode informar um único mês ou mais de um mês.\n_Exemplos de resposta:_\n• *Novembro e Janeiro* (ou *11 e 1*)\n• *11 a 1* (de Novembro até Janeiro)\n• *11* (apenas Novembro)\n\nDigite os meses desejados:"
+                "Você pode escolher:\n" +
+                "• *Contínuo / Ano todo* (gera as datas para o ano inteiro a partir de hoje)\n" +
+                "• Meses específicos (ex: *Novembro e Janeiro* ou *11 e 1*, *11 a 1*, *11*)\n\n" +
+                "Digite os meses desejados ou digite *contínuo*:"
               );
             }
 
@@ -4017,19 +4037,19 @@ function createMessageHandler({
                 "5 - Quinta-feira\n" +
                 "6 - Sexta-feira\n" +
                 "7 - Sábado\n\n" +
-                "Digite o número ou o nome do dia:"
+                "Digite o número (1 a 7) ou o nome do dia:"
               );
             }
 
             return msg.reply(
-              "❌ Opção não reconhecida. Escolha:\n1 - Toda semana (ex: todo domingo)\n2 - A cada 15 dias (Quinzenal)\n3 - Uma vez por mês\n(Ou digite direto, ex: *todo domingo* ou *todas as sextas*):"
+              "❌ Opção não reconhecida. Escolha:\n1 - Toda semana (ex: todo domingo, toda segunda)\n2 - A cada 15 dias (Quinzenal)\n3 - Uma vez por mês\n(Ou digite direto, ex: *toda segunda* ou *todas as sextas*):"
             );
           }
 
           if (info.etapa === "evento_repete_dia_semana") {
             const diaInfo = interpretarDiaSemana(msg.body.trim());
             if (!diaInfo) {
-              return msg.reply("❌ Dia da semana inválido. Digite um número de 1 a 7 (1=Domingo, 6=Sexta, 7=Sábado) ou o nome do dia.");
+              return msg.reply("❌ Dia da semana inválido. Digite um número de 1 a 7 (1=Domingo, 2=Segunda, 6=Sexta, 7=Sábado) ou o nome do dia.");
             }
             info.repeteDiaSemana = diaInfo.diaSemana;
             info.repeteDiaSemanaNome = diaInfo.nome;
@@ -4047,8 +4067,11 @@ function createMessageHandler({
               });
               info.etapa = "evento_repete_excecoes";
               const listaFormatada = formatarListaDatasInterativa(info.datasRecorrentes);
+              const rotuloTotal = info.repeteMesesInfo.isContinuo
+                ? `${info.datasRecorrentes.length} sessões contínuas durante o ano todo`
+                : `${info.datasRecorrentes.length} sessões`;
               return msg.reply(
-                `🗓️ *Datas encontradas para o evento (${info.datasRecorrentes.length} sessões):*\n\n` +
+                `🗓️ *Datas encontradas para o evento (${rotuloTotal}):*\n\n` +
                 `${listaFormatada}\n\n` +
                 `❓ *Tem alguma data em que NÃO vai ter evento?* (Ex: primeiro domingo do mês, feriado ou recesso)\n\n` +
                 `• Para remover datas: digite os números separados por vírgula (ex: *1, 5* ou digite *primeiro domingo*).\n` +
@@ -4060,7 +4083,10 @@ function createMessageHandler({
             info.etapa = "evento_repete_periodo";
             return msg.reply(
               "📆 *Em quais meses o evento vai acontecer?*\n\n" +
-              "Você pode informar um único mês ou mais de um mês.\n_Exemplos de resposta:_\n• *Novembro e Janeiro* (ou *11 e 1*)\n• *11 a 1* (de Novembro até Janeiro)\n• *11* (apenas Novembro)\n\nDigite os meses desejados:"
+              "Você pode escolher:\n" +
+              "• *Contínuo / Ano todo* (gera as datas para o ano inteiro a partir de hoje)\n" +
+              "• Meses específicos (ex: *Novembro e Janeiro* ou *11 e 1*, *11 a 1*, *11*)\n\n" +
+              "Digite os meses desejados ou digite *contínuo*:"
             );
           }
 
@@ -4085,8 +4111,11 @@ function createMessageHandler({
               });
               info.etapa = "evento_repete_excecoes";
               const listaFormatada = formatarListaDatasInterativa(info.datasRecorrentes);
+              const rotuloTotal = info.repeteMesesInfo.isContinuo
+                ? `${info.datasRecorrentes.length} sessões contínuas durante o ano todo`
+                : `${info.datasRecorrentes.length} sessões`;
               return msg.reply(
-                `🗓️ *Datas encontradas para o evento (${info.datasRecorrentes.length} sessões):*\n\n` +
+                `🗓️ *Datas encontradas para o evento (${rotuloTotal}):*\n\n` +
                 `${listaFormatada}\n\n` +
                 `❓ *Tem alguma data em que NÃO vai ter evento?* (Ex: primeiro domingo do mês, feriado ou recesso)\n\n` +
                 `• Para remover datas: digite os números separados por vírgula (ex: *1, 5* ou digite *primeiro domingo*).\n` +
@@ -4098,14 +4127,17 @@ function createMessageHandler({
             info.etapa = "evento_repete_periodo";
             return msg.reply(
               "📆 *Em quais meses o evento vai acontecer?*\n\n" +
-              "Você pode informar um único mês ou mais de um mês.\n_Exemplos de resposta:_\n• *Novembro e Janeiro* (ou *11 e 1*)\n• *11 a 1* (de Novembro até Janeiro)\n• *11* (apenas Novembro)\n\nDigite os meses desejados:"
+              "Você pode escolher:\n" +
+              "• *Contínuo / Ano todo* (gera as datas para o ano inteiro a partir de hoje)\n" +
+              "• Meses específicos (ex: *Novembro e Janeiro* ou *11 e 1*, *11 a 1*, *11*)\n\n" +
+              "Digite os meses desejados ou digite *contínuo*:"
             );
           }
 
           if (info.etapa === "evento_repete_periodo") {
             const mesesInfo = interpretarMesesRecorrencia(msg.body.trim(), moment().tz("America/Sao_Paulo"));
             if (!mesesInfo || mesesInfo.length === 0) {
-              return msg.reply("❌ Não consegui identificar os meses. Por favor digite os números ou nomes dos meses (ex: *11 e 1* ou *Novembro e Janeiro*).");
+              return msg.reply("❌ Não consegui identificar os meses. Por favor digite os números ou nomes dos meses (ex: *11 e 1* ou *Novembro e Janeiro*), ou digite *contínuo* para o ano todo.");
             }
             info.repeteMesesInfo = mesesInfo;
             info.datasRecorrentes = gerarDatasRecorrentes({
@@ -4121,8 +4153,11 @@ function createMessageHandler({
 
             info.etapa = "evento_repete_excecoes";
             const listaFormatada = formatarListaDatasInterativa(info.datasRecorrentes);
+            const rotuloTotal = mesesInfo.isContinuo
+              ? `${info.datasRecorrentes.length} sessões contínuas durante o ano todo`
+              : `${info.datasRecorrentes.length} sessões`;
             return msg.reply(
-              `🗓️ *Datas encontradas para o evento (${info.datasRecorrentes.length} sessões):*\n\n` +
+              `🗓️ *Datas encontradas para o evento (${rotuloTotal}):*\n\n` +
               `${listaFormatada}\n\n` +
               `❓ *Tem alguma data em que NÃO vai ter evento?* (Ex: primeiro domingo do mês, feriado ou recesso)\n\n` +
               `• Para remover datas: digite os números separados por vírgula (ex: *1, 5* ou digite *primeiro domingo*).\n` +

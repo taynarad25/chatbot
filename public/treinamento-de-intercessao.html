@@ -534,6 +534,13 @@
 
         <!-- CARDS INFORMATIVOS -->
         <section class="info-grid">
+            <div class="info-card" style="border: 1px solid rgba(249, 115, 22, 0.45); background: rgba(249, 115, 22, 0.08);">
+                <div class="info-icon">⏳</div>
+                <div class="info-content">
+                    <h4>Prazo de Inscrição</h4>
+                    <p style="color: var(--cor-laranja-suave); font-weight: 700;">Até 05 de Novembro</p>
+                </div>
+            </div>
             <div class="info-card">
                 <div class="info-icon">🗓️</div>
                 <div class="info-content">
@@ -574,7 +581,7 @@
         <section class="form-section">
             <div class="form-header">
                 <h2><span>✍️</span> Ficha de Inscrição</h2>
-                <p>Preencha os dados abaixo para garantir a sua vaga no Treinamento de Intercessão.</p>
+                <p>Preencha os dados abaixo para garantir a sua vaga. ⏳ <strong>Inscrições abertas até o dia 05 de Novembro de 2026.</strong></p>
             </div>
 
             <form id="formIntercessao" onsubmit="realizarInscricao(event)" novalidate>
@@ -671,6 +678,24 @@
 
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQk1-oLONEbLfqfdDgW3xJETF7kKZTW1lP2NpaR_vFwwK2koBaudYuODD04IT0wg65Iw/exec";
+        const PRAZO_INSCRICAO = new Date("2026-11-05T23:59:59.999-03:00");
+
+        function verificarPrazoInscricao() {
+            if (new Date() > PRAZO_INSCRICAO) {
+                const btn = document.getElementById('btnSubmit');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.6';
+                    btn.style.cursor = 'not-allowed';
+                    btn.innerHTML = '<span>🔒 Inscrições Encerradas (Prazo: 05/11/2026)</span>';
+                }
+                const headerP = document.querySelector('.form-header p');
+                if (headerP) {
+                    headerP.innerHTML = '⚠️ <strong style="color: #f87171;">As inscrições para o Treinamento de Intercessão foram encerradas no dia 05 de Novembro de 2026.</strong>';
+                }
+            }
+        }
+        window.addEventListener('DOMContentLoaded', verificarPrazoInscricao);
 
         function mascaraTelefone(input) {
             let v = input.value.replace(/\D/g, '');
@@ -708,6 +733,11 @@
 
         async function realizarInscricao(e) {
             e.preventDefault();
+
+            if (new Date() > PRAZO_INSCRICAO) {
+                alert('As inscrições para o Treinamento de Intercessão foram encerradas no dia 05 de Novembro de 2026.');
+                return;
+            }
 
             const nome = document.getElementById('campoNome').value.trim();
             const telefone = document.getElementById('campoTelefone').value.trim();

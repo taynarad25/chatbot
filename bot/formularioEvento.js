@@ -666,14 +666,15 @@ async function processarRespostaFormulario({
 
     await notificarSecretaria(client, notificacaoGrupo);
 
-    // Notifica o grupo MULTIMÍDIAS caso o formulário contenha pedidos/informações de mídia ou divulgação
+    // Notifica o grupo MULTIMÍDIAS caso o formulário contenha pedidos/informações de mídia ou divulgação pendente
     const temMidia = temConteudoRelevante(payload.midias || payload.estilo);
     const temDivulgacao = temConteudoRelevante(payload.divulgacao || payload.prazo_imagem);
     const temCores = temConteudoRelevante(payload.cores || payload.paleta);
     const temDataDivulgacao = temConteudoRelevante(payload.data_maxima_divulgacao);
     const jaTemMidia = isMidiaJaFeita(payload);
 
-    if (temMidia || temDivulgacao || temCores || temDataDivulgacao || jaTemMidia) {
+    // Se a arte já foi feita previamente pela equipe de mídia, não manda no grupo de mídias
+    if (!jaTemMidia && (temMidia || temDivulgacao || temCores || temDataDivulgacao)) {
       const horario =
         payload.horario_inicio_termino ||
         (payload.horario_inicio && payload.horario_termino
@@ -690,14 +691,10 @@ async function processarRespostaFormulario({
 
       if (temConteudoRelevante(payload.tema)) resumoMultimidia += `\n✨ *Tema:* ${payload.tema}`;
       if (temConteudoRelevante(payload.versiculo)) resumoMultimidia += `\n📖 *Versículo Base:* ${payload.versiculo}`;
-      if (jaTemMidia) {
-        resumoMultimidia += `\n🎨 *Status da Arte:* Já realizada previamente com a equipe de multimídia`;
-      } else {
-        if (temCores) resumoMultimidia += `\n🎨 *Cores/Estilo:* ${payload.cores || payload.paleta}`;
-        if (temMidia) resumoMultimidia += `\n📱 *Mídias Solicitadas:* ${payload.midias || payload.estilo}`;
-        if (temDivulgacao) resumoMultimidia += `\n📢 *Divulgação / Prazo:* ${payload.divulgacao || payload.prazo_imagem}`;
-        if (temDataDivulgacao) resumoMultimidia += `\n🗓️ *Data Máxima para Início da Divulgação:* ${payload.data_maxima_divulgacao}`;
-      }
+      if (temCores) resumoMultimidia += `\n🎨 *Cores/Estilo:* ${payload.cores || payload.paleta}`;
+      if (temMidia) resumoMultimidia += `\n📱 *Mídias Solicitadas:* ${payload.midias || payload.estilo}`;
+      if (temDivulgacao) resumoMultimidia += `\n📢 *Divulgação / Prazo:* ${payload.divulgacao || payload.prazo_imagem}`;
+      if (temDataDivulgacao) resumoMultimidia += `\n🗓️ *Data Máxima para Início da Divulgação:* ${payload.data_maxima_divulgacao}`;
       if (linkDoc) resumoMultimidia += `\n\n📄 *Documento Oficial Gerado (Google Docs):*\n${linkDoc}`;
 
       try {

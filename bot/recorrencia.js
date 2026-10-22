@@ -95,6 +95,21 @@ function interpretarMesesRecorrencia(texto = "", dataRefMom = null) {
   const raw = String(texto || "").toLowerCase().trim();
   if (!raw) return [];
 
+  // Verifica se é contínuo / ano todo / ano inteiro
+  if (/\b(?:cont[ií]nuo|ano\s*(?:todo|inteiro)|sem\s*limite|todos?\s*os?\s*meses|sempre)\b/i.test(raw)) {
+    const lista = [];
+    let curMom = agora.clone().startOf("month");
+    for (let i = 0; i < 12; i++) {
+      lista.push({
+        mes: curMom.month() + 1,
+        ano: curMom.year(),
+      });
+      curMom.add(1, "month");
+    }
+    lista.isContinuo = true;
+    return lista;
+  }
+
   // Verifica se é padrão intervalo "X a Y" ou "X até Y"
   const matchIntervalo = raw.match(/^([a-z0-9çã]+)\s+(?:a|at[eé])\s+([a-z0-9çã]+)$/i);
   if (matchIntervalo) {
@@ -196,8 +211,10 @@ function gerarDatasRecorrentes({
   mesesInfo = [],
   quinzenal = false,
   dataInicioQuinzenal = null,
+  dataMinimaMom = null,
 }) {
   const datas = [];
+  const minMom = dataMinimaMom || (mesesInfo.isContinuo ? moment.tz("America/Sao_Paulo").startOf("day") : null);
 
   for (const mInfo of mesesInfo) {
     const totalDiasMes = moment.tz([mInfo.ano, mInfo.mes - 1], "America/Sao_Paulo").daysInMonth();
@@ -210,6 +227,9 @@ function gerarDatasRecorrentes({
         "America/Sao_Paulo"
       );
       if (dataMom.day() === diaSemana) {
+        if (minMom && dataMom.isBefore(minMom)) {
+          continue; // Pula dias anteriores a hoje se estivermos agendando contínuo a partir de hoje
+        }
         contadorDiaSemanaNoMes++;
         let rotuloOrdem = "";
         if (contadorDiaSemanaNoMes === 1) rotuloOrdem = "1º do mês";
@@ -315,9 +335,22 @@ function formatarListaDatasInterativa(listaDatas = []) {
     return "(Nenhuma data selecionada)";
   }
 
-  return listaDatas
-    .map((item, i) => `${i + 1} - ${item.texto}`)
-    .join("\n");
+  if (listaDatas.length <= 16) {
+    return listaDatas
+      .map((item, i) => `${i + 1} - ${item.texto}`)
+      .join("\n");
+  }
+
+  // Lista longa (ex: evento contínuo de 52 semanas)
+  const primeiras = listaDatas.slice(0, 10).map((item, i) => `${i + 1} - ${item.texto}`);
+  const ultimas = listaDatas.slice(-3).map((item, i) => `${listaDatas.length - 3 + i + 1} - ${item.texto}`);
+  const ocultasQtd = listaDatas.length - 13;
+
+  return [
+    ...primeiras,
+    `... [e mais ${ocultasQtd} sessões intermediárias durante o ano] ...`,
+    ...ultimas,
+  ].join("\n");
 }
 
 module.exports = {

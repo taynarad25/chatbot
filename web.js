@@ -894,6 +894,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       // API: Inscrição Treinamento de Intercessão (/intercessao/api/inscrever)
       if (req.method === 'POST' && (pathname === '/intercessao/api/inscrever' || pathname === '/intercessao/inscrever')) {
         try {
+          if (typeof treinamentoIntercessao.verificarInscricoesAbertasIntercessao === 'function' && !treinamentoIntercessao.verificarInscricoesAbertasIntercessao()) {
+            return sendJson(res, 400, {
+              ok: false,
+              message: 'As inscrições para o Treinamento de Intercessão foram encerradas no dia 05 de Novembro de 2026.'
+            });
+          }
+
           const body = await parseRequestBody(req);
           const { nome, telefone } = body || {};
           if (!nome || !telefone) {

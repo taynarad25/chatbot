@@ -11,6 +11,14 @@ const URL_WEBAPP_INTERCESSAO_PADRAO =
   process.env.INTERCESSAO_WEBAPP_URL ||
   'https://script.google.com/macros/s/AKfycbyQk1-oLONEbLfqfdDgW3xJETF7kKZTW1lP2NpaR_vFwwK2koBaudYuODD04IT0wg65Iw/exec';
 
+const PRAZO_INSCRICOES_INTERCESSAO = '2026-11-05T23:59:59.999-03:00';
+
+function verificarInscricoesAbertasIntercessao() {
+  const agora = new Date();
+  const limite = new Date(PRAZO_INSCRICOES_INTERCESSAO);
+  return agora <= limite;
+}
+
 function normalizarTelefone(telefone) {
   return String(telefone || '').replace(/\D/g, '');
 }
@@ -320,6 +328,8 @@ function renderIntercessaoPdfHtml() {
 }
 
 module.exports = {
+  PRAZO_INSCRICOES_INTERCESSAO,
+  verificarInscricoesAbertasIntercessao,
   salvarInscricaoIntercessao,
   obterInscricaoIntercessaoPorId,
   listarInscricoesIntercessao,
