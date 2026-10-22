@@ -78,12 +78,17 @@ function salvarInscricaoIntercessao({
       dataEvento = excluded.dataEvento
   `);
 
+  let expIntercessao = String(experienciaIntercessao || 'Não').trim();
+  if (/^n[aã]o informado$/i.test(expIntercessao) || !expIntercessao) {
+    expIntercessao = 'Não';
+  }
+
   stmt.run(
     inscricaoId,
     nomeLimpo,
     telNorm,
     emailLimpo,
-    experienciaIntercessao || 'Não',
+    expIntercessao,
     experienciaDetalhes || '',
     evento,
     dataEvento,
@@ -150,9 +155,13 @@ async function enviarInscricaoPlanilhaIntercessao(
   const payload = {
     nome: dados.nome || '',
     telefone: dados.telefone || '',
+    whatsapp: dados.telefone || '',
     email: dados.email || '',
     experienciaIntercessao: dados.experienciaIntercessao || 'Não',
+    jaParticipou: dados.experienciaIntercessao || 'Não',
+    experiencia: dados.experienciaIntercessao || 'Não',
     experienciaDetalhes: dados.experienciaDetalhes || '',
+    detalhesExperiencia: dados.experienciaDetalhes || '',
   };
 
   try {
@@ -207,25 +216,41 @@ async function sincronizarInscricoesComNuvemIntercessao({
     }
 
     const data = await response.json();
-    if (!data || !Array.isArray(data.inscricoes)) {
+    const rows = Array.isArray(data)
+      ? data
+      : (data.inscricoes || data.data || data.registros || data.items || []);
+
+    if (!Array.isArray(rows)) {
       return { ok: false, message: 'Formato inválido retornado pelo Google Apps Script.' };
     }
 
     let adicionados = 0;
-    for (const item of data.inscricoes) {
-      if (!item.nome) continue;
+    for (const item of rows) {
+      if (!item) continue;
+      const nome = item.nome || item.nomeCompleto || item.participante || '';
+      const telefone = item.telefone || item.whatsapp || item.celular || '';
+      if (!nome || !telefone) continue;
+
       salvarInscricaoIntercessao({
-        nome: item.nome,
-        telefone: item.telefone,
+        nome,
+        telefone,
         email: item.email || '',
-        experienciaIntercessao: item.experienciaIntercessao || 'Não',
-        experienciaDetalhes: item.experienciaDetalhes || '',
-        criadoEm: item.criadoEm || null,
+        experienciaIntercessao:
+          item.experienciaIntercessao || item.jaParticipou || item.experiencia || 'Não',
+        experienciaDetalhes:
+          item.experienciaDetalhes || item.detalhesExperiencia || item.detalhes || '',
+        criadoEm: item.criadoEm || item.dataHora || item.data || null,
       });
       adicionados++;
     }
 
-    return { ok: true, total: adicionados };
+    const totalAtual = listarInscricoesIntercessao().length;
+    return {
+      ok: true,
+      total: totalAtual,
+      importados: adicionados,
+      message: `${adicionados} inscrição(ões) sincronizada(s) com sucesso!`,
+    };
   } catch (err) {
     console.warn('[Treinamento Intercessão] Erro na sincronização:', err.message);
     return { ok: false, message: err.message };

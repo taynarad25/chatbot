@@ -779,9 +779,13 @@
             const payload = {
                 nome,
                 telefone,
+                whatsapp: telefone,
                 email,
                 experienciaIntercessao,
-                experienciaDetalhes
+                jaParticipou: experienciaIntercessao,
+                experiencia: experienciaIntercessao,
+                experienciaDetalhes,
+                detalhesExperiencia: experienciaDetalhes
             };
 
             try {
