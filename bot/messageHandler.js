@@ -130,20 +130,22 @@ function resolverOpcaoLocalReuniao(texto) {
 function interpretarDataReuniao(texto) {
   if (!texto) return null;
   const t = texto.trim();
-  const m = t.match(/^([0-2]?[0-9]|3[01])\/(0?[1-9]|1[0-2])(?:\/(\d{4}))?$/);
+  const m = t.match(/^([0-2]?[0-9]|3[01])\/(0?[1-9]|1[0-2])(?:\/(\d{2,4}))?$/);
   if (!m) return null;
   const dia = parseInt(m[1], 10);
   const mes = parseInt(m[2], 10);
   const agora = moment().tz("America/Sao_Paulo");
   let ano = m[3] ? parseInt(m[3], 10) : agora.year();
+  if (m[3] && ano < 100) ano += 2000;
 
-  const dataMoment = moment.tz(`${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`, "YYYY-MM-DD", "America/Sao_Paulo");
+  let dataMoment = moment.tz(`${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`, "YYYY-MM-DD", "America/Sao_Paulo");
   if (!dataMoment.isValid() || dataMoment.date() !== dia || dataMoment.month() + 1 !== mes) {
     return null;
   }
 
-  if (!m[3] && dataMoment.isBefore(agora.clone().startOf("day"))) {
+  if ((!m[3] || ano <= agora.year()) && dataMoment.isBefore(agora.clone().startOf("day"))) {
     ano += 1;
+    dataMoment = moment.tz(`${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`, "YYYY-MM-DD", "America/Sao_Paulo");
   }
 
   return { dia, mes, ano, formatada: `${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}/${ano}` };
@@ -251,30 +253,54 @@ function formatarDisponibilidadeNegativa(disp) {
 
 function extrairOuValidarData(texto, mesFallback, anoFallback) {
   if (!texto) return null;
+  const agoraSP = moment.tz("America/Sao_Paulo");
+  const anoAtual = agoraSP.year();
+  const hoje = agoraSP.clone().startOf("day");
   const t = texto.trim();
-  const partes = t.split("/");
+  const partes = t.split(/[\/\-]/);
+
+  let dia, mes, ano;
+  let anoInformadoExplicitamente = false;
+
   if (partes.length === 1) {
-    const dia = parseInt(partes[0], 10);
-    if (isNaN(dia) || dia < 1 || dia > 31) return null;
-    const m = moment.tz(`${dia}/${mesFallback}/${anoFallback}`, "D/M/YYYY", "America/Sao_Paulo");
-    return m.isValid() && m.date() === dia ? m : null;
+    dia = parseInt(partes[0], 10);
+    mes = mesFallback;
+    ano = anoFallback || (mes && mes < (agoraSP.month() + 1) ? anoAtual + 1 : anoAtual);
+  } else if (partes.length === 2) {
+    dia = parseInt(partes[0], 10);
+    mes = parseInt(partes[1], 10);
+    ano = anoFallback || (mes < (agoraSP.month() + 1) ? anoAtual + 1 : anoAtual);
+  } else if (partes.length === 3) {
+    dia = parseInt(partes[0], 10);
+    mes = parseInt(partes[1], 10);
+    let a = parseInt(partes[2], 10);
+    if (!isNaN(a)) {
+      if (a < 100) a += 2000;
+      ano = a;
+      anoInformadoExplicitamente = true;
+    }
+  } else {
+    return null;
   }
-  if (partes.length === 2) {
-    const dia = parseInt(partes[0], 10);
-    const mes = parseInt(partes[1], 10);
-    if (isNaN(dia) || isNaN(mes)) return null;
-    const m = moment.tz(`${dia}/${mes}/${anoFallback}`, "D/M/YYYY", "America/Sao_Paulo");
-    return m.isValid() ? m : null;
+
+  if (isNaN(dia) || isNaN(mes) || isNaN(ano) || dia < 1 || dia > 31 || mes < 1 || mes > 12) {
+    return null;
   }
-  if (partes.length === 3) {
-    const dia = parseInt(partes[0], 10);
-    const mes = parseInt(partes[1], 10);
-    const ano = parseInt(partes[2], 10);
-    if (isNaN(dia) || isNaN(mes) || isNaN(ano)) return null;
-    const m = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
-    return m.isValid() ? m : null;
+
+  let m = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+  if (!m.isValid() || m.date() !== dia || m.month() + 1 !== mes) {
+    return null;
   }
-  return null;
+
+  // Quando a pessoa mandar uma data que já passou, o bot sempre entende como ano que vem
+  if (m.isBefore(hoje)) {
+    if (!anoInformadoExplicitamente || ano <= anoAtual) {
+      ano = anoAtual + 1;
+      m = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+    }
+  }
+
+  return m.isValid() ? m : null;
 }
 
 // Capitaliza a primeira letra de cada palavra em um nome
@@ -453,9 +479,14 @@ async function processarRespostaEventoExterno({
     if (matchData) {
       const dia = parseInt(matchData[1], 10);
       const mes = parseInt(matchData[2], 10);
-      const ano = matchData[3]
+      const agoraSP = moment.tz("America/Sao_Paulo");
+      let ano = matchData[3]
         ? (matchData[3].length === 2 ? 2000 + parseInt(matchData[3], 10) : parseInt(matchData[3], 10))
-        : moment.tz("America/Sao_Paulo").year();
+        : agoraSP.year();
+      const dTeste = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+      if ((!matchData[3] || ano <= agoraSP.year()) && dTeste.isValid() && dTeste.isBefore(agoraSP.clone().startOf("day"))) {
+        ano += 1;
+      }
       info.dia = dia;
       info.mes = mes;
       info.ano = ano;
@@ -3930,8 +3961,13 @@ function createMessageHandler({
             if (isNaN(mes) || mes < 1 || mes > 12) {
               return msg.reply("❌ Mês inválido. Digite um número de 1 a 12 (ou os meses de repetição, ex: *11 e 1*, ou *contínuo* para o ano todo).");
             }
-            console.log(`[Agendamento] Mês: ${mes}`);
+            const agoraSP = moment.tz("America/Sao_Paulo");
+            const anoAtual = agoraSP.year();
+            const mesAtual = agoraSP.month() + 1;
+            const anoCalculado = mes < mesAtual ? anoAtual + 1 : anoAtual;
+            console.log(`[Agendamento] Mês: ${mes}, Ano: ${anoCalculado}`);
             info.mes = mes;
+            info.ano = anoCalculado;
             info.etapa = "evento_modo_busca";
             return msg.reply(
               "📅 *Qual o formato e duração do evento?*\n\n" +
@@ -3957,7 +3993,7 @@ function createMessageHandler({
             if (opcao === "2" || /consecutivo/i.test(opcao)) {
               info.tipoDuracao = "consecutivo";
               info.etapa = "evento_consecutivo_data_inicio";
-              return msg.reply(`📅 Qual a *data de início* do evento? (Ex: 10/${String(info.mes).padStart(2, "0")} ou 10/${String(info.mes).padStart(2, "0")}/${moment().tz("America/Sao_Paulo").year()})`);
+              return msg.reply(`📅 Qual a *data de início* do evento? (Ex: 10/${String(info.mes).padStart(2, "0")} ou 10/${String(info.mes).padStart(2, "0")}/${info.ano || moment().tz("America/Sao_Paulo").year()})`);
             }
             if (opcao === "3" || /n[aã]o\s+consecutivo|m[uú]ltiplo/i.test(opcao)) {
               info.tipoDuracao = "multiplo";
@@ -4098,7 +4134,15 @@ function createMessageHandler({
               return msg.reply("❌ Data inválida. Por favor digite no formato DD/MM ou DD/MM/AAAA (ex: 08/11 ou 08/11/2026):");
             }
             if (!msg.body.trim().match(/\d{4}/)) {
-              m.year(anoPadrao);
+              const match2d = msg.body.trim().match(/\/(\d{2})$/);
+              if (match2d) {
+                m.year(2000 + parseInt(match2d[1], 10));
+              } else {
+                m.year(anoPadrao);
+              }
+            }
+            if (m.isBefore(agoraMom.clone().startOf("day"))) {
+              m.add(1, "year");
             }
             info.dataInicioQuinzenal = m.format("DD/MM/YYYY");
 
@@ -4433,30 +4477,57 @@ function createMessageHandler({
 
           // Formato 1: Evento de 1 dia (data específica)
           if (info.etapa === "evento_dia_especifico") {
-            const dia = parseInt(msg.body.trim());
-            const ano = moment.tz("America/Sao_Paulo").year();
-            const dataTeste = moment.tz(`${dia}/${info.mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+            const agoraSP = moment.tz("America/Sao_Paulo");
+            const anoAtual = agoraSP.year();
+            const anoBase = info.ano || (info.mes && info.mes < (agoraSP.month() + 1) ? anoAtual + 1 : anoAtual);
 
-            if (isNaN(dia) || !dataTeste.isValid() || dataTeste.date() !== dia) {
-              return msg.reply(`❌ Dia inválido para o mês ${MESES[info.mes - 1]}. Digite um número de dia válido.`);
+            const m = extrairOuValidarData(msg.body, info.mes, anoBase);
+
+            if (!m) {
+              const mesNome = (info.mes && MESES[info.mes - 1]) ? MESES[info.mes - 1] : "selecionado";
+              return msg.reply(`❌ Dia inválido para o mês ${mesNome}. Digite um número de dia válido.`);
             }
 
+            const dia = m.date();
+            const mes = m.month() + 1;
+            let ano = m.year();
+
             info.diaEspecifico = dia;
+            info.mes = mes;
             info.anoEspecifico = ano;
+            info.ano = ano;
             await msg.reply("🔍 Verificando esse dia na agenda...");
 
             try {
-              const inicioBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
-              const fimBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").endOf('month').format();
-              const todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
-              const todosEventos = filtrarEventosAgendamento(todosEventosRaw);
+              let inicioBusca = moment.tz([ano, mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
+              let fimBusca = moment.tz([ano, mes - 1], "America/Sao_Paulo").endOf('month').format();
+              let todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
+              let todosEventos = filtrarEventosAgendamento(todosEventosRaw);
 
-              const resultado = verificarDataEspecifica({
+              let resultado = verificarDataEspecifica({
                 eventos: todosEventos,
                 evangelismoCalendarId: agendasParaLer[0],
-                ano, mes: info.mes, dia,
+                ano, mes, dia,
                 rede: info.rede,
               });
+
+              // Quando a pessoa mandar uma data que já passou o bot sempre entende como ano que vem
+              if (!resultado.disponivel && resultado.motivo === "data_passada") {
+                ano += 1;
+                info.anoEspecifico = ano;
+                info.ano = ano;
+                inicioBusca = moment.tz([ano, mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
+                fimBusca = moment.tz([ano, mes - 1], "America/Sao_Paulo").endOf('month').format();
+                todosEventosRaw = await buscarEventos(inicioBusca, fimBusca);
+                todosEventos = filtrarEventosAgendamento(todosEventosRaw);
+
+                resultado = verificarDataEspecifica({
+                  eventos: todosEventos,
+                  evangelismoCalendarId: agendasParaLer[0],
+                  ano, mes, dia,
+                  rede: info.rede,
+                });
+              }
 
               if (!resultado.disponivel) {
                 delete etapas[numero];
@@ -4466,7 +4537,7 @@ function createMessageHandler({
               info.eventosNoDiaEspecifico = resultado.eventosNoDia || [];
               info.etapa = "evento_horario_especifico";
 
-              const janelas = calcularJanelasLivres({ eventosNoDia: info.eventosNoDiaEspecifico, ano, mes: info.mes, dia });
+              const janelas = calcularJanelasLivres({ eventosNoDia: info.eventosNoDiaEspecifico, ano, mes, dia });
               const listaJanelas = janelas.length > 0
                 ? janelas.map((j) => `${j.inicio} às ${j.fim}`).join("\n")
                 : "(nenhum horário livre entre 07:00 e 22:00 nesse dia — considere outra data)";
@@ -4606,7 +4677,8 @@ function createMessageHandler({
 
             try {
               const agora = moment.tz("America/Sao_Paulo");
-              const ano = agora.year();
+              const ano = info.ano || (info.mes < (agora.month() + 1) ? agora.year() + 1 : agora.year());
+              info.ano = ano;
               const inicioBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").startOf('month').subtract(1, 'minute').format();
               const fimBusca = moment.tz([ano, info.mes - 1], "America/Sao_Paulo").endOf('month').format();
 
@@ -6303,16 +6375,22 @@ function createMessageHandler({
             }
             const dia = parseInt(partes[0], 10);
             const mes = parseInt(partes[1], 10);
-            const ano = partes[2] ? parseInt(partes[2], 10) : moment.tz("America/Sao_Paulo").year();
+            const agora = moment.tz("America/Sao_Paulo");
+            let ano = partes[2] ? parseInt(partes[2], 10) : agora.year();
+            if (partes[2] && ano < 100) ano += 2000;
 
             if (isNaN(dia) || isNaN(mes) || dia < 1 || dia > 31 || mes < 1 || mes > 12) {
               return msg.reply("❌ Data inválida. Digite uma data real no formato DD/MM (ex: 25/10).");
             }
 
-            const agora = moment.tz("America/Sao_Paulo");
-            const dataEscolhida = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo").endOf("day");
+            let dataEscolhida = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo").endOf("day");
             if (dataEscolhida.isBefore(agora)) {
-              return msg.reply("❌ Essa data já passou! Por favor, informe uma data futura para o uso do salão:");
+              if (!partes[2] || ano === agora.year()) {
+                ano += 1;
+                dataEscolhida = moment.tz(`${dia}/${mes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo").endOf("day");
+              } else {
+                return msg.reply("❌ Essa data já passou! Por favor, informe uma data futura para o uso do salão:");
+              }
             }
 
             info.dia = dia;

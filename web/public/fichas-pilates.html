@@ -732,6 +732,13 @@
         let alunasCache = [];
         let filtroAtivo = 'todas';
 
+        function ehAlunaTeste(a) {
+            if (!a) return false;
+            const n = String(a.nome || '').toLowerCase().trim();
+            const t = String(a.telefone || '').replace(/\D/g, '');
+            return n.includes('fernanda costa') || t.includes('988889999');
+        }
+
         async function carregarInscricoes(forcarSync = false) {
             const btn = document.getElementById('btnRecarregar');
             if (btn) btn.innerHTML = '<span>⏳ Atualizando...</span>';
@@ -742,7 +749,7 @@
                 const data = await res.json();
 
                 if (data.ok && Array.isArray(data.inscricoes)) {
-                    alunasCache = data.inscricoes;
+                    alunasCache = data.inscricoes.filter(a => !ehAlunaTeste(a));
                     atualizarMetricas(data.stats || {});
                     filtrarAlunas();
                 } else {
@@ -753,6 +760,29 @@
                 mostrarErro('Erro de conexão ao carregar as fichas.');
             } finally {
                 if (btn) btn.innerHTML = '<span>🔄 Atualizar Dados</span>';
+            }
+        }
+
+        async function removerInscricao(id, nome) {
+            if (!id) return;
+            const confirmou = confirm(`Deseja realmente remover a ficha de "${nome}"?\n\nEsta ação excluirá o registro.`);
+            if (!confirmou) return;
+
+            try {
+                const res = await fetch(`/saude-mulher/api/inscricoes/${encodeURIComponent(id)}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    alunasCache = alunasCache.filter(a => String(a.id) !== String(id));
+                    filtrarAlunas();
+                    carregarInscricoes(false);
+                } else {
+                    alert('Não foi possível remover: ' + (data.message || 'Erro desconhecido.'));
+                }
+            } catch (e) {
+                console.error('Erro ao remover inscrição:', e);
+                alert('Erro ao tentar remover a inscrição.');
             }
         }
 
@@ -890,10 +920,13 @@
                                     <span>${formatarTelefone(aluna.telefone)}</span>
                                 </div>
                             </div>
-                            <div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
                                 <a href="${linkZap(aluna.telefone)}" target="_blank" class="btn-whatsapp" title="Abrir conversa no WhatsApp">
                                     💬 Conversar
                                 </a>
+                                <button onclick="removerInscricao('${aluna.id}', '${(aluna.nome || '').replace(/'/g, "\\'")}')" style="background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); padding: 8px 12px; font-size: 0.85rem; border-radius: 8px; cursor: pointer; transition: all 0.2s;" title="Remover ficha de teste ou cancelada">
+                                    🗑️
+                                </button>
                             </div>
                         </div>
 

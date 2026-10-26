@@ -169,13 +169,24 @@ function buscarInscricaoSaudeMulherPorTelefone(telefone) {
   };
 }
 
-function listarInscricoesSaudeMulher() {
+function ehInscricaoDeTeste(item) {
+  if (!item) return false;
+  const nome = String(item.nome || '').trim().toLowerCase();
+  const tel = String(item.telefone || '').replace(/\D/g, '');
+  if (nome.includes('fernanda costa')) return true;
+  if (tel.includes('988889999')) return true;
+  return false;
+}
+
+function listarInscricoesSaudeMulher({ incluirTestes = false } = {}) {
   if (!db) return [];
   const rows = db.prepare('SELECT * FROM saude_mulher_inscricoes ORDER BY criadoEm DESC').all();
-  return rows.map(r => ({
-    ...r,
-    whatsappConfirmacaoEnviado: Boolean(r.whatsappConfirmacaoEnviado),
-  }));
+  return rows
+    .filter(r => incluirTestes || !ehInscricaoDeTeste(r))
+    .map(r => ({
+      ...r,
+      whatsappConfirmacaoEnviado: Boolean(r.whatsappConfirmacaoEnviado),
+    }));
 }
 
 function ehRespostaSim(valor, detalhes) {
@@ -337,7 +348,7 @@ async function sincronizarInscricoesComNuvemSaudeMulher({ url = URL_WEBAPP_SAUDE
 
     let importados = 0;
     for (const r of rows) {
-      if (r.nome && r.telefone) {
+      if (r.nome && r.telefone && !ehInscricaoDeTeste(r)) {
         salvarInscricaoSaudeMulher({
           nome: r.nome,
           idade: r.idade || '',

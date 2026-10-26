@@ -154,9 +154,9 @@ test("Saúde da Mulher: rotas HTTP no web.js", async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        nome: "Fernanda Costa",
+        nome: "Camila Ferreira",
         idade: "29",
-        telefone: "11988889999",
+        telefone: "11977776666",
         condicoesSaude: "Problemas respiratórios",
         tratamentoMedicamento: "Bombinha de asma",
         cirurgia: "Não",
@@ -173,7 +173,7 @@ test("Saúde da Mulher: rotas HTTP no web.js", async () => {
     assert.equal(resInscricao.status, 200);
     const jsonInscricao = await resInscricao.json();
     assert.equal(jsonInscricao.ok, true);
-    assert.equal(jsonInscricao.inscricao.nome, "Fernanda Costa");
+    assert.equal(jsonInscricao.inscricao.nome, "Camila Ferreira");
 
     // 3. Consulta de inscritas via GET /saude-mulher/api/inscritas
     const resLista = await fetch(`${baseUrl}/saude-mulher/api/inscritas`);
@@ -181,19 +181,19 @@ test("Saúde da Mulher: rotas HTTP no web.js", async () => {
     const jsonLista = await resLista.json();
     assert.equal(jsonLista.ok, true);
     assert.ok(jsonLista.inscricoes.length >= 1);
-    const fernanda = jsonLista.inscricoes.find(i => i.nome === "Fernanda Costa");
-    assert.ok(fernanda);
-    assert.equal(fernanda.telefone, "11988889999");
+    const camila = jsonLista.inscricoes.find(i => i.nome === "Camila Ferreira");
+    assert.ok(camila);
+    assert.equal(camila.telefone, "11977776666");
 
     // 4. Relatório em PDF via GET /saude-mulher/api/relatorio-pdf
     const resPdf = await fetch(`${baseUrl}/saude-mulher/api/relatorio-pdf`);
     assert.equal(resPdf.status, 200);
     const htmlPdf = await resPdf.text();
-    assert.match(htmlPdf, /Fernanda Costa/);
+    assert.match(htmlPdf, /Camila Ferreira/);
     assert.match(htmlPdf, /Dor no joelho direito/);
 
     // 5. Exclusão via DELETE /saude-mulher/api/inscricoes/:id
-    const resDel = await fetch(`${baseUrl}/saude-mulher/api/inscricoes/${fernanda.id}`, {
+    const resDel = await fetch(`${baseUrl}/saude-mulher/api/inscricoes/${camila.id}`, {
       method: "DELETE",
     });
     assert.equal(resDel.status, 200);

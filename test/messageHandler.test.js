@@ -1070,8 +1070,8 @@ test("opção 6 (líder): agenda por data específica — dia inválido para o m
   assert.equal(etapas[NUMERO_LIDER].etapa, "evento_dia_especifico", "deveria continuar esperando um dia válido");
 });
 
-test("opção 6 (líder): agenda por data específica — não deixa escolher um dia que já passou", async () => {
-  const { handleMessage, gruposEnviados } = criarContexto({ eventos: [] });
+test("opção 6 (líder): agenda por data específica — quando a data já passou, entende automaticamente como ano que vem", async () => {
+  const { handleMessage, etapas } = criarContexto({ eventos: [] });
   const ontem = moment.tz("America/Sao_Paulo").subtract(1, "day");
 
   const { respDia } = await iniciarAgendamentoDataEspecifica(handleMessage, {
@@ -1081,9 +1081,37 @@ test("opção 6 (líder): agenda por data específica — não deixa escolher um
     mes: String(ontem.month() + 1),
     dia: String(ontem.date()),
   });
-  assert.match(respDia[respDia.length - 1], /já passou/);
-  assert.match(respDia[respDia.length - 1], /a partir de hoje/);
-  assert.equal(gruposEnviados.length, 0, "não deveria notificar a secretaria de uma data que já passou");
+  assert.match(respDia[respDia.length - 1], /está livre/);
+  assert.equal(etapas[NUMERO_LIDER].anoEspecifico, moment.tz("America/Sao_Paulo").year() + 1);
+});
+
+test("opção 6 (líder): agenda por data específica — usuário informa dia no formato '13/02' ou '13/02/27' de mês passado e entende como ano que vem", async () => {
+  const { handleMessage, etapas } = criarContexto({ eventos: [] });
+  const agoraSP = moment.tz("America/Sao_Paulo");
+  const anoAtual = agoraSP.year();
+
+  const { respDia } = await iniciarAgendamentoDataEspecifica(handleMessage, {
+    titulo: "Treinamento",
+    local: "Igreja",
+    rede: "7",
+    mes: "2",
+    dia: "13/02",
+  });
+  assert.match(respDia[respDia.length - 1], /está livre/);
+  const anoEsperado = agoraSP.month() + 1 > 2 ? anoAtual + 1 : anoAtual;
+  assert.equal(etapas[NUMERO_LIDER].anoEspecifico, anoEsperado);
+
+  // Testando também com o ano de 2 dígitos: '13/02/27'
+  const ctx2 = criarContexto({ eventos: [] });
+  const res2 = await iniciarAgendamentoDataEspecifica(ctx2.handleMessage, {
+    titulo: "Treinamento 2",
+    local: "Igreja",
+    rede: "7",
+    mes: "2",
+    dia: "13/02/27",
+  });
+  assert.match(res2.respDia[res2.respDia.length - 1], /está livre/);
+  assert.equal(ctx2.etapas[NUMERO_LIDER].anoEspecifico, 2027);
 });
 
 test("opção 6 (líder): secretaria recusa a solicitação ('não marcar') — solicitante é avisado e nada é gravado", async () => {
