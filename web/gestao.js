@@ -36,21 +36,23 @@ function obterPerfilGestao(session) {
   const dadosPastoral = pastoralMap[username] || null;
 
   // Busca líder correspondente no banco
-  const lideres = loadLideres();
   let liderEncontrado = null;
-  for (const l of Object.values(lideres)) {
-    const nomeNorm = String(l.nome || "").toLowerCase().trim();
-    if (nomeNorm.includes(username) || username.includes(nomeNorm) || l.telefone === username) {
-      liderEncontrado = l;
-      break;
+  try {
+    const lideres = loadLideres();
+    for (const l of Object.values(lideres)) {
+      const nomeNorm = String(l.nome || "").toLowerCase().trim();
+      if (nomeNorm.includes(username) || username.includes(nomeNorm) || l.telefone === username) {
+        liderEncontrado = l;
+        break;
+      }
     }
-  }
+  } catch (_) {}
 
   const cargos = liderEncontrado?.cargos || [];
   const isPastor = role === 'pastor' || Boolean(dadosPastoral) || cargos.includes('pastor');
   const isDiretor = role === 'diretor' || cargos.includes('diretor');
   const isAdmin = role === 'admin';
-  const isLider = true; // Todo usuário autenticado nessa área tem ao menos nível de líder
+  const isLider = true;
 
   let perfilTitulo = 'Líder';
   let nivelAcesso = 1;
@@ -135,7 +137,6 @@ function listarEventosCalendario() {
     `).all();
 
     for (const p of rowsPainel) {
-      // Evita duplicatas se já veio de formularios_eventos
       if (!eventos.some(e => e.titulo.toLowerCase().trim() === p.titulo.toLowerCase().trim())) {
         eventos.push({
           id: `painel_${p.id}`,
@@ -294,7 +295,6 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     criadoPor: usuarioLogado?.username || 'web'
   };
 
-  // Estrutura para fila de aprovação da secretaria (compatível com bot/pendentesAprovacao)
   const dadosAgendamento = {
     tipo: 'evento',
     nomeEvento: nome_evento.trim(),
@@ -319,7 +319,7 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
   // 1. Salva na tabela pendentes gerando o código único de 4 dígitos
   const codigo = salvarPendente(dadosAgendamento);
 
-  // 2. Registra o formulário no banco (para histórico e consulta)
+  // 2. Registra o formulário no banco
   salvarFormularioEvento({
     evento: nome_evento.trim(),
     departamento: deptoFinal,
@@ -330,7 +330,7 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     docUrl: ''
   });
 
-  // 3. Monta e dispara a notificação no WhatsApp da Secretaria
+  // 3. Notificação no WhatsApp da Secretaria
   const querTesouraria = precisa_valor_ministerio === 'sim' || precisa_valor_ministerio === true;
   const tagTesouraria = querTesouraria
     ? `\n\n💰 *Aviso da Tesouraria:* O líder informou que precisará de verba do ministério. Contato da tesouraria: *${CONTATO_TESOURARIA}*`
@@ -361,7 +361,7 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
       disparadoWhatsApp = true;
       console.log(`[Gestão Web] Notificação enviada para a Secretaria via WhatsApp. Código: ${codigo}`);
     } else {
-      console.warn(`[Gestão Web] Bot WhatsApp não está conectado no momento. Notificação ficará salva no banco com código ${codigo}.`);
+      console.warn(`[Gestão Web] Bot WhatsApp não conectado. Notificação salva com código ${codigo}.`);
     }
   } catch (errZap) {
     console.error(`[Gestão Web] Erro ao disparar mensagem para o WhatsApp da Secretaria:`, errZap.message);
@@ -379,6 +379,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 
 /**
  * Renderiza o HTML da tela de Gestão de Eventos (/gestao)
+ * TEMA: Cinza Claro (Fundo suave #f4f6f8 como o site institucional)
+ * OTIMIZADO: Mobile-first (perfeito para celulares de líderes)
  */
 function renderGestaoHtml({ user }) {
   const perfil = obterPerfilGestao(user);
@@ -388,7 +390,7 @@ function renderGestaoHtml({ user }) {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Gestão de Eventos — Comunidade Cristã Curados</title>
   <link rel="icon" type="image/png" href="/images/logo.png" />
   <link rel="manifest" href="/manifest.json" />
@@ -398,258 +400,239 @@ function renderGestaoHtml({ user }) {
 
   <style>
     :root {
-      --cor-ciano: #00bcd4;
-      --cor-roxo: #7b2cbf;
-      --cor-roxo-claro: #9d4edd;
-      --cor-laranja: #ff7d00;
+      --cor-roxo: #7A2BE2;
+      --cor-roxo-hover: #6922c4;
+      --cor-ciano: #00B7D9;
       --cor-verde: #10b981;
       --cor-amarelo: #f59e0b;
       --cor-vermelho: #ef4444;
-      --cor-azul: #3b82f6;
-      --cor-fundo: #0d0d12;
-      --cor-card: #16161f;
-      --cor-card-hover: #1e1e2b;
-      --cor-input: #21212e;
-      --cor-borda: rgba(255, 255, 255, 0.09);
-      --cor-texto: #f3f4f6;
-      --cor-subtexto: #9ca3af;
+      --cor-azul: #2563eb;
+
+      /* PALETA CLARA (Igual ao site principal: #f4f6f8 / #f8f9fa) */
+      --cor-fundo: #f4f6f8;
+      --cor-card: #ffffff;
+      --cor-borda: #e2e8f0;
+      --cor-input: #ffffff;
+      --cor-input-borda: #cbd5e1;
+      --cor-texto: #1e293b;
+      --cor-subtexto: #64748b;
+      --cor-cinza-suave: #f1f5f9;
+      --sombra-card: 0 4px 16px rgba(0, 0, 0, 0.06);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      font-family: 'Montserrat', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
 
     body {
       background-color: var(--cor-fundo);
-      background-image: 
-        radial-gradient(at 0% 0%, rgba(123, 44, 191, 0.15) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(0, 188, 212, 0.12) 0px, transparent 50%);
       color: var(--cor-texto);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      line-height: 1.5;
     }
 
-    /* TOPBAR */
+    /* TOPBAR COMPACTA & RESPONSIVA */
     .topbar {
-      background: rgba(22, 22, 31, 0.85);
-      backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--cor-borda);
-      padding: 0.9rem 1.5rem;
+      background: #121214;
+      color: #ffffff;
+      padding: 10px 16px;
       position: sticky;
       top: 0;
       z-index: 100;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       text-decoration: none;
-      color: #fff;
+      color: #ffffff;
     }
 
     .brand img {
-      width: 42px;
-      height: 42px;
+      width: 36px;
+      height: 36px;
       object-fit: contain;
-      filter: drop-shadow(0 0 10px rgba(0, 188, 212, 0.4));
     }
 
     .brand-text h1 {
-      font-size: 1.05rem;
+      font-size: 0.95rem;
       font-weight: 800;
-      letter-spacing: 0.5px;
+      line-height: 1.2;
     }
 
     .brand-text span {
-      font-size: 0.72rem;
-      font-weight: 600;
+      font-size: 0.68rem;
+      font-weight: 700;
       color: var(--cor-ciano);
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 1px;
       display: block;
     }
 
     .user-pill {
       display: flex;
       align-items: center;
-      gap: 12px;
-      background: rgba(255, 255, 255, 0.05);
-      padding: 6px 14px;
-      border-radius: 999px;
-      border: 1px solid var(--cor-borda);
-    }
-
-    .user-info {
-      text-align: right;
+      gap: 8px;
     }
 
     .user-name {
-      font-size: 0.82rem;
+      font-size: 0.78rem;
       font-weight: 700;
-      color: #fff;
+      color: #f1f5f9;
+      max-width: 110px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .user-badge {
       display: inline-block;
-      font-size: 0.65rem;
+      font-size: 0.62rem;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.8px;
-      padding: 2px 7px;
-      border-radius: 6px;
-      background: linear-gradient(135deg, var(--cor-roxo), var(--cor-roxo-claro));
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--cor-roxo);
       color: #fff;
     }
-
-    .user-badge.pastor {
-      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
-    }
-    .user-badge.diretor {
-      background: linear-gradient(135deg, #0d9488, #00bcd4);
-    }
-    .user-badge.admin {
-      background: linear-gradient(135deg, #b91c1c, #ef4444);
-    }
+    .user-badge.pastor { background: var(--cor-azul); }
+    .user-badge.diretor { background: var(--cor-ciano); color: #000; }
+    .user-badge.admin { background: var(--cor-vermelho); }
 
     .btn-sair {
-      background: transparent;
+      background: rgba(255, 255, 255, 0.1);
       border: none;
-      color: var(--cor-subtexto);
+      color: #cbd5e1;
       cursor: pointer;
-      font-size: 0.78rem;
-      font-weight: 600;
+      font-size: 0.75rem;
+      font-weight: 700;
       padding: 6px 10px;
-      border-radius: 8px;
-      transition: all 0.2s;
-    }
-    .btn-sair:hover {
-      color: var(--cor-vermelho);
-      background: rgba(239, 68, 68, 0.1);
+      border-radius: 6px;
     }
 
-    /* CONTAINER PRINCIPAL */
+    /* CONTAINER PRINCIPAL (MOBILE FIRST) */
     .main-container {
-      max-width: 1400px;
       width: 100%;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 1.5rem;
+      padding: 12px;
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 12px;
     }
 
-    /* CABEÇALHO DA PÁGINA COM AÇÕES */
-    .page-header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      background: var(--cor-card);
+    /* BARRA DE AÇÃO RÁPIDA SUPERIOR */
+    .quick-bar {
+      background: #ffffff;
       border: 1px solid var(--cor-borda);
-      border-radius: 20px;
-      padding: 1.4rem 1.8rem;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: var(--sombra-card);
+    }
+    @media (min-width: 640px) {
+      .quick-bar {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+      }
     }
 
-    .page-title h2 {
-      font-size: 1.45rem;
+    .quick-bar-title h2 {
+      font-size: 1.15rem;
       font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      color: var(--cor-texto);
     }
-
-    .page-title p {
+    .quick-bar-title p {
+      font-size: 0.78rem;
       color: var(--cor-subtexto);
-      font-size: 0.85rem;
-      margin-top: 4px;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
+      margin-top: 2px;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--cor-roxo), var(--cor-roxo-claro));
-      color: #fff;
+      background: linear-gradient(135deg, var(--cor-roxo), #9d4edd);
+      color: #ffffff;
       border: none;
-      padding: 0.85rem 1.6rem;
+      padding: 12px 18px;
       border-radius: 12px;
       font-size: 0.92rem;
       font-weight: 700;
-      letter-spacing: 0.5px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      box-shadow: 0 6px 20px rgba(123, 44, 191, 0.4);
-      transition: all 0.25s ease;
+      box-shadow: 0 4px 14px rgba(122, 43, 226, 0.3);
+      width: 100%;
+      min-height: 46px;
     }
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(123, 44, 191, 0.6);
+    @media (min-width: 640px) {
+      .btn-primary {
+        width: auto;
+      }
     }
 
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.06);
+      background: var(--cor-cinza-suave);
       color: var(--cor-texto);
       border: 1px solid var(--cor-borda);
-      padding: 0.85rem 1.4rem;
-      border-radius: 12px;
-      font-size: 0.92rem;
-      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s ease;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-    }
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
+      justify-content: center;
+      gap: 6px;
+      min-height: 42px;
     }
 
     /* ABAS DE NAVEGAÇÃO */
     .tabs-nav {
       display: flex;
-      gap: 8px;
-      border-bottom: 1px solid var(--cor-borda);
-      padding-bottom: 0.5rem;
+      gap: 6px;
       overflow-x: auto;
+      padding-bottom: 4px;
+      -webkit-overflow-scrolling: touch;
     }
 
     .tab-btn {
-      background: transparent;
-      border: none;
+      background: #ffffff;
+      border: 1px solid var(--cor-borda);
       color: var(--cor-subtexto);
-      padding: 0.75rem 1.3rem;
+      padding: 9px 14px;
       border-radius: 10px;
-      font-size: 0.9rem;
+      font-size: 0.82rem;
       font-weight: 700;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      transition: all 0.2s;
+      gap: 6px;
       white-space: nowrap;
-    }
-    .tab-btn:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.04);
+      flex-shrink: 0;
     }
     .tab-btn.active {
-      color: var(--cor-ciano);
-      background: rgba(0, 188, 212, 0.12);
-      border-bottom: 2px solid var(--cor-ciano);
+      color: #ffffff;
+      background: var(--cor-roxo);
+      border-color: var(--cor-roxo);
+      box-shadow: 0 2px 8px rgba(122, 43, 226, 0.3);
     }
 
-    /* CONTEÚDO DAS ABAS */
     .tab-pane {
       display: none;
     }
@@ -657,224 +640,212 @@ function renderGestaoHtml({ user }) {
       display: block;
     }
 
-    /* GRID DO CALENDÁRIO */
+    /* LAYOUT DO CALENDÁRIO */
     .calendar-layout {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      gap: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    @media (max-width: 1024px) {
+    @media (min-width: 900px) {
       .calendar-layout {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: 1fr 340px;
       }
     }
 
     .calendar-card {
-      background: var(--cor-card);
+      background: #ffffff;
       border: 1px solid var(--cor-borda);
-      border-radius: 20px;
-      padding: 1.5rem;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: var(--sombra-card);
     }
 
     .calendar-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 1.2rem;
-    }
-
-    .cal-title-wrapper {
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      margin-bottom: 12px;
     }
 
     .cal-month-year {
-      font-size: 1.3rem;
+      font-size: 1.1rem;
       font-weight: 800;
+      color: var(--cor-texto);
       text-transform: capitalize;
     }
 
     .cal-nav-btn {
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--cor-cinza-suave);
       border: 1px solid var(--cor-borda);
-      color: #fff;
-      width: 36px;
-      height: 36px;
+      color: var(--cor-texto);
+      width: 38px;
+      height: 38px;
       border-radius: 10px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.1rem;
-      transition: all 0.2s;
-    }
-    .cal-nav-btn:hover {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: var(--cor-ciano);
+      font-size: 1.2rem;
+      font-weight: 700;
     }
 
     .cal-filters {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 1rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 480px) {
+      .cal-filters {
+        grid-template-columns: 1fr;
+      }
     }
 
     .select-filtro {
-      background: var(--cor-input);
-      border: 1px solid var(--cor-borda);
+      background: #ffffff;
+      border: 1px solid var(--cor-input-borda);
       color: var(--cor-texto);
-      padding: 0.55rem 0.9rem;
+      padding: 10px 12px;
       border-radius: 10px;
       font-size: 0.82rem;
       font-weight: 600;
+      width: 100%;
       outline: none;
     }
 
-    /* GRID DIAS DO MÊS */
+    /* GRID DIAS DA SEMANA */
     .cal-grid-header {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       text-align: center;
-      font-weight: 700;
-      font-size: 0.78rem;
+      font-weight: 800;
+      font-size: 0.72rem;
       color: var(--cor-subtexto);
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--cor-borda);
+      margin-bottom: 6px;
     }
 
     .cal-grid-days {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 8px;
+      gap: 5px;
     }
 
     .cal-day {
-      aspect-ratio: 1;
-      min-height: 85px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 14px;
-      padding: 6px;
+      min-height: 52px;
+      background: #ffffff;
+      border: 1px solid var(--cor-borda);
+      border-radius: 10px;
+      padding: 4px;
       display: flex;
       flex-direction: column;
-      position: relative;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
+      user-select: none;
     }
     .cal-day:hover {
-      background: rgba(0, 188, 212, 0.08);
-      border-color: rgba(0, 188, 212, 0.3);
-      transform: translateY(-2px);
+      border-color: var(--cor-roxo);
+      background: #faf5ff;
     }
     .cal-day.outro-mes {
-      opacity: 0.3;
+      background: #f8fafc;
+      opacity: 0.35;
     }
     .cal-day.hoje {
       border: 2px solid var(--cor-ciano);
-      background: rgba(0, 188, 212, 0.06);
+      background: #f0fdfa;
     }
     .cal-day.selecionado {
-      border: 2px solid var(--cor-roxo-claro);
-      box-shadow: 0 0 15px rgba(157, 78, 221, 0.4);
+      border: 2px solid var(--cor-roxo);
+      background: #f5f3ff;
+      box-shadow: 0 0 0 2px rgba(122, 43, 226, 0.2);
     }
 
     .day-num {
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--cor-subtexto);
-      margin-bottom: 4px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--cor-texto);
+      text-align: right;
     }
     .cal-day.hoje .day-num {
-      color: var(--cor-ciano);
-      font-weight: 800;
+      color: #0d9488;
     }
 
     .day-events {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
+      margin-top: 2px;
       overflow: hidden;
-      flex: 1;
     }
 
     .event-chip {
-      font-size: 0.65rem;
+      font-size: 0.6rem;
       font-weight: 700;
-      padding: 2px 5px;
-      border-radius: 5px;
+      padding: 2px 4px;
+      border-radius: 4px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      color: #fff;
+      display: block;
+      line-height: 1.2;
     }
     .event-chip.aprovado {
-      background: rgba(16, 185, 129, 0.25);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      color: #34d399;
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
     }
     .event-chip.pendente {
-      background: rgba(245, 158, 11, 0.25);
-      border: 1px solid rgba(245, 158, 11, 0.4);
-      color: #fbbf24;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
     }
     .event-chip.pastoral {
-      background: rgba(59, 130, 246, 0.25);
-      border: 1px solid rgba(59, 130, 246, 0.4);
-      color: #60a5fa;
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
     }
 
-    /* PAINEL LATERAL DE DETALHES DO DIA */
+    /* PAINEL LATERAL DO DIA */
     .day-details-panel {
-      background: var(--cor-card);
+      background: #ffffff;
       border: 1px solid var(--cor-borda);
-      border-radius: 20px;
-      padding: 1.4rem;
+      border-radius: 18px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-      height: fit-content;
+      gap: 12px;
+      box-shadow: var(--sombra-card);
     }
 
     .day-details-header {
       border-bottom: 1px solid var(--cor-borda);
-      padding-bottom: 0.8rem;
+      padding-bottom: 8px;
     }
     .day-details-header h3 {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 800;
+      color: var(--cor-texto);
     }
     .day-details-header p {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       color: var(--cor-subtexto);
-    }
-
-    .events-list-empty {
-      text-align: center;
-      padding: 2rem 1rem;
-      color: var(--cor-subtexto);
-      font-size: 0.85rem;
     }
 
     .day-event-card {
-      background: rgba(255, 255, 255, 0.03);
+      background: var(--cor-cinza-suave);
       border: 1px solid var(--cor-borda);
       border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 10px;
-      transition: all 0.2s;
-    }
-    .day-event-card:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(0, 188, 212, 0.3);
+      padding: 10px;
+      margin-bottom: 8px;
     }
     .day-event-card .title {
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: #fff;
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: var(--cor-texto);
     }
     .day-event-card .meta {
       font-size: 0.75rem;
@@ -885,334 +856,301 @@ function renderGestaoHtml({ user }) {
       gap: 2px;
     }
 
-    /* LEGENDA DO CALENDÁRIO */
     .cal-legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 14px;
-      margin-top: 1rem;
-      font-size: 0.78rem;
+      gap: 12px;
+      margin-top: 10px;
+      font-size: 0.72rem;
       color: var(--cor-subtexto);
+      font-weight: 600;
     }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
     .dot-verde { background: var(--cor-verde); }
     .dot-amarelo { background: var(--cor-amarelo); }
     .dot-azul { background: var(--cor-azul); }
 
     /* TABELA / CARDS DE SOLICITAÇÕES */
     .solicitacoes-table-card {
-      background: var(--cor-card);
+      background: #ffffff;
       border: 1px solid var(--cor-borda);
-      border-radius: 20px;
-      padding: 1.5rem;
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: var(--sombra-card);
       overflow-x: auto;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      text-align: left;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
+      min-width: 650px;
     }
-
     th {
       color: var(--cor-subtexto);
-      font-weight: 700;
-      padding: 12px 14px;
+      font-weight: 800;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--cor-borda);
       text-transform: uppercase;
-      font-size: 0.72rem;
-      letter-spacing: 1px;
+      font-size: 0.7rem;
+      letter-spacing: 0.5px;
+      text-align: left;
     }
-
     td {
-      padding: 14px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      padding: 12px;
+      border-bottom: 1px solid #f1f5f9;
       color: var(--cor-texto);
-    }
-
-    tr:hover td {
-      background: rgba(255, 255, 255, 0.02);
     }
 
     .badge-status {
       display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 800;
     }
     .badge-status.pendente {
-      background: rgba(245, 158, 11, 0.15);
-      color: #fbbf24;
-      border: 1px solid rgba(245, 158, 11, 0.3);
+      background: #fef3c7;
+      color: #92400e;
     }
     .badge-status.aprovado {
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.3);
+      background: #dcfce7;
+      color: #166534;
     }
 
     .badge-codigo {
       font-family: monospace;
-      font-size: 0.78rem;
-      font-weight: 700;
-      background: rgba(255, 255, 255, 0.07);
-      padding: 2px 6px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      background: #f1f5f9;
+      padding: 2px 5px;
       border-radius: 4px;
-      color: var(--cor-ciano);
+      color: var(--cor-roxo);
     }
 
-    /* MODAL DO FORMULÁRIO (WIZARD DE 4 ETAPAS) */
+    /* MODAL DO WIZARD */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.82);
-      backdrop-filter: blur(8px);
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(4px);
       z-index: 1000;
       display: none;
       align-items: center;
       justify-content: center;
-      padding: 1rem;
+      padding: 8px;
     }
     .modal-overlay.active {
       display: flex;
     }
 
     .modal-content {
-      background: #181824;
-      border: 1px solid var(--cor-borda);
-      border-radius: 24px;
+      background: #ffffff;
+      border-radius: 20px;
       width: 100%;
-      max-width: 760px;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
-      position: relative;
+      max-width: 680px;
+      max-height: 94vh;
       display: flex;
       flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
     }
 
     .modal-header {
-      padding: 1.5rem 1.8rem;
+      padding: 14px 18px;
       border-bottom: 1px solid var(--cor-borda);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: sticky;
-      top: 0;
-      background: #181824;
-      z-index: 10;
+      background: #ffffff;
     }
-
     .modal-header h3 {
-      font-size: 1.25rem;
+      font-size: 1.1rem;
       font-weight: 800;
+      color: var(--cor-texto);
     }
 
     .modal-close-btn {
-      background: transparent;
+      background: var(--cor-cinza-suave);
       border: none;
-      color: var(--cor-subtexto);
-      font-size: 1.5rem;
+      color: var(--cor-texto);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      font-size: 1.1rem;
+      font-weight: 700;
       cursor: pointer;
-      line-height: 1;
-      padding: 4px 8px;
-      border-radius: 8px;
-    }
-    .modal-close-btn:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    /* STEPPER */
+    /* STEPPER COMPACTO MOBILE */
     .wizard-stepper {
-      display: flex;
-      justify-content: space-between;
-      padding: 1.2rem 1.8rem;
-      background: rgba(255, 255, 255, 0.02);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      padding: 8px 12px;
+      background: var(--cor-cinza-suave);
       border-bottom: 1px solid var(--cor-borda);
+      gap: 4px;
     }
 
     .step-item {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 8px;
-      font-size: 0.78rem;
+      font-size: 0.65rem;
       font-weight: 700;
       color: var(--cor-subtexto);
+      text-align: center;
     }
-    .step-item.active {
-      color: var(--cor-ciano);
-    }
-    .step-item.concluido {
-      color: var(--cor-verde);
-    }
+    .step-item.active { color: var(--cor-roxo); }
+    .step-item.concluido { color: var(--cor-verde); }
 
     .step-badge {
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.08);
+      background: #cbd5e1;
+      color: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
+      margin-bottom: 2px;
     }
     .step-item.active .step-badge {
-      background: var(--cor-ciano);
-      color: #000;
+      background: var(--cor-roxo);
     }
     .step-item.concluido .step-badge {
       background: var(--cor-verde);
-      color: #000;
     }
 
     .modal-body {
-      padding: 1.8rem;
+      padding: 14px 18px;
+      overflow-y: auto;
       flex: 1;
     }
 
-    .form-step {
-      display: none;
-    }
-    .form-step.active {
-      display: block;
-    }
+    .form-step { display: none; }
+    .form-step.active { display: block; }
 
     .form-group {
-      margin-bottom: 1.2rem;
+      margin-bottom: 12px;
     }
-
     .form-group label {
       display: block;
       font-size: 0.82rem;
       font-weight: 700;
-      margin-bottom: 6px;
-      color: #e5e7eb;
+      margin-bottom: 4px;
+      color: var(--cor-texto);
     }
     .form-group .hint {
       font-size: 0.72rem;
       color: var(--cor-subtexto);
-      margin-top: 4px;
+      margin-top: 3px;
     }
 
     .form-control {
       width: 100%;
-      padding: 0.85rem 1.1rem;
-      background: var(--cor-input);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 12px;
-      color: #fff;
-      font-size: 0.9rem;
+      padding: 11px 14px;
+      background: #ffffff;
+      border: 1.5px solid var(--cor-input-borda);
+      border-radius: 10px;
+      color: var(--cor-texto);
+      font-size: 16px; /* Evita auto-zoom no iPhone */
       outline: none;
-      transition: all 0.2s;
     }
     .form-control:focus {
-      border-color: var(--cor-ciano);
-      box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.2);
+      border-color: var(--cor-roxo);
+      box-shadow: 0 0 0 3px rgba(122, 43, 226, 0.15);
     }
 
     textarea.form-control {
-      min-height: 80px;
+      min-height: 70px;
       resize: vertical;
     }
 
     .form-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
+      grid-template-columns: 1fr;
+      gap: 10px;
     }
-    @media (max-width: 600px) {
+    @media (min-width: 540px) {
       .form-row {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
       }
     }
 
-    /* RADIO TILES */
     .radio-tiles {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
     }
     .radio-tile {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--cor-borda);
-      border-radius: 12px;
-      padding: 12px;
+      background: var(--cor-cinza-suave);
+      border: 1.5px solid var(--cor-borda);
+      border-radius: 10px;
+      padding: 10px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 6px;
       cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-    .radio-tile:hover {
-      background: rgba(255, 255, 255, 0.08);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--cor-texto);
     }
     .radio-tile.selected {
-      border-color: var(--cor-ciano);
-      background: rgba(0, 188, 212, 0.1);
-      color: var(--cor-ciano);
+      border-color: var(--cor-roxo);
+      background: #faf5ff;
+      color: var(--cor-roxo);
     }
 
     .modal-footer {
-      padding: 1.2rem 1.8rem;
+      padding: 12px 18px;
       border-top: 1px solid var(--cor-borda);
       display: flex;
-      justify-content: space-between;
-      position: sticky;
-      bottom: 0;
-      background: #181824;
-      z-index: 10;
+      gap: 8px;
+      background: #ffffff;
     }
 
     .alerta-caixa {
-      padding: 12px 16px;
-      border-radius: 12px;
-      font-size: 0.82rem;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.78rem;
       line-height: 1.4;
-      margin-top: 10px;
+      margin-top: 8px;
     }
     .alerta-amarelo {
-      background: rgba(245, 158, 11, 0.12);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      color: #fde68a;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
     }
     .alerta-verde {
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: #a7f3d0;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
     }
 
     /* TOAST */
     #toast-msg {
       position: fixed;
-      bottom: 24px;
-      right: 24px;
-      background: #1f2937;
-      color: #fff;
-      padding: 14px 20px;
+      bottom: 20px;
+      left: 16px;
+      right: 16px;
+      max-width: 400px;
+      margin: 0 auto;
+      background: #1e293b;
+      color: #ffffff;
+      padding: 12px 18px;
       border-radius: 12px;
-      border: 1px solid var(--cor-borda);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
       z-index: 2000;
       display: none;
-      font-size: 0.88rem;
-      font-weight: 600;
-      align-items: center;
-      gap: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-align: center;
     }
   </style>
 </head>
@@ -1228,48 +1166,45 @@ function renderGestaoHtml({ user }) {
       </div>
     </a>
 
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <div class="user-pill">
-        <div class="user-info">
-          <div class="user-name">${perfil?.nome || 'Usuário'}</div>
-          <span class="user-badge ${perfil?.role}">${perfil?.perfilTitulo || 'Líder'}</span>
-        </div>
+    <div class="user-pill">
+      <div style="text-align: right;">
+        <div class="user-name">${perfil?.nome || 'Usuário'}</div>
+        <span class="user-badge ${perfil?.role}">${perfil?.perfilTitulo || 'Líder'}</span>
       </div>
       <button class="btn-sair" onclick="window.location.href='/secretaria/login'">Sair</button>
     </div>
   </header>
 
-  <!-- MAIN -->
+  <!-- CONTAINER PRINCIPAL -->
   <main class="main-container">
 
-    <!-- HEADER DA PÁGINA -->
-    <section class="page-header">
-      <div class="page-title">
-        <h2>🎪 Painel de Eventos e Agendamentos</h2>
-        <p>Agende eventos para o seu ministério com envio automático para aprovação da Secretaria no WhatsApp.</p>
+    <!-- BARRA RÁPIDA / NOVO AGENDAMENTO -->
+    <section class="quick-bar">
+      <div class="quick-bar-title">
+        <h2>🎪 Agendamentos da Igreja</h2>
+        <p>Agende eventos para o seu ministério. A aprovação é solicitada diretamente à Secretaria pelo WhatsApp.</p>
       </div>
-
-      <div class="header-actions">
+      <div>
         <button class="btn-primary" onclick="abrirModalAgendamento()">
           <span>➕</span> Novo Agendamento
         </button>
       </div>
     </section>
 
-    <!-- NAVEGAÇÃO POR ABAS -->
+    <!-- NAVEGAÇÃO DE ABAS -->
     <nav class="tabs-nav">
-      <button class="tab-btn active" onclick="trocarAba('calendario')">
-        📅 Calendário & Disponibilidade
+      <button class="tab-btn active" id="btn-tab-calendario" onclick="trocarAba('calendario')">
+        📅 Calendário
       </button>
-      <button class="tab-btn" onclick="trocarAba('solicitacoes')">
-        📋 Minhas Solicitações <span id="badge-total-solicitacoes" style="background:rgba(255,255,255,0.1); padding:2px 7px; border-radius:999px; font-size:0.75rem;">...</span>
+      <button class="tab-btn" id="btn-tab-solicitacoes" onclick="trocarAba('solicitacoes')">
+        📋 Solicitações <span id="badge-total-solicitacoes" style="background:rgba(0,0,0,0.06); padding:2px 6px; border-radius:999px; font-size:0.7rem;">0</span>
       </button>
-      <button class="tab-btn" onclick="trocarAba('fichas')">
-        📄 Fichas de Eventos
+      <button class="tab-btn" id="btn-tab-fichas" onclick="trocarAba('fichas')">
+        📄 Fichas
       </button>
       ${(perfil?.isPastor || perfil?.isAdmin || perfil?.isDiretor) ? `
-      <button class="tab-btn" onclick="trocarAba('pastoral')">
-        🤝 Área Pastoral
+      <button class="tab-btn" id="btn-tab-pastoral" onclick="trocarAba('pastoral')">
+        🤝 Pastoral
       </button>` : ''}
     </nav>
 
@@ -1280,12 +1215,10 @@ function renderGestaoHtml({ user }) {
         <!-- CALENDÁRIO GRID -->
         <div class="calendar-card">
           <div class="calendar-header">
-            <div class="cal-title-wrapper">
-              <span id="cal-mes-ano" class="cal-month-year">Carregando...</span>
-            </div>
-            <div style="display: flex; gap: 8px;">
+            <span id="cal-mes-ano" class="cal-month-year">Carregando mês...</span>
+            <div style="display: flex; gap: 6px;">
               <button class="cal-nav-btn" onclick="mudarMes(-1)">‹</button>
-              <button class="cal-nav-btn" onclick="irParaHoje()" style="font-size:0.75rem; width:auto; padding:0 10px; font-weight:700;">Hoje</button>
+              <button class="cal-nav-btn" onclick="irParaHoje()" style="font-size:0.75rem; width:auto; padding:0 8px;">Hoje</button>
               <button class="cal-nav-btn" onclick="mudarMes(1)">›</button>
             </div>
           </div>
@@ -1299,8 +1232,8 @@ function renderGestaoHtml({ user }) {
 
             <select id="filtro-status" class="select-filtro" onchange="renderizarCalendario()">
               <option value="">Status: Todos</option>
-              <option value="aprovado">Apenas Confirmados (Verde)</option>
-              <option value="pendente_secretaria">Apenas Pendentes (Amarelo)</option>
+              <option value="aprovado">Apenas Confirmados</option>
+              <option value="pendente_secretaria">Apenas Pendentes</option>
             </select>
           </div>
 
@@ -1309,33 +1242,33 @@ function renderGestaoHtml({ user }) {
             <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
           </div>
 
-          <!-- DIAS DO MÊS -->
+          <!-- GRADE DOS DIAS -->
           <div id="cal-grid-dias" class="cal-grid-days">
             <!-- Gerado via JS -->
           </div>
 
           <!-- LEGENDA -->
           <div class="cal-legend">
-            <div class="legend-item"><span class="legend-dot dot-verde"></span> Evento Confirmado</div>
-            <div class="legend-item"><span class="legend-dot dot-amarelo"></span> Aguardando Secretaria (WhatsApp)</div>
-            <div class="legend-item"><span class="legend-dot dot-azul"></span> Atendimento Pastoral</div>
+            <div class="legend-item"><span class="legend-dot dot-verde"></span> Confirmado</div>
+            <div class="legend-item"><span class="legend-dot dot-amarelo"></span> Aguardando Secretaria</div>
+            <div class="legend-item"><span class="legend-dot dot-azul"></span> Pastoral</div>
           </div>
         </div>
 
-        <!-- PAINEL LATERAL DO DIA SELECIONADO -->
+        <!-- DETALHES DO DIA SELECIONADO -->
         <aside class="day-details-panel">
           <div class="day-details-header">
-            <h3 id="panel-data-selecionada">Selecione um dia</h3>
-            <p id="panel-dia-semana">Clique em uma data no calendário</p>
+            <h3 id="panel-data-selecionada">Data Selecionada</h3>
+            <p id="panel-dia-semana">Toque em qualquer dia no calendário</p>
           </div>
 
-          <div id="panel-eventos-dia" style="flex: 1; overflow-y: auto; max-height: 480px;">
-            <div class="events-list-empty">
-              Nenhum evento neste dia.
+          <div id="panel-eventos-dia" style="flex: 1; max-height: 280px; overflow-y: auto;">
+            <div style="text-align: center; padding: 1.5rem 0; color: var(--cor-subtexto); font-size: 0.82rem;">
+              Nenhum evento registrado nesta data.<br><br>💡 Salão <b>livre</b>!
             </div>
           </div>
 
-          <button id="btn-agendar-neste-dia" class="btn-primary" style="width: 100%; justify-content: center;" onclick="abrirModalComDataSelecionada()">
+          <button id="btn-agendar-neste-dia" class="btn-primary" onclick="abrirModalComDataSelecionada()">
             ➕ Agendar neste Dia
           </button>
         </aside>
@@ -1346,7 +1279,7 @@ function renderGestaoHtml({ user }) {
     <!-- ABA 2: MINHAS SOLICITAÇÕES -->
     <section id="pane-solicitacoes" class="tab-pane">
       <div class="solicitacoes-table-card">
-        <h3 style="margin-bottom: 1rem; font-size: 1.15rem; font-weight: 800;">Histórico de Solicitações</h3>
+        <h3 style="margin-bottom: 10px; font-size: 1.05rem; font-weight: 800;">Histórico de Solicitações</h3>
         <table>
           <thead>
             <tr>
@@ -1362,7 +1295,7 @@ function renderGestaoHtml({ user }) {
           </thead>
           <tbody id="tabela-solicitacoes-corpo">
             <tr>
-              <td colspan="8" style="text-align: center; padding: 2rem; color: var(--cor-subtexto);">
+              <td colspan="8" style="text-align: center; padding: 1.5rem; color: var(--cor-subtexto);">
                 Carregando solicitações...
               </td>
             </tr>
@@ -1374,11 +1307,11 @@ function renderGestaoHtml({ user }) {
     <!-- ABA 3: FICHAS DE EVENTOS -->
     <section id="pane-fichas" class="tab-pane">
       <div class="solicitacoes-table-card">
-        <h3 style="margin-bottom: 1rem; font-size: 1.15rem; font-weight: 800;">Fichas e Documentos Oficiais dos Eventos</h3>
-        <p style="color: var(--cor-subtexto); font-size: 0.85rem; margin-bottom: 1.2rem;">
-          Consulte o formulário detalhado preenchido pelos líderes e o link do documento oficial do Google Docs.
+        <h3 style="margin-bottom: 8px; font-size: 1.05rem; font-weight: 800;">Fichas e Documentos dos Eventos</h3>
+        <p style="color: var(--cor-subtexto); font-size: 0.8rem; margin-bottom: 12px;">
+          Consulte o formulário com todas as respostas e o link oficial do Google Docs.
         </p>
-        <div id="lista-fichas-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
+        <div id="lista-fichas-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;">
           <!-- Carregado via JS -->
         </div>
       </div>
@@ -1388,48 +1321,48 @@ function renderGestaoHtml({ user }) {
     ${(perfil?.isPastor || perfil?.isAdmin || perfil?.isDiretor) ? `
     <section id="pane-pastoral" class="tab-pane">
       <div class="solicitacoes-table-card">
-        <h3 style="margin-bottom: 0.5rem; font-size: 1.15rem; font-weight: 800;">Área Pastoral & Atendimentos</h3>
-        <p style="color: var(--cor-subtexto); font-size: 0.85rem; margin-bottom: 1.2rem;">
-          Visão unificada dos atendimentos pastorais, orientações e autorizações de salão.
+        <h3 style="margin-bottom: 6px; font-size: 1.05rem; font-weight: 800;">Área Pastoral & Atendimentos</h3>
+        <p style="color: var(--cor-subtexto); font-size: 0.8rem; margin-bottom: 12px;">
+          Visão unificada dos atendimentos pastorais, discípulos e autorizações de salão.
         </p>
-        <div id="lista-atendimentos-pastorais" style="display: flex; flex-direction: column; gap: 10px;">
-          <!-- Carregado via JS -->
+        <div id="lista-atendimentos-pastorais" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="color: var(--cor-subtexto); font-size: 0.82rem; padding: 1rem 0;">Nenhum atendimento pendente de autorização.</div>
         </div>
       </div>
     </section>` : ''}
 
   </main>
 
-  <!-- MODAL DE NOVO AGENDAMENTO (4 ETAPAS) -->
+  <!-- MODAL DE NOVO AGENDAMENTO (WIZARD 4 ETAPAS) -->
   <div id="modal-agendamento" class="modal-overlay">
     <div class="modal-content">
 
-      <!-- CABEÇALHO DO MODAL -->
+      <!-- CABEÇALHO MODAL -->
       <div class="modal-header">
         <div>
           <h3>Novo Agendamento de Evento</h3>
-          <p style="font-size: 0.78rem; color: var(--cor-subtexto);">Preenchimento guiado com notificação direta para a Secretaria</p>
+          <p style="font-size: 0.72rem; color: var(--cor-subtexto);">Formulário guiado enviado diretamente à Secretaria</p>
         </div>
         <button class="modal-close-btn" onclick="fecharModalAgendamento()">✕</button>
       </div>
 
-      <!-- STEPPER INDICADOR -->
+      <!-- STEPPER -->
       <div class="wizard-stepper">
         <div class="step-item active" id="step-ind-1">
           <span class="step-badge">1</span>
-          <span>Data & Horário</span>
+          <span>Data/Hora</span>
         </div>
         <div class="step-item" id="step-ind-2">
           <span class="step-badge">2</span>
-          <span>Estrutura & Local</span>
+          <span>Estrutura</span>
         </div>
         <div class="step-item" id="step-ind-3">
           <span class="step-badge">3</span>
-          <span>Mídia & Artes</span>
+          <span>Mídia</span>
         </div>
         <div class="step-item" id="step-ind-4">
           <span class="step-badge">4</span>
-          <span>Tesouraria & Propósito</span>
+          <span>Propósito</span>
         </div>
       </div>
 
@@ -1437,7 +1370,7 @@ function renderGestaoHtml({ user }) {
       <form id="form-novo-evento" onsubmit="event.preventDefault(); submeterFormularioEvento();">
         <div class="modal-body">
 
-          <!-- ETAPA 1: DADOS BÁSICOS & DATA -->
+          <!-- ETAPA 1: DATA E HORÁRIO -->
           <div id="step-1" class="form-step active">
             <div class="form-row">
               <div class="form-group">
@@ -1483,28 +1416,27 @@ function renderGestaoHtml({ user }) {
             <div class="form-group">
               <label>🏛️ Uso do salão antes, depois ou no dia anterior?</label>
               <div class="radio-tiles">
-                <label class="radio-tile selected" onclick="toggleUsoSalao('nao', this)">
+                <label class="radio-tile selected" id="tile-salao-nao" onclick="toggleUsoSalao('nao')">
                   <input type="radio" name="r-salao" value="nao" checked style="display:none;" />
-                  <span>❌ Não precisa de horário extra</span>
+                  <span>❌ Não precisa</span>
                 </label>
-                <label class="radio-tile" onclick="toggleUsoSalao('sim', this)">
+                <label class="radio-tile" id="tile-salao-sim" onclick="toggleUsoSalao('sim')">
                   <input type="radio" name="r-salao" value="sim" style="display:none;" />
-                  <span>🛠️ Sim (Montagem / Decoração)</span>
+                  <span>🛠️ Sim (Montagem)</span>
                 </label>
               </div>
-              <div id="campo-salao-detalhes" style="display:none; margin-top:10px;">
-                <input type="text" id="f-salao-detalhes" class="form-control" placeholder="Ex: Dia anterior das 18h às 21h e no dia das 17h às 19h" />
+              <div id="campo-salao-detalhes" style="display:none; margin-top:8px;">
+                <input type="text" id="f-salao-detalhes" class="form-control" placeholder="Ex: Dia anterior das 18h às 21h e no dia a partir das 17h" />
                 <div class="hint">Especifique os horários exatos para reserva e preparação do espaço.</div>
               </div>
             </div>
           </div>
 
-          <!-- ETAPA 2: ESTRUTURA, LOCAL & PROGRAMAÇÃO -->
+          <!-- ETAPA 2: ESTRUTURA E LOCAL -->
           <div id="step-2" class="form-step">
             <div class="form-group">
               <label>📍 Local do Evento *</label>
               <input type="text" id="f-local" class="form-control" value="${ENDERECO_IGREJA}" required />
-              <div class="hint">Padrão da igreja: ${ENDERECO_IGREJA}</div>
             </div>
 
             <div class="form-row">
@@ -1513,36 +1445,36 @@ function renderGestaoHtml({ user }) {
                 <input type="text" id="f-publico" class="form-control" placeholder="Ex: Mulheres, Jovens, Toda a Igreja" required />
               </div>
               <div class="form-group">
-                <label>👔 Responsável Geral no Dia *</label>
+                <label>👔 Responsável Geral no Dia</label>
                 <input type="text" id="f-responsavel-geral" class="form-control" placeholder="Quem coordenará no dia do evento" />
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label>🎤 Haverá convidado especial (banda, pregador)?</label>
-                <input type="text" id="f-convidado" class="form-control" placeholder="Nome do convidado ou 'Não'" />
+                <label>🎤 Haverá convidado especial?</label>
+                <input type="text" id="f-convidado" class="form-control" placeholder="Banda, pregador ou 'Não'" />
               </div>
               <div class="form-group">
                 <label>🎵 Louvor Definido?</label>
-                <input type="text" id="f-louvor" class="form-control" placeholder="Ex: Equipe local / A definir" />
+                <input type="text" id="f-louvor" class="form-control" placeholder="Equipe local / A definir" />
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
                 <label>🎈 Decoração</label>
-                <input type="text" id="f-decoracao" class="form-control" placeholder="Ex: Simples / Flores / Responsável" />
+                <input type="text" id="f-decoracao" class="form-control" placeholder="Simples / Flores / Responsável" />
               </div>
               <div class="form-group">
                 <label>☕ Haverá Alimentação?</label>
-                <input type="text" id="f-alimentacao" class="form-control" placeholder="Ex: Coffee break / Lanche / Não" />
+                <input type="text" id="f-alimentacao" class="form-control" placeholder="Coffee break / Lanche / Não" />
               </div>
             </div>
 
             <div class="form-group">
-              <label>👥 Equipe de Apoio (Pré, Durante e Pós-evento / Limpeza)</label>
-              <input type="text" id="f-equipe" class="form-control" placeholder="Como será dividida a equipe de montagem e limpeza" />
+              <label>👥 Equipe de Apoio (Pré, Durante e Limpeza Pós-evento)</label>
+              <input type="text" id="f-equipe" class="form-control" placeholder="Como será dividida a equipe de apoio" />
             </div>
 
             <div class="form-group">
@@ -1556,23 +1488,22 @@ function renderGestaoHtml({ user }) {
             </div>
           </div>
 
-          <!-- ETAPA 3: MÍDIA & DIVULGAÇÃO -->
+          <!-- ETAPA 3: MÍDIA E DIVULGAÇÃO -->
           <div id="step-3" class="form-step">
             <div class="form-group">
-              <label>🎨 A arte/mídia já foi feita previamente com a equipe de multimídia? *</label>
+              <label>🎨 A arte/mídia já foi feita previamente com a equipe? *</label>
               <div class="radio-tiles">
-                <label class="radio-tile selected" onclick="toggleMidiaPrevia('nao', this)">
+                <label class="radio-tile selected" id="tile-midia-nao" onclick="toggleMidiaPrevia('nao')">
                   <input type="radio" name="r-midia" value="nao" checked style="display:none;" />
-                  <span>📢 Não (Preciso de artes/divulgação)</span>
+                  <span>📢 Não (Preciso de artes)</span>
                 </label>
-                <label class="radio-tile" onclick="toggleMidiaPrevia('sim', this)">
+                <label class="radio-tile" id="tile-midia-sim" onclick="toggleMidiaPrevia('sim')">
                   <input type="radio" name="r-midia" value="sim" style="display:none;" />
-                  <span>✅ Sim (Já está pronta/alinhada)</span>
+                  <span>✅ Sim (Arte já pronta)</span>
                 </label>
               </div>
             </div>
 
-            <!-- CAMPOS DINÂMICOS DE MÍDIA -->
             <div id="secao-campos-midia">
               <div class="form-group">
                 <label>🎨 Paleta de Cores (Identidade Visual)</label>
@@ -1581,12 +1512,12 @@ function renderGestaoHtml({ user }) {
 
               <div class="form-group">
                 <label>📱 Mídias e Estilo Visual Desejado</label>
-                <textarea id="f-estilo" class="form-control" placeholder="Ex: Flyer feed/stories, telão; estilo jovem e minimalista. Se houver banner impresso, informe medidas (ex: 1x2m)"></textarea>
+                <textarea id="f-estilo" class="form-control" placeholder="Ex: Flyer feed/stories, telão; estilo elegante. Se houver banner impresso, informe medidas"></textarea>
               </div>
 
               <div class="form-row">
                 <div class="form-group">
-                  <label>📢 Prazo Desejado para as Artes Prontas</label>
+                  <label>📢 Prazo para as Artes Prontas</label>
                   <input type="text" id="f-prazo-imagem" class="form-control" placeholder="Ex: Até 10 dias antes do evento" />
                 </div>
                 <div class="form-group">
@@ -1602,7 +1533,7 @@ function renderGestaoHtml({ user }) {
             <div class="form-row">
               <div class="form-group">
                 <label>💰 Cobrança de Inscrição ou Taxa? *</label>
-                <input type="text" id="f-valor-inscricao" class="form-control" value="Gratuito" placeholder="Ex: Gratuito ou R$ 30,00" required />
+                <input type="text" id="f-valor-inscricao" class="form-control" value="Gratuito" placeholder="Gratuito ou R$ 30,00" required />
               </div>
               <div class="form-group">
                 <label>🏛️ Vai precisar de valor/verba do ministério? *</label>
@@ -1614,10 +1545,10 @@ function renderGestaoHtml({ user }) {
             </div>
 
             <div id="alerta-tesouraria" class="alerta-caixa alerta-amarelo" style="display:none;">
-              ⚠️ <b>Atenção:</b> Como o evento precisará de verba, lembre-se de alinhar os valores e necessidades diretamente com a Tesouraria pelo WhatsApp: <b>${CONTATO_TESOURARIA}</b>.
+              ⚠️ <b>Aviso:</b> Como o evento precisará de verba, alinhe os valores diretamente com a Tesouraria pelo WhatsApp: <b>${CONTATO_TESOURARIA}</b>.
             </div>
 
-            <div class="form-row" style="margin-top: 1rem;">
+            <div class="form-row" style="margin-top: 8px;">
               <div class="form-group">
                 <label>✨ Tema Oficial do Evento</label>
                 <input type="text" id="f-tema" class="form-control" placeholder="Ex: O Poder da Oração" />
@@ -1630,22 +1561,22 @@ function renderGestaoHtml({ user }) {
 
             <div class="form-group">
               <label>🙏 Objetivo Espiritual do Evento *</label>
-              <textarea id="f-objetivo-espiritual" class="form-control" placeholder="Descreva o propósito principal do evento e o impacto esperado na vida das pessoas..." required></textarea>
+              <textarea id="f-objetivo-espiritual" class="form-control" placeholder="Propósito principal do evento e o impacto esperado na vida das pessoas..." required></textarea>
             </div>
 
             <div class="form-group">
-              <label>📝 Observações Gerais / Necessidades Extras</label>
+              <label>📝 Observações Gerais</label>
               <input type="text" id="f-observacoes" class="form-control" placeholder="Detalhes extras importantes" />
             </div>
 
             <div class="alerta-caixa alerta-verde">
-              🧹 <b>Lembrete de Entrega do Salão:</b> As dependências da igreja devem ser entregues após o evento limpas e organizadas, exatamente da forma como foram encontradas.
+              🧹 <b>Lembrete de Entrega do Salão:</b> As dependências devem ser entregues limpas e organizadas, exatamente da forma como foram encontradas.
             </div>
           </div>
 
         </div>
 
-        <!-- RODAPÉ DO WIZARD -->
+        <!-- RODAPÉ MODAL -->
         <div class="modal-footer">
           <button type="button" id="btn-wizard-anterior" class="btn-secondary" onclick="navegarEtapa(-1)" style="display:none;">
             ← Voltar
@@ -1663,11 +1594,24 @@ function renderGestaoHtml({ user }) {
     </div>
   </div>
 
+  <!-- MODAL DE DETALHES DA FICHA -->
+  <div id="modal-ficha-detalhe" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="ficha-detalhe-titulo">Ficha do Evento</h3>
+        <button class="modal-close-btn" onclick="fecharModalFicha()">✕</button>
+      </div>
+      <div class="modal-body" id="ficha-detalhe-conteudo" style="font-size:0.85rem; line-height:1.6;">
+        <!-- Preenchido via JS -->
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICAÇÃO -->
   <div id="toast-msg"></div>
 
   <script>
-    // DADOS INICIAIS INJETADOS
+    // DADOS INICIAIS
     const PERFIL_ATUAL = ${jsonPerfil};
 
     let mesAtual = new Date().getMonth();
@@ -1678,19 +1622,26 @@ function renderGestaoHtml({ user }) {
     let todosEventos = [];
     let todasSolicitacoes = [];
 
-    // INICIALIZAÇÃO
-    document.addEventListener('DOMContentLoaded', () => {
+    // EXECUTA IMEDIATAMENTE (NÃO DEPENDE EXCLUSIVAMENTE DE DOMContentLoaded)
+    function iniciarPainel() {
+      renderizarCalendario();
       carregarEventosServidor();
       carregarSolicitacoesServidor();
       carregarFichasServidor();
-    });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', iniciarPainel);
+    } else {
+      iniciarPainel();
+    }
 
     // CONTROLE DE ABAS
     function trocarAba(nomeAba) {
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
+      document.querySelectorAll('.tab-pane').forEach(function(pane) { pane.classList.remove('active'); });
 
-      const btnAlvo = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick')?.includes(nomeAba));
+      const btnAlvo = document.getElementById('btn-tab-' + nomeAba);
       if (btnAlvo) btnAlvo.classList.add('active');
 
       const paneAlvo = document.getElementById('pane-' + nomeAba);
@@ -1702,12 +1653,12 @@ function renderGestaoHtml({ user }) {
       try {
         const res = await fetch('/gestao/api/eventos');
         const data = await res.json();
-        if (data.ok && Array.isArray(data.eventos)) {
+        if (data && data.ok && Array.isArray(data.eventos)) {
           todosEventos = data.eventos;
           renderizarCalendario();
         }
       } catch (err) {
-        console.error('Erro ao buscar eventos:', err);
+        console.warn('Aviso ao carregar eventos:', err);
       }
     }
 
@@ -1715,12 +1666,12 @@ function renderGestaoHtml({ user }) {
       try {
         const res = await fetch('/gestao/api/solicitacoes');
         const data = await res.json();
-        if (data.ok && Array.isArray(data.solicitacoes)) {
+        if (data && data.ok && Array.isArray(data.solicitacoes)) {
           todasSolicitacoes = data.solicitacoes;
           renderizarTabelaSol();
         }
       } catch (err) {
-        console.error('Erro ao buscar solicitações:', err);
+        console.warn('Aviso ao carregar solicitações:', err);
       }
     }
 
@@ -1728,11 +1679,11 @@ function renderGestaoHtml({ user }) {
       try {
         const res = await fetch('/gestao/api/fichas');
         const data = await res.json();
-        if (data.ok && Array.isArray(data.fichas)) {
+        if (data && data.ok && Array.isArray(data.fichas)) {
           renderizarFichas(data.fichas);
         }
       } catch (err) {
-        console.error('Erro ao buscar fichas:', err);
+        console.warn('Aviso ao carregar fichas:', err);
       }
     }
 
@@ -1740,8 +1691,10 @@ function renderGestaoHtml({ user }) {
     function renderizarCalendario() {
       const elMesAno = document.getElementById('cal-mes-ano');
       const elGridDias = document.getElementById('cal-grid-dias');
-      const filtroDepto = document.getElementById('filtro-depto').value.toLowerCase().trim();
-      const filtroStatus = document.getElementById('filtro-status').value;
+      if (!elMesAno || !elGridDias) return;
+
+      const filtroDepto = (document.getElementById('filtro-depto')?.value || '').toLowerCase().trim();
+      const filtroStatus = document.getElementById('filtro-status')?.value || '';
 
       const nomesMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
       elMesAno.textContent = nomesMeses[mesAtual] + ' de ' + anoAtual;
@@ -1757,7 +1710,7 @@ function renderGestaoHtml({ user }) {
       const hojeMes = hoje.getMonth();
       const hojeAno = hoje.getFullYear();
 
-      // Dias do mês anterior (padding)
+      // Dias do mês anterior
       for (let i = primeiroDiaSemana - 1; i >= 0; i--) {
         const diaNum = totalDiasMesAnterior - i;
         const cell = document.createElement('div');
@@ -1781,46 +1734,42 @@ function renderGestaoHtml({ user }) {
           cell.classList.add('selecionado');
         }
 
-        // Filtra eventos deste dia
-        const eventosDoDia = todosEventos.filter(ev => {
+        // Filtra eventos do dia
+        const eventosDoDia = todosEventos.filter(function(ev) {
           let bateData = false;
           if (ev.data) {
-            const dataLimpa = ev.data.trim();
+            const dataLimpa = String(ev.data).trim();
             if (dataLimpa.includes('/')) {
               bateData = dataLimpa.startsWith(String(d).padStart(2, '0') + '/' + String(mesAtual + 1).padStart(2, '0'));
             } else if (dataLimpa.includes('-')) {
               bateData = dataLimpa.startsWith(diaIso);
             }
           }
-
           if (!bateData) return false;
-
-          // Filtro por departamento
-          if (filtroDepto && !String(ev.departamento || '').toLowerCase().includes(filtroDepto)) {
-            return false;
-          }
-
-          // Filtro por status
-          if (filtroStatus && ev.status !== filtroStatus) {
-            return false;
-          }
-
+          if (filtroDepto && !String(ev.departamento || '').toLowerCase().includes(filtroDepto)) return false;
+          if (filtroStatus && ev.status !== filtroStatus) return false;
           return true;
         });
 
         let chipsHtml = '';
-        eventosDoDia.slice(0, 3).forEach(ev => {
+        eventosDoDia.slice(0, 2).forEach(function(ev) {
           const classeChip = ev.status === 'pendente_secretaria' ? 'pendente' : (ev.tipo === 'pastoral' ? 'pastoral' : 'aprovado');
-          chipsHtml += '<span class="event-chip ' + classeChip + '" title="' + ev.titulo + ' (' + ev.horarioInicio + ')">' + (ev.horarioInicio ? ev.horarioInicio + ' ' : '') + ev.titulo + '</span>';
+          chipsHtml += '<span class="event-chip ' + classeChip + '">' + (ev.horarioInicio ? ev.horarioInicio + ' ' : '') + ev.titulo + '</span>';
         });
 
-        if (eventosDoDia.length > 3) {
-          chipsHtml += '<span style="font-size:0.6rem; color:var(--cor-subtexto); font-weight:700;">+' + (eventosDoDia.length - 3) + ' mais</span>';
+        if (eventosDoDia.length > 2) {
+          chipsHtml += '<span style="font-size:0.58rem; color:var(--cor-subtexto); font-weight:700;">+' + (eventosDoDia.length - 2) + ' mais</span>';
         }
 
         cell.innerHTML = '<span class="day-num">' + d + '</span><div class="day-events">' + chipsHtml + '</div>';
 
-        cell.onclick = () => selecionarDia(d, mesAtual, anoAtual, diaIso, eventosDoDia);
+        // Anexa listener diretamente ao elemento (zero risco de aspas escapadas)
+        (function(diaCapturado, diaIsoCapturado, evsCapturados) {
+          cell.addEventListener('click', function() {
+            selecionarDia(diaCapturado, mesAtual, anoAtual, diaIsoCapturado, evsCapturados);
+          });
+        })(d, diaIso, eventosDoDia);
+
         elGridDias.appendChild(cell);
       }
 
@@ -1828,7 +1777,9 @@ function renderGestaoHtml({ user }) {
       if (!dataSelecionadaIso) {
         const diaPadrao = isHojeNoMes() ? hojeDia : 1;
         const diaIsoPadrao = anoAtual + '-' + String(mesAtual + 1).padStart(2, '0') + '-' + String(diaPadrao).padStart(2, '0');
-        const eventosPadrao = todosEventos.filter(e => e.data && (e.data.includes(diaIsoPadrao) || e.data.startsWith(String(diaPadrao).padStart(2, '0') + '/' + String(mesAtual + 1).padStart(2, '0'))));
+        const eventosPadrao = todosEventos.filter(function(e) {
+          return e.data && (e.data.includes(diaIsoPadrao) || e.data.startsWith(String(diaPadrao).padStart(2, '0') + '/' + String(mesAtual + 1).padStart(2, '0')));
+        });
         selecionarDia(diaPadrao, mesAtual, anoAtual, diaIsoPadrao, eventosPadrao);
       }
     }
@@ -1859,12 +1810,11 @@ function renderGestaoHtml({ user }) {
       renderizarCalendario();
     }
 
-    // CLIQUE NO DIA
+    // CLIQUE NO DIA DO CALENDÁRIO
     function selecionarDia(dia, mes, ano, diaIso, eventos) {
       dataSelecionadaIso = diaIso;
 
-      // Destaca na grade
-      document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selecionado'));
+      document.querySelectorAll('.cal-day').forEach(function(el) { el.classList.remove('selecionado'); });
       const diaCells = document.querySelectorAll('.cal-day:not(.outro-mes)');
       if (diaCells[dia - 1]) diaCells[dia - 1].classList.add('selecionado');
 
@@ -1872,27 +1822,30 @@ function renderGestaoHtml({ user }) {
       const dataObj = new Date(ano, mes, dia);
       const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
-      document.getElementById('panel-data-selecionada').textContent = dataFmt;
-      document.getElementById('panel-dia-semana').textContent = diasSemana[dataObj.getDay()];
+      const elDataSel = document.getElementById('panel-data-selecionada');
+      const elSemana = document.getElementById('panel-dia-semana');
+      if (elDataSel) elDataSel.textContent = dataFmt;
+      if (elSemana) elSemana.textContent = diasSemana[dataObj.getDay()];
 
       const containerEventos = document.getElementById('panel-eventos-dia');
+      if (!containerEventos) return;
       containerEventos.innerHTML = '';
 
       if (!eventos || eventos.length === 0) {
-        containerEventos.innerHTML = '<div class="events-list-empty">Nenhum evento registrado nesta data.<br><br>💡 O salão está <b>disponível</b>!</div>';
+        containerEventos.innerHTML = '<div style="text-align: center; padding: 1.5rem 0; color: var(--cor-subtexto); font-size: 0.82rem;">Nenhum evento registrado nesta data.<br><br>💡 Salão <b>disponível</b>!</div>';
         return;
       }
 
-      eventos.forEach(ev => {
+      eventos.forEach(function(ev) {
         const card = document.createElement('div');
         card.className = 'day-event-card';
         const statusTexto = ev.status === 'pendente_secretaria' ? '⏳ Aguardando Aprovação' : '✅ Confirmado';
-        const statusCor = ev.status === 'pendente_secretaria' ? '#fbbf24' : '#34d399';
+        const statusCor = ev.status === 'pendente_secretaria' ? '#d97706' : '#16a34a';
 
         card.innerHTML = 
           '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">' +
             '<div class="title">' + ev.titulo + '</div>' +
-            '<span style="font-size:0.68rem; font-weight:700; color:' + statusCor + ';">' + statusTexto + '</span>' +
+            '<span style="font-size:0.68rem; font-weight:800; color:' + statusCor + ';">' + statusTexto + '</span>' +
           '</div>' +
           '<div class="meta">' +
             '<div>🏢 <b>Ministério:</b> ' + (ev.departamento || 'Geral') + '</div>' +
@@ -1912,30 +1865,62 @@ function renderGestaoHtml({ user }) {
     function renderizarTabelaSol() {
       const tbody = document.getElementById('tabela-solicitacoes-corpo');
       const badge = document.getElementById('badge-total-solicitacoes');
-      badge.textContent = todasSolicitacoes.length;
+      if (badge) badge.textContent = todasSolicitacoes.length;
+      if (!tbody) return;
 
       if (!todasSolicitacoes || todasSolicitacoes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--cor-subtexto);">Nenhuma solicitação encontrada no momento.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--cor-subtexto);">Nenhuma solicitação encontrada no momento.</td></tr>';
         return;
       }
 
       tbody.innerHTML = '';
-      todasSolicitacoes.forEach(sol => {
+      todasSolicitacoes.forEach(function(sol) {
         const tr = document.createElement('tr');
         const statusClass = sol.status === 'aprovado' ? 'aprovado' : 'pendente';
         const statusLabel = sol.status === 'aprovado' ? '✅ Aprovado' : '⏳ Aguardando Secretaria';
 
-        tr.innerHTML = 
-          '<td><span class="badge-codigo">' + (sol.codigo || '—') + '</span></td>' +
-          '<td style="font-weight:700;">' + sol.titulo + '</td>' +
-          '<td>' + (sol.departamento || 'Geral') + '</td>' +
-          '<td>' + (sol.data || '—') + '</td>' +
-          '<td>' + (sol.horarioInicio || '') + (sol.horarioFim ? ' às ' + sol.horarioFim : '') + '</td>' +
-          '<td>' + (sol.responsavel || '—') + '</td>' +
-          '<td><span class="badge-status ' + statusClass + '">' + statusLabel + '</span></td>' +
-          '<td>' +
-            '<button class="btn-secondary" style="padding:4px 10px; font-size:0.75rem;" onclick="visualizarDetalhesSolicitacao(\'' + sol.id + '\')">Ver Ficha</button>' +
-          '</td>';
+        const tdCod = document.createElement('td');
+        tdCod.innerHTML = '<span class="badge-codigo">' + (sol.codigo || '—') + '</span>';
+        tr.appendChild(tdCod);
+
+        const tdTit = document.createElement('td');
+        tdTit.style.fontWeight = '800';
+        tdTit.textContent = sol.titulo;
+        tr.appendChild(tdTit);
+
+        const tdDep = document.createElement('td');
+        tdDep.textContent = sol.departamento || 'Geral';
+        tr.appendChild(tdDep);
+
+        const tdDat = document.createElement('td');
+        tdDat.textContent = sol.data || '—';
+        tr.appendChild(tdDat);
+
+        const tdHor = document.createElement('td');
+        tdHor.textContent = (sol.horarioInicio || '') + (sol.horarioFim ? ' às ' + sol.horarioFim : '');
+        tr.appendChild(tdHor);
+
+        const tdResp = document.createElement('td');
+        tdResp.textContent = sol.responsavel || '—';
+        tr.appendChild(tdResp);
+
+        const tdStatus = document.createElement('td');
+        tdStatus.innerHTML = '<span class="badge-status ' + statusClass + '">' + statusLabel + '</span>';
+        tr.appendChild(tdStatus);
+
+        const tdAcoes = document.createElement('td');
+        const btnVer = document.createElement('button');
+        btnVer.className = 'btn-secondary';
+        btnVer.style.padding = '4px 10px';
+        btnVer.style.fontSize = '0.72rem';
+        btnVer.style.minHeight = 'auto';
+        btnVer.textContent = 'Ver Ficha';
+        btnVer.addEventListener('click', function() {
+          visualizarDetalhesSolicitacao(sol);
+        });
+        tdAcoes.appendChild(btnVer);
+        tr.appendChild(tdAcoes);
+
         tbody.appendChild(tr);
       });
     }
@@ -1943,44 +1928,109 @@ function renderGestaoHtml({ user }) {
     // FICHAS DOS EVENTOS
     function renderizarFichas(fichas) {
       const container = document.getElementById('lista-fichas-container');
+      if (!container) return;
+
       if (!fichas || fichas.length === 0) {
-        container.innerHTML = '<div style="color:var(--cor-subtexto);">Nenhuma ficha preenchida até o momento.</div>';
+        container.innerHTML = '<div style="color:var(--cor-subtexto); font-size:0.85rem;">Nenhuma ficha preenchida até o momento.</div>';
         return;
       }
       container.innerHTML = '';
-      fichas.forEach(f => {
+      fichas.forEach(function(f) {
         const card = document.createElement('div');
         card.className = 'day-event-card';
-        card.style.padding = '16px';
+        card.style.padding = '14px';
 
         card.innerHTML = 
-          '<div style="font-size:1rem; font-weight:800; color:#fff; margin-bottom:6px;">' + f.evento + '</div>' +
-          '<div class="meta" style="font-size:0.8rem; margin-bottom:12px;">' +
+          '<div style="font-size:0.95rem; font-weight:800; color:var(--cor-texto); margin-bottom:4px;">' + f.evento + '</div>' +
+          '<div class="meta" style="font-size:0.75rem; margin-bottom:10px;">' +
             '<div>🏢 <b>Departamento:</b> ' + (f.departamento || 'Geral') + '</div>' +
             '<div>📆 <b>Data:</b> ' + (f.data || '—') + '</div>' +
-            (f.docUrl ? '<div>🔗 <a href="' + f.docUrl + '" target="_blank" style="color:var(--cor-ciano); font-weight:700;">Abrir no Google Docs ↗</a></div>' : '') +
-          '</div>' +
-          '<button class="btn-secondary" style="width:100%; justify-content:center; font-size:0.8rem;" onclick="abrirFichaDetalhe(\'' + encodeURIComponent(JSON.stringify(f)) + '\')">📄 Ver Respostas Completas</button>';
+            (f.docUrl ? '<div>🔗 <a href="' + f.docUrl + '" target="_blank" style="color:var(--cor-roxo); font-weight:700;">Abrir no Google Docs ↗</a></div>' : '') +
+          '</div>';
+
+        const btnDetalhe = document.createElement('button');
+        btnDetalhe.className = 'btn-secondary';
+        btnDetalhe.style.width = '100%';
+        btnDetalhe.style.fontSize = '0.75rem';
+        btnDetalhe.style.minHeight = '34px';
+        btnDetalhe.textContent = '📄 Ver Respostas Completas';
+        btnDetalhe.addEventListener('click', function() {
+          abrirFichaDetalhe(f);
+        });
+
+        card.appendChild(btnDetalhe);
         container.appendChild(card);
       });
     }
 
+    // MODAL DE DETALHES DA FICHA
+    function abrirFichaDetalhe(ficha) {
+      const modal = document.getElementById('modal-ficha-detalhe');
+      const titulo = document.getElementById('ficha-detalhe-titulo');
+      const conteudo = document.getElementById('ficha-detalhe-conteudo');
+      if (!modal || !conteudo) return;
+
+      titulo.textContent = ficha.evento || 'Detalhes do Evento';
+
+      let p = ficha.payload || {};
+      if (typeof p === 'string') {
+        try { p = JSON.parse(p); } catch(_) {}
+      }
+
+      conteudo.innerHTML = 
+        '<div style="margin-bottom:12px; padding:10px; background:#f8fafc; border-radius:10px;">' +
+          '<div><b>📅 Evento:</b> ' + (ficha.evento || p.nome_evento || '—') + '</div>' +
+          '<div><b>🏢 Departamento:</b> ' + (ficha.departamento || p.departamento || '—') + '</div>' +
+          '<div><b>📆 Data:</b> ' + (ficha.data || p.data || '—') + '</div>' +
+          '<div><b>⏰ Horário:</b> ' + (p.horario_inicio_termino || p.horario || '—') + '</div>' +
+          '<div><b>👤 Líder:</b> ' + (p.nome_lider || p.solicitanteNome || '—') + '</div>' +
+          '<div><b>📍 Local:</b> ' + (p.local || '—') + '</div>' +
+          '<div><b>🎯 Público:</b> ' + (p.publico || '—') + '</div>' +
+          '<div><b>🎤 Convidado:</b> ' + (p.convidado || 'Não') + '</div>' +
+          '<div><b>🎵 Louvor:</b> ' + (p.louvor || '—') + '</div>' +
+          '<div><b>🎨 Paleta de Cores:</b> ' + (p.paleta || p.cores || '—') + '</div>' +
+          '<div><b>📱 Mídias e Estilo:</b> ' + (p.estilo || p.midias || '—') + '</div>' +
+          '<div><b>💰 Inscrição:</b> ' + (p.valor_inscricao || 'Gratuito') + '</div>' +
+          '<div><b>🏛️ Verba Ministério:</b> ' + (p.precisa_valor_ministerio || 'Não') + '</div>' +
+          '<div><b>✨ Tema:</b> ' + (p.tema || '—') + '</div>' +
+          '<div><b>📖 Versículo:</b> ' + (p.versiculo || '—') + '</div>' +
+          '<div><b>🙏 Propósito:</b> ' + (p.objetivo_espiritual || '—') + '</div>' +
+          (ficha.docUrl ? '<div style="margin-top:8px;"><b>🔗 Google Docs:</b> <a href="' + ficha.docUrl + '" target="_blank" style="color:var(--cor-roxo); font-weight:700;">Acessar Documento Oficial</a></div>' : '') +
+        '</div>';
+
+      modal.classList.add('active');
+    }
+
+    function fecharModalFicha() {
+      const modal = document.getElementById('modal-ficha-detalhe');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function visualizarDetalhesSolicitacao(sol) {
+      abrirFichaDetalhe(sol);
+    }
+
     // MODAL DO WIZARD
-    function abrirModalAgendamento(dataPrevia = '') {
-      document.getElementById('modal-agendamento').classList.add('active');
+    function abrirModalAgendamento(dataPrevia) {
+      const modal = document.getElementById('modal-agendamento');
+      if (!modal) return;
+      modal.classList.add('active');
       etapaWizardAtual = 1;
       atualizarPassosWizard();
 
-      if (dataPrevia) {
-        document.getElementById('f-data-evento').value = dataPrevia;
-      } else if (!document.getElementById('f-data-evento').value) {
-        const h = new Date();
-        document.getElementById('f-data-evento').value = h.toISOString().split('T')[0];
+      const campoData = document.getElementById('f-data-evento');
+      if (campoData) {
+        if (dataPrevia) {
+          campoData.value = dataPrevia;
+        } else if (!campoData.value) {
+          campoData.value = new Date().toISOString().split('T')[0];
+        }
       }
     }
 
     function fecharModalAgendamento() {
-      document.getElementById('modal-agendamento').classList.remove('active');
+      const modal = document.getElementById('modal-agendamento');
+      if (modal) modal.classList.remove('active');
     }
 
     function navegarEtapa(delta) {
@@ -1996,7 +2046,6 @@ function renderGestaoHtml({ user }) {
     }
 
     function atualizarPassosWizard() {
-      // Abas de formulário
       for (let i = 1; i <= 4; i++) {
         const elStep = document.getElementById('step-' + i);
         const elInd = document.getElementById('step-ind-' + i);
@@ -2007,87 +2056,117 @@ function renderGestaoHtml({ user }) {
         }
       }
 
-      // Botões do footer
-      document.getElementById('btn-wizard-anterior').style.display = etapaWizardAtual > 1 ? 'inline-flex' : 'none';
-      document.getElementById('btn-wizard-proximo').style.display = etapaWizardAtual < 4 ? 'inline-flex' : 'none';
-      document.getElementById('btn-wizard-concluir').style.display = etapaWizardAtual === 4 ? 'inline-flex' : 'none';
+      const btnAnt = document.getElementById('btn-wizard-anterior');
+      const btnProx = document.getElementById('btn-wizard-proximo');
+      const btnConc = document.getElementById('btn-wizard-concluir');
+
+      if (btnAnt) btnAnt.style.display = etapaWizardAtual > 1 ? 'inline-flex' : 'none';
+      if (btnProx) btnProx.style.display = etapaWizardAtual < 4 ? 'inline-flex' : 'none';
+      if (btnConc) btnConc.style.display = etapaWizardAtual === 4 ? 'inline-flex' : 'none';
     }
 
     function validarEtapaAtual(etapa) {
       if (etapa === 1) {
-        const lider = document.getElementById('f-nome-lider').value.trim();
-        const zap = document.getElementById('f-telefone-lider').value.trim();
-        const evento = document.getElementById('f-nome-evento').value.trim();
-        const depto = document.getElementById('f-departamento').value;
-        const data = document.getElementById('f-data-evento').value;
+        const lider = (document.getElementById('f-nome-lider')?.value || '').trim();
+        const zap = (document.getElementById('f-telefone-lider')?.value || '').trim();
+        const evento = (document.getElementById('f-nome-evento')?.value || '').trim();
+        const depto = document.getElementById('f-departamento')?.value || '';
+        const data = document.getElementById('f-data-evento')?.value || '';
 
         if (!lider || !zap || !evento || !depto || !data) {
-          mostrarToast('⚠️ Por favor preencha todos os campos obrigatórios da Etapa 1.');
+          mostrarToast('⚠️ Preencha os campos obrigatórios da Etapa 1.');
           return false;
         }
       } else if (etapa === 2) {
-        const publico = document.getElementById('f-publico').value.trim();
+        const publico = (document.getElementById('f-publico')?.value || '').trim();
         if (!publico) {
-          mostrarToast('⚠️ Por favor informe o público-alvo do evento.');
+          mostrarToast('⚠️ Informe o público-alvo do evento.');
           return false;
         }
       }
       return true;
     }
 
-    function toggleUsoSalao(valor, el) {
-      document.querySelectorAll('input[name="r-salao"]').forEach(r => r.parentElement.classList.remove('selected'));
-      el.classList.add('selected');
-      document.getElementById('campo-salao-detalhes').style.display = (valor === 'sim') ? 'block' : 'none';
+    function toggleUsoSalao(valor) {
+      const tileNao = document.getElementById('tile-salao-nao');
+      const tileSim = document.getElementById('tile-salao-sim');
+      const campoDet = document.getElementById('campo-salao-detalhes');
+
+      if (valor === 'sim') {
+        tileSim.classList.add('selected');
+        tileNao.classList.remove('selected');
+        tileSim.querySelector('input').checked = true;
+        if (campoDet) campoDet.style.display = 'block';
+      } else {
+        tileNao.classList.add('selected');
+        tileSim.classList.remove('selected');
+        tileNao.querySelector('input').checked = true;
+        if (campoDet) campoDet.style.display = 'none';
+      }
     }
 
-    function toggleMidiaPrevia(valor, el) {
-      document.querySelectorAll('input[name="r-midia"]').forEach(r => r.parentElement.classList.remove('selected'));
-      el.classList.add('selected');
-      document.getElementById('secao-campos-midia').style.display = (valor === 'nao') ? 'block' : 'none';
+    function toggleMidiaPrevia(valor) {
+      const tileNao = document.getElementById('tile-midia-nao');
+      const tileSim = document.getElementById('tile-midia-sim');
+      const camposMidia = document.getElementById('secao-campos-midia');
+
+      if (valor === 'sim') {
+        tileSim.classList.add('selected');
+        tileNao.classList.remove('selected');
+        tileSim.querySelector('input').checked = true;
+        if (camposMidia) camposMidia.style.display = 'none';
+      } else {
+        tileNao.classList.add('selected');
+        tileSim.classList.remove('selected');
+        tileNao.querySelector('input').checked = true;
+        if (camposMidia) camposMidia.style.display = 'block';
+      }
     }
 
     function toggleAlertaTesouraria(valor) {
-      document.getElementById('alerta-tesouraria').style.display = (valor === 'sim') ? 'block' : 'none';
+      const alerta = document.getElementById('alerta-tesouraria');
+      if (alerta) alerta.style.display = (valor === 'sim') ? 'block' : 'none';
     }
 
     // SUBMISSÃO DO FORMULÁRIO DE EVENTO
     async function submeterFormularioEvento() {
       const btnConcluir = document.getElementById('btn-wizard-concluir');
-      btnConcluir.disabled = true;
-      btnConcluir.textContent = 'Enviando para Secretaria...';
+      if (btnConcluir) {
+        btnConcluir.disabled = true;
+        btnConcluir.textContent = 'Enviando...';
+      }
 
       const payload = {
-        nome_lider: document.getElementById('f-nome-lider').value,
-        telefone_lider: document.getElementById('f-telefone-lider').value,
-        nome_evento: document.getElementById('f-nome-evento').value,
-        departamento: document.getElementById('f-departamento').value,
-        data_evento: document.getElementById('f-data-evento').value,
-        horario_inicio: document.getElementById('f-horario-inicio').value,
-        horario_termino: document.getElementById('f-horario-termino').value,
+        nome_lider: document.getElementById('f-nome-lider')?.value || '',
+        telefone_lider: document.getElementById('f-telefone-lider')?.value || '',
+        nome_evento: document.getElementById('f-nome-evento')?.value || '',
+        departamento: document.getElementById('f-departamento')?.value || '',
+        data_evento: document.getElementById('f-data-evento')?.value || '',
+        horario_inicio: document.getElementById('f-horario-inicio')?.value || '',
+        horario_termino: document.getElementById('f-horario-termino')?.value || '',
         precisa_salao_antes: document.querySelector('input[name="r-salao"]:checked')?.value || 'nao',
         salao_detalhes: document.getElementById('f-salao-detalhes')?.value || '',
-        local: document.getElementById('f-local').value,
-        publico: document.getElementById('f-publico').value,
-        responsavel_geral: document.getElementById('f-responsavel-geral').value,
-        convidado: document.getElementById('f-convidado').value,
-        louvor: document.getElementById('f-louvor').value,
-        decoracao: document.getElementById('f-decoracao').value,
-        alimentacao: document.getElementById('f-alimentacao').value,
-        equipe: document.getElementById('f-equipe').value,
-        materiais: document.getElementById('f-materiais').value,
-        cronograma: document.getElementById('f-cronograma').value,
+        local: document.getElementById('f-local')?.value || '',
+        publico: document.getElementById('f-publico')?.value || '',
+        responsavel_geral: document.getElementById('f-responsavel-geral')?.value || '',
+        convidado: document.getElementById('f-convidado')?.value || '',
+        louvor: document.getElementById('f-louvor')?.value || '',
+        decoracao: document.getElementById('f-decoracao')?.value || '',
+        alimentacao: document.getElementById('f-alimentacao')?.value || '',
+        equipe: document.getElementById('f-equipe')?.value || '',
+        materiais: document.getElementById('f-materiais')?.value || '',
+        cronograma: document.getElementById('f-cronograma')?.value || '',
         midia_ja_feita: document.querySelector('input[name="r-midia"]:checked')?.value || 'nao',
         paleta: document.getElementById('f-paleta')?.value || '',
         estilo: document.getElementById('f-estilo')?.value || '',
         prazo_imagem: document.getElementById('f-prazo-imagem')?.value || '',
         data_maxima_divulgacao: document.getElementById('f-data-maxima-divulgacao')?.value || '',
-        valor_inscricao: document.getElementById('f-valor-inscricao').value,
-        precisa_valor_ministerio: document.getElementById('f-precisa-valor-ministerio').value,
-        tema: document.getElementById('f-tema').value,
-        versiculo: document.getElementById('f-versiculo').value,
-        objetivo_espiritual: document.getElementById('f-objetivo-espiritual').value,
-        observacoes: document.getElementById('f-observacoes').value
+        valor_inscricao: document.getElementById('f-valor-inscricao')?.value || '',
+        precisa_valor_ministerio: document.getElementById('f-precisa-valor-ministerio')?.value || 'nao',
+        tema: document.getElementById('f-tema')?.value || '',
+        versiculo: document.getElementById('f-versiculo')?.value || '',
+        objetivo_espiritual: document.getElementById('f-objetivo-espiritual')?.value || '',
+        observacoes: document.getElementById('f-observacoes')?.value || ''
       };
 
       try {
@@ -2098,9 +2177,9 @@ function renderGestaoHtml({ user }) {
         });
 
         const data = await res.json();
-        if (data.ok) {
+        if (data && data.ok) {
           fecharModalAgendamento();
-          mostrarToast('🎉 Evento solicitado com sucesso! Código gerado: ' + data.codigo);
+          mostrarToast('🎉 Evento solicitado com sucesso! Código: ' + data.codigo);
           carregarEventosServidor();
           carregarSolicitacoesServidor();
           carregarFichasServidor();
@@ -2112,16 +2191,19 @@ function renderGestaoHtml({ user }) {
         console.error('Erro na submissão:', err);
         alert('Erro ao comunicar com o servidor. Tente novamente.');
       } finally {
-        btnConcluir.disabled = false;
-        btnConcluir.textContent = '🚀 Enviar para Secretaria';
+        if (btnConcluir) {
+          btnConcluir.disabled = false;
+          btnConcluir.textContent = '🚀 Enviar para Secretaria';
+        }
       }
     }
 
     function mostrarToast(mensagem) {
       const toast = document.getElementById('toast-msg');
+      if (!toast) return;
       toast.textContent = mensagem;
-      toast.style.display = 'flex';
-      setTimeout(() => { toast.style.display = 'none'; }, 5500);
+      toast.style.display = 'block';
+      setTimeout(function() { toast.style.display = 'none'; }, 5500);
     }
   </script>
 </body>
@@ -2134,4 +2216,3 @@ module.exports = {
   criarSolicitacaoEventoWeb,
   renderGestaoHtml
 };
-

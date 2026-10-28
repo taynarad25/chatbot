@@ -46,7 +46,7 @@ test("GET /gestao autenticado: retorna a página HTML com status 200 e component
   assert.equal(res.status, 200);
   const html = await res.text();
   assert.match(html, /Gestão de Eventos/);
-  assert.match(html, /Calendário & Disponibilidade/);
+  assert.match(html, /Calendário/);
   assert.match(html, /Novo Agendamento/);
   assert.match(html, /modal-agendamento/);
 });
