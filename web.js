@@ -17,6 +17,8 @@ const eventosGerenciador = require("./web/eventos_gerenciador");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 const { notificarSecretaria } = require("./bot/secretaria");
 const limpezaEventos = require("./web/limpeza_eventos");
+const gestao = require("./web/gestao");
+const db = require("./db");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
 const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
@@ -1110,6 +1112,62 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         } catch (err) {
           console.error(`[Web] Erro no registro: ${err.message}`);
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+        }
+      }
+
+      // ==========================================
+      // NOVA ÁREA: GESTÃO DE EVENTOS (/gestao ou /eventos)
+      // ==========================================
+      if (req.method === 'GET' && (pathname === '/gestao' || pathname === '/gestao/' || pathname === '/eventos' || pathname === '/eventos/')) {
+        if (!isAuthenticated(req)) {
+          res.writeHead(302, { Location: '/secretaria/login?redirect=/gestao' });
+          return res.end();
+        }
+        const session = getSession(req);
+        const html = gestao.renderGestaoHtml({ user: session });
+        return sendHtml(res, html);
+      }
+
+      // API: Informações do Perfil de Gestão
+      if (req.method === 'GET' && pathname === '/gestao/api/user-info') {
+        if (!isAuthenticated(req)) return sendJson(res, 401, { ok: false, message: 'Não autorizado' });
+        const session = getSession(req);
+        const perfil = gestao.obterPerfilGestao(session);
+        return sendJson(res, 200, { ok: true, perfil, user: perfil });
+      }
+
+      // API: Listar Eventos para o Calendário
+      if (req.method === 'GET' && pathname === '/gestao/api/eventos') {
+        const eventos = gestao.listarEventosCalendario();
+        return sendJson(res, 200, { ok: true, eventos });
+      }
+
+      // API: Listar Solicitações de Eventos
+      if (req.method === 'GET' && pathname === '/gestao/api/solicitacoes') {
+        const eventos = gestao.listarEventosCalendario();
+        return sendJson(res, 200, { ok: true, solicitacoes: eventos });
+      }
+
+      // API: Listar Fichas de Eventos Preenchidas
+      if (req.method === 'GET' && pathname === '/gestao/api/fichas') {
+        try {
+          const rows = db.prepare("SELECT * FROM formularios_eventos ORDER BY id DESC LIMIT 50").all();
+          return sendJson(res, 200, { ok: true, fichas: rows });
+        } catch (eFichas) {
+          return sendJson(res, 500, { ok: false, message: eFichas.message });
+        }
+      }
+
+      // API: Enviar Nova Solicitação de Evento via Web
+      if (req.method === 'POST' && pathname === '/gestao/api/solicitar') {
+        try {
+          const body = await parseRequestBody(req);
+          const session = getSession(req) || { username: 'Líder Conectado' };
+          const resultado = await gestao.criarSolicitacaoEventoWeb(body, session, getClient);
+          return sendJson(res, 200, resultado);
+        } catch (errSol) {
+          console.error('[Gestão API] Erro ao registrar solicitação:', errSol.message);
+          return sendJson(res, 400, { ok: false, message: errSol.message });
         }
       }
 

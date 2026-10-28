@@ -268,7 +268,8 @@ function renderLoginHtml(message = "") {
         } else {
           localStorage.removeItem('curados_secretaria_usuario');
         }
-        window.location.href = '/secretaria';
+        const redirectUrl = urlParams.get('redirect') || '/secretaria';
+        window.location.href = redirectUrl;
       } else {
         const json = await res.json();
         console.error('Falha no login:', json.message);
