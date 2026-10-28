@@ -9,6 +9,11 @@ try {
   console.warn('[Eventos Gerenciador] Não foi possível carregar db.js:', err.message);
 }
 
+let limpezaEventos;
+try {
+  limpezaEventos = require('./limpeza_eventos');
+} catch (_) {}
+
 // Inicializa tabelas se ainda não existirem
 if (db) {
   try {
@@ -34,10 +39,6 @@ if (db) {
         atualizadoEm TEXT NOT NULL
       );
 
-      try {
-        db.exec('ALTER TABLE painel_eventos ADD COLUMN bannerMobileUrl TEXT;');
-      } catch (_) {}
-
       CREATE TABLE IF NOT EXISTS painel_eventos_inscricoes (
         id TEXT PRIMARY KEY,
         eventoId TEXT NOT NULL,
@@ -52,6 +53,10 @@ if (db) {
       CREATE INDEX IF NOT EXISTS idx_painel_eventos_slug ON painel_eventos(slug);
       CREATE INDEX IF NOT EXISTS idx_painel_inscricoes_evento ON painel_eventos_inscricoes(eventoId);
     `);
+
+    try {
+      db.exec('ALTER TABLE painel_eventos ADD COLUMN bannerMobileUrl TEXT;');
+    } catch (_) {}
   } catch (errInit) {
     console.error('[Eventos Gerenciador] Erro ao inicializar tabelas:', errInit.message);
   }
@@ -74,15 +79,25 @@ function normalizarTelefone(tel) {
 }
 
 /**
- * Lista todos os eventos cadastrados
+ * Lista todos os eventos cadastrados (purga automaticamente eventos expirados no próximo dia após a execução)
  */
 function listarEventosPainel({ apenasAtivos = false } = {}) {
   if (!db) return [];
+  if (limpezaEventos && typeof limpezaEventos.limparTodosEventosExpirados === 'function') {
+    try {
+      limpezaEventos.limparTodosEventosExpirados({ db });
+    } catch (_) {}
+  }
   const query = apenasAtivos
     ? 'SELECT * FROM painel_eventos WHERE ativo = 1 ORDER BY criadoEm DESC'
     : 'SELECT * FROM painel_eventos ORDER BY criadoEm DESC';
   const rows = db.prepare(query).all();
-  return rows.map(r => {
+  return rows.filter(r => {
+    if (limpezaEventos && typeof limpezaEventos.isEventoExpiradoData === 'function') {
+      return !limpezaEventos.isEventoExpiradoData(r.dataEvento);
+    }
+    return true;
+  }).map(r => {
     let perguntas = [];
     try {
       perguntas = JSON.parse(r.perguntas || '[]');

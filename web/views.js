@@ -1,3 +1,5 @@
+const { isEventoExpiradoData } = require('./limpeza_eventos');
+
 function renderLoginHtml(message = "") {
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1856,83 +1858,8 @@ function renderIndexHtml() {
           </div>
         </div>
 
-      <!-- Card do Evento Culto de Mulheres -->
-      <div class="evento-card-item" data-event-date="2026-10-24" style="margin-top: 2rem; border-color: rgba(200, 100, 82, 0.35);">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(200, 100, 82, 0.2); color: #f4a290; border: 1px solid rgba(200, 100, 82, 0.4); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
-              🌸 Rede de Mulheres
-            </div>
-            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">Culto de Mulheres — O Vaso e o Oleiro</h4>
-            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
-              🗓️ <strong>24/10/2026 às 15:00</strong> &nbsp;•&nbsp; 📍 <strong>R. Benedicto de Abreu Júnior, 40</strong> &nbsp;•&nbsp; <em>Inscrição Estritamente Individual</em>
-            </p>
-          </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-            <button type="button" class="btn-gaveta-toggle" id="btnToggleMulheres" onclick="toggleGavetaEvento('mulheres')" title="Recolher ou expandir inscrições (engavetar)">
-              <span class="gaveta-toggle-text">Recolher</span>
-              <span class="gaveta-arrow" id="arrow-mulheres">▲</span>
-            </button>
-            <button onclick="sincronizarComPlanilhaMulheres()" id="btnSyncPlanilhaMulheres" style="background: rgba(34, 197, 94, 0.15); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(34, 197, 94, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Puxar todas as inscrições atualizadas do Google Sheets">
-              🔄 Puxar da Planilha
-            </button>
-            <button onclick="window.open('/mulheres', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver página pública de inscrição">
-              🔗 Abrir Formulário
-            </button>
-            <button onclick="window.open('/mulheres/api/relatorio-pdf', '_blank')" style="background: linear-gradient(135deg, #c86452, #e27d60); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(200, 100, 82, 0.35);">
-              📄 Exportar Lista (PDF)
-            </button>
-            <button onclick="fetchMulheresInscricoes()" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
-              🔄 Atualizar
-            </button>
-          </div>
-        </div>
 
-        <div class="evento-gaveta-body" id="gaveta-mulheres">
-          <div class="evento-metric-grid" id="mulheresMetrics">
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="mulheresTotal" style="color: #f4a290;">-</div>
-              <div class="evento-metric-lbl">Total de Inscritas</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="mulheresConfirmadosZap" style="color: #4ade80;">-</div>
-              <div class="evento-metric-lbl">Confirmação WhatsApp</div>
-            </div>
-            <div class="evento-metric-box">
-              <div class="evento-metric-val" id="mulheresPendentesZap" style="color: #facc15;">-</div>
-              <div class="evento-metric-lbl">Pendentes de WhatsApp</div>
-            </div>
-          </div>
-
-          <!-- Barra de Filtros e Busca do Culto de Mulheres -->
-          <div class="evento-toolbar" style="margin-top: 1.2rem;">
-            <input type="text" id="mulheresSearchInput" class="evento-search-input" placeholder="🔍 Filtrar por participante, e-mail ou telefone..." oninput="filtrarMulheresInscricoes()" />
-          </div>
-
-          <!-- Tabela de Inscritas do Culto de Mulheres -->
-          <div style="background: var(--cor-card-alt); border: 1px solid var(--cor-borda); border-radius: 16px; overflow-x: auto; margin-bottom: 0.5rem;">
-            <table class="evento-table">
-              <thead>
-                <tr>
-                  <th style="width: 60px; text-align: center;">Nº</th>
-                  <th>Nome da Participante</th>
-                  <th>E-mail</th>
-                  <th>Telefone / WhatsApp</th>
-                  <th style="width: 150px; text-align: center;">Data da Inscrição</th>
-                  <th style="width: 140px; text-align: center;">WhatsApp</th>
-                  <th style="width: 110px; text-align: center;">Ações</th>
-                </tr>
-              </thead>
-              <tbody id="mulheresTbodyInscritos">
-                <tr>
-                  <td colspan="7" style="text-align: center; color: var(--cor-texto-mutado); padding: 2rem;">Carregando inscritas...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
+      ${!isEventoExpiradoData('2026-10-31') ? `
       <!-- Card do Evento Saúde da Mulher — Palestra + Pilates -->
       <div class="evento-card-item" data-event-date="2026-10-31" style="margin-top: 2rem; border-color: rgba(225, 29, 72, 0.45); background: linear-gradient(135deg, rgba(225, 29, 72, 0.12), rgba(219, 39, 119, 0.06));">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
@@ -2024,7 +1951,9 @@ function renderIndexHtml() {
           </div>
         </div>
       </div>
+      ` : ''}
 
+      ${!isEventoExpiradoData('2026-11-15') ? `
       <!-- Card do Evento Treinamento de Intercessão -->
       <div class="evento-card-item" data-event-date="2026-11-15" style="margin-top: 2rem; border-color: rgba(249, 115, 22, 0.45); background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(168, 85, 247, 0.08));">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
@@ -2109,6 +2038,7 @@ function renderIndexHtml() {
           </div>
         </div>
       </div>
+      ` : ''}
       </div>
     </div>
 
@@ -4428,9 +4358,9 @@ function renderIndexHtml() {
     refresh();
     fetchEventosPainel();
     fetchEventosCadastrados();
-    fetchMulheresInscricoes();
-    fetchSaudeMulherInscricoes();
-    fetchIntercessaoInscricoes();
+    if (document.getElementById('gaveta-mulheres')) fetchMulheresInscricoes();
+    if (document.getElementById('gaveta-saude_mulher')) fetchSaudeMulherInscricoes();
+    if (document.getElementById('gaveta-intercessao')) fetchIntercessaoInscricoes();
     removerEventosPassadosSecretaria();
     restaurarEstadoGavetas();
   </script>

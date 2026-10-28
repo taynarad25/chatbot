@@ -535,7 +535,7 @@
             <img src="/images/logo.png" alt="Comunidade Cristã Curados" onerror="this.style.display='none'">
             <span class="top-brand-text">CURADOS</span>
         </a>
-        <div class="top-tag">🎀 Outubro Rosa • Saúde da Mulher</div>
+        <div class="top-tag">🎀 Outubro Rosa • Inscrições até Amanhã (29/10)</div>
     </header>
 
     <main class="container">
@@ -581,6 +581,13 @@
                             <div style="color: var(--cor-texto-mutado); font-size: 0.85rem;">Vagas limitadas • Ficha de Anamnese obrigatória</div>
                         </div>
                     </li>
+                    <li class="meta-item" style="background: rgba(225, 29, 72, 0.15); border: 1px solid rgba(244, 63, 94, 0.4); border-radius: 12px; padding: 10px 14px;">
+                        <span class="meta-icon">⏳</span>
+                        <div>
+                            <strong style="color: #fda4af;">Inscrições: Apenas até amanhã (29/10 às 23:59)</strong>
+                            <div style="color: #ffe4e6; font-size: 0.85rem;">Preenchimento da anamnese obrigatório antes do encerramento das vagas.</div>
+                        </div>
+                    </li>
                 </ul>
 
                 <div class="notice-anamnese">
@@ -592,6 +599,9 @@
             <!-- Formulário de Inscrição e Anamnese -->
             <section class="form-card">
                 <div class="form-header">
+                    <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.22); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.4); padding: 5px 14px; border-radius: 999px; font-size: 0.82rem; font-weight: 700; margin-bottom: 12px;">
+                        ⏳ Inscrições Abertas até Amanhã (29/10/2026 às 23h59)
+                    </div>
                     <h2>📝 Inscrição & Ficha de Anamnese</h2>
                     <p>Preencha todos os campos obrigatórios abaixo para confirmar sua vaga na aula de Pilates.</p>
                 </div>
@@ -1055,6 +1065,13 @@
                 outrasInformacoes
             };
 
+            const DATA_LIMITE_INSCRICAO = new Date('2026-10-29T23:59:59.999-03:00');
+
+            if (new Date().getTime() > DATA_LIMITE_INSCRICAO.getTime()) {
+                verificarStatusPrazoInscricoes();
+                return;
+            }
+
             btn.disabled = true;
             btn.innerHTML = '<span>⏳ Enviando sua anamnese...</span>';
             feedback.style.display = 'none';
@@ -1075,6 +1092,14 @@
                         if (dataServidor.ok) {
                             sucessoServidor = true;
                             if (dataServidor.salvoNaPlanilha) salvoPlanilhaGoogle = true;
+                        } else if (dataServidor.code === 'INSCRICOES_ENCERRADAS') {
+                            feedback.className = 'feedback-box error';
+                            fTitle.innerHTML = '🔒 Inscrições Encerradas';
+                            fBody.innerHTML = dataServidor.message || 'As inscrições para a aula de Pilates foram encerradas no dia 29/10/2026.';
+                            feedback.style.display = 'block';
+                            document.getElementById('formSaudeMulher').style.display = 'none';
+                            feedback.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            return;
                         }
                     } catch (errServ) {
                         console.warn('Aviso ao enviar para o servidor local:', errServ);
@@ -1121,6 +1146,27 @@
                 btn.innerHTML = '<span>Confirmar Minha Inscrição no Pilates</span>';
             }
         }
+
+        function verificarStatusPrazoInscricoes() {
+            const dataLimite = new Date('2026-10-29T23:59:59.999-03:00');
+            const agora = new Date();
+            if (agora.getTime() > dataLimite.getTime()) {
+                const form = document.getElementById('formSaudeMulher');
+                const feedback = document.getElementById('feedbackVisual');
+                const fTitle = document.getElementById('feedbackTitle');
+                const fBody = document.getElementById('feedbackBody');
+                if (form) form.style.display = 'none';
+                if (feedback && fTitle && fBody) {
+                    feedback.className = 'feedback-box error';
+                    feedback.style.display = 'block';
+                    fTitle.innerHTML = '🔒 Inscrições Encerradas';
+                    fBody.innerHTML = 'As inscrições e o envio da ficha de Anamnese para a aula de Pilates do evento Saúde da Mulher foram encerradas no dia <strong>29/10/2026</strong>.<br><br>' +
+                        'O evento acontecerá neste <strong>sábado, 31 de Outubro às 15:00</strong> na Comunidade Cristã Curados.<br><br>' +
+                        'Agradecemos com muito carinho a todas que se inscreveram! Nos vemos no evento! 💕';
+                }
+            }
+        }
+        document.addEventListener('DOMContentLoaded', verificarStatusPrazoInscricoes);
     </script>
 </body>
 </html>

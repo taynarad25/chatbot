@@ -39,6 +39,19 @@ function atualizarMetadataPlanilhaSaudeMulher({ spreadsheetId, spreadsheetUrl, p
   if (pdfUrl) metadataPlanilhaSaudeMulher.pdfUrl = pdfUrl;
 }
 
+const DATA_LIMITE_INSCRICAO = new Date(process.env.SAUDE_MULHER_DATA_LIMITE || '2026-10-29T23:59:59.999-03:00');
+const DATA_EXECUCAO_EVENTO = new Date('2026-10-31T23:59:59.999-03:00');
+
+function estaoInscricoesAbertas(dataReferencia = new Date()) {
+  const agora = new Date(dataReferencia);
+  return agora.getTime() <= DATA_LIMITE_INSCRICAO.getTime();
+}
+
+function isEventoExpirado(dataReferencia = new Date()) {
+  const agora = new Date(dataReferencia);
+  return agora.getTime() > DATA_EXECUCAO_EVENTO.getTime();
+}
+
 function normalizarTelefone(telefone) {
   return String(telefone || '').replace(/\D/g, '');
 }
@@ -67,7 +80,12 @@ function salvarInscricaoSaudeMulher({
   dataEvento = '2026-10-31 15:00',
   whatsappConfirmacaoEnviado = 0,
   criadoEm = null,
+  dataReferencia = new Date(),
 } = {}) {
+  if (!estaoInscricoesAbertas(dataReferencia)) {
+    throw new Error('As inscrições para o evento Saúde da Mulher foram encerradas no dia 29/10/2026.');
+  }
+
   if (!db) {
     throw new Error('Banco de dados não disponível');
   }
@@ -579,4 +597,7 @@ module.exports = {
   renderSaudeMulherPdfHtml,
   obterLinksPlanilhaSaudeMulher,
   atualizarMetadataPlanilhaSaudeMulher,
+  estaoInscricoesAbertas,
+  isEventoExpirado,
+  DATA_LIMITE_INSCRICAO,
 };

@@ -16,6 +16,7 @@ const treinamentoIntercessao = require("./web/treinamento_intercessao");
 const eventosGerenciador = require("./web/eventos_gerenciador");
 const { gerarDescricaoEvento, salvarDescricaoEvento, listarDescricoesEventos } = require("./bot/descricaoEvento");
 const { notificarSecretaria } = require("./bot/secretaria");
+const limpezaEventos = require("./web/limpeza_eventos");
 
 // Rate limiting de login por IP: 10 tentativas a cada 15 minutos, depois reseta sozinho
 const loginRateLimiter = createRateLimiter({ maxAttempts: 10, windowMs: 15 * 60 * 1000 });
@@ -248,7 +249,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       // Rota raiz (/) e /home: Página institucional da Comunidade Cristã Curados
       if (req.method === 'GET' && (pathname === '/' || pathname === '/home' || pathname === '/home/' || pathname === '/home.html')) {
         if (fs.existsSync(HOME_HTML_FILE)) {
-          const content = fs.readFileSync(HOME_HTML_FILE, 'utf8');
+          let content = fs.readFileSync(HOME_HTML_FILE, 'utf8');
+          content = limpezaEventos.filtrarHtmlEventosExpirados(content);
           res.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
             'X-Content-Type-Options': 'nosniff',
@@ -266,7 +268,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         decodedPathname === '/ministérios' || decodedPathname === '/ministérios/' || decodedPathname === '/ministérios.html'
       )) {
         if (fs.existsSync(MINISTERIOS_HTML_FILE)) {
-          const content = fs.readFileSync(MINISTERIOS_HTML_FILE, 'utf8');
+          let content = fs.readFileSync(MINISTERIOS_HTML_FILE, 'utf8');
+          content = limpezaEventos.filtrarHtmlEventosExpirados(content);
           res.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
             'X-Content-Type-Options': 'nosniff',
@@ -404,19 +407,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         pathname === '/mulheres' || pathname === '/mulheres/' || pathname === '/mulheres.html' ||
         pathname === '/culto-mulheres' || pathname === '/culto-mulheres/' || pathname === '/culto-mulheres.html'
       )) {
-        const fileToServe = fs.existsSync(path.join(__dirname, "public", "culto-mulheres.html"))
-          ? path.join(__dirname, "public", "culto-mulheres.html")
-          : (fs.existsSync(path.join(__dirname, "web", "public", "culto-mulheres.html")) ? path.join(__dirname, "web", "public", "culto-mulheres.html") : MULHERES_HTML_FILE);
-        if (fs.existsSync(fileToServe)) {
-          const content = fs.readFileSync(fileToServe, 'utf8');
-          res.writeHead(200, {
-            'Content-Type': 'text/html; charset=utf-8',
-            'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'DENY',
-            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'"
-          });
-          return res.end(content);
-        }
+        // Evento realizado em 24/10/2026: no dia seguinte à execução foi totalmente excluído
+        res.writeHead(302, { 'Location': '/' });
+        return res.end();
+      }
+
+      // API: Processamento de inscrição (/mulheres/api/inscrever)
+      if (req.method === 'POST' && (pathname === '/mulheres/api/inscrever' || pathname === '/mulheres/inscrever')) {
+        return sendJson(res, 400, { ok: false, code: 'EVENTO_ENCERRADO', message: 'As inscrições para o Culto de Mulheres foram encerradas pois o evento já foi realizado.' });
       }
 
       // API: Processamento de inscrição (/mulheres/api/inscrever)
@@ -638,6 +636,12 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         pathname === '/saude-mulher' || pathname === '/saude-mulher/' || pathname === '/saude-mulher.html' ||
         pathname === '/pilates' || pathname === '/pilates/' || pathname === '/pilates.html'
       )) {
+        if (typeof saudeMulher.isEventoExpirado === 'function' && saudeMulher.isEventoExpirado()) {
+          // Evento realizado em 31/10/2026: no próximo dia após a execução (a partir de 01/11), é totalmente excluído
+          res.writeHead(302, { 'Location': '/' });
+          return res.end();
+        }
+
         const fileToServe = fs.existsSync(path.join(__dirname, "public", "saude-da-mulher.html"))
           ? path.join(__dirname, "public", "saude-da-mulher.html")
           : (fs.existsSync(path.join(__dirname, "web", "public", "saude-da-mulher.html")) ? path.join(__dirname, "web", "public", "saude-da-mulher.html") : SAUDE_MULHER_HTML_FILE);
@@ -678,6 +682,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       // API: Processamento de inscrição e anamnese (/saude-mulher/api/inscrever)
       if (req.method === 'POST' && (pathname === '/saude-mulher/api/inscrever' || pathname === '/saude-mulher/inscrever')) {
         try {
+          if (typeof saudeMulher.estaoInscricoesAbertas === 'function' && !saudeMulher.estaoInscricoesAbertas()) {
+            return sendJson(res, 400, {
+              ok: false,
+              code: 'INSCRICOES_ENCERRADAS',
+              message: 'As inscrições para a aula de Pilates do evento Saúde da Mulher foram encerradas no dia 29/10/2026.'
+            });
+          }
+
           const body = await parseRequestBody(req);
           const { nome, idade, telefone } = body || {};
           if (!nome || !idade || !telefone) {
@@ -1103,7 +1115,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
       if (req.method === 'GET' && pathname === '/secretaria') {
         try {
-          const html = renderIndexHtml();
+          let html = renderIndexHtml();
+          html = limpezaEventos.filtrarHtmlEventosExpirados(html);
           return sendHtml(res, html);
         } catch (renderErr) {
           console.error(`[Web] Erro ao renderizar Index:`, renderErr);
@@ -1138,8 +1151,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         return sendJson(res, 200, { ok: true, user: { ...session, pastoral } });
       }
 
-      // API: Listar Eventos Cadastrados
+      // API: Listar Eventos Cadastrados (limpa eventos expirados automaticamente)
       if (req.method === 'GET' && pathname === '/secretaria/api/eventos') {
+        limpezaEventos.limparTodosEventosExpirados();
         const eventos = listarDescricoesEventos();
         return sendJson(res, 200, { ok: true, eventos });
       }
@@ -1478,6 +1492,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
   server.listen(port, '0.0.0.0', () => {
     console.log(`✅ Site de controle rodando em http://0.0.0.0:${server.address().port}`);
+
+    // Rotina automática de limpeza de eventos passados
+    limpezaEventos.iniciarRotinaLimpezaAutomatica();
 
     // Sincroniza dados da planilha ao iniciar o servidor
     if (typeof cultoMulheres.sincronizarInscricoesComNuvem === 'function' && process.env.NODE_ENV !== 'test') {
