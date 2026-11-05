@@ -157,11 +157,11 @@ const calendar = google.calendar({
 
 // Funções auxiliares
 async function buscarEventos(inicio, fim, agendaId = null) {
-  let todosEventos = [];
   const agendas = agendaId ? [agendaId] : agendasParaLer;
-  console.log(`[Google Calendar] Buscando eventos em ${agendas.length} agenda(s) entre ${inicio} e ${fim}`);
+  console.log(`[Google Calendar] Buscando eventos em ${agendas.length} agenda(s) em paralelo entre ${inicio} e ${fim}`);
 
-  for (const id of agendas) {
+  const promessas = agendas.map(async (id) => {
+    const eventosAgenda = [];
     try {
       let pageToken;
       do {
@@ -175,18 +175,25 @@ async function buscarEventos(inicio, fim, agendaId = null) {
           pageToken,
         });
         if (res.data.items) {
-          // Anexa o calendarId a cada evento para permitir filtragem posterior
           const eventsWithCalendarId = res.data.items.map(item => ({ ...item, calendarId: id }));
-          todosEventos = todosEventos.concat(eventsWithCalendarId);
+          eventosAgenda.push(...eventsWithCalendarId);
         }
-        // Segue paginando enquanto o Google indicar que há mais resultados
-        // (agendas com mais de 2500 eventos no período não ficavam truncadas)
         pageToken = res.data.nextPageToken;
       } while (pageToken);
     } catch (e) {
       console.error(`[ALERTA:google-calendar] Erro na agenda ${id}:`, e.response?.data || e.message);
     }
+    return eventosAgenda;
+  });
+
+  const resultados = await Promise.allSettled(promessas);
+  let todosEventos = [];
+  for (const r of resultados) {
+    if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+      todosEventos.push(...r.value);
+    }
   }
+
   return todosEventos.sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
 }
 

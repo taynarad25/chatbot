@@ -151,16 +151,16 @@ function inferirDepartamentoDeTitulo(titulo = '') {
  */
 async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
   const agora = Date.now();
-  if (cacheGoogleEvents.timestamp && (agora - cacheGoogleEvents.timestamp < 180000)) {
+  if (cacheGoogleEvents.timestamp && (agora - cacheGoogleEvents.timestamp < 180000) && Array.isArray(cacheGoogleEvents.data) && cacheGoogleEvents.data.length > 0) {
     return cacheGoogleEvents.data;
   }
 
   const eventosGcal = [];
   try {
     if (injectedBuscarEventos && typeof injectedBuscarEventos === 'function') {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000));
       const res = await Promise.race([injectedBuscarEventos(inicioIso, fimIso), timeoutPromise]);
-      if (Array.isArray(res)) {
+      if (Array.isArray(res) && res.length > 0) {
         cacheGoogleEvents = { timestamp: agora, data: res };
         return res;
       }
@@ -177,16 +177,28 @@ async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
       const cal = googleapis.calendar({ version: 'v3', auth });
 
       const idsAgendas = [
-        AGENDAS_INTERNAS.REUNIOES,
-        AGENDAS_INTERNAS.ENSAIOS,
-        AGENDAS_INTERNAS.ATENDIMENTO,
-        AGENDAS_INTERNAS.USO_SALAO
-      ].filter(Boolean);
+        "694d1388f8f961bdbefed402fab5d498b44e0a489ec5fbcb3a40a5d1c3eda011@group.calendar.google.com",
+        "692b7e0551c4113b02838eadaf1d60873587a956000b7b1932c4575c3a00ddd2@group.calendar.google.com",
+        "f4625f5738f62b443b1f6279b5f124b37dffec23b9a56e3bb0dff064dc30e057@group.calendar.google.com",
+        "9f1ee711c5b270aed77f50597c3fbdcf7bd33775707f4def5c82cc3794810ca4@group.calendar.google.com",
+        "2ebaead80554da51744895e38dc117c3b43e0982e95d75ef64193702f9811bbd@group.calendar.google.com",
+        "3839992a12d4695f87a19e9cfa3257f9ca60fab24e96549160e94c8603862b45@group.calendar.google.com",
+        "8eae57daa28963736c7ab1c343e2d8e973b4c5caecf78caa8f38255662aa9f17@group.calendar.google.com",
+        "384215b0335082cfde0c5f5f98b75ca59612a77a5123544f15bd41dd60d238d4@group.calendar.google.com",
+        "b02048ebc98f7504e086cf4b2a54881a4e645189b565c90b5f7c477a4d0de10f@group.calendar.google.com",
+        "b0aae19433652d50d04ae2290889cf7f905cc226ae103eb839ff3ca511acd6af@group.calendar.google.com",
+        "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com",
+        "b8f01bfd149139d388080ec63176c2556e6e1aedce184b84d37671c3d082d238@group.calendar.google.com",
+        "0a55126694643f39944faf173fe3acd127b2a52074c6ecc9e9ed4dc23edf8b57@group.calendar.google.com",
+        "7975950de545f60f585bc041682c6564ce4c29d0ef7e06cdeffa21ffc0ffd572@group.calendar.google.com",
+        "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com",
+        "49b999ac91607d07310d7e36a26fe088ddc3cd2b34ff741a0e139b43a18bdabc@group.calendar.google.com",
+        "ca137e32f53409b1bd297929b9a2afd663eaf7df370e4c0aea6442c6a68a7946@group.calendar.google.com"
+      ];
 
-      // Chamadas paralelas com timeout de 1.5s
       const promessas = idsAgendas.map(async (calId) => {
         try {
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500));
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
           const reqPromise = cal.events.list({
             calendarId: calId,
             timeMin: inicioIso,
@@ -208,7 +220,9 @@ async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
           eventosGcal.push(...r.value);
         }
       }
-      cacheGoogleEvents = { timestamp: agora, data: eventosGcal };
+      if (eventosGcal.length > 0) {
+        cacheGoogleEvents = { timestamp: agora, data: eventosGcal };
+      }
     }
   } catch (_) {}
   return eventosGcal;
@@ -255,13 +269,18 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
 
       for (let idx = 0; idx < horarios.length; idx++) {
         const h = horarios[idx];
-        const dataEv = h.data || '';
-        if (!dataEv) continue;
+        let dataEv = (h.data || '').trim();
+        if (!dataEv || dataEv.toLowerCase() === 'não') continue;
+        if (/^\d{1,2}\/\d{1,2}$/.test(dataEv)) {
+          dataEv = `${dataEv}/${anoAtual}`;
+        }
+
+        const tituloEv = h.titulo ? `${r.evento} - ${h.titulo}` : (horarios.length > 1 && !r.evento.includes('Sessão') ? `${r.evento} (Sessão ${idx + 1})` : r.evento);
 
         eventos.push({
           id: `desc_${r.id}_${idx}`,
           origem: 'descricao',
-          titulo: r.evento,
+          titulo: tituloEv,
           departamento: r.departamento || inferirDepartamentoDeTitulo(r.evento),
           data: dataEv,
           horarioInicio: h.inicio || '19:00',
@@ -423,21 +442,52 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         if (d.tipo === 'alterar' || d.tipo === 'reuniao_alterar') tipo = 'alteracao';
         if (d.tipo === 'cancelar' || d.tipo === 'cancelar_reuniao') tipo = 'cancelamento';
 
-        eventos.push({
-          id: `pend_${pend.codigo}`,
-          origem: 'pendente',
-          codigo: pend.codigo,
-          titulo: nome,
-          departamento: d.rede || d.departamento || inferirDepartamentoDeTitulo(nome),
-          data: dataFormatada || (d.blocos && d.blocos[0]?.data) || '',
-          horarioInicio: d.horarioInicio || (d.blocos && d.blocos[0]?.inicio) || '19:00',
-          horarioFim: d.horarioFim || (d.blocos && d.blocos[0]?.fim) || '21:30',
-          local: d.local || ENDERECO_IGREJA,
-          responsavel: d.solicitanteNome || '',
-          status: 'pendente_secretaria',
-          tipo,
-          payload: d
-        });
+        if (Array.isArray(d.blocos) && d.blocos.length > 0) {
+          d.blocos.forEach((b, bIdx) => {
+            let bData = (b.data || '').trim();
+            if (bData && /^\d{1,2}\/\d{1,2}$/.test(bData)) {
+              bData = `${bData}/${anoAtual}`;
+            }
+            if (!bData) return;
+            const tituloBloco = b.titulo ? `${nome} - ${b.titulo}` : (d.blocos.length > 1 ? `${nome} (Sessão ${bIdx + 1})` : nome);
+            eventos.push({
+              id: `pend_${pend.codigo}_${bIdx}`,
+              origem: 'pendente',
+              codigo: pend.codigo,
+              titulo: tituloBloco,
+              departamento: d.rede || d.departamento || inferirDepartamentoDeTitulo(nome),
+              data: bData,
+              horarioInicio: b.inicio || '19:00',
+              horarioFim: b.fim || '21:30',
+              local: d.local || ENDERECO_IGREJA,
+              responsavel: d.solicitanteNome || '',
+              status: 'pendente_secretaria',
+              tipo,
+              payload: d
+            });
+          });
+        } else {
+          if (dataFormatada && /^\d{1,2}\/\d{1,2}$/.test(dataFormatada.trim())) {
+            dataFormatada = `${dataFormatada.trim()}/${anoAtual}`;
+          }
+          if (dataFormatada) {
+            eventos.push({
+              id: `pend_${pend.codigo}`,
+              origem: 'pendente',
+              codigo: pend.codigo,
+              titulo: nome,
+              departamento: d.rede || d.departamento || inferirDepartamentoDeTitulo(nome),
+              data: dataFormatada,
+              horarioInicio: d.horarioInicio || '19:00',
+              horarioFim: d.horarioFim || '21:30',
+              local: d.local || ENDERECO_IGREJA,
+              responsavel: d.solicitanteNome || '',
+              status: 'pendente_secretaria',
+              tipo,
+              payload: d
+            });
+          }
+        }
       } catch (_) {}
     }
   } catch (_) {}
