@@ -152,7 +152,10 @@ async function parseRequestBody(req) {
   });
 }
 
-function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, getClient = () => null, port = 3000 }) {
+function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, getClient = () => null, port = 3000, buscarEventos = null, calendar = null }) {
+  if (gestao && typeof gestao.setDependencies === 'function') {
+    gestao.setDependencies({ buscarEventos, calendar });
+  }
   const server = http.createServer(async (req, res) => {
     const start = Date.now();
     const ip = getClientIp(req);
@@ -1138,24 +1141,29 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
       // API: Listar Eventos para o Calendário
       if (req.method === 'GET' && pathname === '/gestao/api/eventos') {
-        const eventos = gestao.listarEventosCalendario();
+        const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const mes = urlObj.searchParams.get('mes');
+        const ano = urlObj.searchParams.get('ano');
+        const session = getSession(req);
+        const perfil = gestao.obterPerfilGestao(session);
+        const eventos = await gestao.listarEventosCalendario({ user: perfil, mes, ano });
         return sendJson(res, 200, { ok: true, eventos });
       }
 
       // API: Listar Solicitações de Eventos
       if (req.method === 'GET' && pathname === '/gestao/api/solicitacoes') {
-        const eventos = gestao.listarEventosCalendario();
-        return sendJson(res, 200, { ok: true, solicitacoes: eventos });
+        const session = getSession(req);
+        const perfil = gestao.obterPerfilGestao(session);
+        const solicitacoes = gestao.listarSolicitacoes({ user: perfil });
+        return sendJson(res, 200, { ok: true, solicitacoes });
       }
 
       // API: Listar Fichas de Eventos Preenchidas
       if (req.method === 'GET' && pathname === '/gestao/api/fichas') {
-        try {
-          const rows = db.prepare("SELECT * FROM formularios_eventos ORDER BY id DESC LIMIT 50").all();
-          return sendJson(res, 200, { ok: true, fichas: rows });
-        } catch (eFichas) {
-          return sendJson(res, 500, { ok: false, message: eFichas.message });
-        }
+        const session = getSession(req);
+        const perfil = gestao.obterPerfilGestao(session);
+        const fichas = gestao.listarFichas({ user: perfil });
+        return sendJson(res, 200, { ok: true, fichas });
       }
 
       // API: Enviar Nova Solicitação de Evento via Web

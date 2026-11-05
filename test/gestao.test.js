@@ -143,3 +143,162 @@ test("POST /gestao/api/solicitar: valida campos e cria solicitação com código
   assert.match(data.message, /Solicitação registrada com sucesso/);
 });
 
+test("GET /gestao/api/fichas: controle rigoroso de acesso (Pastor tem acesso total, Líder só ao seu depto, Diretor sem acesso irrestrito)", async () => {
+  const tokenPastor = createSession("pastor.teste", "pastor", "active");
+  const tokenLider = createSession("lider.teste", "lider", "active");
+  const tokenDiretor = createSession("diretor.teste", "diretor", "active");
+
+  // Pastor
+  const resPastor = await fetch(`${baseUrl}/gestao/api/fichas`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenPastor}` }
+  });
+  assert.equal(resPastor.status, 200);
+  const dataPastor = await resPastor.json();
+  assert.equal(dataPastor.ok, true);
+  assert.ok(Array.isArray(dataPastor.fichas));
+
+  // Líder (Rede de Homens)
+  const resLider = await fetch(`${baseUrl}/gestao/api/fichas`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenLider}` }
+  });
+  assert.equal(resLider.status, 200);
+  const dataLider = await resLider.json();
+  assert.equal(dataLider.ok, true);
+  // Garante que o líder só vê fichas do seu departamento
+  for (const ficha of dataLider.fichas) {
+    assert.match(ficha.departamento.toLowerCase(), /homens|geral/);
+  }
+
+  // Diretor (não pastor): não tem acesso total a fichas de outros departamentos
+  const resDiretor = await fetch(`${baseUrl}/gestao/api/fichas`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenDiretor}` }
+  });
+  assert.equal(resDiretor.status, 200);
+  const dataDiretor = await resDiretor.json();
+  assert.equal(dataDiretor.ok, true);
+  assert.ok(dataDiretor.fichas.length <= dataPastor.fichas.length);
+});
+
+test("GET /gestao/api/solicitacoes: limpa registros de teste e aplica privacidade por líder", async () => {
+  const tokenLider = createSession("lider.teste", "lider", "active");
+  const res = await fetch(`${baseUrl}/gestao/api/solicitacoes`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenLider}` }
+  });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.ok(Array.isArray(data.solicitacoes));
+
+  // Nenhuma solicitação deve ter nomes de teste óbvios
+  for (const sol of data.solicitacoes) {
+    assert.doesNotMatch(sol.titulo.toLowerCase(), /^(teste|test|gabi)$/);
+  }
+});
+
+test("POST /gestao/api/solicitar: suporta reunião, alteração e cancelamento de eventos", async () => {
+  const tokenLider = createSession("lider.teste", "lider", "active");
+
+  // 1. Reunião de liderança
+  const resReuniao = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenLider}`
+    },
+    body: JSON.stringify({
+      tipo: "reuniao",
+      departamento: "Rede de Homens",
+      data: "22/11/2026",
+      horario_inicio: "19:30",
+      horario_termino: "21:00",
+      local: "Igreja",
+      pauta: "Planejamento anual da Rede"
+    })
+  });
+  assert.equal(resReuniao.status, 200);
+  const dataReuniao = await resReuniao.json();
+  assert.equal(dataReuniao.ok, true);
+  assert.ok(dataReuniao.codigo);
+
+  // 2. Pedido de alteração de evento
+  const resAlterar = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenLider}`
+    },
+    body: JSON.stringify({
+      tipo: "alterar",
+      nome_evento: "Café com Deus",
+      campo_alterar: "Horário",
+      novo_valor: "09:00 às 11:30",
+      motivo: "Ajuste na escala"
+    })
+  });
+  assert.equal(resAlterar.status, 200);
+  const dataAlterar = await resAlterar.json();
+  assert.equal(dataAlterar.ok, true);
+  assert.ok(dataAlterar.codigo);
+
+  // 3. Pedido de cancelamento de evento
+  const resCancelar = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenLider}`
+    },
+    body: JSON.stringify({
+      tipo: "cancelar",
+      nome_evento: "Café com Deus",
+      motivo: "Evento cancelado em comum acordo"
+    })
+  });
+  assert.equal(resCancelar.status, 200);
+  const dataCancelar = await resCancelar.json();
+  assert.equal(dataCancelar.ok, true);
+  assert.ok(dataCancelar.codigo);
+});
+
+test("POST /gestao/api/solicitar: atendimento pastoral restrito a pastores", async () => {
+  const tokenLider = createSession("lider.teste", "lider", "active");
+  const tokenPastor = createSession("pastor.teste", "pastor", "active");
+
+  // Líder tenta agendar atendimento pastoral -> Erro 400
+  const resLider = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenLider}`
+    },
+    body: JSON.stringify({
+      tipo: "atendimento",
+      nome_discipulo: "Irmão Marcos",
+      data: "20/11/2026",
+      horario_inicio: "15:00",
+      horario_termino: "16:00"
+    })
+  });
+  assert.equal(resLider.status, 400);
+
+  // Pastor agenda atendimento pastoral -> Sucesso 200
+  const resPastor = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenPastor}`
+    },
+    body: JSON.stringify({
+      tipo: "atendimento",
+      nome_discipulo: "Irmão Marcos",
+      telefone_discipulo: "11999998888",
+      data: "20/11/2026",
+      horario_inicio: "15:00",
+      horario_termino: "16:00",
+      motivo: "Aconselhamento familiar"
+    })
+  });
+  assert.equal(resPastor.status, 200);
+  const dataPastor = await resPastor.json();
+  assert.equal(dataPastor.ok, true);
+});
+

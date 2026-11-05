@@ -2048,7 +2048,12 @@ function createMessageHandler({
                     };
 
                     const calendarId = AGENDAS_INTERNAS.USO_SALAO || agendasParaLer[15];
-                    await calendar.events.insert({ calendarId, resource });
+                    try {
+                      await calendar.events.insert({ calendarId, resource });
+                    } catch (calErr) {
+                      console.error("[ALERTA:google-calendar] Erro no agendamento de uso do salão:", calErr);
+                      return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
+                    }
                     removerPendente(codigo);
 
                     const feedback =
@@ -2057,15 +2062,18 @@ function createMessageHandler({
                       `⚠️ *Lembrete Importante:* Todas as coisas e dependências do salão devem ser mantidas intactas e o espaço deve ser entregue limpo e organizado nas mesmas condições em que for encontrado. 🙏\n\n` +
                       `Digite *menu* para voltar ao menu principal.`;
                     try {
-                      await client.sendMessage(solicitanteId, feedback);
-                      console.log(`[Secretaria] Confirmação de uso do salão enviada para ${mascararTelefone(solicitanteId)}`);
+                      const jid = solicitanteId && (solicitanteId.includes('@') ? solicitanteId : `${solicitanteId.replace(/\D/g, '')}@c.us`);
+                      if (jid && jid.length > 5) {
+                        await client.sendMessage(jid, feedback);
+                        console.log(`[Secretaria] Confirmação de uso do salão enviada para ${mascararTelefone(jid)}`);
+                      }
                     } catch (sendErr) {
                       console.error(`[ALERTA:whatsapp] Erro ao enviar confirmação de salão para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
                     }
                     return msg.reply(`✅ Uso do Salão aprovado, registrado na agenda do salão e membro notificado com sucesso.`);
                   } catch (err) {
-                    console.error("[ALERTA:google-calendar] Erro no agendamento de uso do salão:", err);
-                    return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
+                    console.error("[ALERTA:secretaria] Erro no processamento de aprovação do uso do salão:", err);
+                    return msg.reply("⚠️ Uso do Salão processado com pendências. Verifique na agenda oficial.");
                   }
                 } else {
                   removerPendente(codigo);
@@ -2104,7 +2112,13 @@ function createMessageHandler({
                       },
                     };
 
-                    await calendar.events.insert({ calendarId: AGENDAS_INTERNAS.REUNIOES, resource });
+                    try {
+                      await calendar.events.insert({ calendarId: AGENDAS_INTERNAS.REUNIOES, resource });
+                    } catch (calErr) {
+                      console.error("[ALERTA:google-calendar] Erro no agendamento de reunião:", calErr);
+                      return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
+                    }
+
                     try {
                       salvarFormularioEvento({
                         evento: tituloEvento,
@@ -2123,13 +2137,22 @@ function createMessageHandler({
                     }
                     removerPendente(codigo);
 
-                    const feedback = `✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo e também pode ser acessado pelo link:\n${LINK_ATA_REUNIAO}\n\nEle deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.`;
-                    await enviarConfirmacaoReuniaoComAta(client, solicitanteId, feedback);
-                    console.log(`[Secretaria] Reunião agendada automaticamente para ${mascararTelefone(solicitanteId)}`);
-                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões* e líder notificado com a Ata.`);
+                    let avisouLider = false;
+                    try {
+                      const jid = solicitanteId && (solicitanteId.includes('@') ? solicitanteId : `${solicitanteId.replace(/\D/g, '')}@c.us`);
+                      if (jid && jid.length > 5) {
+                        const feedback = `✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo e também pode ser acessado pelo link:\n${LINK_ATA_REUNIAO}\n\nEle deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.`;
+                        await enviarConfirmacaoReuniaoComAta(client, jid, feedback);
+                        avisouLider = true;
+                        console.log(`[Secretaria] Reunião agendada automaticamente para ${mascararTelefone(jid)}`);
+                      }
+                    } catch (sendErr) {
+                      console.error(`[ALERTA:whatsapp] Erro ao enviar confirmação de reunião para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                    }
+                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões*${avisouLider ? ' e líder notificado com a Ata' : ''}.`);
                   } catch (err) {
-                    console.error("[ALERTA:google-calendar] Erro no agendamento de reunião:", err);
-                    return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
+                    console.error("[ALERTA:secretaria] Erro no processamento da reunião:", err);
+                    return msg.reply("⚠️ Reunião processada com pendências. Verifique na agenda oficial.");
                   }
                 } else {
                   removerPendente(codigo);
@@ -2151,25 +2174,34 @@ function createMessageHandler({
                   const ano = moment().tz("America/Sao_Paulo").year();
                   const agendaId = agendasParaLer[mapearRedeParaAgendaIndex(rede)];
 
-                  if (dados.tipoDuracao === "multiplo" && Array.isArray(dados.blocos)) {
-                    const resources = montarResourcesMultiplosBlocos(dados, ano);
-                    for (const resItem of resources) {
-                      await calendar.events.insert({ calendarId: agendaId, resource: resItem });
+                  try {
+                    if (dados.tipoDuracao === "multiplo" && Array.isArray(dados.blocos)) {
+                      const resources = montarResourcesMultiplosBlocos(dados, ano);
+                      for (const resItem of resources) {
+                        await calendar.events.insert({ calendarId: agendaId, resource: resItem });
+                      }
+                    } else {
+                      const resource = montarResourceEvento(dados, ano);
+                      await calendar.events.insert({ calendarId: agendaId, resource });
                     }
-                  } else {
-                    const resource = montarResourceEvento(dados, ano);
-                    await calendar.events.insert({ calendarId: agendaId, resource });
+                  } catch (calErr) {
+                    console.error("[ALERTA:google-calendar] Erro no agendamento automático:", calErr);
+                    return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                   }
 
                   if (dados.descricao) {
-                    salvarDescricaoEvento({
-                      evento: dados.evento || dados.nomeEvento,
-                      departamento: rede,
-                      local: dados.local,
-                      tipoDuracao: dados.tipoDuracao || "unico",
-                      horarios: dados.blocos || { inicio: dados.horarioInicio, fim: dados.horarioFim },
-                      descricao: dados.descricao
-                    });
+                    try {
+                      salvarDescricaoEvento({
+                        evento: dados.evento || dados.nomeEvento,
+                        departamento: rede,
+                        local: dados.local,
+                        tipoDuracao: dados.tipoDuracao || "unico",
+                        horarios: dados.blocos || { inicio: dados.horarioInicio, fim: dados.horarioFim },
+                        descricao: dados.descricao
+                      });
+                    } catch (eDesc) {
+                      console.error("[Secretaria] Erro ao registrar descrição do evento:", eDesc.message);
+                    }
                   }
                   try {
                     salvarFormularioEvento({
@@ -2185,6 +2217,7 @@ function createMessageHandler({
                         horario_inicio: dados.horarioInicio,
                         horario_termino: dados.horarioFim,
                         local: dados.local || "",
+                        criadoVia: dados.criadoVia || dados.payload?.criadoVia || "whatsapp"
                       },
                     });
                   } catch (eForm) {
@@ -2192,14 +2225,26 @@ function createMessageHandler({
                   }
                   removerPendente(codigo);
 
-                  const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏";
-                  await client.sendMessage(solicitanteId, feedback);
-                  await iniciarFormularioEvento({ etapas, solicitanteId, dadosIniciais: dados, client });
-                  console.log(`[Secretaria] Agendamento automático realizado e formulário iniciado para ${mascararTelefone(solicitanteId)}`);
-                  return msg.reply(`✅ Evento gravado na agenda de *${rede}*, líder notificado e formulário iniciado.`);
+                  let avisouLider = false;
+                  try {
+                    const jid = solicitanteId && (solicitanteId.includes('@') ? solicitanteId : `${solicitanteId.replace(/\D/g, '')}@c.us`);
+                    if (jid && jid.length > 5) {
+                      const feedback = "✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação foi aprovada e já consta na agenda oficial. 🙏";
+                      await client.sendMessage(jid, feedback);
+                      avisouLider = true;
+                      const veioDoWeb = dados.criadoVia === 'painel_web' || dados.payload?.criadoVia === 'painel_web';
+                      if (!veioDoWeb && etapas) {
+                        await iniciarFormularioEvento({ etapas, solicitanteId: jid, dadosIniciais: dados, client });
+                      }
+                      console.log(`[Secretaria] Notificação enviada para ${mascararTelefone(jid)}`);
+                    }
+                  } catch (sendErr) {
+                    console.error(`[ALERTA:whatsapp] Erro ao notificar solicitante ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Evento gravado na agenda de *${rede}* com sucesso${avisouLider ? ' e líder notificado' : ''}.`);
                 } catch (err) {
-                  console.error("[ALERTA:google-calendar] Erro no agendamento automático:", err);
-                  return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
+                  console.error("[ALERTA:secretaria] Erro geral ao processar evento:", err);
+                  return msg.reply("⚠️ Evento gravado na agenda com avisos pendentes. Verifique no painel de gestão.");
                 }
               } else {
                 removerPendente(codigo);
