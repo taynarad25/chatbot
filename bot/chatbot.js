@@ -287,10 +287,17 @@ function criarClient() {
     authTimeoutMs: 0, // Desativa timeout de autenticação rígido para evitar cancelamento prematuro na sincronização
     puppeteer: puppeteerOpts,
     userAgent: process.env.WHATSAPP_USER_AGENT || defaultUserAgent,
+    takeoverOnConflict: true, // Reivindica a sessão caso haja conflito temporário ou reconexão
+    takeoverTimeoutMs: 1000,
   };
 
+  // Garante diretório de cache local para versão do WhatsApp Web
+  const localCacheDir = path.join(ROOT_DIR, '.wwebjs_cache');
+  if (!fs.existsSync(localCacheDir)) {
+    try { fs.mkdirSync(localCacheDir, { recursive: true }); } catch (_) {}
+  }
+
   // Suporte a cache de versão do WhatsApp Web para máxima estabilidade
-  const defaultRemotePath = 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html';
   if (process.env.WWEB_VERSION_REMOTE_PATH) {
     clientOptions.webVersionCache = {
       type: 'remote',
@@ -298,19 +305,13 @@ function criarClient() {
       strict: false,
     };
     console.log(`[Config] webVersionCache remoto customizado configurado: ${process.env.WWEB_VERSION_REMOTE_PATH}`);
-  } else if (process.env.WWEB_CACHE_TYPE === 'local' || process.env.WWEB_VERSION) {
+  } else {
+    // Por padrão usa cache local persistente para não depender de endpoints remotos que retornam 404
     clientOptions.webVersionCache = {
       type: 'local',
-      path: path.join(ROOT_DIR, '.wwebjs_cache'),
+      path: localCacheDir,
     };
     console.log(`[Config] webVersionCache local configurado em .wwebjs_cache`);
-  } else {
-    clientOptions.webVersionCache = {
-      type: 'remote',
-      remotePath: defaultRemotePath,
-      strict: false,
-    };
-    console.log(`[Config] webVersionCache remoto configurado com versão homologada da comunidade.`);
   }
 
   client = new Client(clientOptions);
