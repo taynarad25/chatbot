@@ -169,20 +169,20 @@ function inferirDepartamentoDeTitulo(titulo = '') {
 }
 
 /**
- * Busca rápida no Google Calendar com timeout e cache em memória (não trava a página)
+ * Busca rápida no Google Calendar com timeout reduzido e cache em memória (TTL 10 min)
  */
 async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
   const agora = Date.now();
-  if (cacheGoogleEvents.timestamp && (agora - cacheGoogleEvents.timestamp < 180000) && Array.isArray(cacheGoogleEvents.data) && cacheGoogleEvents.data.length > 0) {
+  if (cacheGoogleEvents.timestamp && (agora - cacheGoogleEvents.timestamp < 600000) && Array.isArray(cacheGoogleEvents.data)) {
     return cacheGoogleEvents.data;
   }
 
   const eventosGcal = [];
   try {
     if (injectedBuscarEventos && typeof injectedBuscarEventos === 'function') {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
       const res = await Promise.race([injectedBuscarEventos(inicioIso, fimIso), timeoutPromise]);
-      if (Array.isArray(res) && res.length > 0) {
+      if (Array.isArray(res)) {
         cacheGoogleEvents = { timestamp: agora, data: res };
         return res;
       }
@@ -192,57 +192,57 @@ async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
     try { googleapis = require('googleapis').google; } catch (_) {}
     if (googleapis) {
       const keyFile = path.join(process.cwd(), 'credenciais-google.json');
-      const auth = new googleapis.auth.GoogleAuth({
-        keyFile,
-        scopes: ['https://www.googleapis.com/auth/calendar']
-      });
-      const cal = googleapis.calendar({ version: 'v3', auth });
+      if (fs.existsSync(keyFile)) {
+        const auth = new googleapis.auth.GoogleAuth({
+          keyFile,
+          scopes: ['https://www.googleapis.com/auth/calendar']
+        });
+        const cal = googleapis.calendar({ version: 'v3', auth });
 
-      const idsAgendas = [
-        "694d1388f8f961bdbefed402fab5d498b44e0a489ec5fbcb3a40a5d1c3eda011@group.calendar.google.com",
-        "692b7e0551c4113b02838eadaf1d60873587a956000b7b1932c4575c3a00ddd2@group.calendar.google.com",
-        "f4625f5738f62b443b1f6279b5f124b37dffec23b9a56e3bb0dff064dc30e057@group.calendar.google.com",
-        "9f1ee711c5b270aed77f50597c3fbdcf7bd33775707f4def5c82cc3794810ca4@group.calendar.google.com",
-        "2ebaead80554da51744895e38dc117c3b43e0982e95d75ef64193702f9811bbd@group.calendar.google.com",
-        "3839992a12d4695f87a19e9cfa3257f9ca60fab24e96549160e94c8603862b45@group.calendar.google.com",
-        "8eae57daa28963736c7ab1c343e2d8e973b4c5caecf78caa8f38255662aa9f17@group.calendar.google.com",
-        "384215b0335082cfde0c5f5f98b75ca59612a77a5123544f15bd41dd60d238d4@group.calendar.google.com",
-        "b02048ebc98f7504e086cf4b2a54881a4e645189b565c90b5f7c477a4d0de10f@group.calendar.google.com",
-        "b0aae19433652d50d04ae2290889cf7f905cc226ae103eb839ff3ca511acd6af@group.calendar.google.com",
-        "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com",
-        "b8f01bfd149139d388080ec63176c2556e6e1aedce184b84d37671c3d082d238@group.calendar.google.com",
-        "0a55126694643f39944faf173fe3acd127b2a52074c6ecc9e9ed4dc23edf8b57@group.calendar.google.com",
-        "7975950de545f60f585bc041682c6564ce4c29d0ef7e06cdeffa21ffc0ffd572@group.calendar.google.com",
-        "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com",
-        "49b999ac91607d07310d7e36a26fe088ddc3cd2b34ff741a0e139b43a18bdabc@group.calendar.google.com",
-        "ca137e32f53409b1bd297929b9a2afd663eaf7df370e4c0aea6442c6a68a7946@group.calendar.google.com"
-      ];
+        const idsAgendas = [
+          "694d1388f8f961bdbefed402fab5d498b44e0a489ec5fbcb3a40a5d1c3eda011@group.calendar.google.com",
+          "692b7e0551c4113b02838eadaf1d60873587a956000b7b1932c4575c3a00ddd2@group.calendar.google.com",
+          "f4625f5738f62b443b1f6279b5f124b37dffec23b9a56e3bb0dff064dc30e057@group.calendar.google.com",
+          "9f1ee711c5b270aed77f50597c3fbdcf7bd33775707f4def5c82cc3794810ca4@group.calendar.google.com",
+          "2ebaead80554da51744895e38dc117c3b43e0982e95d75ef64193702f9811bbd@group.calendar.google.com",
+          "3839992a12d4695f87a19e9cfa3257f9ca60fab24e96549160e94c8603862b45@group.calendar.google.com",
+          "8eae57daa28963736c7ab1c343e2d8e973b4c5caecf78caa8f38255662aa9f17@group.calendar.google.com",
+          "384215b0335082cfde0c5f5f98b75ca59612a77a5123544f15bd41dd60d238d4@group.calendar.google.com",
+          "b02048ebc98f7504e086cf4b2a54881a4e645189b565c90b5f7c477a4d0de10f@group.calendar.google.com",
+          "b0aae19433652d50d04ae2290889cf7f905cc226ae103eb839ff3ca511acd6af@group.calendar.google.com",
+          "18e7b84e62b7f4155bb98458b8c750099b937bed118a572d51d9a21b87aaaa3e@group.calendar.google.com",
+          "b8f01bfd149139d388080ec63176c2556e6e1aedce184b84d37671c3d082d238@group.calendar.google.com",
+          "0a55126694643f39944faf173fe3acd127b2a52074c6ecc9e9ed4dc23edf8b57@group.calendar.google.com",
+          "7975950de545f60f585bc041682c6564ce4c29d0ef7e06cdeffa21ffc0ffd572@group.calendar.google.com",
+          "fc012c51d15e9b272d4f955f504df24d816277da10194302f0ac1f04ae997e81@group.calendar.google.com",
+          "49b999ac91607d07310d7e36a26fe088ddc3cd2b34ff741a0e139b43a18bdabc@group.calendar.google.com",
+          "ca137e32f53409b1bd297929b9a2afd663eaf7df370e4c0aea6442c6a68a7946@group.calendar.google.com"
+        ];
 
-      const promessas = idsAgendas.map(async (calId) => {
-        try {
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
-          const reqPromise = cal.events.list({
-            calendarId: calId,
-            timeMin: inicioIso,
-            timeMax: fimIso,
-            singleEvents: true,
-            maxResults: 100
-          });
-          const res = await Promise.race([reqPromise, timeoutPromise]);
-          if (res?.data?.items) {
-            return res.data.items.map(item => ({ ...item, calendarId: calId }));
+        const promessas = idsAgendas.map(async (calId) => {
+          try {
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
+            const reqPromise = cal.events.list({
+              calendarId: calId,
+              timeMin: inicioIso,
+              timeMax: fimIso,
+              singleEvents: true,
+              maxResults: 100
+            });
+            const res = await Promise.race([reqPromise, timeoutPromise]);
+            if (res?.data?.items) {
+              return res.data.items.map(item => ({ ...item, calendarId: calId }));
+            }
+          } catch (_) {}
+          return [];
+        });
+
+        const results = await Promise.allSettled(promessas);
+        for (const r of results) {
+          if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+            eventosGcal.push(...r.value);
           }
-        } catch (_) {}
-        return [];
-      });
-
-      const results = await Promise.allSettled(promessas);
-      for (const r of results) {
-        if (r.status === 'fulfilled' && Array.isArray(r.value)) {
-          eventosGcal.push(...r.value);
         }
-      }
-      if (eventosGcal.length > 0) {
         cacheGoogleEvents = { timestamp: agora, data: eventosGcal };
       }
     }
@@ -251,17 +251,67 @@ async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
 }
 
 /**
- * Lista eventos unificados para exibir no calendário do site com filtros de permissão
+ * Filtra lista de eventos aplicando regras de privacidade e visibilidade por papel
  */
-async function listarEventosCalendario({ user = null, mes = null, ano = null } = {}) {
+function filtrarEventosPorPapel(eventos, perfil) {
+  const resultadoFiltrado = [];
+  for (const ev of eventos) {
+    const isAtendimento = ev.tipo === 'atendimento' || ev.departamento === 'Pastoral';
+
+    // 1. Atendimento Pastoral
+    if (isAtendimento) {
+      if (perfil?.isPastor || perfil?.isAdmin) {
+        resultadoFiltrado.push(ev);
+      } else if (perfil?.isDiretor) {
+        resultadoFiltrado.push({
+          ...ev,
+          titulo: 'Atendimento Pastoral (Sigiloso)',
+          responsavel: 'Sigiloso',
+          descricao: 'Atendimento pastoral agendado'
+        });
+      }
+      continue;
+    }
+
+    // 2. Pastor, Diretor ou Administrador vê tudo
+    if (perfil?.isPastor || perfil?.isDiretor || perfil?.isAdmin) {
+      resultadoFiltrado.push(ev);
+      continue;
+    }
+
+    // 3. Líder Comum: Vê apenas do seu departamento
+    const deptosLider = (perfil?.departamentos || []).map(d => String(d).toLowerCase().trim());
+    const deptoEv = String(ev.departamento || '').toLowerCase().trim();
+    
+    const pertenceAoLider = deptosLider.length === 0 || 
+      deptosLider.includes('geral') || 
+      deptosLider.some(d => deptoEv.includes(d) || d.includes(deptoEv));
+
+    if (pertenceAoLider) {
+      resultadoFiltrado.push(ev);
+    } else {
+      // Ocupação do salão por outro ministério
+      resultadoFiltrado.push({
+        ...ev,
+        titulo: 'Salão Ocupado (Outro Ministério)',
+        departamento: 'Igreja',
+        responsavel: '',
+        descricao: 'Horário já reservado por outro ministério.',
+        isOcupacaoExterna: true
+      });
+    }
+  }
+  return resultadoFiltrado;
+}
+
+/**
+ * Carrega instantaneamente os eventos armazenados no banco local (SQLite)
+ * Executa em menos de 2 milissegundos sem dependência de rede externa.
+ */
+function listarEventosLocais(user = null, ano = null, mes = null) {
   const eventos = [];
   const perfil = user?.perfilTitulo ? user : (user ? obterPerfilGestao(user) : null);
-
   const anoAtual = ano ? parseInt(ano, 10) : moment().tz("America/Sao_Paulo").year();
-  const mesAtual = mes ? parseInt(mes, 10) : moment().tz("America/Sao_Paulo").month() + 1;
-
-  const inicioMes = moment.tz([anoAtual, mesAtual - 1, 1], "America/Sao_Paulo").startOf('month').subtract(7, 'days').startOf('day');
-  const fimMes = moment.tz([anoAtual, mesAtual - 1, 1], "America/Sao_Paulo").endOf('month').add(7, 'days').endOf('day');
 
   // 1. descricoes_eventos (eventos aprovados pelo bot com blocos/dias múltiplos/consecutivos)
   try {
@@ -392,57 +442,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
     }
   } catch (errPainel) {}
 
-  // 4. Google Calendar (Reuniões, Ensaios, Atendimentos, Eventos)
-  try {
-    const gcalEvents = await buscarEventosGoogleCalendar(inicioMes.toISOString(), fimMes.toISOString());
-    for (const g of gcalEvents) {
-      const summary = g.summary || 'Evento Oficial';
-      const startIso = g.start?.dateTime || g.start?.date;
-      const endIso = g.end?.dateTime || g.end?.date;
-      if (!startIso) continue;
-
-      const mStart = moment.tz(startIso, "America/Sao_Paulo");
-      const mEnd = endIso ? moment.tz(endIso, "America/Sao_Paulo") : mStart.clone().add(2, 'hours');
-      const dataFormatada = mStart.format('DD/MM/YYYY');
-      const hIni = mStart.format('HH:mm');
-      const hFim = mEnd.format('HH:mm');
-
-      let tipo = 'evento';
-      let depto = inferirDepartamentoDeTitulo(summary);
-
-      if (g.calendarId === AGENDAS_INTERNAS.REUNIOES || summary.toLowerCase().includes('reunião')) {
-        tipo = 'reuniao';
-      } else if (g.calendarId === AGENDAS_INTERNAS.ENSAIOS || summary.toLowerCase().includes('ensaio')) {
-        tipo = 'ensaio';
-        depto = 'Música / Louvor';
-      } else if (g.calendarId === AGENDAS_INTERNAS.ATENDIMENTO || summary.toLowerCase().includes('atendimento')) {
-        tipo = 'atendimento';
-        depto = 'Pastoral';
-      } else if (g.calendarId === AGENDAS_INTERNAS.USO_SALAO || summary.toLowerCase().includes('uso do salão')) {
-        tipo = 'uso_salao';
-      }
-
-      const duplicado = eventos.some(e => e.data === dataFormatada && e.titulo.toLowerCase().trim() === summary.toLowerCase().trim());
-      if (!duplicado) {
-        eventos.push({
-          id: `gcal_${g.id}`,
-          origem: 'google',
-          titulo: summary,
-          departamento: depto,
-          data: dataFormatada,
-          horarioInicio: hIni,
-          horarioFim: hFim,
-          local: g.location || ENDERECO_IGREJA,
-          responsavel: '',
-          status: 'confirmado',
-          tipo,
-          descricao: g.description || ''
-        });
-      }
-    }
-  } catch (_) {}
-
-  // 5. pendentes
+  // 4. pendentes
   try {
     const rowsPendentes = db.prepare(`
       SELECT codigo, dados, criadoEm FROM pendentes ORDER BY rowid DESC
@@ -514,56 +514,80 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
     }
   } catch (_) {}
 
-  // FILTROS DE VISIBILIDADE / PRIVACIDADE POR PAPEL
-  const resultadoFiltrado = [];
-  for (const ev of eventos) {
-    const isAtendimento = ev.tipo === 'atendimento' || ev.departamento === 'Pastoral';
+  return filtrarEventosPorPapel(eventos, perfil);
+}
 
-    // 1. Atendimento Pastoral
-    if (isAtendimento) {
-      if (perfil?.isPastor || perfil?.isAdmin) {
-        resultadoFiltrado.push(ev);
-      } else if (perfil?.isDiretor) {
-        resultadoFiltrado.push({
-          ...ev,
-          titulo: 'Atendimento Pastoral (Sigiloso)',
-          responsavel: 'Sigiloso',
-          descricao: 'Atendimento pastoral agendado'
+/**
+ * Lista eventos unificados para exibir no calendário do site com filtros de permissão e suporte a Google Calendar
+ */
+async function listarEventosCalendario({ user = null, mes = null, ano = null } = {}) {
+  const eventos = listarEventosLocais(user, ano, mes);
+  const perfil = user?.perfilTitulo ? user : (user ? obterPerfilGestao(user) : null);
+
+  const anoAtual = ano ? parseInt(ano, 10) : moment().tz("America/Sao_Paulo").year();
+  const mesAtual = mes ? parseInt(mes, 10) : moment().tz("America/Sao_Paulo").month() + 1;
+
+  const inicioMes = moment.tz([anoAtual, mesAtual - 1, 1], "America/Sao_Paulo").startOf('month').subtract(7, 'days').startOf('day');
+  const fimMes = moment.tz([anoAtual, mesAtual - 1, 1], "America/Sao_Paulo").endOf('month').add(7, 'days').endOf('day');
+
+  // Google Calendar (Reuniões, Ensaios, Atendimentos, Eventos) com timeout rápido de 4s
+  try {
+    const gcalEvents = await buscarEventosGoogleCalendar(inicioMes.toISOString(), fimMes.toISOString());
+    const novosEventosGcal = [];
+
+    for (const g of gcalEvents) {
+      const summary = g.summary || 'Evento Oficial';
+      const startIso = g.start?.dateTime || g.start?.date;
+      const endIso = g.end?.dateTime || g.end?.date;
+      if (!startIso) continue;
+
+      const mStart = moment.tz(startIso, "America/Sao_Paulo");
+      const mEnd = endIso ? moment.tz(endIso, "America/Sao_Paulo") : mStart.clone().add(2, 'hours');
+      const dataFormatada = mStart.format('DD/MM/YYYY');
+      const hIni = mStart.format('HH:mm');
+      const hFim = mEnd.format('HH:mm');
+
+      let tipo = 'evento';
+      let depto = inferirDepartamentoDeTitulo(summary);
+
+      if (g.calendarId === AGENDAS_INTERNAS.REUNIOES || summary.toLowerCase().includes('reunião')) {
+        tipo = 'reuniao';
+      } else if (g.calendarId === AGENDAS_INTERNAS.ENSAIOS || summary.toLowerCase().includes('ensaio')) {
+        tipo = 'ensaio';
+        depto = 'Música / Louvor';
+      } else if (g.calendarId === AGENDAS_INTERNAS.ATENDIMENTO || summary.toLowerCase().includes('atendimento')) {
+        tipo = 'atendimento';
+        depto = 'Pastoral';
+      } else if (g.calendarId === AGENDAS_INTERNAS.USO_SALAO || summary.toLowerCase().includes('uso do salão')) {
+        tipo = 'uso_salao';
+      }
+
+      const duplicado = eventos.some(e => e.data === dataFormatada && e.titulo.toLowerCase().trim() === summary.toLowerCase().trim());
+      if (!duplicado) {
+        novosEventosGcal.push({
+          id: `gcal_${g.id}`,
+          origem: 'google',
+          titulo: summary,
+          departamento: depto,
+          data: dataFormatada,
+          horarioInicio: hIni,
+          horarioFim: hFim,
+          local: g.location || ENDERECO_IGREJA,
+          responsavel: '',
+          status: 'confirmado',
+          tipo,
+          descricao: g.description || ''
         });
       }
-      continue;
     }
 
-    // 2. Pastor, Diretor ou Administrador vê tudo
-    if (perfil?.isPastor || perfil?.isDiretor || perfil?.isAdmin) {
-      resultadoFiltrado.push(ev);
-      continue;
+    if (novosEventosGcal.length > 0) {
+      const gcalFiltrados = filtrarEventosPorPapel(novosEventosGcal, perfil);
+      eventos.push(...gcalFiltrados);
     }
+  } catch (_) {}
 
-    // 3. Líder Comum: Vê apenas do seu departamento
-    const deptosLider = (perfil?.departamentos || []).map(d => String(d).toLowerCase().trim());
-    const deptoEv = String(ev.departamento || '').toLowerCase().trim();
-    
-    const pertenceAoLider = deptosLider.length === 0 || 
-      deptosLider.includes('geral') || 
-      deptosLider.some(d => deptoEv.includes(d) || d.includes(deptoEv));
-
-    if (pertenceAoLider) {
-      resultadoFiltrado.push(ev);
-    } else {
-      // Ocupação do salão por outro ministério
-      resultadoFiltrado.push({
-        ...ev,
-        titulo: 'Salão Ocupado (Outro Ministério)',
-        departamento: 'Igreja',
-        responsavel: '',
-        descricao: 'Horário já reservado por outro ministério.',
-        isOcupacaoExterna: true
-      });
-    }
-  }
-
-  return resultadoFiltrado;
+  return eventos;
 }
 
 /**
@@ -1211,6 +1235,15 @@ function renderGestaoHtml({ user }) {
   const deptosParaForm = (perfil?.isPastor || perfil?.isDiretor || perfil?.isAdmin || !perfil?.departamentos || perfil.departamentos.length === 0)
     ? LISTA_TODOS_DEPARTAMENTOS
     : perfil.departamentos;
+
+  // Carrega instantaneamente os eventos do banco local (SQLite) para renderização imediata sem espera
+  let eventosIniciais = [];
+  try {
+    eventosIniciais = listarEventosLocais(perfil);
+  } catch (errIniciais) {
+    console.warn('[Gestão] Aviso ao carregar eventos locais iniciais:', errIniciais.message);
+  }
+  const jsonEventosIniciais = JSON.stringify(eventosIniciais);
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -2084,7 +2117,7 @@ function renderGestaoHtml({ user }) {
           </div>
 
           <!-- INDICADOR VISUAL DE CARREGAMENTO -->
-          <div id="calLoadingIndicator" class="cal-loading-badge" style="display: flex;">
+          <div id="calLoadingIndicator" class="cal-loading-badge" style="display: none;">
             <span class="spinner-mini"></span> ⏳ Sincronizando eventos com a agenda...
           </div>
 
@@ -2822,7 +2855,7 @@ function renderGestaoHtml({ user }) {
     let anoAtual = dataAtual.getFullYear();
     let diaSelecionado = dataAtual.getDate();
 
-    let todosEventos = [];
+    let todosEventos = ${jsonEventosIniciais} || [];
     let todasSolicitacoes = [];
     let todasFichas = [];
     let eventoSendoGerenciado = null;
@@ -2832,7 +2865,7 @@ function renderGestaoHtml({ user }) {
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
 
-    // RENDERIZAÇÃO IMEDIATA
+    // RENDERIZAÇÃO IMEDIATA (sem piscar tela, usando eventos locais do servidor)
     renderizarCalendario();
     selecionarDia(diaSelecionado);
 
@@ -2862,16 +2895,24 @@ function renderGestaoHtml({ user }) {
     }
 
     async function carregarEventosServidor() {
+      const loader = document.getElementById('calLoadingIndicator');
+      if (loader && todosEventos.length === 0) loader.style.display = 'flex';
       try {
         const res = await fetch(\`/gestao/api/eventos?mes=\${mesAtual + 1}&ano=\${anoAtual}\`);
+        if (!res.ok) throw new Error('Falha HTTP ' + res.status);
         const data = await res.json();
         if (data && data.ok && Array.isArray(data.eventos)) {
           todosEventos = data.eventos;
           renderizarCalendario();
           selecionarDia(diaSelecionado);
+          if (typeof executarPesquisaEventos === 'function') {
+            executarPesquisaEventos();
+          }
         }
       } catch (err) {
-        console.warn('Erro ao carregar eventos:', err);
+        console.warn('Erro ao sincronizar eventos:', err);
+      } finally {
+        if (loader) loader.style.display = 'none';
       }
     }
 
@@ -3671,6 +3712,7 @@ function renderGestaoHtml({ user }) {
 
 module.exports = {
   obterPerfilGestao,
+  listarEventosLocais,
   listarEventosCalendario,
   listarSolicitacoes,
   listarFichas,

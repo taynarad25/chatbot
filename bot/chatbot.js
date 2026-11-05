@@ -19,6 +19,84 @@ const { garantirDiretorioTemp, limparMidiasAntigas } = require("./mediaStorage")
 const { aplicarResilienciaClient, injetarPatchesCompatibilidade } = require("./senderResiliente");
 const db = require("../db");
 
+// =====================================
+// PATCHES DE SINCRONIZAÇÃO WHATSAPP WEB
+// =====================================
+// Patch no Client.prototype.inject do whatsapp-web.js para garantir que se hasSynced já for true,
+// o onAppStateHasSyncedEvent seja chamado imediatamente sem depender apenas do evento change:hasSynced.
+if (Client && Client.prototype && typeof Client.prototype.inject === 'function' && !Client.prototype._patchedInject) {
+  const originalInject = Client.prototype.inject;
+  Client.prototype.inject = async function () {
+    const res = await originalInject.call(this);
+    try {
+      if (this.pupPage && typeof this.pupPage.evaluate === 'function' && !this.pupPage.isClosed?.()) {
+        await this.pupPage.evaluate(() => {
+          if (typeof window.onAppStateHasSyncedEvent === 'function' && !window._hasSyncedHandled) {
+            const appState = window.AuthStore?.AppState;
+            if (appState && (appState.hasSynced === true || appState.state === 'CONNECTED')) {
+              window._hasSyncedHandled = true;
+              console.log('[Puppeteer] hasSynced detectado como true no inject. Disparando onAppStateHasSyncedEvent...');
+              window.onAppStateHasSyncedEvent();
+            }
+          }
+        });
+      }
+    } catch (_) {}
+    return res;
+  };
+  Client.prototype._patchedInject = true;
+}
+
+let syncWatchdog = null;
+function pararSyncWatchdog() {
+  if (syncWatchdog) {
+    clearInterval(syncWatchdog);
+    syncWatchdog = null;
+  }
+}
+
+function iniciarSyncWatchdog(clientInstance) {
+  pararSyncWatchdog();
+  syncWatchdog = setInterval(async () => {
+    if (!clientInstance || clientReady) {
+      pararSyncWatchdog();
+      return;
+    }
+    try {
+      if (clientInstance.pupPage && typeof clientInstance.pupPage.evaluate === 'function' && !clientInstance.pupPage.isClosed?.()) {
+        const disparou = await clientInstance.pupPage.evaluate(() => {
+          if (typeof window.onAppStateHasSyncedEvent !== 'function' || window._hasSyncedHandled) {
+            return false;
+          }
+          const appState = window.AuthStore?.AppState;
+          const isHasSynced = Boolean(appState?.hasSynced);
+          const isConnected = appState?.state === 'CONNECTED';
+          const progress = typeof window.AuthStore?.OfflineMessageHandler?.getOfflineDeliveryProgress === 'function'
+            ? window.AuthStore.OfflineMessageHandler.getOfflineDeliveryProgress()
+            : null;
+          const is100 = progress === 100;
+
+          if (isHasSynced || isConnected || is100) {
+            window._hasSyncedHandled = true;
+            try {
+              window.onAppStateHasSyncedEvent();
+              return true;
+            } catch (e) {
+              return false;
+            }
+          }
+          return false;
+        });
+
+        if (disparou) {
+          console.log("[WhatsApp] ⚡ Watchdog detectou sincronização concluída! onAppStateHasSyncedEvent disparado com sucesso.");
+          pararSyncWatchdog();
+        }
+      }
+    } catch (_) {}
+  }, 1000);
+}
+
 // Raiz do projeto (um nível acima de bot/). Login, credenciais, log combinado,
 // estado persistido e a sessão do WhatsApp (.wwebjs_auth) sempre viveram na
 // raiz — o docker-compose.bot.yml monta os volumes nesses caminhos exatos —
@@ -262,6 +340,7 @@ function criarClient() {
       '--no-zygote',
       '--disable-gpu',
       '--disable-extensions',
+      '--disable-blink-features=AutomationControlled',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
@@ -337,10 +416,27 @@ function criarClient() {
     console.log("✅ Autenticado no WhatsApp com sucesso! Sincronizando dados e conversas...");
   });
 
-  client.on("loading_screen", (percent, message) => {
+  client.on("loading_screen", async (percent, message) => {
     loadingPercent = percent;
     loadingMessage = message || "WhatsApp";
     console.log(`[WhatsApp] ⏳ Sincronizando dados: ${percent}% (${message || 'Carregando'})`);
+
+    // Quando atinge 100% de sincronização offline, garante o avanço imediato para ready/authenticated
+    if (percent >= 100 && !clientReady && client?.pupPage) {
+      try {
+        if (!client.pupPage.isClosed?.()) {
+          console.log("[WhatsApp] 🔄 100% de sincronização atingido. Garantindo avanço para estado pronto...");
+          await client.pupPage.evaluate(() => {
+            if (!window._hasSyncedHandled && typeof window.onAppStateHasSyncedEvent === 'function') {
+              window._hasSyncedHandled = true;
+              window.onAppStateHasSyncedEvent();
+            }
+          });
+        }
+      } catch (errSync) {
+        console.warn("[WhatsApp] Aviso ao verificar sincronização 100% no Puppeteer:", errSync.message);
+      }
+    }
   });
 
   client.on("change_state", (state) => {
@@ -348,6 +444,7 @@ function criarClient() {
   });
 
   client.on("ready", async () => {
+    pararSyncWatchdog();
     clientReady = true;
     clientAuthenticated = true;
     pendingQr = null;
@@ -462,6 +559,7 @@ function criarClient() {
   }, 3 * 60 * 1000).unref();
 
   client.on("auth_failure", (msg) => {
+    pararSyncWatchdog();
     console.error("Falha na autenticação:", msg);
     clientReady = false;
     clientAuthenticated = false;
@@ -473,6 +571,7 @@ function criarClient() {
   });
 
   client.on("disconnected", async (reason) => {
+    pararSyncWatchdog();
     clientReady = false;
     clientAuthenticated = false;
     loadingPercent = 0;
@@ -490,7 +589,8 @@ function criarClient() {
       } catch (errDestroy) {}
     }
 
-    if (reason === "LOGOUT") {
+    // Apenas limpa a pasta da sessão se o usuário solicitou cancelamento deliberado
+    if (isCanceling) {
       limparSessaoResidual(clientId);
     }
   });
@@ -570,6 +670,7 @@ async function startClient(options = {}) {
   isGeneratingQr = true;
   pendingQr = null;
   criarClient();
+  iniciarSyncWatchdog(client);
   try {
     console.log("[WhatsApp] Tentando inicializar o cliente Puppeteer...");
     await client.initialize();
@@ -598,6 +699,7 @@ async function startClient(options = {}) {
 
 async function cancelQr() {
   isCanceling = true;
+  pararSyncWatchdog();
   try {
     console.log("⏹️ Solicitando cancelamento da geração do QR Code...");
     if (client && !clientReady) {
