@@ -302,3 +302,72 @@ test("POST /gestao/api/solicitar: atendimento pastoral restrito a pastores", asy
   assert.equal(dataPastor.ok, true);
 });
 
+test("POST /gestao/api/solicitar: suporta solicitação de artes e mídia com código e notificação", async () => {
+  const tokenLider = createSession("lider.teste", "lider", "active");
+
+  const resMidia = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenLider}`
+    },
+    body: JSON.stringify({
+      tipo: "midia",
+      departamento: "Rede de Homens",
+      tipo_material: "Flyer / Redes Sociais (Feed e Stories)",
+      nome_evento: "Café de Homens",
+      prazo_entrega: "15/11/2026",
+      detalhes: "Tema: Homens Fortes na Fé. Preletor: Pr. Idel. Horário: 08:30"
+    })
+  });
+
+  assert.equal(resMidia.status, 200);
+  const dataMidia = await resMidia.json();
+  assert.equal(dataMidia.ok, true);
+  assert.ok(dataMidia.codigo);
+
+  // Verifica se aparece em Minhas Solicitações
+  const resSol = await fetch(`${baseUrl}/gestao/api/solicitacoes`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenLider}` }
+  });
+  const dataSol = await resSol.json();
+  assert.equal(dataSol.ok, true);
+  const solMidia = dataSol.solicitacoes.find(s => s.codigo === dataMidia.codigo);
+  assert.ok(solMidia, "Solicitação de mídia deve estar listada nas solicitações");
+  assert.equal(solMidia.tipo, "midia");
+  assert.equal(solMidia.status, "Aguardando Multimídia");
+});
+
+test("GET /gestao: inclui saudação personalizada, busca de eventos, modal de mídia e cores corretas", async () => {
+  const tokenAdmin = createSession("gabriela", "admin", "active");
+  const res = await fetch(`${baseUrl}/gestao`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenAdmin}` }
+  });
+  assert.equal(res.status, 200);
+  const html = await res.text();
+
+  // Saudação personalizada
+  assert.match(html, /Olá,.*O que você gostaria de fazer hoje/);
+
+  // Aba e controles de pesquisa
+  assert.match(html, /Pesquisar Eventos/);
+  assert.match(html, /pane-pesquisa/);
+
+  // Solicitar Mídia
+  assert.match(html, /Solicitar Arte \/ Mídia/);
+  assert.match(html, /modalSolicitarMidia/);
+
+  // Cores de ensaio (azul) e pastoral (roxo)
+  assert.match(html, /\.event-chip\.ensaio\s*\{\s*background:\s*#e0f2fe/);
+  assert.match(html, /\.event-chip\.pastoral\s*\{\s*background:\s*#f3e8ff/);
+
+  // Indicador de carregamento
+  assert.match(html, /calLoadingIndicator/);
+  assert.match(html, /Sincronizando eventos com a agenda/);
+
+  // Dropdown de ministérios populado
+  assert.match(html, /Rede de Mulheres/);
+  assert.match(html, /Rede de Homens/);
+  assert.match(html, /Epifania/);
+});
+

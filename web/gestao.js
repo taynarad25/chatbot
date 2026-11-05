@@ -16,6 +16,23 @@ const { AGENDAS_INTERNAS } = require("../bot/agendasInternas");
 const { loadLideres } = require("./lideres");
 const { loadUsers } = require("./users");
 
+const LISTA_TODOS_DEPARTAMENTOS = [
+  "Rede de Mulheres",
+  "Rede de Homens",
+  "Rede Ruach",
+  "Rede de Casais",
+  "Rede Kids",
+  "Epifania (Louvor)",
+  "Departamento de Artes",
+  "Evangelismo",
+  "Intercessão",
+  "Projeto Social Seeds",
+  "Diaconia",
+  "Relacionamentos",
+  "Liderança",
+  "Geral"
+];
+
 const ENDERECO_IGREJA = "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi";
 const CONTATO_TESOURARIA = "11943890204";
 const LINK_ATA_REUNIAO = "https://docs.google.com/document/d/1ZtFfD3f3jB1QkL2Y4XvW5T6n8M7a9K0p/edit";
@@ -105,8 +122,13 @@ function obterPerfilGestao(session) {
     departamentos = [dadosPastoral.departamento];
   } else if (username === 'lider.teste') {
     departamentos = ['Rede de Homens'];
+  } else if (isAdmin || isPastor || isDiretor) {
+    departamentos = [...LISTA_TODOS_DEPARTAMENTOS];
   } else {
     departamentos = ['Geral'];
+  }
+  if (!departamentos || departamentos.length === 0) {
+    departamentos = (isAdmin || isPastor || isDiretor) ? [...LISTA_TODOS_DEPARTAMENTOS] : ['Geral'];
   }
 
   return {
@@ -433,7 +455,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         if (!nome || /^(teste|test|gabi|gabriela)$/i.test(nome)) continue;
 
         const dataFormatada = d.dataFormatada || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
-        if (!dataFormatada && !d.blocos && !d.dataInicio) continue;
+        if (!dataFormatada && !d.blocos && !d.dataInicio && d.tipo !== 'midia') continue;
 
         let tipo = d.tipo || 'evento';
         if (d.tipo === 'uso_salao') tipo = 'uso_salao';
@@ -563,7 +585,7 @@ function listarSolicitacoes({ user = null } = {}) {
         if (!nome || /^(teste|test|gabi|gabriela)$/i.test(nome)) continue;
 
         const dataFormatada = d.dataFormatada || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
-        if (!dataFormatada && !d.blocos && !d.dataInicio) continue;
+        if (!dataFormatada && !d.blocos && !d.dataInicio && d.tipo !== 'midia') continue;
 
         if (!perfil?.isPastor && !perfil?.isDiretor && !perfil?.isAdmin) {
           const deptos = (perfil?.departamentos || []).map(d => String(d).toLowerCase());
@@ -575,18 +597,25 @@ function listarSolicitacoes({ user = null } = {}) {
           if (!pertenceDepto && !ehDoUsuario) continue;
         }
 
+        let statusTexto = 'Aguardando Secretaria';
+        let statusClass = 'pendente';
+        if (d.tipo === 'midia') {
+          statusTexto = 'Aguardando Multimídia';
+          statusClass = 'midia';
+        }
+
         solicitacoes.push({
           codigo: p.codigo,
           id: p.codigo,
           tipo: d.tipo || 'evento',
           titulo: nome,
           departamento: d.rede || d.departamento || 'Geral',
-          data: dataFormatada || (d.blocos && d.blocos[0]?.data) || '',
-          horarioInicio: d.horarioInicio || (d.blocos && d.blocos[0]?.inicio) || '19:00',
-          horarioFim: d.horarioFim || (d.blocos && d.blocos[0]?.fim) || '21:30',
+          data: dataFormatada || (d.blocos && d.blocos[0]?.data) || d.prazoEntrega || '',
+          horarioInicio: d.horarioInicio || (d.blocos && d.blocos[0]?.inicio) || (d.tipo === 'midia' ? 'Prazo de Entrega' : '19:00'),
+          horarioFim: d.horarioFim || (d.blocos && d.blocos[0]?.fim) || '',
           responsavel: d.solicitanteNome || '',
-          status: 'Aguardando Secretaria',
-          statusClass: 'pendente',
+          status: statusTexto,
+          statusClass: statusClass,
           criadoEm: p.criadoEm,
           payload: d
         });
@@ -668,6 +697,57 @@ function listarFichas({ user = null } = {}) {
 async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () => null) {
   const perfil = obterPerfilGestao(usuarioLogado);
   const tipoAcao = String(corpo.tipo || 'evento').toLowerCase().trim();
+
+  // 0. SOLICITAÇÃO DE ARTES / MÍDIA
+  if (tipoAcao === 'midia') {
+    const { departamento, tipo_material, detalhes, prazo_entrega, nome_evento } = corpo;
+    if (!departamento || !tipo_material || !detalhes) {
+      throw new Error('Preencha o departamento, o tipo de material e os detalhes da arte.');
+    }
+
+    const dadosMidia = {
+      tipo: 'midia',
+      departamento: departamento.trim(),
+      rede: departamento.trim(),
+      tipoMaterial: tipo_material.trim(),
+      detalhesArte: detalhes.trim(),
+      prazoEntrega: prazo_entrega?.trim() || 'A combinar',
+      nomeEvento: nome_evento?.trim() || `Arte para ${departamento.trim()}`,
+      solicitanteNome: perfil?.nome || 'Líder',
+      solicitanteId: perfil?.telefone || perfil?.username || '',
+      criadoVia: 'painel_web',
+      criadoEm: new Date().toISOString()
+    };
+
+    const codigo = salvarPendente(dadosMidia);
+
+    const avisoGrupo =
+      `🎨 *NOVA SOLICITAÇÃO DE ARTE/FLYER (VIA PAINEL WEB)*\n\n` +
+      `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
+      `🏢 *Depto/Rede:* ${departamento}\n` +
+      `📌 *Tipo de Material:* ${tipo_material}\n` +
+      `⏳ *Prazo de Entrega:* ${dadosMidia.prazoEntrega}\n` +
+      `📝 *Detalhes/Texto da Arte:*\n${detalhes}\n\n` +
+      `_Código da Solicitação: ${codigo}_`;
+
+    try {
+      const client = typeof getClient === 'function' ? getClient() : null;
+      if (client && client.info) {
+        const { notificarMultimidia } = require('../bot/secretaria');
+        if (typeof notificarMultimidia === 'function') {
+          await notificarMultimidia(client, avisoGrupo);
+        }
+        await notificarSecretaria(client, avisoGrupo);
+      }
+    } catch (_) {}
+
+    return {
+      ok: true,
+      codigo,
+      message: `Solicitação de arte/divulgação registrada com sucesso (Código: ${codigo}) e enviada à equipe de Multimídia!`,
+      mensagem: `Solicitação de arte/divulgação registrada com sucesso (Código: ${codigo}) e enviada à equipe de Multimídia!`
+    };
+  }
 
   // 1. REUNIÃO DE LIDERANÇA
   if (tipoAcao === 'reuniao') {
@@ -1127,6 +1207,10 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 function renderGestaoHtml({ user }) {
   const perfil = obterPerfilGestao(user);
   const jsonPerfil = JSON.stringify(perfil || {});
+  const primeiroNome = perfil?.nome ? perfil.nome.split(' ')[0] : 'Líder';
+  const deptosParaForm = (perfil?.isPastor || perfil?.isDiretor || perfil?.isAdmin || !perfil?.departamentos || perfil.departamentos.length === 0)
+    ? LISTA_TODOS_DEPARTAMENTOS
+    : perfil.departamentos;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1524,8 +1608,8 @@ function renderGestaoHtml({ user }) {
     .event-chip.confirmado { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .event-chip.pendente { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
     .event-chip.reuniao { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-    .event-chip.ensaio { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
-    .event-chip.pastoral { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .event-chip.ensaio { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .event-chip.pastoral { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
     .event-chip.bloqueio { background: #f1f5f9; color: #64748b; border: 1px dashed #cbd5e1; }
 
     @media (max-width: 600px) {
@@ -1931,15 +2015,20 @@ function renderGestaoHtml({ user }) {
   <!-- CONTAINER -->
   <main class="container">
     
-    <!-- HEADER -->
+    <!-- HEADER COM SAUDAÇÃO PERSONALIZADA -->
     <section class="gestao-header">
       <div>
-        <h2>🎪 Gestão de Eventos & Agendas</h2>
-        <p>Acompanhe o calendário, verifique a disponibilidade do salão e solicite aprovações à Secretaria.</p>
+        <h2>Olá, ${primeiroNome}! O que você gostaria de fazer hoje? 👋</h2>
+        <p>Acompanhe a agenda da igreja, reserve datas, consulte fichas ou solicite artes para o seu ministério.</p>
       </div>
-      <button class="btn-principal" onclick="abrirNovoAgendamento()">
-        ➕ Novo Agendamento
-      </button>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn-principal" onclick="abrirNovoAgendamento()">
+          ➕ Novo Agendamento
+        </button>
+        <button class="btn-secundario" onclick="abrirModalSolicitarMidia()" style="background: #ffffff; border: 1.5px solid #cbd5e1; color: var(--cor-roxo); font-weight: 800;">
+          🎨 Solicitar Arte / Mídia
+        </button>
+      </div>
     </section>
 
     <!-- NAVEGAÇÃO DE ABAS -->
@@ -1947,8 +2036,14 @@ function renderGestaoHtml({ user }) {
       <button class="tab-btn active" onclick="trocarAba('calendario')">
         📅 Calendário
       </button>
+      <button class="tab-btn" onclick="trocarAba('pesquisa')">
+        🔍 Pesquisar Eventos
+      </button>
       <button class="tab-btn" onclick="trocarAba('solicitacoes')">
         📋 Minhas Solicitações <span class="tab-badge" id="badgeTotalSol">0</span>
+      </button>
+      <button class="tab-btn" onclick="abrirModalSolicitarMidia()">
+        🎨 Solicitar Arte / Mídia
       </button>
       <button class="tab-btn" onclick="trocarAba('fichas')">
         📑 Fichas de Eventos
@@ -1976,7 +2071,7 @@ function renderGestaoHtml({ user }) {
             <div class="cal-filtros">
               <select id="filtroDepartamento" class="cal-select" onchange="filtrarCalendario()">
                 <option value="todos">Todos os Ministérios</option>
-                ${(perfil?.departamentos || []).map(d => `<option value="${d}">${d}</option>`).join('')}
+                ${LISTA_TODOS_DEPARTAMENTOS.map(d => `<option value="${d}">${d}</option>`).join('')}
               </select>
               <select id="filtroTipo" class="cal-select" onchange="filtrarCalendario()">
                 <option value="todos">Todos os Tipos</option>
@@ -1986,6 +2081,11 @@ function renderGestaoHtml({ user }) {
                 ${perfil?.isPastor || perfil?.isDiretor ? '<option value="atendimento">Atendimentos</option>' : ''}
               </select>
             </div>
+          </div>
+
+          <!-- INDICADOR VISUAL DE CARREGAMENTO -->
+          <div id="calLoadingIndicator" class="cal-loading-badge" style="display: flex;">
+            <span class="spinner-mini"></span> ⏳ Sincronizando eventos com a agenda...
           </div>
 
           <div class="cal-weekdays">
@@ -2023,6 +2123,37 @@ function renderGestaoHtml({ user }) {
           </button>
         </div>
 
+      </div>
+    </div>
+
+    <!-- ABA DE PESQUISA DE EVENTOS -->
+    <div id="pane-pesquisa" class="tab-pane">
+      <div class="solicitacoes-table-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0 0 4px 0;">🔍 Pesquisar Agendas e Eventos</h3>
+            <p style="font-size: 0.8rem; color: var(--cor-subtexto); margin: 0;">Busque por título, departamento, reunião, ensaio ou data.</p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+          <input type="text" id="campoBuscaPesquisa" class="form-control" style="flex: 1; min-width: 240px;" placeholder="Digite o nome do evento, reunião, ensaio, tema ou data..." oninput="executarPesquisaEventos()" />
+          <select id="filtroTipoPesquisa" class="form-control" style="width: auto; min-width: 140px;" onchange="executarPesquisaEventos()">
+            <option value="todos">Todos os Tipos</option>
+            <option value="evento">Eventos</option>
+            <option value="reuniao">Reuniões</option>
+            <option value="ensaio">Ensaios</option>
+            ${perfil?.isPastor || perfil?.isDiretor ? '<option value="atendimento">Atendimentos</option>' : ''}
+          </select>
+          <select id="filtroDeptoPesquisa" class="form-control" style="width: auto; min-width: 170px;" onchange="executarPesquisaEventos()">
+            <option value="todos">Todos os Ministérios</option>
+            ${LISTA_TODOS_DEPARTAMENTOS.map(d => `<option value="${d}">${d}</option>`).join('')}
+          </select>
+        </div>
+
+        <div id="containerResultadosPesquisa" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+          <p style="grid-column: 1 / -1; text-align: center; color: var(--cor-subtexto); padding: 20px;">Carregando eventos...</p>
+        </div>
       </div>
     </div>
 
@@ -2142,6 +2273,12 @@ function renderGestaoHtml({ user }) {
               <span class="desc">Agendamento sigiloso de aconselhamento pastoral com membros.</span>
             </button>
             ` : ''}
+
+            <button class="tipo-card-btn" onclick="fecharModalAgendamento(); abrirModalSolicitarMidia();">
+              <span class="icone">🎨</span>
+              <span class="titulo">Solicitar Arte / Mídia</span>
+              <span class="desc">Flyers para redes sociais, comunicados gerais, banners impressos e vídeos.</span>
+            </button>
           </div>
         </div>
 
@@ -2162,7 +2299,7 @@ function renderGestaoHtml({ user }) {
               <div class="form-group">
                 <label>Ministério / Departamento *</label>
                 <select class="form-control" id="ev_departamento" required>
-                  ${(perfil?.departamentos || ['Geral']).map(d => `<option value="${d}">${d}</option>`).join('')}
+                  ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
                 </select>
               </div>
             </div>
@@ -2301,7 +2438,7 @@ function renderGestaoHtml({ user }) {
               <div class="form-group">
                 <label>Departamento / Ministério *</label>
                 <select class="form-control" id="reu_departamento" required>
-                  ${(perfil?.departamentos || ['Liderança']).map(d => `<option value="${d}">${d}</option>`).join('')}
+                  ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
                 </select>
               </div>
               <div class="form-group">
@@ -2351,10 +2488,9 @@ function renderGestaoHtml({ user }) {
               <div class="form-group">
                 <label>Ministério / Grupo *</label>
                 <select class="form-control" id="ens_departamento" required>
-                  <option value="Música / Louvor">Música / Louvor</option>
-                  <option value="Departamento de Artes">Departamento de Artes (Dança/Teatro)</option>
-                  <option value="Coral">Coral</option>
-                  <option value="Rede Kids">Rede Kids</option>
+                  <option value="Epifania (Louvor)">Epifania (Louvor)</option>
+                  <option value="Departamento de Artes">Departamento de Artes</option>
+                  ${deptosParaForm.filter(d => !d.includes('Epifania') && !d.includes('Artes')).map(d => `<option value="${d}">${d}</option>`).join('')}
                 </select>
               </div>
               <div class="form-group">
@@ -2455,6 +2591,64 @@ function renderGestaoHtml({ user }) {
     </div>
   </div>
 
+  <!-- MODAL: SOLICITAR ARTE / MÍDIA -->
+  <div class="modal-overlay" id="modalSolicitarMidia">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🎨 Solicitar Arte / Divulgação para Mídia</h3>
+        <button class="modal-close-btn" onclick="fecharModalSolicitarMidia()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="formSolicitarMidia" onsubmit="submeterSolicitacaoMidia(event)">
+          <div class="alert-banner info">
+            📢 A solicitação será encaminhada diretamente para a equipe de Multimídia e para a Secretaria.
+          </div>
+
+          <div class="form-row two-cols">
+            <div class="form-group">
+              <label>Departamento / Ministério *</label>
+              <select class="form-control" id="midia_departamento" required>
+                ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tipo de Material *</label>
+              <select class="form-control" id="midia_tipo_material" required>
+                <option value="Flyer / Redes Sociais (Feed e Stories)">Flyer / Redes Sociais (Feed & Stories)</option>
+                <option value="Aviso / Comunicado Geral">Aviso / Comunicado Geral</option>
+                <option value="Banner / Faixa para Fachada ou Salão">Banner / Faixa Impressa</option>
+                <option value="Lembrancinha / Tag / Crachá">Lembrancinha / Tag / Crachá</option>
+                <option value="Vídeo Teaser / Telão">Vídeo Teaser / Telão</option>
+                <option value="Outro Material">Outro Material</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row two-cols">
+            <div class="form-group">
+              <label>Nome do Evento ou Finalidade *</label>
+              <input type="text" class="form-control" id="midia_evento" placeholder="Ex: Chá das Mulheres ou Culto da Família" required />
+            </div>
+            <div class="form-group">
+              <label>Prazo Máximo de Entrega *</label>
+              <input type="text" class="form-control" id="midia_prazo" placeholder="Ex: 20/11/2026 ou Até quinta-feira" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Detalhes, Texto da Arte e Estilo Visual *</label>
+            <textarea class="form-control" id="midia_detalhes" rows="4" placeholder="Informe temas, frases obrigatórias, preletores, horários, cores desejadas ou referências..." required></textarea>
+          </div>
+
+          <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn-secundario" onclick="fecharModalSolicitarMidia()">Cancelar</button>
+            <button type="submit" class="btn-principal">🚀 Enviar para Multimídia</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL DE GERENCIAMENTO DE EVENTO (ALTERAR / CANCELAR / FORMULÁRIO) -->
   <div class="modal-overlay" id="modalGerenciarEvento">
     <div class="modal-content">
@@ -2484,7 +2678,7 @@ function renderGestaoHtml({ user }) {
             </div>
           </button>
 
-          <button class="btn-acao-evento" onclick="exibirSubtelaGerenciar('formulario')">
+          <button class="btn-acao-evento" id="btnAcaoFormulario" onclick="exibirSubtelaGerenciar('formulario')">
             <span>📝</span>
             <div>
               <strong>Terminar de Responder / Ver Formulário</strong>
@@ -2638,15 +2832,22 @@ function renderGestaoHtml({ user }) {
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
 
-    // RENDERIZAÇÃO IMEDIATA (Sem tela travada em "Carregando...")
+    // RENDERIZAÇÃO IMEDIATA
     renderizarCalendario();
     selecionarDia(diaSelecionado);
 
-    document.addEventListener('DOMContentLoaded', () => {
+    function iniciarCarregamentos() {
       carregarEventosServidor();
       carregarSolicitacoesServidor();
       carregarFichasServidor();
-    });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', iniciarCarregamentos);
+    } else {
+      iniciarCarregamentos();
+    }
+    setTimeout(iniciarCarregamentos, 50);
 
     function trocarAba(abaId) {
       document.querySelectorAll('.tabs-nav .tab-btn').forEach(b => b.classList.remove('active'));
@@ -2786,7 +2987,21 @@ function renderGestaoHtml({ user }) {
 
       return todosEventos.filter(ev => {
         if (ev.data !== dataStr) return false;
-        if (filtroDepto !== 'todos' && ev.departamento !== filtroDepto && !ev.isOcupacaoExterna) return false;
+        if (filtroDepto !== 'todos' && !ev.isOcupacaoExterna) {
+          const deptoEv = String(ev.departamento || '').toLowerCase();
+          const f = filtroDepto.toLowerCase();
+          const match = deptoEv.includes(f) || f.includes(deptoEv) ||
+                        (f.includes('epifania') && deptoEv.includes('epifania')) ||
+                        (f.includes('mulher') && deptoEv.includes('mulher')) ||
+                        (f.includes('homem') && deptoEv.includes('homem')) ||
+                        (f.includes('ruach') && deptoEv.includes('ruach')) ||
+                        (f.includes('casais') && deptoEv.includes('casais')) ||
+                        (f.includes('kids') && deptoEv.includes('kids')) ||
+                        (f.includes('arte') && deptoEv.includes('arte')) ||
+                        (f.includes('intercess') && deptoEv.includes('intercess')) ||
+                        (f.includes('seeds') && deptoEv.includes('seeds'));
+          if (!match) return false;
+        }
         if (filtroTipo !== 'todos' && ev.tipo !== filtroTipo) return false;
         return true;
       });
@@ -3337,6 +3552,116 @@ function renderGestaoHtml({ user }) {
     function filtrarCalendario() {
       renderizarCalendario();
       selecionarDia(diaSelecionado);
+    }
+
+        // PESQUISA GLOBAL DE EVENTOS
+    function executarPesquisaEventos() {
+      const termo = (document.getElementById('campoBuscaPesquisa')?.value || '').toLowerCase().trim();
+      const filtroTipo = document.getElementById('filtroTipoPesquisa')?.value || 'todos';
+      const filtroDepto = document.getElementById('filtroDeptoPesquisa')?.value || 'todos';
+
+      const container = document.getElementById('containerResultadosPesquisa');
+      if (!container) return;
+
+      const resultados = todosEventos.filter(ev => {
+        if (filtroTipo !== 'todos' && ev.tipo !== filtroTipo) return false;
+        if (filtroDepto !== 'todos') {
+          const deptoEv = String(ev.departamento || '').toLowerCase();
+          const f = filtroDepto.toLowerCase();
+          const match = deptoEv.includes(f) || f.includes(deptoEv) ||
+                        (f.includes('epifania') && deptoEv.includes('epifania')) ||
+                        (f.includes('mulher') && deptoEv.includes('mulher')) ||
+                        (f.includes('homem') && deptoEv.includes('homem')) ||
+                        (f.includes('ruach') && deptoEv.includes('ruach')) ||
+                        (f.includes('casais') && deptoEv.includes('casais')) ||
+                        (f.includes('kids') && deptoEv.includes('kids')) ||
+                        (f.includes('arte') && deptoEv.includes('arte')) ||
+                        (f.includes('intercess') && deptoEv.includes('intercess')) ||
+                        (f.includes('seeds') && deptoEv.includes('seeds'));
+          if (!match && !ev.isOcupacaoExterna) return false;
+        }
+        if (termo) {
+          const t = String(ev.titulo || '') + ' ' + String(ev.departamento || '') + ' ' + String(ev.data || '') + ' ' + String(ev.local || '') + ' ' + String(ev.descricao || '');
+          if (!t.toLowerCase().includes(termo)) return false;
+        }
+        return true;
+      });
+
+      if (resultados.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 30px; color: var(--cor-subtexto);">Nenhum agendamento encontrado para esta busca.</div>';
+        return;
+      }
+
+      container.innerHTML = resultados.map(ev => {
+        let chipClass = 'confirmado';
+        let tipoNome = 'EVENTO';
+        if (ev.tipo === 'reuniao') { chipClass = 'reuniao'; tipoNome = 'REUNIÃO'; }
+        else if (ev.tipo === 'ensaio') { chipClass = 'ensaio'; tipoNome = 'ENSAIO'; }
+        else if (ev.tipo === 'atendimento') { chipClass = 'pastoral'; tipoNome = 'ATENDIMENTO'; }
+
+        const statusHtml = ev.status === 'pendente_secretaria'
+          ? '<span style="color: var(--cor-amarelo); font-weight: 700;">⏳ Aguardando Aprovação</span>'
+          : '<span style="color: var(--cor-verde); font-weight: 700;">✅ Confirmado</span>';
+
+        const horarioStr = '⏰ ' + (ev.horarioInicio || '19:00') + (ev.horarioFim ? ' às ' + ev.horarioFim : '');
+
+        return '<div class="day-event-card" style="border: 1px solid var(--cor-borda); background: #ffffff; cursor: pointer;" onclick="abrirGerenciadorPorId(\'' + (ev.id || ev.codigo) + '\')">' +
+          '<div class="title" style="margin-bottom: 6px;">' +
+            '<span style="font-size: 0.92rem; font-weight: 800;">' + ev.titulo + '</span>' +
+            '<span class="event-chip ' + chipClass + '" style="pointer-events: auto;">' + tipoNome + '</span>' +
+          '</div>' +
+          '<div class="meta" style="gap: 4px;">' +
+            '<span>📅 ' + (ev.data || '-') + ' • ' + horarioStr + '</span>' +
+            '<span>🏢 ' + (ev.departamento || 'Geral') + ' • 📍 ' + (ev.local || 'Na Igreja') + '</span>' +
+            statusHtml +
+          '</div>' +
+          '<span class="action-hint" style="margin-top: 8px;">Toque para gerenciar ›</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    // MODAL DE SOLICITAÇÃO DE MÍDIA
+    function abrirModalSolicitarMidia() {
+      document.getElementById('modalSolicitarMidia').classList.add('active');
+    }
+    function fecharModalSolicitarMidia() {
+      document.getElementById('modalSolicitarMidia').classList.remove('active');
+    }
+
+    async function submeterSolicitacaoMidia(event) {
+      event.preventDefault();
+      const departamento = document.getElementById('midia_departamento').value;
+      const tipo_material = document.getElementById('midia_tipo_material').value;
+      const nome_evento = document.getElementById('midia_evento').value;
+      const prazo_entrega = document.getElementById('midia_prazo').value;
+      const detalhes = document.getElementById('midia_detalhes').value;
+
+      try {
+        const res = await fetch('/gestao/api/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo: 'midia',
+            departamento,
+            tipo_material,
+            nome_evento,
+            prazo_entrega,
+            detalhes
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert('✅ ' + (data.mensagem || data.message || 'Solicitação de arte enviada com sucesso!'));
+          fecharModalSolicitarMidia();
+          document.getElementById('formSolicitarMidia').reset();
+          carregarSolicitacoesServidor();
+          trocarAba('solicitacoes');
+        } else {
+          alert('❌ Erro: ' + (data.message || 'Falha ao registrar solicitação.'));
+        }
+      } catch (err) {
+        alert('❌ Erro de conexão ao enviar solicitação.');
+      }
     }
   </script>
 </body>
