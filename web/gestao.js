@@ -3605,7 +3605,8 @@ function renderGestaoHtml({ user }) {
 
         const horarioStr = '⏰ ' + (ev.horarioInicio || '19:00') + (ev.horarioFim ? ' às ' + ev.horarioFim : '');
 
-        return '<div class="day-event-card" style="border: 1px solid var(--cor-borda); background: #ffffff; cursor: pointer;" onclick="abrirGerenciadorPorId(\'' + (ev.id || ev.codigo) + '\')">' +
+        const idEv = String(ev.id || ev.codigo || '');
+        return '<div class="day-event-card" style="border: 1px solid var(--cor-borda); background: #ffffff; cursor: pointer;" onclick="abrirGerenciadorPorId(&quot;' + idEv + '&quot;)">' +
           '<div class="title" style="margin-bottom: 6px;">' +
             '<span style="font-size: 0.92rem; font-weight: 800;">' + ev.titulo + '</span>' +
             '<span class="event-chip ' + chipClass + '" style="pointer-events: auto;">' + tipoNome + '</span>' +
