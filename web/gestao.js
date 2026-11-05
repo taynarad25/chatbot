@@ -20,29 +20,14 @@ const ENDERECO_IGREJA = "Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Ita
 const CONTATO_TESOURARIA = "11943890204";
 const LINK_ATA_REUNIAO = "https://docs.google.com/document/d/1ZtFfD3f3jB1QkL2Y4XvW5T6n8M7a9K0p/edit";
 
-// Mapeamento de agenda index para nome do departamento
-const NOMES_AGENDAS_INDEX = [
-  "Evangelismo",           // 0
-  "Epifania",              // 1
-  "Intercessão",           // 2
-  "Outros",                // 3
-  "Projeto Social Seeds",  // 4
-  "Rede Ruach",            // 5
-  "Rede de Casais",        // 6
-  "Rede de Homens",        // 7
-  "Rede de Mulheres",      // 8
-  "Rede Kids",             // 9
-  "Eventos Externos",      // 10
-  "Reuniões",              // 11
-  "Atendimento",           // 12
-  "Limpeza",               // 13
-  "Ensaios",               // 14
-  "Uso do Salão",          // 15
-  "Departamento de Artes"  // 16
-];
-
 let injectedBuscarEventos = null;
 let injectedCalendar = null;
+
+// Cache em memória para Google Calendar (TTL 3 minutos)
+let cacheGoogleEvents = {
+  timestamp: 0,
+  data: []
+};
 
 function setDependencies({ buscarEventos = null, calendar = null } = {}) {
   if (buscarEventos) injectedBuscarEventos = buscarEventos;
@@ -77,7 +62,6 @@ function obterPerfilGestao(session) {
 
   const dadosPastoral = pastoralMap[username] || null;
 
-  // Busca líder correspondente no banco
   let liderEncontrado = null;
   try {
     const lideres = loadLideres();
@@ -94,7 +78,7 @@ function obterPerfilGestao(session) {
   const isAdmin = role === 'admin' || username === 'admin' || username === 'gabriela';
   const isPastor = isAdmin || role === 'pastor' || Boolean(dadosPastoral && dadosPastoral.cargo.toLowerCase().includes('pastor')) || cargos.includes('pastor');
   const isDiretor = isPastor || role === 'diretor' || cargos.includes('diretor') || username.includes('diretor');
-  const isLider = true; // Todo usuário autenticado tem pelo menos nível líder
+  const isLider = true;
 
   let perfilTitulo = 'Líder';
   let nivelAcesso = 1;
@@ -142,7 +126,7 @@ function obterPerfilGestao(session) {
 }
 
 /**
- * Extrai departamento provável a partir do título do evento
+ * Identifica o departamento provável do evento
  */
 function inferirDepartamentoDeTitulo(titulo = '') {
   const t = String(titulo).toLowerCase();
@@ -163,23 +147,25 @@ function inferirDepartamentoDeTitulo(titulo = '') {
 }
 
 /**
- * Consulta eventos do Google Calendar se as credenciais e APIs estiverem disponíveis
+ * Busca rápida no Google Calendar com timeout e cache em memória (não trava a página)
  */
 async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
+  const agora = Date.now();
+  if (cacheGoogleEvents.timestamp && (agora - cacheGoogleEvents.timestamp < 180000)) {
+    return cacheGoogleEvents.data;
+  }
+
   const eventosGcal = [];
   try {
-    // Se foi injetado buscarEventos do chatbot.js
     if (injectedBuscarEventos && typeof injectedBuscarEventos === 'function') {
-      const results = await injectedBuscarEventos(inicioIso, fimIso);
-      if (Array.isArray(results)) {
-        for (const item of results) {
-          eventosGcal.push(item);
-        }
-        return eventosGcal;
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500));
+      const res = await Promise.race([injectedBuscarEventos(inicioIso, fimIso), timeoutPromise]);
+      if (Array.isArray(res)) {
+        cacheGoogleEvents = { timestamp: agora, data: res };
+        return res;
       }
     }
 
-    // Caso contrário, tenta usar googleapis se disponível
     let googleapis;
     try { googleapis = require('googleapis').google; } catch (_) {}
     if (googleapis) {
@@ -190,35 +176,41 @@ async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
       });
       const cal = googleapis.calendar({ version: 'v3', auth });
 
-      // Agendas comuns
-      const agendasParaBuscar = [
-        ...Object.values(AGENDAS_INTERNAS),
-        ...REDES.map((r, i) => NOMES_AGENDAS_INDEX[r.agendaIndex] ? r.agendaIndex : i)
-      ];
+      const idsAgendas = [
+        AGENDAS_INTERNAS.REUNIOES,
+        AGENDAS_INTERNAS.ENSAIOS,
+        AGENDAS_INTERNAS.ATENDIMENTO,
+        AGENDAS_INTERNAS.USO_SALAO
+      ].filter(Boolean);
 
-      // Busca na agenda primária e secundárias
-      const idsUnicos = Array.from(new Set(Object.values(AGENDAS_INTERNAS)));
-      for (const calId of idsUnicos) {
+      // Chamadas paralelas com timeout de 1.5s
+      const promessas = idsAgendas.map(async (calId) => {
         try {
-          const res = await cal.events.list({
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500));
+          const reqPromise = cal.events.list({
             calendarId: calId,
             timeMin: inicioIso,
             timeMax: fimIso,
             singleEvents: true,
-            maxResults: 250
+            maxResults: 100
           });
-          if (res.data?.items) {
-            for (const ev of res.data.items) {
-              ev.calendarId = calId;
-              eventosGcal.push(ev);
-            }
+          const res = await Promise.race([reqPromise, timeoutPromise]);
+          if (res?.data?.items) {
+            return res.data.items.map(item => ({ ...item, calendarId: calId }));
           }
         } catch (_) {}
+        return [];
+      });
+
+      const results = await Promise.allSettled(promessas);
+      for (const r of results) {
+        if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+          eventosGcal.push(...r.value);
+        }
       }
+      cacheGoogleEvents = { timestamp: agora, data: eventosGcal };
     }
-  } catch (err) {
-    // Falha silenciosa de rede no Google Agenda (não bloqueia o site)
-  }
+  } catch (_) {}
   return eventosGcal;
 }
 
@@ -232,11 +224,10 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
   const anoAtual = ano ? parseInt(ano, 10) : moment().tz("America/Sao_Paulo").year();
   const mesAtual = mes ? parseInt(mes, 10) : moment().tz("America/Sao_Paulo").month() + 1;
 
-  // Janela de busca para o mês
   const inicioMes = moment.tz([anoAtual, mesAtual - 1, 1], "America/Sao_Paulo").startOf('month').subtract(7, 'days').startOf('day');
   const fimMes = moment.tz([anoAtual, mesAtual - 1, 1], "America/Sao_Paulo").endOf('month').add(7, 'days').endOf('day');
 
-  // 1. Eventos Gravados em descricoes_eventos (eventos aprovados pelo bot)
+  // 1. descricoes_eventos (eventos aprovados pelo bot com blocos/dias múltiplos/consecutivos)
   try {
     const rowsDesc = db.prepare(`
       SELECT id, evento, departamento, local, tipoDuracao, horariosJson, descricao, criadoEm
@@ -279,7 +270,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
           responsavel: '',
           docUrl: '',
           status: 'confirmado',
-          tipo: 'evento',
+          tipo: r.evento.toLowerCase().includes('ensaio') ? 'ensaio' : (r.evento.toLowerCase().includes('reunião') ? 'reuniao' : 'evento'),
           descricao: r.descricao || ''
         });
       }
@@ -288,7 +279,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
     console.error('[Gestão Eventos] Erro ao carregar descricoes_eventos:', errDesc.message);
   }
 
-  // 2. Eventos com fichas e formulários preenchidos (formularios_eventos)
+  // 2. formularios_eventos
   try {
     const rowsFormularios = db.prepare(`
       SELECT id, evento, departamento, data, dataMaximaDivulgacao, solicitanteId, payload, docUrl, criadoEm
@@ -303,7 +294,6 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
       const horarioIni = payload.horario_inicio || (payload.horario_inicio_termino ? payload.horario_inicio_termino.split('às')[0].trim() : '19:00');
       const horarioFim = payload.horario_termino || (payload.horario_inicio_termino && payload.horario_inicio_termino.includes('às') ? payload.horario_inicio_termino.split('às')[1].trim() : '21:30');
 
-      // Verifica se já não foi incluído por descricoes_eventos
       const jaExiste = eventos.some(e => 
         e.data === r.data && 
         e.titulo.toLowerCase().trim() === r.evento.toLowerCase().trim()
@@ -322,7 +312,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
           responsavel: payload.nome_lider || payload.solicitanteNome || '',
           docUrl: r.docUrl || '',
           status: 'confirmado',
-          tipo: r.evento.toLowerCase().includes('reunião') ? 'reuniao' : 'evento',
+          tipo: r.evento.toLowerCase().includes('ensaio') ? 'ensaio' : (r.evento.toLowerCase().includes('reunião') ? 'reuniao' : 'evento'),
           payload
         });
       }
@@ -331,7 +321,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
     console.error('[Gestão Eventos] Erro ao carregar formularios_eventos:', err.message);
   }
 
-  // 3. Eventos Dinâmicos do Painel da Secretaria (painel_eventos)
+  // 3. painel_eventos
   try {
     const rowsPainel = db.prepare(`
       SELECT id, slug, titulo, descricao, dataEvento, horario, local, tipoInscricao, ativo
@@ -359,11 +349,9 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         });
       }
     }
-  } catch (errPainel) {
-    console.error('[Gestão Eventos] Erro ao carregar painel_eventos:', errPainel.message);
-  }
+  } catch (errPainel) {}
 
-  // 4. Google Calendar (Reuniões, Ensaios, Atendimentos, Eventos ao Vivo)
+  // 4. Google Calendar (Reuniões, Ensaios, Atendimentos, Eventos)
   try {
     const gcalEvents = await buscarEventosGoogleCalendar(inicioMes.toISOString(), fimMes.toISOString());
     for (const g of gcalEvents) {
@@ -393,7 +381,6 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         tipo = 'uso_salao';
       }
 
-      // Evita duplicar se já estiver na lista local
       const duplicado = eventos.some(e => e.data === dataFormatada && e.titulo.toLowerCase().trim() === summary.toLowerCase().trim());
       if (!duplicado) {
         eventos.push({
@@ -412,22 +399,18 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         });
       }
     }
-  } catch (errGcal) {
-    // Erros de Google Agenda são absorvidos
-  }
+  } catch (_) {}
 
-  // 5. Solicitações Pendentes (que estão aguardando aprovação da Secretaria)
+  // 5. pendentes
   try {
     const rowsPendentes = db.prepare(`
-      SELECT codigo, dados, criadoEm FROM pendentes ORDER BY criadoEm DESC
+      SELECT codigo, dados, criadoEm FROM pendentes ORDER BY rowid DESC
     `).all();
 
     for (const pend of rowsPendentes) {
       try {
         const d = JSON.parse(pend.dados);
         const nome = (d.nomeEvento || d.evento || d.nome || d.finalidade || '').trim();
-        
-        // Ignora mocks e testes óbvios
         if (!nome || /^(teste|test|gabi|gabriela)$/i.test(nome)) continue;
 
         const dataFormatada = d.dataFormatada || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
@@ -436,6 +419,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         let tipo = d.tipo || 'evento';
         if (d.tipo === 'uso_salao') tipo = 'uso_salao';
         if (d.tipo === 'reuniao') tipo = 'reuniao';
+        if (d.tipo === 'ensaio') tipo = 'ensaio';
         if (d.tipo === 'alterar' || d.tipo === 'reuniao_alterar') tipo = 'alteracao';
         if (d.tipo === 'cancelar' || d.tipo === 'cancelar_reuniao') tipo = 'cancelamento';
 
@@ -456,55 +440,35 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         });
       } catch (_) {}
     }
-  } catch (errPend) {
-    console.error('[Gestão Eventos] Erro ao carregar pendentes:', errPend.message);
-  }
+  } catch (_) {}
 
-  // APLICAÇÃO DE REGRAS DE PERMISSÃO / VISIBILIDADE
-  // -------------------------------------------------------------
-  // Regra Líder:
-  // - Vê ensaios, eventos e reuniões SÓ do seu departamento
-  // - Se outro ministério ocupar o salão, mostra apenas "Salão Ocupado" para não dar conflito
-  // - Não vê atendimento pastoral
-  // Regra Diretor:
-  // - Vê tudo de todos os departamentos
-  // - No atendimento pastoral: máscara o nome do discípulo (mostra apenas "Atendimento Pastoral")
-  // Regra Pastor:
-  // - Vê tudo de todos os departamentos
-  // - No atendimento pastoral: vê o nome completo de quem vai ser atendido
+  // FILTROS DE VISIBILIDADE / PRIVACIDADE POR PAPEL
   const resultadoFiltrado = [];
-
   for (const ev of eventos) {
     const isAtendimento = ev.tipo === 'atendimento' || ev.departamento === 'Pastoral';
 
-    // 1. Caso Atendimento Pastoral
+    // 1. Atendimento Pastoral
     if (isAtendimento) {
       if (perfil?.isPastor || perfil?.isAdmin) {
-        // Pastor vê tudo com nome do discípulo
         resultadoFiltrado.push(ev);
       } else if (perfil?.isDiretor) {
-        // Diretor só vê que tem atendimento (nome do discípulo mascarado)
         resultadoFiltrado.push({
           ...ev,
-          titulo: 'Atendimento Pastoral',
+          titulo: 'Atendimento Pastoral (Sigiloso)',
           responsavel: 'Sigiloso',
           descricao: 'Atendimento pastoral agendado'
         });
-      } else {
-        // Líder comum NÃO vê atendimento pastoral de terceiros
-        // Apenas como bloqueio de salão se for no mesmo espaço
-        continue;
       }
       continue;
     }
 
-    // 2. Caso Pastor, Diretor ou Administrador: vê tudo
+    // 2. Pastor, Diretor ou Administrador vê tudo
     if (perfil?.isPastor || perfil?.isDiretor || perfil?.isAdmin) {
       resultadoFiltrado.push(ev);
       continue;
     }
 
-    // 3. Caso Líder Comum:
+    // 3. Líder Comum: Vê apenas do seu departamento
     const deptosLider = (perfil?.departamentos || []).map(d => String(d).toLowerCase().trim());
     const deptoEv = String(ev.departamento || '').toLowerCase().trim();
     
@@ -515,8 +479,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
     if (pertenceAoLider) {
       resultadoFiltrado.push(ev);
     } else {
-      // Evento de outro departamento: exibe no calendário apenas como aviso de salão ocupado
-      // para evitar conflitos na marcação de datas
+      // Ocupação do salão por outro ministério
       resultadoFiltrado.push({
         ...ev,
         titulo: 'Salão Ocupado (Outro Ministério)',
@@ -532,7 +495,7 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
 }
 
 /**
- * Lista solicitações de eventos limpas e filtradas pelo perfil do usuário
+ * Lista solicitações limpas e filtradas
  */
 function listarSolicitacoes({ user = null } = {}) {
   const perfil = user?.perfilTitulo ? user : (user ? obterPerfilGestao(user) : null);
@@ -552,7 +515,6 @@ function listarSolicitacoes({ user = null } = {}) {
         const dataFormatada = d.dataFormatada || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
         if (!dataFormatada && !d.blocos && !d.dataInicio) continue;
 
-        // Se for Líder comum, filtra apenas as solicitações dele
         if (!perfil?.isPastor && !perfil?.isDiretor && !perfil?.isAdmin) {
           const deptos = (perfil?.departamentos || []).map(d => String(d).toLowerCase());
           const deptoPed = String(d.rede || d.departamento || '').toLowerCase();
@@ -580,11 +542,8 @@ function listarSolicitacoes({ user = null } = {}) {
         });
       } catch (_) {}
     }
-  } catch (err) {
-    console.error('[Gestão] Erro ao listar pendentes:', err.message);
-  }
+  } catch (_) {}
 
-  // Adiciona solicitações aprovadas recentes
   try {
     const rowsForm = db.prepare(`
       SELECT id, evento, departamento, data, solicitanteId, payload, criadoEm
@@ -596,7 +555,6 @@ function listarSolicitacoes({ user = null } = {}) {
       let p = {};
       try { p = JSON.parse(f.payload); } catch (_) {}
       
-      // Filtragem por líder
       if (!perfil?.isPastor && !perfil?.isDiretor && !perfil?.isAdmin) {
         const deptos = (perfil?.departamentos || []).map(d => String(d).toLowerCase());
         const deptoForm = String(f.departamento || '').toLowerCase();
@@ -628,10 +586,7 @@ function listarSolicitacoes({ user = null } = {}) {
 }
 
 /**
- * Lista fichas de eventos preenchidas com controle rigoroso de acesso:
- * - Pastores: acesso total a todas as fichas
- * - Líderes: apenas fichas do seu próprio departamento
- * - Diretores: não têm acesso a todas as fichas (apenas se pastor)
+ * Lista fichas de eventos preenchidas com controle rigoroso de acesso
  */
 function listarFichas({ user = null } = {}) {
   const perfil = user?.perfilTitulo ? user : (user ? obterPerfilGestao(user) : null);
@@ -643,36 +598,28 @@ function listarFichas({ user = null } = {}) {
       ORDER BY id DESC LIMIT 100
     `).all();
 
-    // Se for Pastor ou Admin: vê tudo
     if (perfil?.isPastor || perfil?.isAdmin) {
       return rows;
     }
 
-    // Se for Líder comum ou Diretor (sem cargo de pastor): vê apenas o seu departamento
     const deptosUsuario = (perfil?.departamentos || []).map(d => String(d).toLowerCase().trim());
     return rows.filter(f => {
       const deptoFicha = String(f.departamento || '').toLowerCase().trim();
       return deptosUsuario.some(du => deptoFicha.includes(du) || du.includes(deptoFicha));
     });
   } catch (err) {
-    console.error('[Gestão] Erro ao listar fichas:', err.message);
     return [];
   }
 }
 
 /**
- * Cria nova solicitação no portal web com suporte a todos os tipos de agendamento:
- * - Novo Evento (Único, Múltiplo, Consecutivo)
- * - Reunião de Liderança
- * - Atendimento Pastoral (somente pastores)
- * - Alteração de Evento
- * - Cancelamento de Evento
+ * Cria ou atualiza solicitação no portal web
  */
 async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () => null) {
   const perfil = obterPerfilGestao(usuarioLogado);
   const tipoAcao = String(corpo.tipo || 'evento').toLowerCase().trim();
 
-  // 1. REUNIÃO DE LIDERANÇA / DEPARTAMENTO
+  // 1. REUNIÃO DE LIDERANÇA
   if (tipoAcao === 'reuniao') {
     const { departamento, data, horario_inicio, horario_termino, local, pauta } = corpo;
     if (!departamento || !data || !horario_inicio || !horario_termino) {
@@ -726,7 +673,61 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     };
   }
 
-  // 2. ATENDIMENTO PASTORAL (Exclusivo para Pastores / Admin)
+  // 2. ENSAIO
+  if (tipoAcao === 'ensaio') {
+    const { departamento, data, horario_inicio, horario_termino, local, pauta } = corpo;
+    if (!departamento || !data || !horario_inicio || !horario_termino) {
+      throw new Error('Preencha o ministério, data e horários do ensaio.');
+    }
+
+    const [diaStr, mesStr, anoStr] = data.split('/');
+    const dadosEnsaio = {
+      tipo: 'ensaio',
+      departamento: departamento.trim(),
+      rede: departamento.trim(),
+      dia: parseInt(diaStr, 10),
+      mes: parseInt(mesStr, 10),
+      ano: parseInt(anoStr, 10),
+      dataFormatada: data,
+      horarioInicio: horario_inicio,
+      horarioFim: horario_termino,
+      local: local?.trim() || ENDERECO_IGREJA,
+      solicitanteNome: perfil?.nome || 'Líder',
+      solicitanteId: perfil?.telefone || perfil?.username || '',
+      pauta: pauta?.trim() || 'Ensaio geral',
+      criadoVia: 'painel_web',
+      criadoEm: new Date().toISOString()
+    };
+
+    const codigo = salvarPendente(dadosEnsaio);
+
+    const avisoGrupo =
+      `🎵 *SOLICITAÇÃO DE ENSAIO*\n\n` +
+      `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
+      `🏢 *Ministério:* ${departamento}\n` +
+      `📆 *Data:* ${data}\n` +
+      `⏰ *Horário:* ${horario_inicio} às ${horario_termino}\n` +
+      `📍 *Local:* ${dadosEnsaio.local}\n` +
+      `🎼 *Detalhes:* ${dadosEnsaio.pauta}\n\n` +
+      `_Responda a este resumo com "marcar evento" para confirmar ou "não marcar" para negar._\n\n` +
+      `_Código: ${codigo}_`;
+
+    try {
+      const client = typeof getClient === 'function' ? getClient() : null;
+      if (client && client.info) {
+        await notificarSecretaria(client, avisoGrupo);
+      }
+    } catch (_) {}
+
+    return {
+      ok: true,
+      codigo,
+      message: `Ensaio registrado com sucesso (Código: ${codigo}) e enviado para aprovação da Secretaria!`,
+      mensagem: `Ensaio registrado com sucesso (Código: ${codigo}) e enviado para aprovação da Secretaria!`
+    };
+  }
+
+  // 3. ATENDIMENTO PASTORAL (Exclusivo Pastores / Admin)
   if (tipoAcao === 'atendimento') {
     if (!perfil?.isPastor && !perfil?.isAdmin) {
       throw new Error('Apenas pastores têm permissão para agendar atendimentos pastorais.');
@@ -755,7 +756,6 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
       criadoEm: new Date().toISOString()
     };
 
-    // Registra direto como aprovado no banco de descrições/fichas pastorais
     const tituloAtendimento = `Atendimento Pastoral - ${nome_discipulo.trim()}`;
     db.prepare(`
       INSERT INTO descricoes_eventos (evento, departamento, local, tipoDuracao, horariosJson, descricao, criadoEm, atualizadoEm)
@@ -770,11 +770,12 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 
     return {
       ok: true,
+      message: `Atendimento pastoral agendado com sucesso para ${nome_discipulo}!`,
       mensagem: `Atendimento pastoral agendado com sucesso para ${nome_discipulo} no dia ${data} às ${horario_inicio}!`
     };
   }
 
-  // 3. ALTERAR EVENTO
+  // 4. ALTERAR EVENTO
   if (tipoAcao === 'alterar') {
     const { nome_evento, campo_alterar, novo_valor, motivo } = corpo;
     if (!nome_evento || !campo_alterar || !novo_valor) {
@@ -815,11 +816,12 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     return {
       ok: true,
       codigo,
+      message: `Solicitação registrada com sucesso (Código: ${codigo}) e enviada para aprovação da Secretaria!`,
       mensagem: `Solicitação de alteração enviada à Secretaria (Código: ${codigo})!`
     };
   }
 
-  // 4. CANCELAR EVENTO
+  // 5. CANCELAR EVENTO
   if (tipoAcao === 'cancelar') {
     const { nome_evento, motivo } = corpo;
     if (!nome_evento || !motivo) {
@@ -856,11 +858,41 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     return {
       ok: true,
       codigo,
+      message: `Solicitação registrada com sucesso (Código: ${codigo}) e enviada para aprovação da Secretaria!`,
       mensagem: `Solicitação de cancelamento enviada à Secretaria (Código: ${codigo})!`
     };
   }
 
-  // 5. NOVO EVENTO (Padrão: Único, Múltiplos Blocos ou Consecutivo)
+  // 6. ATUALIZAR FORMULÁRIO / DETALHES
+  if (tipoAcao === 'atualizar_formulario') {
+    const { nome_evento, tema, versiculo, objetivo_espiritual, precisa_inscricao, valor_inscricao, precisa_valor_ministerio, observacoes } = corpo;
+    if (!nome_evento) throw new Error('Nome do evento é obrigatório.');
+
+    try {
+      const rowForm = db.prepare("SELECT id, payload FROM formularios_eventos WHERE LOWER(TRIM(evento)) = LOWER(TRIM(?)) ORDER BY id DESC LIMIT 1").get(nome_evento);
+      if (rowForm) {
+        let p = {};
+        try { p = JSON.parse(rowForm.payload); } catch (_) {}
+        if (tema) p.tema = tema;
+        if (versiculo) p.versiculo = versiculo;
+        if (objetivo_espiritual) p.objetivo_espiritual = objetivo_espiritual;
+        if (precisa_inscricao) p.precisa_inscricao = precisa_inscricao;
+        if (valor_inscricao) p.valor_inscricao = valor_inscricao;
+        if (precisa_valor_ministerio) p.precisa_valor_ministerio = precisa_valor_ministerio;
+        if (observacoes) p.observacoes = observacoes;
+
+        db.prepare("UPDATE formularios_eventos SET payload = ? WHERE id = ?").run(JSON.stringify(p), rowForm.id);
+      }
+    } catch (_) {}
+
+    return {
+      ok: true,
+      message: 'Formulário atualizado com sucesso!',
+      mensagem: 'Formulário atualizado com sucesso!'
+    };
+  }
+
+  // 7. NOVO EVENTO (Padrão)
   const {
     nome_lider,
     telefone_lider,
@@ -912,7 +944,6 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     anoNum = parseInt(partes[2], 10) || moment().tz("America/Sao_Paulo").year();
   }
 
-  // Montagem de horários e blocos
   let blocosArray = null;
   if (tipo_duracao === 'multiplo' && blocos_json) {
     try {
@@ -988,10 +1019,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     criadoEm: new Date().toISOString()
   };
 
-  // 1. Salva na tabela pendentes gerando o código único de 4 dígitos
   const codigo = salvarPendente(dadosAgendamento);
 
-  // 2. Registra o formulário no banco
   salvarFormularioEvento({
     evento: nome_evento.trim(),
     departamento: deptoFinal,
@@ -1002,7 +1031,6 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     docUrl: ''
   });
 
-  // 3. Notificação no WhatsApp da Secretaria
   const querTesouraria = precisa_valor_ministerio === 'sim' || precisa_valor_ministerio === true;
   const tagTesouraria = querTesouraria
     ? `\n\n💰 *Aviso da Tesouraria:* O líder informou que precisará de verba do ministério. Contato da tesouraria: *${CONTATO_TESOURARIA}*`
@@ -1030,9 +1058,7 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     if (client && client.info) {
       await notificarSecretaria(client, avisoGrupo);
     }
-  } catch (errZap) {
-    console.error('[Gestão Web] Erro ao notificar secretaria via WhatsApp:', errZap.message);
-  }
+  } catch (_) {}
 
   return {
     ok: true,
@@ -1047,8 +1073,6 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 
 /**
  * Renderiza o HTML da tela de Gestão de Eventos (/gestao)
- * TEMA: Cinza Claro (#f4f6f8 / #ffffff) matching public/home.html
- * OTIMIZADO: Mobile-first (perfeito para celulares)
  */
 function renderGestaoHtml({ user }) {
   const perfil = obterPerfilGestao(user);
@@ -1076,7 +1100,6 @@ function renderGestaoHtml({ user }) {
       --cor-vermelho: #ef4444;
       --cor-azul: #2563eb;
 
-      /* PALETA CLARA - Fundo suave */
       --cor-fundo: #f4f6f8;
       --cor-card: #ffffff;
       --cor-borda: #e2e8f0;
@@ -1105,7 +1128,6 @@ function renderGestaoHtml({ user }) {
       line-height: 1.5;
     }
 
-    /* TOPBAR */
     .topbar {
       background: #121214;
       color: #ffffff;
@@ -1131,7 +1153,6 @@ function renderGestaoHtml({ user }) {
     .brand-info h1 {
       font-size: 0.88rem;
       font-weight: 800;
-      letter-spacing: 0.5px;
       color: #ffffff;
       line-height: 1.1;
     }
@@ -1148,9 +1169,7 @@ function renderGestaoHtml({ user }) {
       align-items: center;
       gap: 8px;
     }
-    .user-name-tag {
-      text-align: right;
-    }
+    .user-name-tag { text-align: right; }
     .user-name-tag .name {
       font-size: 0.78rem;
       font-weight: 700;
@@ -1163,7 +1182,6 @@ function renderGestaoHtml({ user }) {
       padding: 2px 6px;
       border-radius: 999px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
       background: rgba(122, 43, 226, 0.2);
       color: #d8b4fe;
       border: 1px solid rgba(122, 43, 226, 0.4);
@@ -1184,7 +1202,6 @@ function renderGestaoHtml({ user }) {
       text-decoration: none;
     }
 
-    /* CONTAINER PRINCIPAL */
     .container {
       width: 100%;
       max-width: 1200px;
@@ -1193,7 +1210,6 @@ function renderGestaoHtml({ user }) {
       flex: 1;
     }
 
-    /* HEADER DE GESTÃO */
     .gestao-header {
       background: #ffffff;
       border: 1px solid var(--cor-borda);
@@ -1248,7 +1264,6 @@ function renderGestaoHtml({ user }) {
       transform: translateY(-1px);
     }
 
-    /* NAVEGAÇÃO DE ABAS */
     .tabs-nav {
       display: flex;
       gap: 6px;
@@ -1292,11 +1307,9 @@ function renderGestaoHtml({ user }) {
       color: #fff;
     }
 
-    /* CONTEÚDO DAS ABAS */
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
 
-    /* LAYOUT CALENDÁRIO */
     .calendario-layout {
       display: grid;
       grid-template-columns: 1fr;
@@ -1339,7 +1352,7 @@ function renderGestaoHtml({ user }) {
       font-size: 1.05rem;
       font-weight: 800;
       color: var(--cor-texto);
-      min-width: 140px;
+      min-width: 150px;
     }
     .cal-nav-btn {
       background: var(--cor-cinza-suave);
@@ -1372,10 +1385,9 @@ function renderGestaoHtml({ user }) {
       outline: none;
     }
 
-    /* GRID DO CALENDÁRIO */
     .cal-weekdays {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 4px;
       text-align: center;
       font-size: 0.7rem;
@@ -1385,20 +1397,23 @@ function renderGestaoHtml({ user }) {
     }
     .cal-grid {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 4px;
     }
     .cal-day {
       background: #ffffff;
       border: 1px solid var(--cor-borda);
       border-radius: 10px;
-      min-height: 58px;
-      padding: 4px;
+      min-height: 64px;
+      max-height: 84px;
+      padding: 3px 4px;
       cursor: pointer;
       display: flex;
       flex-direction: column;
       position: relative;
       transition: all 0.15s ease;
+      min-width: 0;
+      overflow: hidden;
     }
     .cal-day:active, .cal-day:hover {
       border-color: var(--cor-roxo);
@@ -1430,18 +1445,31 @@ function renderGestaoHtml({ user }) {
       flex-direction: column;
       gap: 2px;
       margin-top: 2px;
+      min-width: 0;
       overflow: hidden;
     }
     .event-chip {
-      font-size: 0.6rem;
+      font-size: 0.62rem;
       font-weight: 700;
       padding: 2px 4px;
-      border-radius: 4px;
-      white-space: nowrap;
+      border-radius: 5px;
+      line-height: 1.15;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
-      display: block;
-      line-height: 1.2;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
+      min-width: 0;
+      max-width: 100%;
+      cursor: pointer;
+      transition: transform 0.1s ease, filter 0.1s ease;
+    }
+    .event-chip:hover {
+      filter: brightness(0.93);
+      transform: scale(0.98);
     }
     .event-chip.confirmado { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .event-chip.pendente { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
@@ -1449,6 +1477,24 @@ function renderGestaoHtml({ user }) {
     .event-chip.ensaio { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
     .event-chip.pastoral { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
     .event-chip.bloqueio { background: #f1f5f9; color: #64748b; border: 1px dashed #cbd5e1; }
+
+    @media (max-width: 600px) {
+      .cal-day {
+        min-height: 56px;
+        max-height: 74px;
+        padding: 2px;
+        border-radius: 8px;
+      }
+      .day-num {
+        font-size: 0.7rem;
+      }
+      .event-chip {
+        font-size: 0.58rem;
+        line-height: 1.1;
+        padding: 1px 3px;
+        border-radius: 4px;
+      }
+    }
 
     /* PAINEL LATERAL DO DIA SELECIONADO */
     .day-details-panel {
@@ -1493,11 +1539,22 @@ function renderGestaoHtml({ user }) {
       border-radius: 12px;
       padding: 10px;
       margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+    .day-event-card:hover {
+      border-color: var(--cor-roxo);
+      background: #faf5ff;
+      transform: translateY(-1px);
     }
     .day-event-card .title {
       font-size: 0.88rem;
       font-weight: 800;
       color: var(--cor-texto);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     .day-event-card .meta {
       font-size: 0.75rem;
@@ -1506,6 +1563,13 @@ function renderGestaoHtml({ user }) {
       display: flex;
       flex-direction: column;
       gap: 2px;
+    }
+    .day-event-card .action-hint {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--cor-roxo);
     }
 
     .cal-legend {
@@ -1590,7 +1654,7 @@ function renderGestaoHtml({ user }) {
       background: #ffffff;
       border-radius: 20px;
       width: 100%;
-      max-width: 680px;
+      max-width: 620px;
       max-height: 94vh;
       display: flex;
       flex-direction: column;
@@ -1622,32 +1686,48 @@ function renderGestaoHtml({ user }) {
       cursor: pointer;
     }
 
-    /* SELETOR DE AÇÃO DO MODAL */
-    .action-selector-bar {
-      display: flex;
-      gap: 6px;
-      padding: 10px 14px;
-      background: var(--cor-cinza-suave);
-      border-bottom: 1px solid var(--cor-borda);
-      overflow-x: auto;
-      scrollbar-width: none;
+    /* CARDS DO PASSO 1: ESCOLHA DE TIPO */
+    .tipo-escolha-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 16px;
     }
-    .action-selector-bar::-webkit-scrollbar { display: none; }
-    .action-pill {
+    @media (min-width: 500px) {
+      .tipo-escolha-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .tipo-card-btn {
       background: #ffffff;
-      border: 1px solid var(--cor-borda);
-      color: var(--cor-subtexto);
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 6px 12px;
-      border-radius: 8px;
+      border: 2px solid var(--cor-borda);
+      border-radius: 14px;
+      padding: 16px 14px;
+      text-align: left;
       cursor: pointer;
-      white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: all 0.2s ease;
     }
-    .action-pill.active {
-      background: var(--cor-roxo);
-      color: #ffffff;
+    .tipo-card-btn:hover {
       border-color: var(--cor-roxo);
+      background: #faf5ff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(122, 43, 226, 0.12);
+    }
+    .tipo-card-btn .icone {
+      font-size: 1.7rem;
+    }
+    .tipo-card-btn .titulo {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--cor-texto);
+    }
+    .tipo-card-btn .desc {
+      font-size: 0.75rem;
+      color: var(--cor-subtexto);
+      line-height: 1.3;
     }
 
     .modal-body {
@@ -1655,23 +1735,30 @@ function renderGestaoHtml({ user }) {
       overflow-y: auto;
       flex: 1;
     }
-    .form-section { display: none; }
-    .form-section.active { display: block; }
+    .form-step { display: none; }
+    .form-step.active { display: block; }
 
-    .form-group {
+    .btn-voltar-tipo {
+      background: none;
+      border: none;
+      color: var(--cor-roxo);
+      font-size: 0.82rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       margin-bottom: 12px;
+      padding: 4px 0;
     }
+
+    .form-group { margin-bottom: 12px; }
     .form-group label {
       display: block;
       font-size: 0.82rem;
       font-weight: 700;
       margin-bottom: 4px;
       color: var(--cor-texto);
-    }
-    .form-group .hint {
-      font-size: 0.72rem;
-      color: var(--cor-subtexto);
-      margin-top: 3px;
     }
     .form-control {
       width: 100%;
@@ -1682,7 +1769,6 @@ function renderGestaoHtml({ user }) {
       padding: 10px 12px;
       font-size: 0.88rem;
       outline: none;
-      transition: border 0.15s;
     }
     .form-control:focus {
       border-color: var(--cor-roxo);
@@ -1698,14 +1784,6 @@ function renderGestaoHtml({ user }) {
       .form-row.three-cols { grid-template-columns: 1fr 1fr 1fr; }
     }
 
-    .modal-footer {
-      padding: 12px 18px;
-      border-top: 1px solid var(--cor-borda);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #ffffff;
-    }
     .btn-secundario {
       background: var(--cor-cinza-suave);
       border: 1px solid var(--cor-borda);
@@ -1729,6 +1807,55 @@ function renderGestaoHtml({ user }) {
     }
     .alert-banner.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
     .alert-banner.info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+    /* MODAL DE GERENCIAMENTO DO EVENTO (ALTERAR / CANCELAR / FORMULÁRIO) */
+    .evento-detalhes-box {
+      background: var(--cor-cinza-suave);
+      border: 1px solid var(--cor-borda);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .evento-detalhes-box h4 {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--cor-texto);
+      margin-bottom: 4px;
+    }
+    .evento-detalhes-box p {
+      font-size: 0.78rem;
+      color: var(--cor-subtexto);
+    }
+
+    .acoes-evento-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .btn-acao-evento {
+      background: #ffffff;
+      border: 1.5px solid var(--cor-borda);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--cor-texto);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.15s;
+    }
+    .btn-acao-evento:hover {
+      border-color: var(--cor-roxo);
+      background: #faf5ff;
+    }
+    .btn-acao-evento.cancelar:hover {
+      border-color: var(--cor-vermelho);
+      background: #fef2f2;
+      color: var(--cor-vermelho);
+    }
   </style>
 </head>
 <body>
@@ -1760,7 +1887,7 @@ function renderGestaoHtml({ user }) {
         <h2>🎪 Gestão de Eventos & Agendas</h2>
         <p>Acompanhe o calendário, verifique a disponibilidade do salão e solicite aprovações à Secretaria.</p>
       </div>
-      <button class="btn-principal" onclick="abrirModalAcao('evento')">
+      <button class="btn-principal" onclick="abrirNovoAgendamento()">
         ➕ Novo Agendamento
       </button>
     </section>
@@ -1792,7 +1919,7 @@ function renderGestaoHtml({ user }) {
           <div class="cal-controls">
             <div class="cal-mes-ano">
               <button class="cal-nav-btn" onclick="mudarMes(-1)">‹</button>
-              <h3 id="labelMesAno">Carregando...</h3>
+              <h3 id="labelMesAno">Novembro de 2026</h3>
               <button class="cal-nav-btn" onclick="mudarMes(1)">›</button>
               <button class="cal-nav-btn" onclick="irParaHoje()" style="width: auto; padding: 0 10px;">Hoje</button>
             </div>
@@ -1862,8 +1989,8 @@ function renderGestaoHtml({ user }) {
               <th>Ministério</th>
               <th>Data</th>
               <th>Horário</th>
-              <th>Responsável</th>
               <th>Status</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody id="tabelaCorpoSolicitacoes">
@@ -1910,7 +2037,7 @@ function renderGestaoHtml({ user }) {
             <p style="font-size: 0.78rem; color: var(--cor-subtexto);">Acompanhamento sigiloso de atendimentos e orientações pastorais.</p>
           </div>
           ${perfil?.isPastor ? `
-          <button class="btn-principal" onclick="abrirModalAcao('atendimento')" style="min-height: 38px; padding: 8px 14px; font-size: 0.78rem;">
+          <button class="btn-principal" onclick="iniciarAgendamentoTipo('atendimento')" style="min-height: 38px; padding: 8px 14px; font-size: 0.78rem;">
             ➕ Novo Atendimento
           </button>
           ` : ''}
@@ -1924,327 +2051,520 @@ function renderGestaoHtml({ user }) {
 
   </main>
 
-  <!-- MODAL DE AGENDAMENTO MULTI-AÇÕES -->
+  <!-- MODAL DE NOVO AGENDAMENTO (EM 2 PASSOS) -->
   <div class="modal-overlay modal-agendamento" id="modalAgendamento">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="modalTitulo">➕ Agendamento</h3>
+        <h3 id="modalAgendamentoTitulo">➕ Novo Agendamento</h3>
         <button class="modal-close-btn" onclick="fecharModalAgendamento()">✕</button>
       </div>
 
-      <!-- SELETOR DE AÇÕES -->
-      <div class="action-selector-bar">
-        <button class="action-pill active" onclick="selecionarAcaoModal('evento')">🎪 Novo Evento</button>
-        <button class="action-pill" onclick="selecionarAcaoModal('reuniao')">🤝 Reunião</button>
-        ${perfil?.isPastor ? '<button class="action-pill" onclick="selecionarAcaoModal(\'atendimento\')">📖 Atendimento Pastoral</button>' : ''}
-        <button class="action-pill" onclick="selecionarAcaoModal('alterar')">🔄 Alterar Evento</button>
-        <button class="action-pill" onclick="selecionarAcaoModal('cancelar')">🗑️ Cancelar Evento</button>
-      </div>
-
       <div class="modal-body">
+        
+        <!-- PASSO 1: ESCOLHA DO TIPO (CARDS VISUAIS E LIMPOS) -->
+        <div id="stepEscolhaTipo" class="form-step active">
+          <p style="font-size: 0.88rem; font-weight: 700; color: var(--cor-subtexto); margin-bottom: 14px;">
+            Qual tipo de agendamento você deseja realizar?
+          </p>
+          <div class="tipo-escolha-grid">
+            <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('evento')">
+              <span class="icone">🎪</span>
+              <span class="titulo">Evento da Igreja</span>
+              <span class="desc">Cultos especiais, conferências, congressos, encontros e vigílias.</span>
+            </button>
 
-        <!-- 1. FORMULÁRIO: NOVO EVENTO -->
-        <form id="formNovoEvento" class="form-section active" onsubmit="submeterNovoEvento(event)">
-          <div class="alert-banner info">
-            📌 O evento será enviado automaticamente para aprovação da Secretaria no WhatsApp.
+            <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('reuniao')">
+              <span class="icone">🤝</span>
+              <span class="titulo">Reunião de Liderança</span>
+              <span class="desc">Alinhamento de departamento e líderes com geração de Ata.</span>
+            </button>
+
+            <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('ensaio')">
+              <span class="icone">🎵</span>
+              <span class="titulo">Ensaio</span>
+              <span class="desc">Ensaios de louvor, coral, dança, teatro ou artes.</span>
+            </button>
+
+            ${perfil?.isPastor ? `
+            <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('atendimento')">
+              <span class="icone">📖</span>
+              <span class="titulo">Atendimento Pastoral</span>
+              <span class="desc">Agendamento sigiloso de aconselhamento pastoral com membros.</span>
+            </button>
+            ` : ''}
           </div>
+        </div>
 
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label>Nome do Evento *</label>
-              <input type="text" class="form-control" id="ev_nome" placeholder="Ex: Chá das Mulheres" required />
+        <!-- PASSO 2A: FORMULÁRIO DE EVENTO -->
+        <div id="stepFormEvento" class="form-step">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarParaEscolhaTipo()">← Escolher outro tipo</button>
+          
+          <form id="formNovoEvento" onsubmit="submeterNovoEvento(event)">
+            <div class="alert-banner info">
+              📌 O evento será enviado automaticamente para aprovação da Secretaria no WhatsApp.
             </div>
-            <div class="form-group">
-              <label>Ministério / Departamento *</label>
-              <select class="form-control" id="ev_departamento" required>
-                ${(perfil?.departamentos || ['Geral']).map(d => `<option value="${d}">${d}</option>`).join('')}
-              </select>
-            </div>
-          </div>
 
-          <div class="form-group">
-            <label>Formato de Duração *</label>
-            <select class="form-control" id="ev_tipo_duracao" onchange="mudarTipoDuracaoEvento()">
-              <option value="unico">📅 Dia Único</option>
-              <option value="multiplo">📆 Múltiplos Dias / Blocos de Sessões</option>
-              <option value="consecutivo">⛺ Dias Consecutivos (Ex: Acampamento)</option>
-            </select>
-          </div>
-
-          <!-- Campos Dia Único -->
-          <div id="secaoDiaUnico">
-            <div class="form-row three-cols">
+            <div class="form-row two-cols">
               <div class="form-group">
-                <label>Data *</label>
-                <input type="text" class="form-control" id="ev_data" placeholder="DD/MM/AAAA" />
+                <label>Nome do Evento *</label>
+                <input type="text" class="form-control" id="ev_nome" placeholder="Ex: Chá das Mulheres" required />
               </div>
               <div class="form-group">
+                <label>Ministério / Departamento *</label>
+                <select class="form-control" id="ev_departamento" required>
+                  ${(perfil?.departamentos || ['Geral']).map(d => `<option value="${d}">${d}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Formato de Duração *</label>
+              <select class="form-control" id="ev_tipo_duracao" onchange="mudarTipoDuracaoEvento()">
+                <option value="unico">📅 Dia Único</option>
+                <option value="multiplo">📆 Múltiplos Dias / Blocos de Sessões</option>
+                <option value="consecutivo">⛺ Dias Consecutivos (Ex: Acampamento)</option>
+              </select>
+            </div>
+
+            <!-- Campos Dia Único -->
+            <div id="secaoDiaUnico">
+              <div class="form-row three-cols">
+                <div class="form-group">
+                  <label>Data *</label>
+                  <input type="text" class="form-control" id="ev_data" placeholder="DD/MM/AAAA" />
+                </div>
+                <div class="form-group">
+                  <label>Horário Início *</label>
+                  <input type="time" class="form-control" id="ev_hora_ini" value="19:00" />
+                </div>
+                <div class="form-group">
+                  <label>Horário Término *</label>
+                  <input type="time" class="form-control" id="ev_hora_fim" value="21:30" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Campos Múltiplos Dias -->
+            <div id="secaoMultiplosDias" style="display: none;">
+              <div class="form-group">
+                <label>Sessões / Blocos Programados</label>
+                <div id="containerBlocos" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                <button type="button" class="btn-secundario" onclick="adicionarBlocoSessao()" style="margin-top: 8px;">
+                  ➕ Adicionar Sessão
+                </button>
+              </div>
+            </div>
+
+            <!-- Campos Consecutivo -->
+            <div id="secaoConsecutivo" style="display: none;">
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Data de Início *</label>
+                  <input type="text" class="form-control" id="ev_consec_data_ini" placeholder="DD/MM/AAAA" />
+                </div>
+                <div class="form-group">
+                  <label>Hora de Início *</label>
+                  <input type="time" class="form-control" id="ev_consec_hora_ini" value="18:00" />
+                </div>
+              </div>
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Data de Término *</label>
+                  <input type="text" class="form-control" id="ev_consec_data_fim" placeholder="DD/MM/AAAA" />
+                </div>
+                <div class="form-group">
+                  <label>Hora de Término *</label>
+                  <input type="time" class="form-control" id="ev_consec_hora_fim" value="16:00" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Local do Evento</label>
+                <input type="text" class="form-control" id="ev_local" value="${ENDERECO_IGREJA}" />
+              </div>
+              <div class="form-group">
+                <label>Público Alvo</label>
+                <select class="form-control" id="ev_publico">
+                  <option value="Toda a Igreja">Toda a Igreja</option>
+                  <option value="Mulheres">Mulheres</option>
+                  <option value="Homens">Homens</option>
+                  <option value="Jovens">Jovens</option>
+                  <option value="Crianças">Crianças</option>
+                  <option value="Casais">Casais</option>
+                  <option value="Liderança">Liderança</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Tema do Evento</label>
+                <input type="text" class="form-control" id="ev_tema" placeholder="Ex: Mulheres Restauradas" />
+              </div>
+              <div class="form-group">
+                <label>Versículo Chave</label>
+                <input type="text" class="form-control" id="ev_versiculo" placeholder="Ex: Provérbios 31:10" />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Precisa de Inscrição?</label>
+                <select class="form-control" id="ev_inscricao" onchange="document.getElementById('ev_valor_box').style.display = this.value === 'sim' ? 'block' : 'none'">
+                  <option value="nao">Não (Entrada Livre)</option>
+                  <option value="sim">Sim (Pago ou Controle)</option>
+                </select>
+              </div>
+              <div class="form-group" id="ev_valor_box" style="display: none;">
+                <label>Valor da Inscrição (R$)</label>
+                <input type="text" class="form-control" id="ev_valor" placeholder="Ex: 25,00" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Precisará de verba da Tesouraria da Igreja?</label>
+              <select class="form-control" id="ev_tesouraria">
+                <option value="nao">Não</option>
+                <option value="sim">Sim (Encaminhar aviso à Tesouraria)</option>
+              </select>
+            </div>
+
+            <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
+              <button type="submit" class="btn-principal" id="btnSalvarEvento">Enviar Solicitação</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- PASSO 2B: FORMULÁRIO DE REUNIÃO -->
+        <div id="stepFormReuniao" class="form-step">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarParaEscolhaTipo()">← Escolher outro tipo</button>
+          
+          <form id="formNovaReuniao" onsubmit="submeterNovaReuniao(event)">
+            <div class="alert-banner info">
+              🤝 A reunião será registrada na agenda de Reuniões e a Ata gerada automaticamente.
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Departamento / Ministério *</label>
+                <select class="form-control" id="reu_departamento" required>
+                  ${(perfil?.departamentos || ['Liderança']).map(d => `<option value="${d}">${d}</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Data *</label>
+                <input type="text" class="form-control" id="reu_data" placeholder="DD/MM/AAAA" required />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
                 <label>Horário Início *</label>
-                <input type="time" class="form-control" id="ev_hora_ini" value="19:00" />
+                <input type="time" class="form-control" id="reu_hora_ini" value="19:30" required />
               </div>
               <div class="form-group">
                 <label>Horário Término *</label>
-                <input type="time" class="form-control" id="ev_hora_fim" value="21:30" />
+                <input type="time" class="form-control" id="reu_hora_fim" value="21:00" required />
               </div>
             </div>
-          </div>
 
-          <!-- Campos Múltiplos Dias -->
-          <div id="secaoMultiplosDias" style="display: none;">
-            <div class="form-group">
-              <label>Sessões / Blocos Programados</label>
-              <div id="containerBlocos" style="display: flex; flex-direction: column; gap: 8px;"></div>
-              <button type="button" class="btn-secundario" onclick="adicionarBlocoSessao()" style="margin-top: 8px;">
-                ➕ Adicionar Sessão
-              </button>
-            </div>
-          </div>
-
-          <!-- Campos Consecutivo -->
-          <div id="secaoConsecutivo" style="display: none;">
-            <div class="form-row two-cols">
-              <div class="form-group">
-                <label>Data de Início *</label>
-                <input type="text" class="form-control" id="ev_consec_data_ini" placeholder="DD/MM/AAAA" />
-              </div>
-              <div class="form-group">
-                <label>Hora de Início *</label>
-                <input type="time" class="form-control" id="ev_consec_hora_ini" value="18:00" />
-              </div>
-            </div>
-            <div class="form-row two-cols">
-              <div class="form-group">
-                <label>Data de Término *</label>
-                <input type="text" class="form-control" id="ev_consec_data_fim" placeholder="DD/MM/AAAA" />
-              </div>
-              <div class="form-group">
-                <label>Hora de Término *</label>
-                <input type="time" class="form-control" id="ev_consec_hora_fim" value="16:00" />
-              </div>
-            </div>
-          </div>
-
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label>Local do Evento</label>
-              <input type="text" class="form-control" id="ev_local" value="${ENDERECO_IGREJA}" />
-            </div>
-            <div class="form-group">
-              <label>Público Alvo</label>
-              <select class="form-control" id="ev_publico">
-                <option value="Toda a Igreja">Toda a Igreja</option>
-                <option value="Mulheres">Mulheres</option>
-                <option value="Homens">Homens</option>
-                <option value="Jovens">Jovens</option>
-                <option value="Crianças">Crianças</option>
-                <option value="Casais">Casais</option>
-                <option value="Liderança">Liderança</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label>Tema do Evento</label>
-              <input type="text" class="form-control" id="ev_tema" placeholder="Ex: Mulheres Restauradas" />
-            </div>
-            <div class="form-group">
-              <label>Versículo Chave</label>
-              <input type="text" class="form-control" id="ev_versiculo" placeholder="Ex: Provérbios 31:10" />
-            </div>
-          </div>
-
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label>Precisa de Inscrição?</label>
-              <select class="form-control" id="ev_inscricao" onchange="document.getElementById('ev_valor_box').style.display = this.value === 'sim' ? 'block' : 'none'">
-                <option value="nao">Não (Entrada Livre)</option>
-                <option value="sim">Sim (Pago ou Controle)</option>
-              </select>
-            </div>
-            <div class="form-group" id="ev_valor_box" style="display: none;">
-              <label>Valor da Inscrição (R$)</label>
-              <input type="text" class="form-control" id="ev_valor" placeholder="Ex: 25,00" />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Precisará de verba da Tesouraria da Igreja?</label>
-            <select class="form-control" id="ev_tesouraria">
-              <option value="nao">Não</option>
-              <option value="sim">Sim (Encaminhar aviso à Tesouraria)</option>
-            </select>
-          </div>
-
-          <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
-            <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
-            <button type="submit" class="btn-principal" id="btnSalvarEvento">Enviar Solicitação</button>
-          </div>
-        </form>
-
-        <!-- 2. FORMULÁRIO: REUNIÃO DE LIDERANÇA -->
-        <form id="formNovaReuniao" class="form-section" onsubmit="submeterNovaReuniao(event)">
-          <div class="alert-banner info">
-            🤝 A reunião de liderança será registrada e a Ata gerada automaticamente.
-          </div>
-
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label>Departamento / Ministério *</label>
-              <select class="form-control" id="reu_departamento" required>
-                ${(perfil?.departamentos || ['Liderança']).map(d => `<option value="${d}">${d}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Data *</label>
-              <input type="text" class="form-control" id="reu_data" placeholder="DD/MM/AAAA" required />
-            </div>
-          </div>
-
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label>Horário Início *</label>
-              <input type="time" class="form-control" id="reu_hora_ini" value="19:30" required />
-            </div>
-            <div class="form-group">
-              <label>Horário Término *</label>
-              <input type="time" class="form-control" id="reu_hora_fim" value="21:00" required />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Local</label>
-            <input type="text" class="form-control" id="reu_local" value="Na Igreja" />
-          </div>
-
-          <div class="form-group">
-            <label>Pauta da Reunião</label>
-            <textarea class="form-control" id="reu_pauta" rows="3" placeholder="Tópicos que serão abordados na reunião..."></textarea>
-          </div>
-
-          <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
-            <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
-            <button type="submit" class="btn-principal" id="btnSalvarReuniao">Solicitar Reunião</button>
-          </div>
-        </form>
-
-        <!-- 3. FORMULÁRIO: ATENDIMENTO PASTORAL (Pastores) -->
-        ${perfil?.isPastor ? `
-        <form id="formAtendimentoPastoral" class="form-section" onsubmit="submeterAtendimentoPastoral(event)">
-          <div class="alert-banner info">
-            📖 Agendamento pastoral confidencial. Visível apenas para pastores e diretoria (mascarado).
-          </div>
-
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label>Nome do Discípulo / Membro *</label>
-              <input type="text" class="form-control" id="at_discipulo" placeholder="Nome completo" required />
-            </div>
-            <div class="form-group">
-              <label>Telefone do Discípulo</label>
-              <input type="tel" class="form-control" id="at_telefone" placeholder="(11) 99999-9999" />
-            </div>
-          </div>
-
-          <div class="form-row three-cols">
-            <div class="form-group">
-              <label>Data *</label>
-              <input type="text" class="form-control" id="at_data" placeholder="DD/MM/AAAA" required />
-            </div>
-            <div class="form-group">
-              <label>Início *</label>
-              <input type="time" class="form-control" id="at_hora_ini" value="14:00" required />
-            </div>
-            <div class="form-group">
-              <label>Término *</label>
-              <input type="time" class="form-control" id="at_hora_fim" value="15:00" required />
-            </div>
-          </div>
-
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label>Pastor Responsável</label>
-              <input type="text" class="form-control" id="at_pastor" value="${perfil?.nome}" />
-            </div>
             <div class="form-group">
               <label>Local</label>
-              <input type="text" class="form-control" id="at_local" value="Gabinete Pastoral" />
+              <input type="text" class="form-control" id="reu_local" value="Na Igreja" />
             </div>
-          </div>
 
-          <div class="form-group">
-            <label>Motivo / Observações Confidenciais</label>
-            <textarea class="form-control" id="at_motivo" rows="2" placeholder="Assunto confidencial..."></textarea>
-          </div>
+            <div class="form-group">
+              <label>Pauta da Reunião</label>
+              <textarea class="form-control" id="reu_pauta" rows="3" placeholder="Tópicos que serão abordados na reunião..."></textarea>
+            </div>
 
-          <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
-            <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
-            <button type="submit" class="btn-principal" id="btnSalvarAtendimento">Confirmar Atendimento</button>
-          </div>
-        </form>
+            <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
+              <button type="submit" class="btn-principal" id="btnSalvarReuniao">Solicitar Reunião</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- PASSO 2C: FORMULÁRIO DE ENSAIO -->
+        <div id="stepFormEnsaio" class="form-step">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarParaEscolhaTipo()">← Escolher outro tipo</button>
+          
+          <form id="formNovoEnsaio" onsubmit="submeterNovoEnsaio(event)">
+            <div class="alert-banner info">
+              🎵 O ensaio será registrado na agenda oficial com aviso à Secretaria.
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Ministério / Grupo *</label>
+                <select class="form-control" id="ens_departamento" required>
+                  <option value="Música / Louvor">Música / Louvor</option>
+                  <option value="Departamento de Artes">Departamento de Artes (Dança/Teatro)</option>
+                  <option value="Coral">Coral</option>
+                  <option value="Rede Kids">Rede Kids</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Data *</label>
+                <input type="text" class="form-control" id="ens_data" placeholder="DD/MM/AAAA" required />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Horário Início *</label>
+                <input type="time" class="form-control" id="ens_hora_ini" value="19:30" required />
+              </div>
+              <div class="form-group">
+                <label>Horário Término *</label>
+                <input type="time" class="form-control" id="ens_hora_fim" value="21:30" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Local</label>
+              <input type="text" class="form-control" id="ens_local" value="Templo Principal" />
+            </div>
+
+            <div class="form-group">
+              <label>Músicas / Observações do Ensaio</label>
+              <textarea class="form-control" id="ens_pauta" rows="3" placeholder="Repertório ou foco do ensaio..."></textarea>
+            </div>
+
+            <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
+              <button type="submit" class="btn-principal" id="btnSalvarEnsaio">Solicitar Ensaio</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- PASSO 2D: FORMULÁRIO DE ATENDIMENTO PASTORAL (Pastores) -->
+        ${perfil?.isPastor ? `
+        <div id="stepFormAtendimento" class="form-step">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarParaEscolhaTipo()">← Escolher outro tipo</button>
+          
+          <form id="formAtendimentoPastoral" onsubmit="submeterAtendimentoPastoral(event)">
+            <div class="alert-banner info">
+              📖 Agendamento pastoral confidencial. Visível apenas para pastores e diretoria (mascarado).
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Nome do Discípulo / Membro *</label>
+                <input type="text" class="form-control" id="at_discipulo" placeholder="Nome completo" required />
+              </div>
+              <div class="form-group">
+                <label>Telefone do Discípulo</label>
+                <input type="tel" class="form-control" id="at_telefone" placeholder="(11) 99999-9999" />
+              </div>
+            </div>
+
+            <div class="form-row three-cols">
+              <div class="form-group">
+                <label>Data *</label>
+                <input type="text" class="form-control" id="at_data" placeholder="DD/MM/AAAA" required />
+              </div>
+              <div class="form-group">
+                <label>Início *</label>
+                <input type="time" class="form-control" id="at_hora_ini" value="14:00" required />
+              </div>
+              <div class="form-group">
+                <label>Término *</label>
+                <input type="time" class="form-control" id="at_hora_fim" value="15:00" required />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Pastor Responsável</label>
+                <input type="text" class="form-control" id="at_pastor" value="${perfil?.nome}" />
+              </div>
+              <div class="form-group">
+                <label>Local</label>
+                <input type="text" class="form-control" id="at_local" value="Gabinete Pastoral" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Motivo / Observações Confidenciais</label>
+              <textarea class="form-control" id="at_motivo" rows="2" placeholder="Assunto confidencial..."></textarea>
+            </div>
+
+            <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
+              <button type="submit" class="btn-principal" id="btnSalvarAtendimento">Confirmar Atendimento</button>
+            </div>
+          </form>
+        </div>
         ` : ''}
 
-        <!-- 4. FORMULÁRIO: ALTERAR EVENTO -->
-        <form id="formAlterarEvento" class="form-section" onsubmit="submeterAlterarEvento(event)">
-          <div class="alert-banner warning">
-            🔄 A solicitação de alteração será enviada à Secretaria para confirmação.
-          </div>
+      </div>
+    </div>
+  </div>
 
-          <div class="form-group">
-            <label>Evento a ser Alterado *</label>
-            <input type="text" class="form-control" id="alt_evento" placeholder="Nome exato do evento já agendado" required />
-          </div>
+  <!-- MODAL DE GERENCIAMENTO DE EVENTO (ALTERAR / CANCELAR / FORMULÁRIO) -->
+  <div class="modal-overlay" id="modalGerenciarEvento">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="gerenciarEventoTitulo">⚙️ Gerenciar Evento</h3>
+        <button class="modal-close-btn" onclick="fecharModalGerenciarEvento()">✕</button>
+      </div>
 
-          <div class="form-row two-cols">
+      <div class="modal-body">
+        
+        <div class="evento-detalhes-box" id="boxDetalhesEventoGerenciar">
+          <h4 id="det_titulo">Nome do Evento</h4>
+          <p id="det_meta">Data • Horário • Local</p>
+        </div>
+
+        <div class="alert-banner info" id="avisoOcupacaoExterna" style="display: none;">
+          ℹ️ Este horário está reservado por outro ministério. Os detalhes, formulário e alterações são restritos à respectiva liderança e à Secretaria.
+        </div>
+
+        <!-- MENU DE AÇÕES DO EVENTO -->
+        <div id="acoesEventoMenu" class="acoes-evento-grid">
+          <button class="btn-acao-evento" onclick="exibirSubtelaGerenciar('alterar')">
+            <span>🔄</span>
+            <div>
+              <strong>Alterar Evento</strong>
+              <div style="font-size: 0.72rem; color: var(--cor-subtexto);">Mudar data, horário, local ou informações</div>
+            </div>
+          </button>
+
+          <button class="btn-acao-evento" onclick="exibirSubtelaGerenciar('formulario')">
+            <span>📝</span>
+            <div>
+              <strong>Terminar de Responder / Ver Formulário</strong>
+              <div style="font-size: 0.72rem; color: var(--cor-subtexto);">Completar tema, versículo, verba e detalhes da ficha</div>
+            </div>
+          </button>
+
+          <button class="btn-acao-evento cancelar" onclick="exibirSubtelaGerenciar('cancelar')">
+            <span>🗑️</span>
+            <div>
+              <strong>Cancelar / Excluir Evento</strong>
+              <div style="font-size: 0.72rem; color: var(--cor-subtexto);">Enviar pedido formal de cancelamento para a Secretaria</div>
+            </div>
+          </button>
+        </div>
+
+        <!-- SUBTELA 1: ALTERAR EVENTO -->
+        <div id="subtelaAlterar" style="display: none;">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarMenuGerenciar()">← Voltar às opções</button>
+          
+          <form onsubmit="submeterAlterarEventoSelecionado(event)">
+            <div class="alert-banner warning">
+              🔄 A alteração será enviada à Secretaria para aprovação no WhatsApp.
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>O que deseja alterar? *</label>
+                <select class="form-control" id="ger_alt_campo" required>
+                  <option value="Data">Data</option>
+                  <option value="Horário">Horário</option>
+                  <option value="Local">Local</option>
+                  <option value="Outro Detalhe">Outro Detalhe</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Nova Informação *</label>
+                <input type="text" class="form-control" id="ger_alt_novo_valor" placeholder="Ex: Nova data 25/11 ou 19h às 21h" required />
+              </div>
+            </div>
+
             <div class="form-group">
-              <label>O que deseja alterar? *</label>
-              <select class="form-control" id="alt_campo" required>
-                <option value="Data">Data</option>
-                <option value="Horário">Horário</option>
-                <option value="Local">Local</option>
-                <option value="Outro">Outro Detalhe</option>
+              <label>Motivo da Alteração</label>
+              <textarea class="form-control" id="ger_alt_motivo" rows="2" placeholder="Explique brevemente o motivo da mudança..."></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+              <button type="button" class="btn-secundario" onclick="voltarMenuGerenciar()">Voltar</button>
+              <button type="submit" class="btn-principal">Enviar Alteração</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- SUBTELA 2: COMPLETAR FORMULÁRIO -->
+        <div id="subtelaFormulario" style="display: none;">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarMenuGerenciar()">← Voltar às opções</button>
+          
+          <form onsubmit="submeterAtualizarFormularioSelecionado(event)">
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Tema do Evento</label>
+                <input type="text" class="form-control" id="ger_form_tema" placeholder="Tema oficial" />
+              </div>
+              <div class="form-group">
+                <label>Versículo Chave</label>
+                <input type="text" class="form-control" id="ger_form_versiculo" placeholder="Livro, capítulo e versículo" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Objetivo Espiritual do Evento</label>
+              <textarea class="form-control" id="ger_form_objetivo" rows="2" placeholder="Edificação da igreja e salvação de almas..."></textarea>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Inscrição</label>
+                <select class="form-control" id="ger_form_inscricao">
+                  <option value="nao">Não (Entrada Livre)</option>
+                  <option value="sim">Sim (Inscrição Necessária)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Valor da Inscrição (R$)</label>
+                <input type="text" class="form-control" id="ger_form_valor" placeholder="Ex: 20,00" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Precisará de verba da Tesouraria?</label>
+              <select class="form-control" id="ger_form_tesouraria">
+                <option value="nao">Não</option>
+                <option value="sim">Sim</option>
               </select>
             </div>
+
             <div class="form-group">
-              <label>Nova Informação *</label>
-              <input type="text" class="form-control" id="alt_novo_valor" placeholder="Ex: Nova data 25/11 ou 19h às 21h" required />
+              <label>Observações Gerais</label>
+              <textarea class="form-control" id="ger_form_obs" rows="2" placeholder="Requisitos de multimídia, som, voluntários..."></textarea>
             </div>
-          </div>
 
-          <div class="form-group">
-            <label>Motivo da Alteração</label>
-            <textarea class="form-control" id="alt_motivo" rows="2" placeholder="Explique brevemente o motivo da mudança..."></textarea>
-          </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+              <button type="button" class="btn-secundario" onclick="voltarMenuGerenciar()">Voltar</button>
+              <button type="submit" class="btn-principal">Salvar Formulário</button>
+            </div>
+          </form>
+        </div>
 
-          <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
-            <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
-            <button type="submit" class="btn-principal" id="btnSalvarAlteracao">Enviar Alteração</button>
-          </div>
-        </form>
+        <!-- SUBTELA 3: CANCELAR EVENTO -->
+        <div id="subtelaCancelar" style="display: none;">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarMenuGerenciar()">← Voltar às opções</button>
+          
+          <form onsubmit="submeterCancelarEventoSelecionado(event)">
+            <div class="alert-banner warning">
+              ⚠️ O cancelamento será comunicado à Secretaria e o evento retirado da agenda oficial.
+            </div>
 
-        <!-- 5. FORMULÁRIO: CANCELAR EVENTO -->
-        <form id="formCancelarEvento" class="form-section" onsubmit="submeterCancelarEvento(event)">
-          <div class="alert-banner warning">
-            ⚠️ O cancelamento remove o evento da agenda oficial e notifica a Secretaria.
-          </div>
+            <div class="form-group">
+              <label>Motivo do Cancelamento *</label>
+              <textarea class="form-control" id="ger_canc_motivo" rows="3" placeholder="Informe detalhadamente o motivo do cancelamento..." required></textarea>
+            </div>
 
-          <div class="form-group">
-            <label>Evento a ser Cancelado *</label>
-            <input type="text" class="form-control" id="canc_evento" placeholder="Nome do evento" required />
-          </div>
-
-          <div class="form-group">
-            <label>Motivo do Cancelamento *</label>
-            <textarea class="form-control" id="canc_motivo" rows="3" placeholder="Informe o motivo do cancelamento..." required></textarea>
-          </div>
-
-          <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
-            <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Voltar</button>
-            <button type="submit" class="btn-principal" id="btnSalvarCancelamento" style="background: var(--cor-vermelho);">
-              Confirmar Cancelamento
-            </button>
-          </div>
-        </form>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+              <button type="button" class="btn-secundario" onclick="voltarMenuGerenciar()">Voltar</button>
+              <button type="submit" class="btn-principal" style="background: var(--cor-vermelho);">
+                Confirmar Cancelamento
+              </button>
+            </div>
+          </form>
+        </div>
 
       </div>
     </div>
@@ -2261,11 +2581,16 @@ function renderGestaoHtml({ user }) {
     let todosEventos = [];
     let todasSolicitacoes = [];
     let todasFichas = [];
+    let eventoSendoGerenciado = null;
 
     const nomesMeses = [
       'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
+
+    // RENDERIZAÇÃO IMEDIATA (Sem tela travada em "Carregando...")
+    renderizarCalendario();
+    selecionarDia(diaSelecionado);
 
     document.addEventListener('DOMContentLoaded', () => {
       carregarEventosServidor();
@@ -2332,6 +2657,8 @@ function renderGestaoHtml({ user }) {
         anoAtual++;
       }
       diaSelecionado = 1;
+      renderizarCalendario();
+      selecionarDia(1);
       carregarEventosServidor();
     }
 
@@ -2340,6 +2667,8 @@ function renderGestaoHtml({ user }) {
       mesAtual = hoje.getMonth();
       anoAtual = hoje.getFullYear();
       diaSelecionado = hoje.getDate();
+      renderizarCalendario();
+      selecionarDia(diaSelecionado);
       carregarEventosServidor();
     }
 
@@ -2358,7 +2687,7 @@ function renderGestaoHtml({ user }) {
       const hoje = new Date();
       const ehMesAtual = hoje.getMonth() === mesAtual && hoje.getFullYear() === anoAtual;
 
-      // Dias do mês anterior
+      // Dias anteriores
       for (let i = primeiroDiaSemana - 1; i >= 0; i--) {
         const d = totalDiasMesAnterior - i;
         const cell = document.createElement('div');
@@ -2367,7 +2696,7 @@ function renderGestaoHtml({ user }) {
         grid.appendChild(cell);
       }
 
-      // Dias do mês atual
+      // Dias do mês
       for (let d = 1; d <= totalDiasMes; d++) {
         const cell = document.createElement('div');
         cell.className = 'cal-day';
@@ -2380,7 +2709,8 @@ function renderGestaoHtml({ user }) {
         const eventosDia = obterEventosNaData(dataStr);
 
         let chipsHtml = '';
-        eventosDia.slice(0, 3).forEach(ev => {
+        const maxChipsVisiveis = 2;
+        eventosDia.slice(0, maxChipsVisiveis).forEach((ev, idx) => {
           let chipClass = 'confirmado';
           if (ev.status === 'pendente_secretaria') chipClass = 'pendente';
           else if (ev.tipo === 'reuniao') chipClass = 'reuniao';
@@ -2388,10 +2718,11 @@ function renderGestaoHtml({ user }) {
           else if (ev.tipo === 'atendimento') chipClass = 'pastoral';
           else if (ev.isOcupacaoExterna) chipClass = 'bloqueio';
 
-          chipsHtml += \`<span class="event-chip \${chipClass}" title="\${ev.titulo}">\${ev.titulo}</span>\`;
+          chipsHtml += \`<span class="event-chip \${chipClass}" onclick="event.stopPropagation(); selecionarDia(\${d}); abrirGerenciadorPorEventoData(\${d}, \${idx});" title="\${ev.titulo} (Toque para gerenciar)">\${ev.titulo}</span>\`;
         });
-        if (eventosDia.length > 3) {
-          chipsHtml += \`<span class="event-chip bloqueio">+\${eventosDia.length - 3} mais</span>\`;
+        if (eventosDia.length > maxChipsVisiveis) {
+          const restantes = eventosDia.length - maxChipsVisiveis;
+          chipsHtml += \`<span class="event-chip bloqueio" onclick="event.stopPropagation(); selecionarDia(\${d});">+\${restantes} mais</span>\`;
         }
 
         cell.innerHTML = \`<div class="day-num">\${d}</div><div class="day-events">\${chipsHtml}</div>\`;
@@ -2440,68 +2771,254 @@ function renderGestaoHtml({ user }) {
         boxSalao.className = 'salao-status-box ocupado';
         boxSalao.innerHTML = \`⚠️ Salão com \${eventosDia.length} evento(s) agendado(s)\`;
 
-        container.innerHTML = eventosDia.map(ev => \`
-          <div class="day-event-card">
-            <div class="title">\${ev.titulo}</div>
+        container.innerHTML = eventosDia.map((ev, i) => \`
+          <div class="day-event-card" onclick="abrirGerenciadorEvento(\${i})">
+            <div class="title">
+              <span>\${ev.titulo}</span>
+              <span style="font-size: 0.7rem; color: var(--cor-roxo);">⚙️</span>
+            </div>
             <div class="meta">
-              <span>🏢 \${ev.departamento} • \${ev.tipo.toUpperCase()}</span>
+              <span>🏢 \${ev.departamento} • \${(ev.tipo || 'evento').toUpperCase()}</span>
               <span>⏰ \${ev.horarioInicio || '19:00'} \${ev.horarioFim ? 'às ' + ev.horarioFim : ''}</span>
               <span>📍 \${ev.local}</span>
               \${ev.status === 'pendente_secretaria' ? '<span style="color: var(--cor-amarelo); font-weight:800;">⏳ Aguardando Aprovação</span>' : '<span style="color: var(--cor-verde); font-weight:800;">✅ Confirmado</span>'}
             </div>
+            <span class="action-hint">Toque para alterar, ver formulário ou cancelar ›</span>
           </div>
         \`).join('');
       }
     }
 
-    function agendarDataSelecionada() {
-      const dataStr = \`\${String(diaSelecionado).padStart(2, '0')}/\${String(mesAtual + 1).padStart(2, '0')}/\${anoAtual}\`;
-      abrirModalAcao('evento', dataStr);
+    // ABERTURA DE NOVO AGENDAMENTO (PASSO 1: ESCOLHA DE TIPO)
+    function abrirNovoAgendamento() {
+      voltarParaEscolhaTipo();
+      document.getElementById('modalAgendamento').classList.add('active');
     }
 
-    function abrirModalAcao(acao = 'evento', dataPreDefinida = null) {
-      document.getElementById('modalAgendamento').classList.add('active');
-      selecionarAcaoModal(acao);
+    function agendarDataSelecionada() {
+      abrirNovoAgendamento();
+    }
 
-      const dataStr = dataPreDefinida || \`\${String(diaSelecionado).padStart(2, '0')}/\${String(mesAtual + 1).padStart(2, '0')}/\${anoAtual}\`;
-      if (document.getElementById('ev_data')) document.getElementById('ev_data').value = dataStr;
-      if (document.getElementById('reu_data')) document.getElementById('reu_data').value = dataStr;
-      if (document.getElementById('at_data')) document.getElementById('at_data').value = dataStr;
+    function voltarParaEscolhaTipo() {
+      document.querySelectorAll('#modalAgendamento .form-step').forEach(s => s.classList.remove('active'));
+      document.getElementById('stepEscolhaTipo').classList.add('active');
+      document.getElementById('modalAgendamentoTitulo').innerText = '➕ Novo Agendamento';
+    }
+
+    function iniciarAgendamentoTipo(tipo) {
+      document.querySelectorAll('#modalAgendamento .form-step').forEach(s => s.classList.remove('active'));
+
+      const dataStr = \`\${String(diaSelecionado).padStart(2, '0')}/\${String(mesAtual + 1).padStart(2, '0')}/\${anoAtual}\`;
+
+      if (tipo === 'evento') {
+        document.getElementById('stepFormEvento').classList.add('active');
+        document.getElementById('modalAgendamentoTitulo').innerText = '🎪 Agendar Novo Evento';
+        if (document.getElementById('ev_data')) document.getElementById('ev_data').value = dataStr;
+      } else if (tipo === 'reuniao') {
+        document.getElementById('stepFormReuniao').classList.add('active');
+        document.getElementById('modalAgendamentoTitulo').innerText = '🤝 Agendar Reunião de Liderança';
+        if (document.getElementById('reu_data')) document.getElementById('reu_data').value = dataStr;
+      } else if (tipo === 'ensaio') {
+        document.getElementById('stepFormEnsaio').classList.add('active');
+        document.getElementById('modalAgendamentoTitulo').innerText = '🎵 Agendar Ensaio';
+        if (document.getElementById('ens_data')) document.getElementById('ens_data').value = dataStr;
+      } else if (tipo === 'atendimento') {
+        const stepAt = document.getElementById('stepFormAtendimento');
+        if (stepAt) {
+          stepAt.classList.add('active');
+          document.getElementById('modalAgendamentoTitulo').innerText = '📖 Agendar Atendimento Pastoral';
+          if (document.getElementById('at_data')) document.getElementById('at_data').value = dataStr;
+        }
+      }
+
+      document.getElementById('modalAgendamento').classList.add('active');
     }
 
     function fecharModalAgendamento() {
       document.getElementById('modalAgendamento').classList.remove('active');
     }
 
-    function selecionarAcaoModal(acao) {
-      document.querySelectorAll('.action-pill').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+    // MODAL DE GERENCIAMENTO DO EVENTO (ALTERAR / CANCELAR / FORMULÁRIO)
+    function abrirGerenciadorPorObjeto(ev) {
+      if (!ev) return;
+      eventoSendoGerenciado = ev;
+      document.getElementById('det_titulo').innerText = ev.titulo;
+      document.getElementById('det_meta').innerText = \`\${ev.data || '-'} • \${ev.horarioInicio || '19:00'} às \${ev.horarioFim || '21:30'} • \${ev.local || 'Na Igreja'} (\${ev.departamento || 'Geral'})\`;
 
-      const mapForm = {
-        'evento': 'formNovoEvento',
-        'reuniao': 'formNovaReuniao',
-        'atendimento': 'formAtendimentoPastoral',
-        'alterar': 'formAlterarEvento',
-        'cancelar': 'formCancelarEvento'
-      };
+      // Pré-preenche campos
+      if (document.getElementById('ger_alt_novo_valor')) document.getElementById('ger_alt_novo_valor').value = '';
+      if (document.getElementById('ger_alt_motivo')) document.getElementById('ger_alt_motivo').value = '';
+      if (document.getElementById('ger_canc_motivo')) document.getElementById('ger_canc_motivo').value = '';
 
-      const mapTitulo = {
-        'evento': '🎪 Novo Evento',
-        'reuniao': '🤝 Nova Reunião de Liderança',
-        'atendimento': '📖 Agendar Atendimento Pastoral',
-        'alterar': '🔄 Alterar Evento Existente',
-        'cancelar': '🗑️ Cancelar Evento'
-      };
-
-      const fId = mapForm[acao];
-      if (fId && document.getElementById(fId)) {
-        document.getElementById(fId).classList.add('active');
+      if (ev.payload) {
+        if (document.getElementById('ger_form_tema')) document.getElementById('ger_form_tema').value = ev.payload.tema || '';
+        if (document.getElementById('ger_form_versiculo')) document.getElementById('ger_form_versiculo').value = ev.payload.versiculo || '';
+        if (document.getElementById('ger_form_objetivo')) document.getElementById('ger_form_objetivo').value = ev.payload.objetivo_espiritual || '';
+        if (document.getElementById('ger_form_obs')) document.getElementById('ger_form_obs').value = ev.payload.observacoes || '';
       }
 
-      document.getElementById('modalTitulo').innerText = mapTitulo[acao] || '➕ Agendamento';
+      voltarMenuGerenciar();
 
-      const btnPill = Array.from(document.querySelectorAll('.action-pill')).find(p => p.innerText.toLowerCase().includes(acao));
-      if (btnPill) btnPill.classList.add('active');
+      if (ev.isOcupacaoExterna) {
+        const aviso = document.getElementById('avisoOcupacaoExterna');
+        if (aviso) aviso.style.display = 'flex';
+        const menu = document.getElementById('acoesEventoMenu');
+        if (menu) menu.style.display = 'none';
+      }
+
+      document.getElementById('modalGerenciarEvento').classList.add('active');
+    }
+
+    function abrirGerenciadorPorEventoData(d, idx) {
+      const dataStr = \`\${String(d).padStart(2, '0')}/\${String(mesAtual + 1).padStart(2, '0')}/\${anoAtual}\`;
+      const eventosDia = obterEventosNaData(dataStr);
+      const ev = eventosDia[idx];
+      if (!ev) return;
+      abrirGerenciadorPorObjeto(ev);
+    }
+
+    function abrirGerenciadorEvento(indexNoDia) {
+      abrirGerenciadorPorEventoData(diaSelecionado, indexNoDia);
+    }
+
+    function abrirGerenciadorPorId(idOuCodigo) {
+      let ev = todosEventos.find(e => e.id === idOuCodigo || e.codigo === idOuCodigo);
+      if (!ev) {
+        const sol = todasSolicitacoes.find(s => s.id === idOuCodigo || s.codigo === idOuCodigo);
+        if (sol) {
+          ev = {
+            titulo: sol.titulo,
+            data: sol.data,
+            horarioInicio: sol.horarioInicio,
+            horarioFim: sol.horarioFim,
+            local: sol.local || ENDERECO_IGREJA,
+            departamento: sol.departamento,
+            payload: sol.payload
+          };
+        }
+      }
+      if (!ev) return;
+      abrirGerenciadorPorObjeto(ev);
+    }
+
+    function fecharModalGerenciarEvento() {
+      document.getElementById('modalGerenciarEvento').classList.remove('active');
+    }
+
+    function voltarMenuGerenciar() {
+      const aviso = document.getElementById('avisoOcupacaoExterna');
+      if (aviso) aviso.style.display = 'none';
+      document.getElementById('acoesEventoMenu').style.display = 'grid';
+      document.getElementById('subtelaAlterar').style.display = 'none';
+      document.getElementById('subtelaFormulario').style.display = 'none';
+      document.getElementById('subtelaCancelar').style.display = 'none';
+      document.getElementById('gerenciarEventoTitulo').innerText = '⚙️ Gerenciar Evento';
+    }
+
+    function exibirSubtelaGerenciar(tipo) {
+      document.getElementById('acoesEventoMenu').style.display = 'none';
+      document.getElementById('subtelaAlterar').style.display = tipo === 'alterar' ? 'block' : 'none';
+      document.getElementById('subtelaFormulario').style.display = tipo === 'formulario' ? 'block' : 'none';
+      document.getElementById('subtelaCancelar').style.display = tipo === 'cancelar' ? 'block' : 'none';
+
+      if (tipo === 'alterar') document.getElementById('gerenciarEventoTitulo').innerText = '🔄 Alterar Informações do Evento';
+      if (tipo === 'formulario') document.getElementById('gerenciarEventoTitulo').innerText = '📝 Ficha & Formulário do Evento';
+      if (tipo === 'cancelar') document.getElementById('gerenciarEventoTitulo').innerText = '🗑️ Cancelar Evento';
+    }
+
+    async function submeterAlterarEventoSelecionado(e) {
+      e.preventDefault();
+      if (!eventoSendoGerenciado) return;
+
+      const payload = {
+        tipo: 'alterar',
+        nome_evento: eventoSendoGerenciado.titulo,
+        campo_alterar: document.getElementById('ger_alt_campo').value,
+        novo_valor: document.getElementById('ger_alt_novo_valor').value,
+        motivo: document.getElementById('ger_alt_motivo').value
+      };
+
+      try {
+        const res = await fetch('/gestao/api/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ret = await res.json();
+        if (ret.ok) {
+          alert('✅ ' + (ret.mensagem || 'Solicitação de alteração enviada!'));
+          fecharModalGerenciarEvento();
+          carregarSolicitacoesServidor();
+        } else {
+          alert('❌ Erro: ' + ret.message);
+        }
+      } catch (_) {
+        alert('❌ Erro de conexão.');
+      }
+    }
+
+    async function submeterAtualizarFormularioSelecionado(e) {
+      e.preventDefault();
+      if (!eventoSendoGerenciado) return;
+
+      const payload = {
+        tipo: 'atualizar_formulario',
+        nome_evento: eventoSendoGerenciado.titulo,
+        tema: document.getElementById('ger_form_tema').value,
+        versiculo: document.getElementById('ger_form_versiculo').value,
+        objetivo_espiritual: document.getElementById('ger_form_objetivo').value,
+        precisa_inscricao: document.getElementById('ger_form_inscricao').value,
+        valor_inscricao: document.getElementById('ger_form_valor').value,
+        precisa_valor_ministerio: document.getElementById('ger_form_tesouraria').value,
+        observacoes: document.getElementById('ger_form_obs').value
+      };
+
+      try {
+        const res = await fetch('/gestao/api/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ret = await res.json();
+        if (ret.ok) {
+          alert('✅ Ficha atualizada com sucesso!');
+          fecharModalGerenciarEvento();
+          carregarFichasServidor();
+        } else {
+          alert('❌ Erro: ' + ret.message);
+        }
+      } catch (_) {
+        alert('❌ Erro ao atualizar.');
+      }
+    }
+
+    async function submeterCancelarEventoSelecionado(e) {
+      e.preventDefault();
+      if (!eventoSendoGerenciado) return;
+
+      const payload = {
+        tipo: 'cancelar',
+        nome_evento: eventoSendoGerenciado.titulo,
+        motivo: document.getElementById('ger_canc_motivo').value
+      };
+
+      try {
+        const res = await fetch('/gestao/api/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ret = await res.json();
+        if (ret.ok) {
+          alert('✅ Solicitação de cancelamento enviada à Secretaria!');
+          fecharModalGerenciarEvento();
+          carregarSolicitacoesServidor();
+        } else {
+          alert('❌ Erro: ' + ret.message);
+        }
+      } catch (_) {
+        alert('❌ Erro de conexão.');
+      }
     }
 
     function mudarTipoDuracaoEvento() {
@@ -2588,8 +3105,8 @@ function renderGestaoHtml({ user }) {
         } else {
           alert('❌ Erro: ' + ret.message);
         }
-      } catch (err) {
-        alert('❌ Erro de conexão com o servidor.');
+      } catch (_) {
+        alert('❌ Erro ao enviar.');
       } finally {
         btn.disabled = false;
         btn.innerText = 'Enviar Solicitação';
@@ -2600,7 +3117,6 @@ function renderGestaoHtml({ user }) {
       e.preventDefault();
       const btn = document.getElementById('btnSalvarReuniao');
       btn.disabled = true;
-      btn.innerText = 'Enviando...';
 
       const payload = {
         tipo: 'reuniao',
@@ -2628,17 +3144,53 @@ function renderGestaoHtml({ user }) {
           alert('❌ Erro: ' + ret.message);
         }
       } catch (_) {
-        alert('❌ Erro ao enviar solicitação.');
+        alert('❌ Erro ao enviar.');
       } finally {
         btn.disabled = false;
-        btn.innerText = 'Solicitar Reunião';
+      }
+    }
+
+    async function submeterNovoEnsaio(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSalvarEnsaio');
+      btn.disabled = true;
+
+      const payload = {
+        tipo: 'ensaio',
+        departamento: document.getElementById('ens_departamento').value,
+        data: document.getElementById('ens_data').value,
+        horario_inicio: document.getElementById('ens_hora_ini').value,
+        horario_termino: document.getElementById('ens_hora_fim').value,
+        local: document.getElementById('ens_local').value,
+        pauta: document.getElementById('ens_pauta').value
+      };
+
+      try {
+        const res = await fetch('/gestao/api/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ret = await res.json();
+        if (ret.ok) {
+          alert('✅ ' + (ret.mensagem || 'Ensaio solicitado com sucesso!'));
+          fecharModalAgendamento();
+          carregarEventosServidor();
+          carregarSolicitacoesServidor();
+        } else {
+          alert('❌ Erro: ' + ret.message);
+        }
+      } catch (_) {
+        alert('❌ Erro ao enviar.');
+      } finally {
+        btn.disabled = false;
       }
     }
 
     async function submeterAtendimentoPastoral(e) {
       e.preventDefault();
       const btn = document.getElementById('btnSalvarAtendimento');
-      btn.disabled = true;
+      if (btn) btn.disabled = true;
 
       const payload = {
         tipo: 'atendimento',
@@ -2667,65 +3219,9 @@ function renderGestaoHtml({ user }) {
           alert('❌ Erro: ' + ret.message);
         }
       } catch (_) {
-        alert('❌ Erro ao salvar atendimento.');
+        alert('❌ Erro ao salvar.');
       } finally {
-        btn.disabled = false;
-      }
-    }
-
-    async function submeterAlterarEvento(e) {
-      e.preventDefault();
-      const payload = {
-        tipo: 'alterar',
-        nome_evento: document.getElementById('alt_evento').value,
-        campo_alterar: document.getElementById('alt_campo').value,
-        novo_valor: document.getElementById('alt_novo_valor').value,
-        motivo: document.getElementById('alt_motivo').value
-      };
-
-      try {
-        const res = await fetch('/gestao/api/solicitar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const ret = await res.json();
-        if (ret.ok) {
-          alert('✅ ' + (ret.mensagem || 'Pedido de alteração enviado!'));
-          fecharModalAgendamento();
-          carregarSolicitacoesServidor();
-        } else {
-          alert('❌ Erro: ' + ret.message);
-        }
-      } catch (_) {
-        alert('❌ Erro ao enviar alteração.');
-      }
-    }
-
-    async function submeterCancelarEvento(e) {
-      e.preventDefault();
-      const payload = {
-        tipo: 'cancelar',
-        nome_evento: document.getElementById('canc_evento').value,
-        motivo: document.getElementById('canc_motivo').value
-      };
-
-      try {
-        const res = await fetch('/gestao/api/solicitar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const ret = await res.json();
-        if (ret.ok) {
-          alert('✅ ' + (ret.mensagem || 'Pedido de cancelamento enviado!'));
-          fecharModalAgendamento();
-          carregarSolicitacoesServidor();
-        } else {
-          alert('❌ Erro: ' + ret.message);
-        }
-      } catch (_) {
-        alert('❌ Erro ao enviar cancelamento.');
+        if (btn) btn.disabled = false;
       }
     }
 
@@ -2746,8 +3242,12 @@ function renderGestaoHtml({ user }) {
           <td>\${sol.departamento}</td>
           <td>\${sol.data || '-'}</td>
           <td>\${sol.horarioInicio} \${sol.horarioFim ? 'às ' + sol.horarioFim : ''}</td>
-          <td>\${sol.responsavel || '-'}</td>
           <td><span class="badge-status \${sol.statusClass}">\${sol.status}</span></td>
+          <td>
+            <button class="btn-secundario" onclick="abrirGerenciadorPorId('\${sol.codigo || sol.id}')" style="padding: 4px 8px; font-size: 0.72rem;">
+              ⚙️ Opções
+            </button>
+          </td>
         </tr>
       \`).join('');
     }
@@ -2772,7 +3272,12 @@ function renderGestaoHtml({ user }) {
             <td>\${f.data}</td>
             <td>\${p.nome_lider || p.nomeSolicitante || '-'}</td>
             <td>
-              \${f.docUrl ? \`<a href="\${f.docUrl}" target="_blank" class="btn-secundario" style="text-decoration: none; padding: 4px 8px; font-size: 0.72rem;">Abrir Google Docs</a>\` : '<span style="color: var(--cor-subtexto); font-size: 0.72rem;">Docs em geração</span>'}
+              <div style="display: flex; gap: 4px;">
+                \${f.docUrl ? \`<a href="\${f.docUrl}" target="_blank" class="btn-secundario" style="text-decoration: none; padding: 4px 8px; font-size: 0.72rem;">Abrir Docs</a>\` : ''}
+                <button class="btn-secundario" onclick="abrirGerenciadorPorId('form_\${f.id}')" style="padding: 4px 8px; font-size: 0.72rem;">
+                  📝 Ver / Editar
+                </button>
+              </div>
             </td>
           </tr>
         \`;
