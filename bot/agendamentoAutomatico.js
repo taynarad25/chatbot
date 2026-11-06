@@ -40,7 +40,11 @@ function montarResourceEvento(dados, ano) {
     resource.end = { date: end.format("YYYY-MM-DD") };
   } else {
     const start = moment.tz(`${dia}/${mes}/${ano} ${horarioInicio}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
-    const end = moment.tz(`${dia}/${mes}/${ano} ${horarioFim}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
+    let end = moment.tz(`${dia}/${mes}/${ano} ${horarioFim}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
+    // Se o término for menor ou igual ao início (ex: 22h às 01h), o evento atravessa a meia-noite
+    if (end.isSameOrBefore(start)) {
+      end = end.add(1, "day");
+    }
     resource.start = { dateTime: start.format(), timeZone: "America/Sao_Paulo" };
     resource.end = { dateTime: end.format(), timeZone: "America/Sao_Paulo" };
   }
@@ -54,7 +58,10 @@ function montarResourcesMultiplosBlocos(dados, ano) {
   return blocos.map((bloco, idx) => {
     const dataStr = bloco.data.includes("/") ? bloco.data : `${bloco.data}/${ano}`;
     const start = moment.tz(`${dataStr} ${bloco.inicio}`, ["D/M/YYYY HH:mm", "DD/MM/YYYY HH:mm"], "America/Sao_Paulo");
-    const end = moment.tz(`${dataStr} ${bloco.fim}`, ["D/M/YYYY HH:mm", "DD/MM/YYYY HH:mm"], "America/Sao_Paulo");
+    let end = moment.tz(`${dataStr} ${bloco.fim}`, ["D/M/YYYY HH:mm", "DD/MM/YYYY HH:mm"], "America/Sao_Paulo");
+    if (end.isSameOrBefore(start)) {
+      end = end.add(1, "day");
+    }
     const rotulo = bloco.titulo || bloco.sessao || `Sessão ${idx + 1}`;
 
     return {
@@ -108,6 +115,9 @@ function montarResourcePatchAlteracao(dados) {
     const [hFim, mFim] = dados.novoHorarioFim.split(":").map(Number);
     novoInicio = novoInicio.clone().set({ hour: hInicio, minute: mInicio, second: 0, millisecond: 0 });
     novoFim = novoInicio.clone().set({ hour: hFim, minute: mFim, second: 0, millisecond: 0 });
+    if (novoFim.isSameOrBefore(novoInicio)) {
+      novoFim = novoFim.add(1, "day");
+    }
   }
 
   return {

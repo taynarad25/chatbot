@@ -466,6 +466,7 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
         const d = JSON.parse(pend.dados);
         const nome = (d.nomeEvento || d.evento || d.nome || d.finalidade || '').trim();
         if (!nome) continue;
+        if (d.status === 'recusado' || d.status === 'aprovado') continue;
 
         const dataFormatada = d.dataFormatada || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
         if (!dataFormatada && !d.blocos && !d.dataInicio && d.tipo !== 'midia') continue;
@@ -474,6 +475,7 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
         if (d.tipo === 'uso_salao') tipo = 'uso_salao';
         if (d.tipo === 'reuniao') tipo = 'reuniao';
         if (d.tipo === 'ensaio') tipo = 'ensaio';
+        if (d.tipo === 'acao' || d.tipo === 'venda') tipo = 'acao';
         if (d.tipo === 'alterar' || d.tipo === 'reuniao_alterar') tipo = 'alteracao';
         if (d.tipo === 'cancelar' || d.tipo === 'cancelar_reuniao') tipo = 'cancelamento';
 
@@ -573,6 +575,8 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         depto = 'Pastoral';
       } else if (g.calendarId === AGENDAS_INTERNAS.USO_SALAO || summary.toLowerCase().includes('uso do salão')) {
         tipo = 'uso_salao';
+      } else if (summary.toLowerCase().includes('feijoada') || summary.toLowerCase().includes('venda') || summary.toLowerCase().includes('pastel') || summary.toLowerCase().includes('bazar') || summary.toLowerCase().includes('cantina') || summary.toLowerCase().includes('arrecadação')) {
+        tipo = 'acao';
       }
 
       const duplicado = eventos.some(e => e.data === dataFormatada && e.titulo.toLowerCase().trim() === summary.toLowerCase().trim());
@@ -636,7 +640,13 @@ function listarSolicitacoes({ user = null } = {}) {
 
         let statusTexto = 'Aguardando Secretaria';
         let statusClass = 'pendente';
-        if (d.tipo === 'midia') {
+        if (d.status === 'recusado') {
+          statusTexto = '❌ Recusado pela Secretaria';
+          statusClass = 'recusado';
+        } else if (d.status === 'aprovado') {
+          statusTexto = '✅ Aprovado';
+          statusClass = 'aprovado';
+        } else if (d.tipo === 'midia') {
           statusTexto = 'Aguardando Multimídia';
           statusClass = 'midia';
         }
@@ -786,7 +796,66 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     };
   }
 
-  // 1. REUNIÃO DE LIDERANÇA
+  // 1. AÇÃO / VENDA BENEFICENTE (Feijoada, Pastelada, Cantina, Bazar, Arrecadação)
+  if (tipoAcao === 'acao' || tipoAcao === 'venda') {
+    const { nome_evento, departamento, data, horario_inicio, horario_termino, local, ocupa_salao, detalhes } = corpo;
+    if (!nome_evento || !departamento || !data || !horario_inicio || !horario_termino) {
+      throw new Error('Preencha o nome da ação/venda, o ministério responsável, a data e os horários.');
+    }
+
+    const [diaStr, mesStr, anoStr] = data.split('/');
+    const dadosAcao = {
+      tipo: 'acao',
+      evento: nome_evento.trim(),
+      nomeEvento: nome_evento.trim(),
+      departamento: departamento.trim(),
+      rede: departamento.trim(),
+      dia: parseInt(diaStr, 10),
+      mes: parseInt(mesStr, 10),
+      ano: parseInt(anoStr, 10),
+      dataFormatada: data,
+      horarioInicio: horario_inicio,
+      horarioFim: horario_termino,
+      local: local?.trim() || ENDERECO_IGREJA,
+      ocupaSalao: ocupa_salao === 'sim',
+      detalhes: detalhes?.trim() || 'Ação beneficente / venda de alimentos',
+      solicitanteNome: perfil?.nome || 'Líder',
+      solicitanteId: perfil?.telefone || perfil?.username || '',
+      criadoVia: 'painel_web',
+      criadoEm: new Date().toISOString()
+    };
+
+    const codigo = salvarPendente(dadosAcao);
+
+    const avisoGrupo =
+      `🍲 *SOLICITAÇÃO DE AÇÃO / VENDA BENEFICENTE*\n\n` +
+      `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
+      `🏢 *Departamento:* ${departamento}\n` +
+      `🍛 *Ação / Venda:* ${nome_evento.trim()}\n` +
+      `📆 *Data:* ${data}\n` +
+      `⏰ *Horário:* ${horario_inicio} às ${horario_termino}\n` +
+      `📍 *Local:* ${dadosAcao.local}\n` +
+      `🏛️ *Ocupa o Salão/Cozinha:* ${dadosAcao.ocupaSalao ? 'Sim' : 'Não'}\n` +
+      `📝 *Detalhes:* ${dadosAcao.detalhes}\n\n` +
+      `_Responda a este resumo com "marcar evento" para confirmar ou "não marcar" para negar._\n\n` +
+      `_Código: ${codigo}_`;
+
+    try {
+      const client = typeof getClient === 'function' ? getClient() : null;
+      if (client && client.info) {
+        await notificarSecretaria(client, avisoGrupo);
+      }
+    } catch (_) {}
+
+    return {
+      ok: true,
+      codigo,
+      message: `Ação/Venda solicitada com sucesso (Código: ${codigo}) e enviada para aprovação da Secretaria!`,
+      mensagem: `Ação/Venda solicitada com sucesso (Código: ${codigo}) e enviada para aprovação da Secretaria!`
+    };
+  }
+
+  // 1B. REUNIÃO DE LIDERANÇA
   if (tipoAcao === 'reuniao') {
     const { departamento, data, horario_inicio, horario_termino, local, pauta } = corpo;
     if (!departamento || !data || !horario_inicio || !horario_termino) {
@@ -1657,6 +1726,7 @@ function renderGestaoHtml({ user }) {
     }
     .event-chip.confirmado { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .event-chip.pendente { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .event-chip.acao { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
     .event-chip.reuniao { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
     .event-chip.ensaio { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
     .event-chip.pastoral { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
@@ -1771,6 +1841,7 @@ function renderGestaoHtml({ user }) {
     .dot-amarelo { background: var(--cor-amarelo); }
     .dot-azul { background: var(--cor-azul); }
     .dot-roxo { background: var(--cor-roxo); }
+    .dot-laranja { background: #f97316; }
 
     /* TABELA DE SOLICITAÇÕES */
     .solicitacoes-table-card {
@@ -1810,6 +1881,8 @@ function renderGestaoHtml({ user }) {
     }
     .badge-status.pendente { background: #fef3c7; color: #92400e; }
     .badge-status.aprovado { background: #dcfce7; color: #166534; }
+    .badge-status.recusado { background: #fee2e2; color: #991b1b; }
+    .badge-status.acao { background: #ffedd5; color: #c2410c; }
     .badge-codigo {
       font-family: monospace;
       font-size: 0.75rem;
@@ -2126,6 +2199,7 @@ function renderGestaoHtml({ user }) {
               <select id="filtroTipo" class="cal-select" onchange="filtrarCalendario()">
                 <option value="todos">Todos os Tipos</option>
                 <option value="evento">Eventos</option>
+                <option value="acao">Ações / Vendas</option>
                 <option value="reuniao">Reuniões</option>
                 <option value="ensaio">Ensaios</option>
                 ${perfil?.isPastor || perfil?.isDiretor ? '<option value="atendimento">Atendimentos</option>' : ''}
@@ -2146,6 +2220,7 @@ function renderGestaoHtml({ user }) {
           <div class="cal-legend">
             <div class="legend-item"><span class="legend-dot dot-verde"></span> Evento Confirmado</div>
             <div class="legend-item"><span class="legend-dot dot-amarelo"></span> Aguardando Secretaria</div>
+            <div class="legend-item"><span class="legend-dot dot-laranja"></span> Ação / Venda</div>
             <div class="legend-item"><span class="legend-dot dot-azul"></span> Reunião / Ensaio</div>
             ${perfil?.isPastor || perfil?.isDiretor ? '<div class="legend-item"><span class="legend-dot dot-roxo"></span> Atendimento Pastoral</div>' : ''}
           </div>
@@ -2191,6 +2266,7 @@ function renderGestaoHtml({ user }) {
           <select id="filtroTipoPesquisa" class="form-control" style="width: auto; min-width: 140px;" onchange="executarPesquisaEventos()">
             <option value="todos">Todos os Tipos</option>
             <option value="evento">Eventos</option>
+            <option value="acao">Ações / Vendas</option>
             <option value="reuniao">Reuniões</option>
             <option value="ensaio">Ensaios</option>
             ${perfil?.isPastor || perfil?.isDiretor ? '<option value="atendimento">Atendimentos</option>' : ''}
@@ -2302,6 +2378,12 @@ function renderGestaoHtml({ user }) {
               <span class="icone">🎪</span>
               <span class="titulo">Evento da Igreja</span>
               <span class="desc">Cultos especiais, conferências, congressos, encontros e vigílias.</span>
+            </button>
+
+            <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('acao')">
+              <span class="icone">🍲</span>
+              <span class="titulo">Ação / Venda Beneficente</span>
+              <span class="desc">Feijoada, pastelada, cantina ou bazar. Formulário rápido sem ficha longa.</span>
             </button>
 
             <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('reuniao')">
@@ -2573,6 +2655,71 @@ function renderGestaoHtml({ user }) {
             <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
               <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
               <button type="submit" class="btn-principal" id="btnSalvarEnsaio">Solicitar Ensaio</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- PASSO 2E: FORMULÁRIO DE AÇÃO / VENDA BENEFICENTE -->
+        <div id="stepFormAcao" class="form-step">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarParaEscolhaTipo()">← Escolher outro tipo</button>
+          
+          <form id="formNovaAcao" onsubmit="submeterNovaAcao(event)">
+            <div class="alert-banner info">
+              🍲 Formulário rápido para ações e vendas beneficentes (Feijoada, Pastelada, Cantina, Bazar). Não requer preenchimento de ficha de evento detalhada.
+            </div>
+
+            <div class="form-group">
+              <label>Nome da Ação / Venda *</label>
+              <input type="text" class="form-control" id="acao_nome" placeholder="Ex: Feijoada dos Jovens, Pastelada da Família, Bazar..." required />
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Ministério Responsável *</label>
+                <select class="form-control" id="acao_departamento" required>
+                  <option value="">Selecione...</option>
+                  ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Data *</label>
+                <input type="text" class="form-control" id="acao_data" placeholder="DD/MM/AAAA" required />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Horário Início *</label>
+                <input type="time" class="form-control" id="acao_hora_ini" value="11:30" required />
+              </div>
+              <div class="form-group">
+                <label>Horário Término *</label>
+                <input type="time" class="form-control" id="acao_hora_fim" value="15:00" required />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Local</label>
+                <input type="text" class="form-control" id="acao_local" value="Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi" />
+              </div>
+              <div class="form-group">
+                <label>Ocupa o Salão / Cozinha?</label>
+                <select class="form-control" id="acao_ocupa_salao">
+                  <option value="sim">Sim (utilizará a estrutura da igreja)</option>
+                  <option value="nao">Não (apenas retirada / externo)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Detalhes / Observações (opcional)</label>
+              <textarea class="form-control" id="acao_detalhes" rows="3" placeholder="Informações adicionais, valor, objetivo..."></textarea>
+            </div>
+
+            <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
+              <button type="submit" class="btn-principal" id="btnSalvarAcao">Solicitar Ação / Venda</button>
             </div>
           </form>
         </div>
@@ -3022,6 +3169,7 @@ function renderGestaoHtml({ user }) {
         eventosDia.slice(0, maxChipsVisiveis).forEach((ev, idx) => {
           let chipClass = 'confirmado';
           if (ev.status === 'pendente_secretaria') chipClass = 'pendente';
+          else if (ev.tipo === 'acao') chipClass = 'acao';
           else if (ev.tipo === 'reuniao') chipClass = 'reuniao';
           else if (ev.tipo === 'ensaio') chipClass = 'ensaio';
           else if (ev.tipo === 'atendimento') chipClass = 'pastoral';
@@ -3101,7 +3249,7 @@ function renderGestaoHtml({ user }) {
               <span style="font-size: 0.7rem; color: var(--cor-roxo);">⚙️</span>
             </div>
             <div class="meta">
-              <span>🏢 \${ev.departamento} • \${(ev.tipo || 'evento').toUpperCase()}</span>
+              <span>🏢 \${ev.departamento} • \${ev.tipo === 'acao' ? 'AÇÃO / VENDA' : (ev.tipo || 'evento').toUpperCase()}</span>
               <span>⏰ \${ev.horarioInicio || '19:00'} \${ev.horarioFim ? 'às ' + ev.horarioFim : ''}</span>
               <span>📍 \${ev.local}</span>
               \${ev.status === 'pendente_secretaria' ? '<span style="color: var(--cor-amarelo); font-weight:800;">⏳ Aguardando Aprovação</span>' : '<span style="color: var(--cor-verde); font-weight:800;">✅ Confirmado</span>'}
@@ -3137,6 +3285,13 @@ function renderGestaoHtml({ user }) {
         document.getElementById('stepFormEvento').classList.add('active');
         document.getElementById('modalAgendamentoTitulo').innerText = '🎪 Agendar Novo Evento';
         if (document.getElementById('ev_data')) document.getElementById('ev_data').value = dataStr;
+      } else if (tipo === 'acao') {
+        const stepAc = document.getElementById('stepFormAcao');
+        if (stepAc) {
+          stepAc.classList.add('active');
+          document.getElementById('modalAgendamentoTitulo').innerText = '🍲 Agendar Ação / Venda Beneficente';
+          if (document.getElementById('acao_data')) document.getElementById('acao_data').value = dataStr;
+        }
       } else if (tipo === 'reuniao') {
         document.getElementById('stepFormReuniao').classList.add('active');
         document.getElementById('modalAgendamentoTitulo').innerText = '🤝 Agendar Reunião de Liderança';
@@ -3517,6 +3672,45 @@ function renderGestaoHtml({ user }) {
       }
     }
 
+    async function submeterNovaAcao(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSalvarAcao');
+      if (btn) btn.disabled = true;
+
+      const payload = {
+        tipo: 'acao',
+        nome_evento: document.getElementById('acao_nome').value,
+        departamento: document.getElementById('acao_departamento').value,
+        data: document.getElementById('acao_data').value,
+        horario_inicio: document.getElementById('acao_hora_ini').value,
+        horario_termino: document.getElementById('acao_hora_fim').value,
+        local: document.getElementById('acao_local').value,
+        ocupa_salao: document.getElementById('acao_ocupa_salao').value,
+        detalhes: document.getElementById('acao_detalhes').value
+      };
+
+      try {
+        const res = await fetch('/gestao/api/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ret = await res.json();
+        if (ret.ok) {
+          alert('✅ ' + (ret.mensagem || ret.message || 'Ação/Venda solicitada com sucesso!'));
+          fecharModalAgendamento();
+          carregarEventosServidor();
+          carregarSolicitacoesServidor();
+        } else {
+          alert('❌ Erro: ' + (ret.message || 'Falha ao solicitar ação/venda.'));
+        }
+      } catch (_) {
+        alert('❌ Erro ao enviar.');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
     async function submeterAtendimentoPastoral(e) {
       e.preventDefault();
       const btn = document.getElementById('btnSalvarAtendimento');
@@ -3660,7 +3854,8 @@ function renderGestaoHtml({ user }) {
       container.innerHTML = resultados.map(ev => {
         let chipClass = 'confirmado';
         let tipoNome = 'EVENTO';
-        if (ev.tipo === 'reuniao') { chipClass = 'reuniao'; tipoNome = 'REUNIÃO'; }
+        if (ev.tipo === 'acao') { chipClass = 'acao'; tipoNome = 'AÇÃO / VENDA'; }
+        else if (ev.tipo === 'reuniao') { chipClass = 'reuniao'; tipoNome = 'REUNIÃO'; }
         else if (ev.tipo === 'ensaio') { chipClass = 'ensaio'; tipoNome = 'ENSAIO'; }
         else if (ev.tipo === 'atendimento') { chipClass = 'pastoral'; tipoNome = 'ATENDIMENTO'; }
 

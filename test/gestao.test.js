@@ -12,6 +12,7 @@ const assert = require("node:assert/strict");
 const { startWebServer, addUser } = require("../web");
 const gestao = require("../web/gestao");
 const { createSession } = require("../web/auth");
+const { montarResourceEvento } = require("../bot/agendamentoAutomatico");
 
 const getStatus = () => ({ connected: false, initializing: false });
 const noop = async () => ({ ok: true });
@@ -369,5 +370,110 @@ test("GET /gestao: inclui saudação personalizada, busca de eventos, modal de m
   assert.match(html, /Rede de Mulheres/);
   assert.match(html, /Rede de Homens/);
   assert.match(html, /Epifania/);
+
+  // Ação / Venda Beneficente
+  assert.match(html, /Ação \/ Venda Beneficente/);
+  assert.match(html, /stepFormAcao/);
+  assert.match(html, /\.event-chip\.acao/);
 });
+
+test("POST /gestao/api/solicitar: suporta criação de Ação / Venda Beneficente (tipo: acao)", async () => {
+  addUser("lider_acao", "senha123", "lider");
+  const tokenLider = createSession("lider_acao", "lider", "active");
+
+  const res = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenLider}`
+    },
+    body: JSON.stringify({
+      tipo: "acao",
+      nome_evento: "Feijoada Beneficente dos Jovens",
+      departamento: "Ruach (Jovens)",
+      data: "21/11/2026",
+      horario_inicio: "11:30",
+      horario_termino: "15:00",
+      local: "Salão da Igreja",
+      ocupa_salao: "sim",
+      detalhes: "Venda de marmitas de feijoada para arrecadação do acampamento"
+    })
+  });
+
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.ok(data.codigo);
+
+  // Verifica listagem em solicitações
+  const resSol = await fetch(`${baseUrl}/gestao/api/solicitacoes`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenLider}` }
+  });
+  const dataSol = await resSol.json();
+  assert.equal(dataSol.ok, true);
+  const sol = dataSol.solicitacoes.find(s => s.codigo === data.codigo);
+  assert.ok(sol, "Solicitação de ação deve constar na lista de solicitações");
+  assert.equal(sol.tipo, "acao");
+  assert.equal(sol.status, "Aguardando Secretaria");
+
+  // Verifica listagem em eventos locais (aparece como pendente no calendário)
+  const eventos = gestao.listarEventosLocais("lider_acao", 2026, 11);
+  const evAcao = eventos.find(e => e.codigo === data.codigo);
+  assert.ok(evAcao, "Ação solicitada deve aparecer na listagem de eventos locais do mês");
+  assert.equal(evAcao.tipo, "acao");
+  assert.equal(evAcao.status, "pendente_secretaria");
+});
+
+test("Status de recusa e aprovação: pendentes recusados não aparecem no calendário e exibem status ❌ Recusado pela Secretaria", async () => {
+  const { salvarPendente } = require("../bot/pendentesAprovacao");
+  const codigo = salvarPendente({
+    tipo: "evento",
+    nomeEvento: "Evento Rejeitado Teste",
+    departamento: "Geral",
+    rede: "Geral",
+    dia: 15,
+    mes: 11,
+    ano: 2026,
+    dataFormatada: "15/11/2026",
+    solicitanteNome: "Líder Teste",
+    solicitanteId: "5511999990001",
+    status: "recusado",
+    recusadoEm: new Date().toISOString()
+  });
+
+  // Não deve aparecer no calendário como pendente
+  const eventos = gestao.listarEventosLocais(null, 2026, 11);
+  const evRecusado = eventos.find(e => e.codigo === codigo);
+  assert.equal(evRecusado, undefined, "Evento recusado NÃO deve ser listado como evento pendente no calendário");
+
+  // Deve aparecer em Minhas Solicitações com status Recusado
+  const solicitacoes = gestao.listarSolicitacoes();
+  const solRecusada = solicitacoes.find(s => s.codigo === codigo);
+  assert.ok(solRecusada, "Solicitação recusada deve constar no histórico de solicitações");
+  assert.equal(solRecusada.status, "❌ Recusado pela Secretaria");
+  assert.equal(solRecusada.statusClass, "recusado");
+});
+
+test("Overnight calendar: montarResourceEvento calcula data de término no dia seguinte quando cruza a meia-noite", () => {
+  const resource = montarResourceEvento({
+    dia: 28,
+    mes: 11,
+    horarioInicio: "22:00",
+    horarioFim: "01:00",
+    nomeEvento: "Sala de Oração",
+    departamento: "Intercessão",
+    local: "Igreja"
+  }, 2026);
+
+  assert.ok(resource.start.dateTime, "Deve conter start.dateTime");
+  assert.ok(resource.end.dateTime, "Deve conter end.dateTime");
+
+  const dtInicio = new Date(resource.start.dateTime);
+  const dtFim = new Date(resource.end.dateTime);
+
+  assert.ok(dtFim > dtInicio, `O horário de término (${dtFim.toISOString()}) deve ser maior que o início (${dtInicio.toISOString()})`);
+  assert.equal(dtInicio.getDate(), 28);
+  assert.equal(dtFim.getDate(), 29, "Término às 01:00 deve cair no dia seguinte (29)");
+});
+
 

@@ -1898,6 +1898,12 @@ function createMessageHandler({
               if (!dados) {
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
+              if (dados.status === "recusado") {
+                return msg.reply("ℹ️ Esta solicitação já foi recusada anteriormente pela Secretaria.");
+              }
+              if (dados.status === "aprovado") {
+                return msg.reply("ℹ️ Este agendamento já foi aprovado e gravado na agenda anteriormente.");
+              }
 
               if (dados.tipo === "evento_externo") {
                 const { solicitanteId } = dados;
@@ -2006,7 +2012,9 @@ function createMessageHandler({
                     return msg.reply("❌ Erro ao salvar o evento externo na agenda do Google. Responda de novo a esta mensagem após corrigir.");
                   }
                 } else {
-                  removerPendente(codigo);
+                  dados.status = 'recusado';
+                  dados.recusadoEm = new Date().toISOString();
+                  atualizarPendente(codigo, dados);
                   const feedbackRecusa =
                     `❌ *Solicitação de Evento Externo*\n\n` +
                     `Infelizmente não pudemos aprovar sua solicitação para o evento "*${dados.nomeEvento}*".\n` +
@@ -2076,7 +2084,9 @@ function createMessageHandler({
                     return msg.reply("⚠️ Uso do Salão processado com pendências. Verifique na agenda oficial.");
                   }
                 } else {
-                  removerPendente(codigo);
+                  dados.status = 'recusado';
+                  dados.recusadoEm = new Date().toISOString();
+                  atualizarPendente(codigo, dados);
                   const feedback =
                     `❌ *Solicitação de Uso do Salão*\n\n` +
                     `Infelizmente não pudemos aprovar sua solicitação para uso do salão no dia *${dados.dataFormatada}*. Para mais informações, entre em contato diretamente com a secretaria.\n\n` +
@@ -2098,16 +2108,21 @@ function createMessageHandler({
                   try {
                     const ano = dados.ano || moment().tz("America/Sao_Paulo").year();
                     const tituloEvento = formatarTituloReuniao(departamento);
+                    const mStart = moment.tz(`${dados.dia}/${dados.mes}/${ano} ${dados.horarioInicio}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
+                    let mEnd = moment.tz(`${dados.dia}/${dados.mes}/${ano} ${dados.horarioFim}`, "D/M/YYYY HH:mm", "America/Sao_Paulo");
+                    if (mEnd.isSameOrBefore(mStart)) {
+                      mEnd = mEnd.add(1, "day");
+                    }
                     const resource = {
                       summary: tituloEvento,
                       description: `Agendado via Bot - Departamento: ${departamento}\nSolicitante: ${dados.solicitanteNome || ""}\nTelefone: ${solicitanteId || ""}`,
                       location: dados.local || ENDERECO_IGREJA,
                       start: {
-                        dateTime: moment.tz(`${dados.dia}/${dados.mes}/${ano} ${dados.horarioInicio}`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format(),
+                        dateTime: mStart.format(),
                         timeZone: "America/Sao_Paulo",
                       },
                       end: {
-                        dateTime: moment.tz(`${dados.dia}/${dados.mes}/${ano} ${dados.horarioFim}`, "D/M/YYYY HH:mm", "America/Sao_Paulo").format(),
+                        dateTime: mEnd.format(),
                         timeZone: "America/Sao_Paulo",
                       },
                     };
@@ -2119,23 +2134,9 @@ function createMessageHandler({
                       return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
                     }
 
-                    try {
-                      salvarFormularioEvento({
-                        evento: tituloEvento,
-                        departamento: departamento,
-                        data: `${dados.dia}/${dados.mes}/${ano}`,
-                        solicitanteId: solicitanteId,
-                        payload: {
-                          nomeSolicitante: dados.solicitanteNome || "",
-                          departamento,
-                          data: `${dados.dia}/${dados.mes}/${ano}`,
-                          horario: `${dados.horarioInicio} às ${dados.horarioFim}`,
-                        },
-                      });
-                    } catch (eForm) {
-                      console.error("[Secretaria] Erro ao registrar formulário inicial de reunião:", eForm.message);
-                    }
-                    removerPendente(codigo);
+                    dados.status = 'aprovado';
+                    dados.aprovadoEm = new Date().toISOString();
+                    atualizarPendente(codigo, dados);
 
                     let avisouLider = false;
                     try {
@@ -2155,7 +2156,9 @@ function createMessageHandler({
                     return msg.reply("⚠️ Reunião processada com pendências. Verifique na agenda oficial.");
                   }
                 } else {
-                  removerPendente(codigo);
+                  dados.status = 'recusado';
+                  dados.recusadoEm = new Date().toISOString();
+                  atualizarPendente(codigo, dados);
                   const feedback = "❌ *Aviso de Solicitação de Reunião*\n\nInfelizmente não pudemos confirmar sua solicitação de reunião para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
                   try {
                     await client.sendMessage(solicitanteId, feedback);
@@ -2203,34 +2206,39 @@ function createMessageHandler({
                       console.error("[Secretaria] Erro ao registrar descrição do evento:", eDesc.message);
                     }
                   }
-                  try {
-                    salvarFormularioEvento({
-                      evento: dados.nomeEvento,
-                      departamento: rede,
-                      data: `${dados.dia}/${dados.mes}/${ano}`,
-                      solicitanteId: solicitanteId,
-                      payload: {
-                        nomeSolicitante: dados.solicitanteNome || "",
-                        nome_lider: dados.solicitanteNome || "",
+                  const ehEnsaioOuReuniao = dados.tipo === 'ensaio' || dados.tipo === 'reuniao' || dados.tipo === 'atendimento' || dados.tipo === 'uso_salao' || dados.tipo === 'acao' || dados.tipo === 'venda';
+                  if (dados.nomeEvento && !ehEnsaioOuReuniao) {
+                    try {
+                      salvarFormularioEvento({
+                        evento: dados.nomeEvento,
                         departamento: rede,
                         data: `${dados.dia}/${dados.mes}/${ano}`,
-                        horario_inicio: dados.horarioInicio,
-                        horario_termino: dados.horarioFim,
-                        local: dados.local || "",
-                        criadoVia: dados.criadoVia || dados.payload?.criadoVia || "whatsapp"
-                      },
-                    });
-                  } catch (eForm) {
-                    console.error("[Secretaria] Erro ao registrar formulário inicial de evento:", eForm.message);
+                        solicitanteId: solicitanteId,
+                        payload: {
+                          nomeSolicitante: dados.solicitanteNome || "",
+                          nome_lider: dados.solicitanteNome || "",
+                          departamento: rede,
+                          data: `${dados.dia}/${dados.mes}/${ano}`,
+                          horario_inicio: dados.horarioInicio,
+                          horario_termino: dados.horarioFim,
+                          local: dados.local || "",
+                          criadoVia: dados.criadoVia || dados.payload?.criadoVia || "whatsapp"
+                        },
+                      });
+                    } catch (eForm) {
+                      console.error("[Secretaria] Erro ao registrar formulário inicial de evento:", eForm.message);
+                    }
                   }
-                  removerPendente(codigo);
+
+                  dados.status = 'aprovado';
+                  dados.aprovadoEm = new Date().toISOString();
+                  atualizarPendente(codigo, dados);
 
                   let avisouLider = false;
                   try {
                     const jid = solicitanteId && (solicitanteId.includes('@') ? solicitanteId : `${solicitanteId.replace(/\D/g, '')}@c.us`);
                     if (jid && jid.length > 5) {
                       const ehEvento = !dados.tipo || dados.tipo === 'evento';
-                      const ehEnsaioOuReuniao = dados.tipo === 'ensaio' || dados.tipo === 'reuniao' || dados.tipo === 'atendimento' || dados.tipo === 'uso_salao';
 
                       let feedback = `✅ *Agendamento Confirmado e Gravado!*\n\nSua solicitação para *"${dados.nomeEvento || dados.evento}"* (${dados.dataFormatada || `${dados.dia}/${dados.mes}/${ano}`}) foi aprovada pela Secretaria e já consta na agenda oficial! 🙏`;
 
@@ -2265,7 +2273,9 @@ function createMessageHandler({
                   return msg.reply("⚠️ Evento gravado na agenda com avisos pendentes. Verifique no painel de gestão.");
                 }
               } else {
-                removerPendente(codigo);
+                dados.status = 'recusado';
+                dados.recusadoEm = new Date().toISOString();
+                atualizarPendente(codigo, dados);
                 const feedback = "❌ *Aviso de Agendamento*\n\nInfelizmente não pudemos confirmar sua solicitação de evento para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
                 try {
                   await client.sendMessage(solicitanteId, feedback);
@@ -2282,6 +2292,12 @@ function createMessageHandler({
               const dados = codigo ? buscarPendente(codigo) : null;
               if (!dados) {
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
+              }
+              if (dados.status === "recusado") {
+                return msg.reply("ℹ️ Esta solicitação já foi recusada anteriormente pela Secretaria.");
+              }
+              if (dados.status === "aprovado") {
+                return msg.reply("ℹ️ Este agendamento já foi aprovado e gravado na agenda anteriormente.");
               }
 
               if (dados.tipo === "adicionar_sessao") {
@@ -2311,7 +2327,9 @@ function createMessageHandler({
                     return msg.reply("❌ Erro ao adicionar o novo dia na agenda do Google. Responda de novo a esta mesma mensagem depois de resolvido.");
                   }
                 } else {
-                  removerPendente(codigo);
+                  dados.status = 'recusado';
+                  dados.recusadoEm = new Date().toISOString();
+                  atualizarPendente(codigo, dados);
                   const feedback = `❌ *Solicitação de Novo Dia Não Aprovada*\n\nInfelizmente sua solicitação de adicionar um novo dia ao evento "*${dados.evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria.\n\nDigite *menu* para voltar ao menu principal.`;
                   try {
                     await client.sendMessage(solicitanteId, feedback);
@@ -2352,7 +2370,9 @@ function createMessageHandler({
                   }
                   return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração de reunião.`);
                 } else {
-                  removerPendente(codigo);
+                  dados.status = 'recusado';
+                  dados.recusadoEm = new Date().toISOString();
+                  atualizarPendente(codigo, dados);
                   const feedback = `❌ *Alteração de Reunião Não Aprovada*\n\nInfelizmente sua solicitação de alteração para a reunião "*${evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria.\n\nDigite *menu* para voltar ao menu principal.`;
                   try {
                     await client.sendMessage(solicitanteId, feedback);
@@ -2414,6 +2434,12 @@ function createMessageHandler({
               if (!dados) {
                 return msg.reply("❌ Não encontrei essa solicitação (código inválido ou já respondido antes).");
               }
+              if (dados.status === "recusado") {
+                return msg.reply("ℹ️ Esta solicitação já foi recusada anteriormente pela Secretaria.");
+              }
+              if (dados.status === "aprovado") {
+                return msg.reply("ℹ️ Este agendamento já foi aprovado e gravado na agenda anteriormente.");
+              }
 
               if (dados.tipo === "reuniao_cancelar") {
                 const { solicitanteId, evento, calendarId, eventId } = dados;
@@ -2432,7 +2458,9 @@ function createMessageHandler({
                     return msg.reply("❌ Erro ao desmarcar a reunião na agenda do Google. Responda de novo a esta mesma mensagem depois de resolvido.");
                   }
                 } else {
-                  removerPendente(codigo);
+                  dados.status = 'recusado';
+                  dados.recusadoEm = new Date().toISOString();
+                  atualizarPendente(codigo, dados);
                   const feedback = `✅ *Reunião Mantida*\n\nSua solicitação para desmarcar a reunião "*${evento}*" não foi aprovada — a reunião continua marcada normalmente.\n\nDigite *menu* para voltar ao menu principal.`;
                   try {
                     await client.sendMessage(solicitanteId, feedback);
