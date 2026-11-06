@@ -1344,6 +1344,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         const session = getSession(req);
         const perfil = gestao.obterPerfilGestao(session);
         const eventos = await gestao.listarEventosCalendario({ user: perfil, mes, ano });
+        res.setHeader('Cache-Control', 'private, max-age=60');
         return sendJson(res, 200, { ok: true, eventos });
       }
 

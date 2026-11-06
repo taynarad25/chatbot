@@ -40,11 +40,13 @@ const LINK_ATA_REUNIAO = "https://docs.google.com/document/d/1ZtFfD3f3jB1QkL2Y4X
 let injectedBuscarEventos = null;
 let injectedCalendar = null;
 
-// Cache em memória para Google Calendar (TTL 3 minutos)
-let cacheGoogleEvents = {
-  timestamp: 0,
-  data: []
-};
+// Cache em memória para Google Calendar (TTL 15 minutos por mês)
+const cacheGcalPorChave = new Map();
+const TTL_CACHE_GCAL = 15 * 60 * 1000;
+
+function limparCacheCalendario() {
+  cacheGcalPorChave.clear();
+}
 
 function setDependencies({ buscarEventos = null, calendar = null } = {}) {
   if (buscarEventos) injectedBuscarEventos = buscarEventos;
@@ -231,21 +233,23 @@ function inferirDepartamentoDeTitulo(titulo = '') {
 }
 
 /**
- * Busca rápida no Google Calendar com timeout reduzido e cache em memória (TTL 10 min)
+ * Busca rápida no Google Calendar com timeout resiliente e cache em memória por período (TTL 15 min)
  */
-async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
+async function buscarEventosGoogleCalendar(inicioIso, fimIso, chaveCache = null) {
   const agora = Date.now();
-  if (cacheGoogleEvents.timestamp && (agora - cacheGoogleEvents.timestamp < 600000) && Array.isArray(cacheGoogleEvents.data)) {
-    return cacheGoogleEvents.data;
+  const chave = chaveCache || `${inicioIso}_${fimIso}`;
+  const emCache = cacheGcalPorChave.get(chave);
+  if (emCache && (agora - emCache.timestamp < TTL_CACHE_GCAL) && Array.isArray(emCache.data)) {
+    return emCache.data;
   }
 
   const eventosGcal = [];
   try {
     if (injectedBuscarEventos && typeof injectedBuscarEventos === 'function') {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000));
       const res = await Promise.race([injectedBuscarEventos(inicioIso, fimIso), timeoutPromise]);
       if (Array.isArray(res)) {
-        cacheGoogleEvents = { timestamp: agora, data: res };
+        cacheGcalPorChave.set(chave, { timestamp: agora, data: res });
         return res;
       }
     }
@@ -283,7 +287,7 @@ async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
 
         const promessas = idsAgendas.map(async (calId) => {
           try {
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
             const reqPromise = cal.events.list({
               calendarId: calId,
               timeMin: inicioIso,
@@ -305,7 +309,7 @@ async function buscarEventosGoogleCalendar(inicioIso, fimIso) {
             eventosGcal.push(...r.value);
           }
         }
-        cacheGoogleEvents = { timestamp: agora, data: eventosGcal };
+        cacheGcalPorChave.set(chave, { timestamp: agora, data: eventosGcal });
       }
     }
   } catch (_) {}
@@ -607,9 +611,11 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
   const inicioMes = moment.tz([anoAtual, mesAtual - 1, 1], "America/Sao_Paulo").startOf('month').subtract(7, 'days').startOf('day');
   const fimMes = moment.tz([anoAtual, mesAtual - 1, 1], "America/Sao_Paulo").endOf('month').add(7, 'days').endOf('day');
 
-  // Google Calendar (Reuniões, Ensaios, Atendimentos, Eventos) com timeout rápido de 4s
+  const chaveCache = `${anoAtual}-${mesAtual}`;
+
+  // Google Calendar (Reuniões, Ensaios, Atendimentos, Eventos) com cache inteligente por mês
   try {
-    const gcalEvents = await buscarEventosGoogleCalendar(inicioMes.toISOString(), fimMes.toISOString());
+    const gcalEvents = await buscarEventosGoogleCalendar(inicioMes.toISOString(), fimMes.toISOString(), chaveCache);
     const novosEventosGcal = [];
 
     for (const g of gcalEvents) {
@@ -809,19 +815,74 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 
   // 0. SOLICITAÇÃO DE ARTES / MÍDIA
   if (tipoAcao === 'midia') {
-    const { departamento, tipo_material, detalhes, prazo_entrega, nome_evento } = corpo;
-    if (!departamento || !tipo_material || !detalhes) {
-      throw new Error('Preencha o departamento, o tipo de material e os detalhes da arte.');
+    const { departamento, tipo_material, detalhes, prazo_entrega, nome_evento, itens } = corpo;
+    if (!departamento) {
+      throw new Error('O departamento ou ministério é obrigatório.');
     }
+
+    let listaItens = [];
+    if (Array.isArray(itens) && itens.length > 0) {
+      listaItens = itens;
+    } else if (tipo_material && detalhes) {
+      listaItens = [{
+        tipo_arte: 'digital',
+        tipo_material: tipo_material.trim(),
+        detalhes: detalhes.trim(),
+        texto: detalhes.trim(),
+        formatos: [tipo_material.trim()]
+      }];
+    } else {
+      throw new Error('Preencha os detalhes de pelo menos uma arte para a solicitação.');
+    }
+
+    const prazoEntregaFinal = prazo_entrega?.trim() || 'A combinar';
+    const nomeEventoFinal = nome_evento?.trim() || `Arte para ${departamento.trim()}`;
+
+    // Montar resumo textual e dados completos
+    const resumoItensTexto = listaItens.map((it, idx) => {
+      const num = idx + 1;
+      if (it.tipo_arte === 'digital') {
+        const formatos = (it.formatos && it.formatos.length > 0) ? it.formatos.join(', ') : 'Feed / Stories';
+        let txt = `🔹 *Material ${num}: Arte Digital*\n` +
+                  `  • *Formatos/Tamanhos:* ${formatos}\n` +
+                  `  • *Texto/Informações:* ${it.detalhes || it.texto || ''}`;
+        if (it.estilo) txt += `\n  • *Estilo/Cores:* ${it.estilo}`;
+        return txt;
+      } else if (it.tipo_arte === 'impressa') {
+        let txt = `🔹 *Material ${num}: Arte Impressa*\n` +
+                  `  • *Tipo de Impresso:* ${it.tipo_impresso || 'Banner/Faixa'}\n` +
+                  `  • *Medidas/Dimensões:* ${it.medidas || 'A definir'}\n` +
+                  `  • *Texto/Informações:* ${it.detalhes || it.texto || ''}`;
+        if (it.acabamento) txt += `\n  • *Acabamento/Local:* ${it.acabamento}`;
+        return txt;
+      } else if (it.tipo_arte === 'video') {
+        let txt = `🔹 *Material ${num}: Vídeo*\n` +
+                  `  • *Formato:* ${it.formato_video || 'Vertical / Reels'}\n` +
+                  `  • *Duração Estimada:* ${it.duracao || 'Até 30s'}\n` +
+                  `  • *Roteiro/Conteúdo:* ${it.detalhes || it.roteiro || ''}`;
+        if (it.trilha) txt += `\n  • *Trilha/Música:* ${it.trilha}`;
+        if (it.material_bruto) txt += `\n  • *Captação:* ${it.material_bruto}`;
+        return txt;
+      } else {
+        return `🔹 *Material ${num}: ${it.tipo_material || 'Outro Material'}*\n` +
+               `  • *Descrição/Medidas:* ${it.medidas || it.descricao || 'Diversos'}\n` +
+               `  • *Texto/Detalhes:* ${it.detalhes || it.texto || ''}`;
+      }
+    }).join('\n\n');
+
+    const tipoMaterialResumo = listaItens.length === 1 
+      ? (listaItens[0].tipo_impresso || listaItens[0].tipo_material || listaItens[0].tipo_arte || 'Arte')
+      : `${listaItens.length} materiais (${listaItens.map(i => i.tipo_arte || 'arte').join(', ')})`;
 
     const dadosMidia = {
       tipo: 'midia',
       departamento: departamento.trim(),
       rede: departamento.trim(),
-      tipoMaterial: tipo_material.trim(),
-      detalhesArte: detalhes.trim(),
-      prazoEntrega: prazo_entrega?.trim() || 'A combinar',
-      nomeEvento: nome_evento?.trim() || `Arte para ${departamento.trim()}`,
+      tipoMaterial: tipoMaterialResumo,
+      detalhesArte: resumoItensTexto,
+      itens: listaItens,
+      prazoEntrega: prazoEntregaFinal,
+      nomeEvento: nomeEventoFinal,
       solicitanteNome: perfil?.nome || 'Líder',
       solicitanteId: perfil?.telefone || perfil?.username || '',
       criadoVia: 'painel_web',
@@ -831,12 +892,15 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     const codigo = salvarPendente(dadosMidia);
 
     const avisoGrupo =
-      `🎨 *NOVA SOLICITAÇÃO DE ARTE/FLYER (VIA PAINEL WEB)*\n\n` +
+      `🎨 *NOVA SOLICITAÇÃO DE ARTES / MÍDIA (${listaItens.length} item(ns))*` +
+      `\n━━━━━━━━━━━━━━━━━━━━\n` +
       `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
-      `🏢 *Depto/Rede:* ${departamento}\n` +
-      `📌 *Tipo de Material:* ${tipo_material}\n` +
-      `⏳ *Prazo de Entrega:* ${dadosMidia.prazoEntrega}\n` +
-      `📝 *Detalhes/Texto da Arte:*\n${detalhes}\n\n` +
+      `🏢 *Depto/Ministério:* ${departamento}\n` +
+      `📅 *Evento/Finalidade:* ${nomeEventoFinal}\n` +
+      `⏳ *Prazo de Entrega:* ${prazoEntregaFinal}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `${resumoItensTexto}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
       `_Código da Solicitação: ${codigo}_`;
 
     try {
@@ -853,8 +917,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     return {
       ok: true,
       codigo,
-      message: `Solicitação de arte/divulgação registrada com sucesso (Código: ${codigo}) e enviada à equipe de Multimídia!`,
-      mensagem: `Solicitação de arte/divulgação registrada com sucesso (Código: ${codigo}) e enviada à equipe de Multimídia!`
+      message: `Solicitação de arte/mídia registrada com sucesso (${listaItens.length} material(is) - Código: ${codigo}) e enviada à equipe de Multimídia!`,
+      mensagem: `Solicitação de arte/mídia registrada com sucesso (${listaItens.length} material(is) - Código: ${codigo}) e enviada à equipe de Multimídia!`
     };
   }
 
@@ -2114,6 +2178,60 @@ function renderGestaoHtml({ user }) {
       cursor: pointer;
     }
 
+    .tipo-arte-btn {
+      background: #ffffff;
+      border: 1.5px solid var(--cor-borda);
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+    }
+    .tipo-arte-btn:hover {
+      border-color: var(--cor-roxo);
+      background: #faf5ff;
+    }
+    .tipo-arte-btn.active {
+      border-color: var(--cor-roxo);
+      background: #f3e8ff;
+      color: var(--cor-roxo);
+      box-shadow: 0 0 0 2px rgba(122, 43, 226, 0.25);
+    }
+    .checkbox-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ffffff;
+      border: 1.5px solid var(--cor-borda);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .checkbox-pill:hover {
+      background: #f1f5f9;
+    }
+    .arte-adicionada-card {
+      background: #ffffff;
+      border: 1px solid var(--cor-borda);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .arte-badge-digital { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.7rem; }
+    .arte-badge-impressa { background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.7rem; }
+    .arte-badge-video { background: #f3e8ff; color: #7e22ce; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.7rem; }
+    .arte-badge-outro { background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.7rem; }
+
     .alert-banner {
       padding: 10px 12px;
       border-radius: 10px;
@@ -2852,7 +2970,7 @@ function renderGestaoHtml({ user }) {
 
   <!-- MODAL: SOLICITAR ARTE / MÍDIA -->
   <div class="modal-overlay" id="modalSolicitarMidia">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
       <div class="modal-header">
         <h3>🎨 Solicitar Arte / Divulgação para Mídia</h3>
         <button class="modal-close-btn" onclick="fecharModalSolicitarMidia()">✕</button>
@@ -2863,6 +2981,7 @@ function renderGestaoHtml({ user }) {
             📢 A solicitação será encaminhada diretamente para a equipe de Multimídia e para a Secretaria.
           </div>
 
+          <!-- DADOS GERAIS DO PEDIDO -->
           <div class="form-row two-cols">
             <div class="form-group">
               <label>Departamento / Ministério *</label>
@@ -2871,37 +2990,180 @@ function renderGestaoHtml({ user }) {
               </select>
             </div>
             <div class="form-group">
-              <label>Tipo de Material *</label>
-              <select class="form-control" id="midia_tipo_material" required>
-                <option value="Flyer / Redes Sociais (Feed e Stories)">Flyer / Redes Sociais (Feed & Stories)</option>
-                <option value="Aviso / Comunicado Geral">Aviso / Comunicado Geral</option>
-                <option value="Banner / Faixa para Fachada ou Salão">Banner / Faixa Impressa</option>
-                <option value="Lembrancinha / Tag / Crachá">Lembrancinha / Tag / Crachá</option>
-                <option value="Vídeo Teaser / Telão">Vídeo Teaser / Telão</option>
-                <option value="Outro Material">Outro Material</option>
-              </select>
+              <label>Nome do Evento ou Finalidade *</label>
+              <input type="text" class="form-control" id="midia_evento" placeholder="Ex: Chá das Mulheres ou Culto da Família" required />
             </div>
           </div>
 
           <div class="form-row two-cols">
             <div class="form-group">
-              <label>Nome do Evento ou Finalidade *</label>
-              <input type="text" class="form-control" id="midia_evento" placeholder="Ex: Chá das Mulheres ou Culto da Família" required />
-            </div>
-            <div class="form-group">
-              <label>Prazo Máximo de Entrega *</label>
+              <label>Prazo Máximo de Entrega Geral *</label>
               <input type="text" class="form-control" id="midia_prazo" placeholder="Ex: 20/11/2026 ou Até quinta-feira" required />
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Detalhes, Texto da Arte e Estilo Visual *</label>
-            <textarea class="form-control" id="midia_detalhes" rows="4" placeholder="Informe temas, frases obrigatórias, preletores, horários, cores desejadas ou referências..." required></textarea>
+          <!-- LISTA DE ARTES JÁ ADICIONADAS A ESTE PEDIDO -->
+          <div id="containerListaArtes" style="display: none; margin: 10px 0 14px 0; padding: 12px; background: var(--cor-cinza-suave); border: 1.5px dashed #cbd5e1; border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 0.82rem; font-weight: 800; color: var(--cor-roxo);">📦 Artes adicionadas a este pedido: (<span id="contagemArtes">0</span>)</span>
+            </div>
+            <div id="listaArtesAdicionadas" style="display: flex; flex-direction: column; gap: 8px;"></div>
           </div>
 
+          <!-- SELEÇÃO DO TIPO DE ARTE -->
+          <div style="background: #ffffff; border: 1.5px solid var(--cor-borda); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+            <label style="display: block; font-size: 0.86rem; font-weight: 800; color: var(--cor-roxo); margin-bottom: 10px;">
+              1. Qual o tipo de arte/material? *
+            </label>
+            <input type="hidden" id="midia_tipo_arte_selecionado" value="digital" />
+
+            <div class="tipo-arte-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
+              <button type="button" class="tipo-arte-btn active" id="btnTipoArte_digital" onclick="selecionarTipoArte('digital')">
+                <span style="font-size: 1.5rem;">📱</span>
+                <span style="font-weight: 700; font-size: 0.82rem;">Arte Digital</span>
+                <span style="font-size: 0.68rem; color: var(--cor-subtexto);">Feed, Stories, Telão</span>
+              </button>
+              <button type="button" class="tipo-arte-btn" id="btnTipoArte_impressa" onclick="selecionarTipoArte('impressa')">
+                <span style="font-size: 1.5rem;">🖨️</span>
+                <span style="font-weight: 700; font-size: 0.82rem;">Arte Impressa</span>
+                <span style="font-size: 0.68rem; color: var(--cor-subtexto);">Banner, Cartaz, Faixa</span>
+              </button>
+              <button type="button" class="tipo-arte-btn" id="btnTipoArte_video" onclick="selecionarTipoArte('video')">
+                <span style="font-size: 1.5rem;">🎬</span>
+                <span style="font-weight: 700; font-size: 0.82rem;">Vídeo</span>
+                <span style="font-size: 0.68rem; color: var(--cor-subtexto);">Teaser, Reels, Telão</span>
+              </button>
+              <button type="button" class="tipo-arte-btn" id="btnTipoArte_outro" onclick="selecionarTipoArte('outro')">
+                <span style="font-size: 1.5rem;">💡</span>
+                <span style="font-weight: 700; font-size: 0.82rem;">Outro Material</span>
+                <span style="font-size: 0.68rem; color: var(--cor-subtexto);">Tag, Comunicados</span>
+              </button>
+            </div>
+
+            <!-- PERGUNTAS ESPECÍFICAS: ARTE DIGITAL -->
+            <div id="secaoArteDigital" class="secao-tipo-arte">
+              <div class="form-group">
+                <label>Formatos e Tamanhos Necessários (marque os que precisa) *</label>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-top: 4px;">
+                  <label class="checkbox-pill"><input type="checkbox" name="midia_digital_formato" value="Feed Instagram (1:1)" checked /> 📷 Feed Instagram (1:1)</label>
+                  <label class="checkbox-pill"><input type="checkbox" name="midia_digital_formato" value="Story / Reels (9:16)" checked /> 📲 Story / Reels (9:16)</label>
+                  <label class="checkbox-pill"><input type="checkbox" name="midia_digital_formato" value="Telão da Igreja (16:9)" /> 🖥️ Telão Igreja (16:9)</label>
+                  <label class="checkbox-pill"><input type="checkbox" name="midia_digital_formato" value="Card / Perfil WhatsApp" /> 💬 Card WhatsApp</label>
+                  <label class="checkbox-pill"><input type="checkbox" name="midia_digital_formato" value="Carrossel Informativo" /> 📑 Carrossel (várias imagens)</label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Informações Obrigatórias da Arte (Textos, datas, horários, preletor, tema) *</label>
+                <textarea class="form-control" id="midia_digital_texto" rows="3" placeholder="Ex: Tema: Mulheres Vitoriosas. Data: 20/11 às 19:30. Preletora: Pra. Ana. Versículo: Fp 4:13."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>Estilo Visual, Cores ou Referências (Opcional)</label>
+                <input type="text" class="form-control" id="midia_digital_estilo" placeholder="Ex: Tons lilás e dourado, floral, estilo moderno e limpo..." />
+              </div>
+            </div>
+
+            <!-- PERGUNTAS ESPECÍFICAS: ARTE IMPRESSA -->
+            <div id="secaoArteImpressa" class="secao-tipo-arte" style="display: none;">
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Tipo de Material Impresso *</label>
+                  <select class="form-control" id="midia_impressa_tipo">
+                    <option value="Banner com Ilhós (para suporte)">Banner com Ilhós (para suporte)</option>
+                    <option value="Banner com Bastão e Cordinha">Banner com Bastão e Cordinha</option>
+                    <option value="Faixa de Lona (Fachada/Rua)">Faixa de Lona (Fachada/Rua)</option>
+                    <option value="Cartaz A3 / A4">Cartaz A3 / A4</option>
+                    <option value="Panfleto / Flyer para Entrega">Panfleto / Flyer para Entrega</option>
+                    <option value="Crachá / Tag de Identificação">Crachá / Tag de Identificação</option>
+                    <option value="Lembrancinha / Adesivo">Lembrancinha / Adesivo</option>
+                    <option value="Outro Impresso">Outro Impresso</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Medidas e Dimensões Exatas *</label>
+                  <input type="text" class="form-control" id="midia_impressa_medidas" placeholder="Ex: 1,00m (largura) x 2,00m (altura) ou A4 (21x29cm)" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Texto e Conteúdo Completo que Deve Constar no Impresso *</label>
+                <textarea class="form-control" id="midia_impressa_texto" rows="3" placeholder="Informe tudo o que deve estar legível no impresso: título, horários, local, frases..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>Local de Instalação ou Observações de Acabamento (Opcional)</label>
+                <input type="text" class="form-control" id="midia_impressa_acabamento" placeholder="Ex: Para entrada da igreja, reforço nas bordas, papel couché..." />
+              </div>
+            </div>
+
+            <!-- PERGUNTAS ESPECÍFICAS: VÍDEO -->
+            <div id="secaoArteVideo" class="secao-tipo-arte" style="display: none;">
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Formato do Vídeo *</label>
+                  <select class="form-control" id="midia_video_formato">
+                    <option value="Vertical (9:16 - Reels / Stories / TikTok)">Vertical (9:16 - Reels / Stories / TikTok)</option>
+                    <option value="Horizontal (16:9 - Telão da Igreja / YouTube)">Horizontal (16:9 - Telão da Igreja / YouTube)</option>
+                    <option value="Ambos os formatos (Vertical e Horizontal)">Ambos os formatos (Vertical e Horizontal)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Duração Estimada *</label>
+                  <select class="form-control" id="midia_video_duracao">
+                    <option value="Até 15 segundos (Story rápido)">Até 15 segundos (Story rápido)</option>
+                    <option value="Até 30 segundos (Teaser dinâmico)">Até 30 segundos (Teaser dinâmico)</option>
+                    <option value="Até 1 minuto (Chamada completa)">Até 1 minuto (Chamada completa)</option>
+                    <option value="Mais de 1 minuto (Vídeo explicativo)">Mais de 1 minuto (Vídeo explicativo)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Roteiro / O Que Deve Ser Falado ou Mostrado no Vídeo *</label>
+                <textarea class="form-control" id="midia_video_roteiro" rows="3" placeholder="Descreva o que vai aparecer na tela, frases principais de impacto, locução ou texto na tela..."></textarea>
+              </div>
+
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Estilo / Trilha Sonora Desejada (Opcional)</label>
+                  <input type="text" class="form-control" id="midia_video_trilha" placeholder="Ex: Música animada, instrumental suave, som épico..." />
+                </div>
+                <div class="form-group">
+                  <label>Material Gravado / Captação *</label>
+                  <select class="form-control" id="midia_video_captacao">
+                    <option value="Já possuo fotos/vídeos gravados para enviar">Já possuo fotos/vídeos gravados para enviar</option>
+                    <option value="A equipe precisa filmar ou usar material de arquivo">A equipe precisa filmar ou usar acervo</option>
+                    <option value="Apenas animação gráfica / Motion com texto">Apenas animação gráfica com texto</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- PERGUNTAS ESPECÍFICAS: OUTRO -->
+            <div id="secaoArteOutro" class="secao-tipo-arte" style="display: none;">
+              <div class="form-group">
+                <label>Descrição do Material e Formato *</label>
+                <input type="text" class="form-control" id="midia_outro_tipo" placeholder="Ex: Crachás plastificados, adesivo para copo, comunicado impresso..." />
+              </div>
+              <div class="form-group">
+                <label>Texto e Conteúdo Necessário *</label>
+                <textarea class="form-control" id="midia_outro_texto" rows="3" placeholder="Detalhes do que deve constar no material..."></textarea>
+              </div>
+            </div>
+
+            <!-- BOTÃO: ADICIONAR OUTRA ARTE A ESTE PEDIDO -->
+            <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
+              <button type="button" class="btn-secundario" onclick="adicionarArteAoPedido()" style="background: #f8fafc; border: 1.5px dashed var(--cor-roxo); color: var(--cor-roxo); font-weight: 800; padding: 10px 14px; border-radius: 10px;">
+                ➕ Adicionar Esta Arte à Lista (+ Pedir Outra Arte)
+              </button>
+            </div>
+          </div>
+
+          <!-- BOTÕES FINAIS -->
           <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
             <button type="button" class="btn-secundario" onclick="fecharModalSolicitarMidia()">Cancelar</button>
-            <button type="submit" class="btn-principal">🚀 Enviar para Multimídia</button>
+            <button type="submit" class="btn-principal" id="btnEnviarMidia">🚀 Enviar Pedido para Multimídia</button>
           </div>
         </form>
       </div>
@@ -3120,14 +3382,32 @@ function renderGestaoHtml({ user }) {
       if (btnAba) btnAba.classList.add('active');
     }
 
-    async function carregarEventosServidor() {
+    const cacheEventosCliente = new Map();
+
+    async function carregarEventosServidor(forcar = false) {
+      const chave = \`\${anoAtual}-\${mesAtual}\`;
       const loader = document.getElementById('calLoadingIndicator');
+
+      // Se já temos os eventos deste mês no cache local e não é recarga forçada: renderiza NA HORA (0ms)
+      if (!forcar && cacheEventosCliente.has(chave)) {
+        todosEventos = cacheEventosCliente.get(chave);
+        renderizarCalendario();
+        selecionarDia(diaSelecionado);
+        if (typeof executarPesquisaEventos === 'function') {
+          executarPesquisaEventos();
+        }
+        // Silenciosamente revalida com o servidor em segundo plano sem travar tela
+        revalidarEventosSegundoPlano(anoAtual, mesAtual);
+        return;
+      }
+
       if (loader && todosEventos.length === 0) loader.style.display = 'flex';
       try {
         const res = await fetch(\`/gestao/api/eventos?mes=\${mesAtual + 1}&ano=\${anoAtual}\`);
         if (!res.ok) throw new Error('Falha HTTP ' + res.status);
         const data = await res.json();
         if (data && data.ok && Array.isArray(data.eventos)) {
+          cacheEventosCliente.set(chave, data.eventos);
           todosEventos = data.eventos;
           renderizarCalendario();
           selecionarDia(diaSelecionado);
@@ -3140,6 +3420,51 @@ function renderGestaoHtml({ user }) {
       } finally {
         if (loader) loader.style.display = 'none';
       }
+
+      // Prefetch inteligente dos próximos meses em segundo plano
+      prefetchMesesAdjacentes();
+    }
+
+    function revalidarEventosSegundoPlano(ano, mes) {
+      const k = \`\${ano}-\${mes}\`;
+      fetch(\`/gestao/api/eventos?mes=\${mes + 1}&ano=\${ano}\`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.ok && Array.isArray(data.eventos)) {
+            cacheEventosCliente.set(k, data.eventos);
+            if (anoAtual === ano && mesAtual === mes) {
+              todosEventos = data.eventos;
+              renderizarCalendario();
+              selecionarDia(diaSelecionado);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    function prefetchMesesAdjacentes() {
+      setTimeout(() => {
+        let pM = mesAtual + 1, pA = anoAtual;
+        if (pM > 11) { pM = 0; pA++; }
+        let aM = mesAtual - 1, aA = anoAtual;
+        if (aM < 0) { aM = 11; aA--; }
+        let p2M = pM + 1, p2A = pA;
+        if (p2M > 11) { p2M = 0; p2A++; }
+
+        [[pA, pM], [aA, aM], [p2A, p2M]].forEach(([a, m]) => {
+          const k = \`\${a}-\${m}\`;
+          if (!cacheEventosCliente.has(k)) {
+            fetch(\`/gestao/api/eventos?mes=\${m + 1}&ano=\${a}\`)
+              .then(r => r.json())
+              .then(data => {
+                if (data && data.ok && Array.isArray(data.eventos)) {
+                  cacheEventosCliente.set(k, data.eventos);
+                }
+              })
+              .catch(() => {});
+          }
+        });
+      }, 350);
     }
 
     async function carregarSolicitacoesServidor() {
@@ -3175,6 +3500,14 @@ function renderGestaoHtml({ user }) {
         anoAtual++;
       }
       diaSelecionado = 1;
+
+      // Se temos o mês em cache, já renderiza instantaneamente
+      const chave = \`\${anoAtual}-\${mesAtual}\`;
+      if (cacheEventosCliente.has(chave)) {
+        todosEventos = cacheEventosCliente.get(chave);
+      } else {
+        todosEventos = [];
+      }
       renderizarCalendario();
       selecionarDia(1);
       carregarEventosServidor();
@@ -3185,6 +3518,11 @@ function renderGestaoHtml({ user }) {
       mesAtual = hoje.getMonth();
       anoAtual = hoje.getFullYear();
       diaSelecionado = hoje.getDate();
+
+      const chave = \`\${anoAtual}-\${mesAtual}\`;
+      if (cacheEventosCliente.has(chave)) {
+        todosEventos = cacheEventosCliente.get(chave);
+      }
       renderizarCalendario();
       selecionarDia(diaSelecionado);
       carregarEventosServidor();
@@ -3944,20 +4282,245 @@ function renderGestaoHtml({ user }) {
     }
 
     // MODAL DE SOLICITAÇÃO DE MÍDIA
+    let artesDoPedido = [];
+
+    function selecionarTipoArte(tipo) {
+      document.querySelectorAll('.tipo-arte-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('btnTipoArte_' + tipo);
+      if (btn) btn.classList.add('active');
+      document.getElementById('midia_tipo_arte_selecionado').value = tipo;
+
+      document.getElementById('secaoArteDigital').style.display = (tipo === 'digital') ? 'block' : 'none';
+      document.getElementById('secaoArteImpressa').style.display = (tipo === 'impressa') ? 'block' : 'none';
+      document.getElementById('secaoArteVideo').style.display = (tipo === 'video') ? 'block' : 'none';
+      document.getElementById('secaoArteOutro').style.display = (tipo === 'outro') ? 'block' : 'none';
+    }
+
+    function obterArteAtualFormulario(silencioso = false) {
+      const tipo = document.getElementById('midia_tipo_arte_selecionado').value;
+
+      if (tipo === 'digital') {
+        const formatos = Array.from(document.querySelectorAll('input[name="midia_digital_formato"]:checked')).map(cb => cb.value);
+        const texto = (document.getElementById('midia_digital_texto').value || '').trim();
+        const estilo = (document.getElementById('midia_digital_estilo').value || '').trim();
+
+        if (!texto) {
+          if (!silencioso) alert('Por favor, informe o texto e informações da arte digital.');
+          return null;
+        }
+        if (formatos.length === 0) {
+          if (!silencioso) alert('Por favor, marque ao menos um formato para a arte digital (Feed, Story, Telão...).');
+          return null;
+        }
+        return {
+          tipo_arte: 'digital',
+          tipo_material: 'Arte Digital (' + formatos.join(', ') + ')',
+          formatos,
+          detalhes: texto,
+          texto,
+          estilo
+        };
+      }
+
+      if (tipo === 'impressa') {
+        const tipoImpresso = document.getElementById('midia_impressa_tipo').value;
+        const medidas = (document.getElementById('midia_impressa_medidas').value || '').trim();
+        const texto = (document.getElementById('midia_impressa_texto').value || '').trim();
+        const acabamento = (document.getElementById('midia_impressa_acabamento').value || '').trim();
+
+        if (!medidas) {
+          if (!silencioso) alert('Por favor, informe as medidas/dimensões do material impresso.');
+          return null;
+        }
+        if (!texto) {
+          if (!silencioso) alert('Por favor, informe o texto completo do material impresso.');
+          return null;
+        }
+        return {
+          tipo_arte: 'impressa',
+          tipo_material: 'Arte Impressa (' + tipoImpresso + ' - ' + medidas + ')',
+          tipo_impresso: tipoImpresso,
+          medidas,
+          detalhes: texto,
+          texto,
+          acabamento
+        };
+      }
+
+      if (tipo === 'video') {
+        const formato = document.getElementById('midia_video_formato').value;
+        const duracao = document.getElementById('midia_video_duracao').value;
+        const roteiro = (document.getElementById('midia_video_roteiro').value || '').trim();
+        const trilha = (document.getElementById('midia_video_trilha').value || '').trim();
+        const material_bruto = document.getElementById('midia_video_captacao').value;
+
+        if (!roteiro) {
+          if (!silencioso) alert('Por favor, informe o roteiro ou conteúdo do vídeo.');
+          return null;
+        }
+        return {
+          tipo_arte: 'video',
+          tipo_material: 'Vídeo (' + duracao + ')',
+          formato_video: formato,
+          duracao,
+          detalhes: roteiro,
+          roteiro,
+          trilha,
+          material_bruto
+        };
+      }
+
+      if (tipo === 'outro') {
+        const tipoOutro = (document.getElementById('midia_outro_tipo').value || '').trim();
+        const texto = (document.getElementById('midia_outro_texto').value || '').trim();
+
+        if (!tipoOutro || !texto) {
+          if (!silencioso) alert('Por favor, informe a descrição e o texto do material.');
+          return null;
+        }
+        return {
+          tipo_arte: 'outro',
+          tipo_material: tipoOutro,
+          detalhes: texto,
+          texto
+        };
+      }
+
+      return null;
+    }
+
+    function limparFormularioArteAtual() {
+      document.getElementById('midia_digital_texto').value = '';
+      document.getElementById('midia_digital_estilo').value = '';
+      document.getElementById('midia_impressa_medidas').value = '';
+      document.getElementById('midia_impressa_texto').value = '';
+      document.getElementById('midia_impressa_acabamento').value = '';
+      document.getElementById('midia_video_roteiro').value = '';
+      document.getElementById('midia_video_trilha').value = '';
+      document.getElementById('midia_outro_tipo').value = '';
+      document.getElementById('midia_outro_texto').value = '';
+    }
+
+    function adicionarArteAoPedido() {
+      const item = obterArteAtualFormulario(false);
+      if (!item) return;
+      artesDoPedido.push(item);
+      renderizarListaArtesPedido();
+      limparFormularioArteAtual();
+    }
+
+    function removerArteDoPedido(idx) {
+      artesDoPedido.splice(idx, 1);
+      renderizarListaArtesPedido();
+    }
+
+    function renderizarListaArtesPedido() {
+      const container = document.getElementById('containerListaArtes');
+      const listaDiv = document.getElementById('listaArtesAdicionadas');
+      const badgeCount = document.getElementById('contagemArtes');
+      const btnEnviar = document.getElementById('btnEnviarMidia');
+
+      if (!container || !listaDiv) return;
+
+      badgeCount.innerText = artesDoPedido.length;
+      if (artesDoPedido.length === 0) {
+        container.style.display = 'none';
+        listaDiv.innerHTML = '';
+        if (btnEnviar) btnEnviar.innerText = '🚀 Enviar Pedido para Multimídia';
+        return;
+      }
+
+      container.style.display = 'block';
+      let html = '';
+      artesDoPedido.forEach((it, idx) => {
+        let badgeClass = 'arte-badge-digital';
+        let badgeTexto = '📱 Arte Digital';
+        let resumo = it.formatos ? it.formatos.join(', ') : '';
+
+        if (it.tipo_arte === 'impressa') {
+          badgeClass = 'arte-badge-impressa';
+          badgeTexto = '🖨️ Arte Impressa';
+          resumo = (it.tipo_impresso || '') + ' (' + (it.medidas || '') + ')';
+        } else if (it.tipo_arte === 'video') {
+          badgeClass = 'arte-badge-video';
+          badgeTexto = '🎬 Vídeo';
+          resumo = (it.duracao || '') + ' - ' + (it.formato_video || '');
+        } else if (it.tipo_arte === 'outro') {
+          badgeClass = 'arte-badge-outro';
+          badgeTexto = '💡 Outro';
+          resumo = it.tipo_material || '';
+        }
+
+        const textoPreview = (it.detalhes || it.texto || '').slice(0, 60);
+
+        html += \`
+          <div class="arte-adicionada-card">
+            <div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                <span class="\${badgeClass}">\${badgeTexto}</span>
+                <strong style="font-size: 0.82rem; color: var(--cor-texto);">\${resumo}</strong>
+              </div>
+              <p style="font-size: 0.74rem; color: var(--cor-subtexto); margin: 0;">\${textoPreview}\${textoPreview.length >= 60 ? '...' : ''}</p>
+            </div>
+            <button type="button" onclick="removerArteDoPedido(\${idx})" style="background: none; border: none; color: #ef4444; font-size: 0.8rem; font-weight: 800; cursor: pointer; padding: 4px 6px;">✕ Remover</button>
+          </div>
+        \`;
+      });
+
+      listaDiv.innerHTML = html;
+      if (btnEnviar) btnEnviar.innerText = \`🚀 Enviar Pedido (\${artesDoPedido.length} arte(s))\`;
+    }
+
     function abrirModalSolicitarMidia() {
+      artesDoPedido = [];
+      renderizarListaArtesPedido();
+      limparFormularioArteAtual();
+      selecionarTipoArte('digital');
       document.getElementById('modalSolicitarMidia').classList.add('active');
     }
+
     function fecharModalSolicitarMidia() {
       document.getElementById('modalSolicitarMidia').classList.remove('active');
+      artesDoPedido = [];
+      renderizarListaArtesPedido();
+      limparFormularioArteAtual();
     }
 
     async function submeterSolicitacaoMidia(event) {
-      event.preventDefault();
+      if (event) event.preventDefault();
       const departamento = document.getElementById('midia_departamento').value;
-      const tipo_material = document.getElementById('midia_tipo_material').value;
-      const nome_evento = document.getElementById('midia_evento').value;
-      const prazo_entrega = document.getElementById('midia_prazo').value;
-      const detalhes = document.getElementById('midia_detalhes').value;
+      const nome_evento = document.getElementById('midia_evento').value.trim();
+      const prazo_entrega = document.getElementById('midia_prazo').value.trim();
+
+      if (!departamento || !nome_evento || !prazo_entrega) {
+        alert('Por favor, preencha o departamento, o nome do evento e o prazo de entrega.');
+        return;
+      }
+
+      // Se há texto na arte atual, captura e adiciona automaticamente à lista
+      const textoDigital = (document.getElementById('midia_digital_texto').value || '').trim();
+      const textoImpressa = (document.getElementById('midia_impressa_texto').value || '').trim();
+      const textoVideo = (document.getElementById('midia_video_roteiro').value || '').trim();
+      const textoOutro = (document.getElementById('midia_outro_texto').value || '').trim();
+
+      if (textoDigital || textoImpressa || textoVideo || textoOutro) {
+        const itemAtual = obterArteAtualFormulario(false);
+        if (!itemAtual) return; // Validação falhou, usuário já alertado
+        artesDoPedido.push(itemAtual);
+        renderizarListaArtesPedido();
+        limparFormularioArteAtual();
+      }
+
+      if (artesDoPedido.length === 0) {
+        alert('Por favor, preencha ao menos uma arte para enviar.');
+        return;
+      }
+
+      const btnEnviar = document.getElementById('btnEnviarMidia');
+      if (btnEnviar) {
+        btnEnviar.disabled = true;
+        btnEnviar.innerText = 'Enviando...';
+      }
 
       try {
         const res = await fetch('/gestao/api/solicitar', {
@@ -3966,17 +4529,15 @@ function renderGestaoHtml({ user }) {
           body: JSON.stringify({
             tipo: 'midia',
             departamento,
-            tipo_material,
             nome_evento,
             prazo_entrega,
-            detalhes
+            itens: artesDoPedido
           })
         });
         const data = await res.json();
         if (data.ok) {
           alert('✅ ' + (data.mensagem || data.message || 'Solicitação de arte enviada com sucesso!'));
           fecharModalSolicitarMidia();
-          document.getElementById('formSolicitarMidia').reset();
           carregarSolicitacoesServidor();
           trocarAba('solicitacoes');
         } else {
@@ -3984,6 +4545,11 @@ function renderGestaoHtml({ user }) {
         }
       } catch (err) {
         alert('❌ Erro de conexão ao enviar solicitação.');
+      } finally {
+        if (btnEnviar) {
+          btnEnviar.disabled = false;
+          renderizarListaArtesPedido();
+        }
       }
     }
   </script>
@@ -3998,6 +4564,7 @@ module.exports = {
   listarSolicitacoes,
   listarFichas,
   criarSolicitacaoEventoWeb,
+  limparCacheCalendario,
   renderGestaoHtml,
   setDependencies
 };

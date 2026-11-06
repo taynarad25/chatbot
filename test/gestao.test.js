@@ -571,5 +571,86 @@ test("Controle de Acesso: membro cadastrado não tem acesso ao painel de lideran
   assert.match(regData.message, /Membro/);
 });
 
+test("POST /gestao/api/solicitar: suporta solicitação com múltiplas artes e perguntas específicas por tipo", async () => {
+  const tokenLider = createSession("lider.multi", "lider", "active");
+
+  const resMulti = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenLider}`
+    },
+    body: JSON.stringify({
+      tipo: "midia",
+      departamento: "Rede de Mulheres",
+      nome_evento: "Chá das Mulheres",
+      prazo_entrega: "20/11/2026",
+      itens: [
+        {
+          tipo_arte: "digital",
+          formatos: ["Feed Instagram (1:1)", "Story / Reels (9:16)"],
+          detalhes: "Tema: Mulheres Vitoriosas. Preletora: Pra. Ana",
+          estilo: "Tons florais e lilás"
+        },
+        {
+          tipo_arte: "impressa",
+          tipo_impresso: "Banner com Ilhós",
+          medidas: "1,00m x 2,00m",
+          detalhes: "Entrada Franca - Traga sua Bíblia",
+          acabamento: "Para suporte no hall"
+        },
+        {
+          tipo_arte: "video",
+          formato_video: "Vertical (9:16 - Reels)",
+          duracao: "Até 30 segundos",
+          detalhes: "Chamada convidando todas as mulheres com frases de ânimo",
+          trilha: "Música animada instrumental",
+          material_bruto: "A equipe precisa filmar"
+        }
+      ]
+    })
+  });
+
+  assert.equal(resMulti.status, 200);
+  const dataMulti = await resMulti.json();
+  assert.equal(dataMulti.ok, true);
+  assert.ok(dataMulti.codigo);
+
+  // Confere que o pedido foi salvo com os itens
+  const resSol = await fetch(`${baseUrl}/gestao/api/solicitacoes`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenLider}` }
+  });
+  const dataSol = await resSol.json();
+  assert.equal(dataSol.ok, true);
+  const sol = dataSol.solicitacoes.find(s => s.codigo === dataMulti.codigo);
+  assert.ok(sol, "Solicitação com múltiplos itens deve constar na listagem");
+  assert.equal(sol.status, "Aguardando Multimídia");
+  assert.equal(sol.payload.itens.length, 3);
+});
+
+test("Cache de Calendário: listarEventosCalendario armazena dados em memória por período", async () => {
+  const tokenAdmin = createSession("gabriela", "admin", "active");
+
+  const t0 = Date.now();
+  const res1 = await fetch(`${baseUrl}/gestao/api/eventos?mes=11&ano=2026`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenAdmin}` }
+  });
+  assert.equal(res1.status, 200);
+  const data1 = await res1.json();
+  assert.equal(data1.ok, true);
+
+  // Segunda chamada para o mesmo mês deve ser praticamente instantânea (cache backend)
+  const t1 = Date.now();
+  const res2 = await fetch(`${baseUrl}/gestao/api/eventos?mes=11&ano=2026`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenAdmin}` }
+  });
+  const t2 = Date.now();
+  assert.equal(res2.status, 200);
+  const data2 = await res2.json();
+  assert.equal(data2.ok, true);
+  assert.ok(t2 - t1 < 50, `Segunda chamada deve responder via cache instantaneamente (${t2 - t1}ms)`);
+});
+
+
 
 
