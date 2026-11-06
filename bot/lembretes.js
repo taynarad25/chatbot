@@ -1624,7 +1624,7 @@ function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens 
     `🔔 *Lembrete de Alinhamento - Faltam ${diasAntecedencia} dias!*\n\n` +
     `${saudacao}\n\n` +
     `Faltam apenas *${diasAntecedencia} dias* para a realização do evento *${evento}*${dataStr}!\n\n` +
-    `No formulário do evento, as seguintes informações ficaram pendentes de confirmação (a ver / a definir):\n` +
+    `No formulário de agendamento, os seguintes itens haviam ficado marcados como *a definir*:\n` +
     `${listaItens}\n` +
     `Elas já foram definidas? Você pode atualizar o formulário diretamente no portal (https://comunidadecristacurados.com.br/gestao) ou responder diretamente a esta mensagem com as definições para alinharmos tudo certinho!\n\n` +
     `_Seguimos à disposição e em oração pelo seu evento!_ 🙏✨`
@@ -1843,42 +1843,6 @@ async function processarLembretesItensADefinir({
   return { processados: eventos.length, enviados: totalEnviados };
 }
 
-function iniciarAgendadorLembretes({
-  client,
-  buscarEventos,
-  agendasParaLer = [],
-  horaExecucao = 8,
-  etapas = null,
-} = {}) {
-  let executando = false;
-  let ultimoDiaExecutado = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
-
-  async function checarExecutar(forcar = false) {
-    if (executando) return;
-    const agora = moment.tz("America/Sao_Paulo");
-    const diaHoje = agora.format("YYYY-MM-DD");
-    const horaSp = agora.hour();
-
-    if (!forcar) {
-      if (!ehHorarioComercialEnvio(agora.toDate()) || horaSp < horaExecucao) {
-        console.log(`[Agendador Lembretes] Bloqueio: fora do horário comercial de envio (08:00 às 18:00). Hora atual: ${horaSp}h.`);
-        return;
-      }
-      const ultimaData = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
-      if (ultimaData === diaHoje) {
-        console.log(`[Agendador Lembretes] Rotina diária de lembretes já executada hoje (${diaHoje}). Pulando execução.`);
-        return;
-      }
-    }
-
-    executando = true;
-    try {
-      // 0. Parabéns aos aniversariantes do dia (diariamente às 08:00)
-      await processarAniversariantesDoDia({
-        client,
-      });
-
-      
 /**
  * Cobrança de preenchimento obrigatório de formulário de evento:
  * Se após 1 dia (24h) da aprovação da Secretaria o líder não tiver preenchido,
@@ -1947,15 +1911,47 @@ async function processarCobrancasFormularioPendente({ client, forcar = false } =
   }
 }
 
-      // Cobrança de formulários pendentes (24h após aprovação)
-      await processarCobrancasFormularioPendente({ client });
+function iniciarAgendadorLembretes({
+  client,
+  buscarEventos,
+  agendasParaLer = [],
+  horaExecucao = 8,
+  etapas = null,
+} = {}) {
+  let executando = false;
+  let ultimoDiaExecutado = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
 
-      // 1. Lembretes de itens a definir no formulário (5 dias antes)
+  async function checarExecutar(forcar = false) {
+    if (executando) return;
+    const agora = moment.tz("America/Sao_Paulo");
+    const diaHoje = agora.format("YYYY-MM-DD");
+    const horaSp = agora.hour();
+
+    if (!forcar) {
+      if (!ehHorarioComercialEnvio(agora.toDate()) || horaSp < horaExecucao) {
+        console.log(`[Agendador Lembretes] Bloqueio: fora do horário comercial de envio (08:00 às 18:00). Hora atual: ${horaSp}h.`);
+        return;
+      }
+      const ultimaData = obterUltimaExecucaoRotina("rotina_diaria_lembretes");
+      if (ultimaData === diaHoje) {
+        console.log(`[Agendador Lembretes] Rotina diária de lembretes já executada hoje (${diaHoje}). Pulando execução.`);
+        return;
+      }
+    }
+
+    executando = true;
+    try {
+      // 0. Parabéns aos aniversariantes do dia (diariamente às 08:00)
+      await processarAniversariantesDoDia({
+        client,
+      });
+
+      // 1. Lembretes de itens a definir no formulário (7 dias antes)
       await processarLembretesItensADefinir({
         client,
         buscarEventos,
         agendasParaLer,
-        diasAntecedencia: 5,
+        diasAntecedencia: 7,
         etapas,
       });
 
