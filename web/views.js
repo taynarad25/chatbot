@@ -514,18 +514,9 @@ function renderRegisterHtml(message = "") {
     const telInput = document.getElementById('regTelefone');
     if (telInput) {
       telInput.addEventListener('input', (e) => {
-        let v = e.target.value.replace(/\D/g, '');
-        if (v.startsWith('55') && v.length > 11) v = v.slice(2);
-        if (v.length > 11) v = v.slice(0, 11);
-        if (v.length > 10) {
-          e.target.value = '(' + v.slice(0, 2) + ') ' + v.slice(2, 7) + '-' + v.slice(7);
-        } else if (v.length > 6) {
-          e.target.value = '(' + v.slice(0, 2) + ') ' + v.slice(2, 6) + '-' + v.slice(6);
-        } else if (v.length > 2) {
-          e.target.value = '(' + v.slice(0, 2) + ') ' + v.slice(2);
-        } else {
-          e.target.value = v;
-        }
+        let raw = e.target.value;
+        let limpo = raw.replace(/[^\d\s\(\)\+\-]/g, '');
+        if (raw !== limpo) e.target.value = limpo;
       });
       telInput.addEventListener('blur', (e) => {
         let v = e.target.value.replace(/\D/g, '');
@@ -551,8 +542,12 @@ function renderRegisterHtml(message = "") {
         return;
       }
 
-      // Se informou telefone, define também username para compatibilidade
-      if (data.telefone && !data.username) {
+      // Se informou telefone, limpa e define username para compatibilidade
+      if (data.telefone) {
+        data.telefone = data.telefone.replace(/\D/g, '');
+        if (data.telefone.startsWith('55') && data.telefone.length > 11) {
+          data.telefone = data.telefone.slice(2);
+        }
         data.username = data.telefone;
       }
 

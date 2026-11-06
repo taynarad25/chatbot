@@ -1225,26 +1225,80 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     };
   }
 
-  // 6. ATUALIZAR FORMULÁRIO / DETALHES
+  // 6. ATUALIZAR FORMULÁRIO / DETALHES COMPLETO
   if (tipoAcao === 'atualizar_formulario') {
-    const { nome_evento, tema, versiculo, objetivo_espiritual, precisa_inscricao, valor_inscricao, precisa_valor_ministerio, observacoes } = corpo;
+    const {
+      nome_evento,
+      tema,
+      versiculo,
+      objetivo_espiritual,
+      publico,
+      responsavel_geral,
+      uso_salao,
+      horario_total,
+      materiais,
+      decoracao,
+      alimentacao,
+      equipe,
+      louvor,
+      convidado,
+      cronograma,
+      midia_ja_feita,
+      paleta,
+      estilo,
+      prazo_imagem,
+      data_maxima_divulgacao,
+      precisa_inscricao,
+      valor_inscricao,
+      precisa_valor_ministerio,
+      observacoes
+    } = corpo;
+
     if (!nome_evento) throw new Error('Nome do evento é obrigatório.');
 
     try {
       const rowForm = db.prepare("SELECT id, payload FROM formularios_eventos WHERE LOWER(TRIM(evento)) = LOWER(TRIM(?)) ORDER BY id DESC LIMIT 1").get(nome_evento);
+      let p = {};
       if (rowForm) {
-        let p = {};
         try { p = JSON.parse(rowForm.payload); } catch (_) {}
-        if (tema) p.tema = tema;
-        if (versiculo) p.versiculo = versiculo;
-        if (objetivo_espiritual) p.objetivo_espiritual = objetivo_espiritual;
-        if (precisa_inscricao) p.precisa_inscricao = precisa_inscricao;
-        if (valor_inscricao) p.valor_inscricao = valor_inscricao;
-        if (precisa_valor_ministerio) p.precisa_valor_ministerio = precisa_valor_ministerio;
-        if (observacoes) p.observacoes = observacoes;
-
-        db.prepare("UPDATE formularios_eventos SET payload = ? WHERE id = ?").run(JSON.stringify(p), rowForm.id);
       }
+
+      if (tema !== undefined) p.tema = tema;
+      if (versiculo !== undefined) p.versiculo = versiculo;
+      if (objetivo_espiritual !== undefined) p.objetivo_espiritual = objetivo_espiritual;
+      if (publico !== undefined) p.publico = publico;
+      if (responsavel_geral !== undefined) p.responsavel_geral = responsavel_geral;
+      if (uso_salao !== undefined) p.uso_salao = uso_salao;
+      if (horario_total !== undefined) p.horario_total = horario_total;
+      if (materiais !== undefined) p.materiais = materiais;
+      if (decoracao !== undefined) p.decoracao = decoracao;
+      if (alimentacao !== undefined) p.alimentacao = alimentacao;
+      if (equipe !== undefined) p.equipe = equipe;
+      if (louvor !== undefined) p.louvor = louvor;
+      if (convidado !== undefined) p.convidado = convidado;
+      if (cronograma !== undefined) p.cronograma = cronograma;
+      if (midia_ja_feita !== undefined) p.midia_ja_feita = midia_ja_feita;
+      if (paleta !== undefined) p.paleta = paleta;
+      if (estilo !== undefined) p.estilo = estilo;
+      if (prazo_imagem !== undefined) p.prazo_imagem = prazo_imagem;
+      if (data_maxima_divulgacao !== undefined) p.data_maxima_divulgacao = data_maxima_divulgacao;
+      if (precisa_inscricao !== undefined) p.precisa_inscricao = precisa_inscricao;
+      if (valor_inscricao !== undefined) p.valor_inscricao = valor_inscricao;
+      if (precisa_valor_ministerio !== undefined) p.precisa_valor_ministerio = precisa_valor_ministerio;
+      if (observacoes !== undefined) p.observacoes = observacoes;
+
+      if (rowForm) {
+        db.prepare("UPDATE formularios_eventos SET payload = ? WHERE id = ?").run(JSON.stringify(p), rowForm.id);
+      } else {
+        db.prepare("INSERT INTO formularios_eventos (evento, departamento, data, payload, criadoEm) VALUES (?, ?, ?, ?, ?)").run(
+          nome_evento,
+          corpo.departamento || 'Geral',
+          corpo.data || '',
+          JSON.stringify(p),
+          new Date().toISOString()
+        );
+      }
+
       if (typeof db.marcarFormularioComoPreenchido === 'function') {
         db.marcarFormularioComoPreenchido(nome_evento);
       }
@@ -1252,8 +1306,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 
     return {
       ok: true,
-      message: 'Formulário atualizado com sucesso!',
-      mensagem: 'Formulário atualizado com sucesso!'
+      message: 'Formulário completo do evento salvo e atualizado com sucesso!',
+      mensagem: 'Formulário completo do evento salvo e atualizado com sucesso!'
     };
   }
 
@@ -2231,6 +2285,39 @@ function renderGestaoHtml({ user }) {
     .arte-badge-impressa { background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.7rem; }
     .arte-badge-video { background: #f3e8ff; color: #7e22ce; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.7rem; }
     .arte-badge-outro { background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 6px; font-weight: 800; font-size: 0.7rem; }
+
+    .form-wizard-step-btn {
+      background: var(--cor-cinza-suave);
+      border: 1.5px solid var(--cor-borda);
+      color: var(--cor-subtexto);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .form-wizard-step-btn:hover {
+      background: #f1f5f9;
+      color: var(--cor-texto);
+      border-color: var(--cor-roxo);
+    }
+    .form-wizard-step-btn.active {
+      background: #f3e8ff;
+      border-color: var(--cor-roxo);
+      color: var(--cor-roxo);
+      box-shadow: 0 0 0 2px rgba(122, 43, 226, 0.2);
+    }
+    .wizard-step-content {
+      display: none;
+    }
+    .wizard-step-content.active {
+      display: block;
+    }
 
     .alert-banner {
       padding: 10px 12px;
@@ -3253,57 +3340,231 @@ function renderGestaoHtml({ user }) {
           </form>
         </div>
 
-        <!-- SUBTELA 2: COMPLETAR FORMULÁRIO -->
+        <!-- SUBTELA 2: COMPLETAR FORMULÁRIO EM ETAPAS (WIZARD) -->
         <div id="subtelaFormulario" style="display: none;">
           <button type="button" class="btn-voltar-tipo" onclick="voltarMenuGerenciar()">← Voltar às opções</button>
-          
+
+          <!-- NAVEGAÇÃO ENTRE ABAS DO WIZARD -->
+          <div style="display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 6px;">
+            <button type="button" class="form-wizard-step-btn active" id="wizardTab_1" onclick="irParaAbaWizard(1)">
+              1. 📖 Propósito
+            </button>
+            <button type="button" class="form-wizard-step-btn" id="wizardTab_2" onclick="irParaAbaWizard(2)">
+              2. 🏛️ Estrutura & Salão
+            </button>
+            <button type="button" class="form-wizard-step-btn" id="wizardTab_3" onclick="irParaAbaWizard(3)">
+              3. 🎵 Programação
+            </button>
+            <button type="button" class="form-wizard-step-btn" id="wizardTab_4" onclick="irParaAbaWizard(4)">
+              4. 🎨 Mídia & Finanças
+            </button>
+          </div>
+
           <form onsubmit="submeterAtualizarFormularioSelecionado(event)">
-            <div class="form-row two-cols">
-              <div class="form-group">
-                <label>Tema do Evento</label>
-                <input type="text" class="form-control" id="ger_form_tema" placeholder="Tema oficial" />
+            <!-- ETAPA 1: PROPÓSITO & IDENTIDADE -->
+            <div id="wizardStepContent_1" class="wizard-step-content active">
+              <div class="alert-banner info" style="margin-bottom: 12px;">
+                📖 <strong>Passo 1 de 4:</strong> Defina o tema, base bíblica e o propósito espiritual deste evento.
               </div>
+
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Tema Oficial do Evento *</label>
+                  <input type="text" class="form-control" id="ger_form_tema" placeholder="Ex: Lâmpada e Luz, Mulheres Vitoriosas..." />
+                </div>
+                <div class="form-group">
+                  <label>Versículo Base (se houver)</label>
+                  <input type="text" class="form-control" id="ger_form_versiculo" placeholder="Ex: Salmos 119:105, Atos 7:24..." />
+                </div>
+              </div>
+
               <div class="form-group">
-                <label>Versículo Chave</label>
-                <input type="text" class="form-control" id="ger_form_versiculo" placeholder="Livro, capítulo e versículo" />
+                <label>Objetivo Espiritual e Propósito Principal *</label>
+                <textarea class="form-control" id="ger_form_objetivo" rows="2" placeholder="Qual o impacto e resultado espiritual esperado na vida das pessoas?"></textarea>
+              </div>
+
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Público-Alvo do Evento *</label>
+                  <select class="form-control" id="ger_form_publico">
+                    <option value="Toda a Igreja">Toda a Igreja / Família</option>
+                    <option value="Mulheres">Mulheres (Rede de Mulheres)</option>
+                    <option value="Homens">Homens (Rede de Homens)</option>
+                    <option value="Jovens">Jovens (Rede Ruach)</option>
+                    <option value="Casais">Casais</option>
+                    <option value="Crianças">Crianças (Kids)</option>
+                    <option value="Liderança">Liderança / Voluntários</option>
+                    <option value="Evangelístico / Visitantes">Evangelístico / Visitantes</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Líder / Responsável Geral na Coordenação *</label>
+                  <input type="text" class="form-control" id="ger_form_responsavel" placeholder="Quem responderá pela coordenação no dia?" />
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+                <button type="button" class="btn-secundario" onclick="voltarMenuGerenciar()">Cancelar</button>
+                <button type="button" class="btn-principal" onclick="irParaAbaWizard(2)">Avançar para Estrutura ➔</button>
               </div>
             </div>
 
-            <div class="form-group">
-              <label>Objetivo Espiritual do Evento</label>
-              <textarea class="form-control" id="ger_form_objetivo" rows="2" placeholder="Edificação da igreja e salvação de almas..."></textarea>
-            </div>
+            <!-- ETAPA 2: ESTRUTURA, SALÃO & EQUIPE -->
+            <div id="wizardStepContent_2" class="wizard-step-content">
+              <div class="alert-banner info" style="margin-bottom: 12px;">
+                🏛️ <strong>Passo 2 de 4:</strong> Informe as necessidades do salão, horários extras, equipamentos e equipe.
+              </div>
 
-            <div class="form-row two-cols">
               <div class="form-group">
-                <label>Inscrição</label>
-                <select class="form-control" id="ger_form_inscricao">
-                  <option value="nao">Não (Entrada Livre)</option>
-                  <option value="sim">Sim (Inscrição Necessária)</option>
+                <label>Vai precisar da igreja/salão antes para arrumar, no dia anterior para decoração ou depois para limpeza? *</label>
+                <select class="form-control" id="ger_form_uso_salao" onchange="toggleHorarioSalao()">
+                  <option value="nao">Não (Apenas no horário oficial do evento)</option>
+                  <option value="sim">Sim (Precisará de horários extras antes/depois ou na véspera)</option>
                 </select>
               </div>
+
+              <div class="form-group" id="boxHorarioSalao" style="display: none; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 10px;">
+                <label style="color: #92400e; font-weight: 700;">Horários necessários para uso pré/pós do salão *</label>
+                <input type="text" class="form-control" id="ger_form_horario_total" placeholder="Ex: Dia anterior das 18h às 21h para decoração, e no dia a partir das 17h para montagem" />
+              </div>
+
               <div class="form-group">
-                <label>Valor da Inscrição (R$)</label>
-                <input type="text" class="form-control" id="ger_form_valor" placeholder="Ex: 20,00" />
+                <label>Materiais e Equipamentos da Igreja Necessários</label>
+                <textarea class="form-control" id="ger_form_materiais" rows="2" placeholder="Ex: Som, microfones sem fio, projetor/telão, mesas, cadeiras, púlpito..."></textarea>
+              </div>
+
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Decoração</label>
+                  <input type="text" class="form-control" id="ger_form_decoracao" placeholder="Ex: Balões, flores, simples, ou Quem cuidará da decoração..." />
+                </div>
+                <div class="form-group">
+                  <label>Haverá Alimentação / Lanche?</label>
+                  <input type="text" class="form-control" id="ger_form_alimentacao" placeholder="Ex: Coffee break, lanche, almoço comunitário ou Não" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Equipe de Apoio Separada (Montagem, durante e pós-evento / limpeza)</label>
+                <textarea class="form-control" id="ger_form_equipe" rows="2" placeholder="Como está dividida a equipe de montagem, recepção e limpeza após o evento?"></textarea>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 14px;">
+                <button type="button" class="btn-secundario" onclick="irParaAbaWizard(1)">← Voltar para Propósito</button>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" class="btn-principal" onclick="irParaAbaWizard(3)">Avançar para Programação ➔</button>
+                </div>
               </div>
             </div>
 
-            <div class="form-group">
-              <label>Precisará de verba da Tesouraria?</label>
-              <select class="form-control" id="ger_form_tesouraria">
-                <option value="nao">Não</option>
-                <option value="sim">Sim</option>
-              </select>
+            <!-- ETAPA 3: PROGRAMAÇÃO, LOUVOR & CONVIDADOS -->
+            <div id="wizardStepContent_3" class="wizard-step-content">
+              <div class="alert-banner info" style="margin-bottom: 12px;">
+                🎵 <strong>Passo 3 de 4:</strong> Alinhamento de louvor, preletores convidados e cronograma.
+              </div>
+
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Louvor Definido? *</label>
+                  <select class="form-control" id="ger_form_louvor">
+                    <option value="sim">Sim (Banda/Ministério de Louvor da igreja)</option>
+                    <option value="a_definir">A Definir / Em alinhamento com Louvor</option>
+                    <option value="nao">Não haverá momento de louvor</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Haverá Convidado Especial (banda, pregador, cantor)?</label>
+                  <input type="text" class="form-control" id="ger_form_convidado" placeholder="Ex: Não / Sim: Pr. Fulano de Tal (Igreja X)" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Cronograma Previsto do Evento</label>
+                <textarea class="form-control" id="ger_form_cronograma" rows="3" placeholder="Ex: 19h00 Abertura e Oração&#10;19h20 Louvor&#10;19h50 Ministração da Palavra&#10;21h00 Apelo e Oração Final&#10;21h30 Término e Comunhão"></textarea>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 14px;">
+                <button type="button" class="btn-secundario" onclick="irParaAbaWizard(2)">← Voltar para Estrutura</button>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" class="btn-principal" onclick="irParaAbaWizard(4)">Avançar para Mídia & Finanças ➔</button>
+                </div>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label>Observações Gerais</label>
-              <textarea class="form-control" id="ger_form_obs" rows="2" placeholder="Requisitos de multimídia, som, voluntários..."></textarea>
-            </div>
+            <!-- ETAPA 4: MÍDIA, DIVULGAÇÃO & FINANCEIRO -->
+            <div id="wizardStepContent_4" class="wizard-step-content">
+              <div class="alert-banner info" style="margin-bottom: 12px;">
+                🎨 <strong>Passo 4 de 4:</strong> Mídia, materiais de divulgação, taxas de inscrição e tesouraria.
+              </div>
 
-            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
-              <button type="button" class="btn-secundario" onclick="voltarMenuGerenciar()">Voltar</button>
-              <button type="submit" class="btn-principal">Salvar Formulário</button>
+              <div class="form-group">
+                <label>A arte/mídia deste evento já foi solicitada ou feita com a equipe de multimídia? *</label>
+                <select class="form-control" id="ger_form_midia_feita" onchange="toggleMidiaCampos()">
+                  <option value="sim">Sim, já alinhada / em produção com a Multimídia</option>
+                  <option value="nao">Não, precisará criar e produzir arte</option>
+                </select>
+              </div>
+
+              <div id="boxCamposMidia" style="display: none; background: var(--cor-cinza-suave); border: 1.5px dashed var(--cor-roxo); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                <div style="font-size: 0.82rem; font-weight: 800; color: var(--cor-roxo); margin-bottom: 8px;">
+                  🎨 Detalhes para Criação da Arte / Mídia:
+                </div>
+                <div class="form-row two-cols">
+                  <div class="form-group">
+                    <label>Paleta de Cores Desejada</label>
+                    <input type="text" class="form-control" id="ger_form_paleta" placeholder="Ex: Tons lilás e dourado, azul marinho..." />
+                  </div>
+                  <div class="form-group">
+                    <label>Estilo Visual e Formatos</label>
+                    <input type="text" class="form-control" id="ger_form_estilo" placeholder="Ex: Feed, Story, Telão, Banner 1x2m..." />
+                  </div>
+                </div>
+                <div class="form-row two-cols">
+                  <div class="form-group">
+                    <label>Prazo Máximo para ter as Imagens Prontas</label>
+                    <input type="text" class="form-control" id="ger_form_prazo_imagem" placeholder="Ex: 15/11/2026 ou 5 dias antes" />
+                  </div>
+                  <div class="form-group">
+                    <label>Data Limite para Iniciar a Divulgação</label>
+                    <input type="text" class="form-control" id="ger_form_data_maxima_divulgacao" placeholder="Ex: 16/11/2026" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-row two-cols">
+                <div class="form-group">
+                  <label>Precisará de verba da Tesouraria? *</label>
+                  <select class="form-control" id="ger_form_tesouraria">
+                    <option value="nao">Não</option>
+                    <option value="sim">Sim (Alinhar com a Tesouraria)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Inscrição / Taxa do Evento *</label>
+                  <select class="form-control" id="ger_form_inscricao" onchange="toggleInscricaoValor()">
+                    <option value="nao">Não (Entrada Livre e Gratuita)</option>
+                    <option value="sim">Sim (Evento Pago / Inscrição)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group" id="boxValorInscricao" style="display: none;">
+                <label>Valor da Inscrição (R$)</label>
+                <input type="text" class="form-control" id="ger_form_valor" placeholder="Ex: R$ 25,00" />
+              </div>
+
+              <div class="form-group">
+                <label>Observações Gerais / Detalhes Finais para Secretaria e Pastores</label>
+                <textarea class="form-control" id="ger_form_obs" rows="2" placeholder="Algum detalhe ou necessidade especial que não foi mencionada nos passos anteriores?"></textarea>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 14px;">
+                <button type="button" class="btn-secundario" onclick="irParaAbaWizard(3)">← Voltar para Programação</button>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" class="btn-secundario" onclick="voltarMenuGerenciar()">Cancelar</button>
+                  <button type="submit" class="btn-principal" id="btnSalvarFormularioCompleto">💾 Salvar e Concluir Formulário</button>
+                </div>
+              </div>
             </div>
           </form>
         </div>
@@ -3728,12 +3989,50 @@ function renderGestaoHtml({ user }) {
       if (document.getElementById('ger_alt_motivo')) document.getElementById('ger_alt_motivo').value = '';
       if (document.getElementById('ger_canc_motivo')) document.getElementById('ger_canc_motivo').value = '';
 
+      let p = {};
       if (ev.payload) {
-        if (document.getElementById('ger_form_tema')) document.getElementById('ger_form_tema').value = ev.payload.tema || '';
-        if (document.getElementById('ger_form_versiculo')) document.getElementById('ger_form_versiculo').value = ev.payload.versiculo || '';
-        if (document.getElementById('ger_form_objetivo')) document.getElementById('ger_form_objetivo').value = ev.payload.objetivo_espiritual || '';
-        if (document.getElementById('ger_form_obs')) document.getElementById('ger_form_obs').value = ev.payload.observacoes || '';
+        if (typeof ev.payload === 'string') {
+          try { p = JSON.parse(ev.payload); } catch (_) { p = {}; }
+        } else if (typeof ev.payload === 'object') {
+          p = ev.payload;
+        }
       }
+
+      // Passo 1: Propósito & Tema
+      if (document.getElementById('ger_form_tema')) document.getElementById('ger_form_tema').value = p.tema || '';
+      if (document.getElementById('ger_form_versiculo')) document.getElementById('ger_form_versiculo').value = p.versiculo || '';
+      if (document.getElementById('ger_form_objetivo')) document.getElementById('ger_form_objetivo').value = p.objetivo_espiritual || '';
+      if (document.getElementById('ger_form_publico')) document.getElementById('ger_form_publico').value = p.publico || 'Toda a Igreja';
+      if (document.getElementById('ger_form_responsavel')) document.getElementById('ger_form_responsavel').value = p.responsavel_geral || '';
+
+      // Passo 2: Estrutura & Salão
+      if (document.getElementById('ger_form_uso_salao')) document.getElementById('ger_form_uso_salao').value = p.uso_salao || 'nao';
+      if (document.getElementById('ger_form_horario_total')) document.getElementById('ger_form_horario_total').value = p.horario_total || '';
+      if (document.getElementById('ger_form_materiais')) document.getElementById('ger_form_materiais').value = p.materiais || '';
+      if (document.getElementById('ger_form_decoracao')) document.getElementById('ger_form_decoracao').value = p.decoracao || '';
+      if (document.getElementById('ger_form_alimentacao')) document.getElementById('ger_form_alimentacao').value = p.alimentacao || '';
+      if (document.getElementById('ger_form_equipe')) document.getElementById('ger_form_equipe').value = p.equipe || '';
+
+      // Passo 3: Programação & Louvor
+      if (document.getElementById('ger_form_louvor')) document.getElementById('ger_form_louvor').value = p.louvor || 'sim';
+      if (document.getElementById('ger_form_convidado')) document.getElementById('ger_form_convidado').value = p.convidado || '';
+      if (document.getElementById('ger_form_cronograma')) document.getElementById('ger_form_cronograma').value = p.cronograma || '';
+
+      // Passo 4: Mídia & Financeiro
+      if (document.getElementById('ger_form_midia_feita')) document.getElementById('ger_form_midia_feita').value = p.midia_ja_feita || 'sim';
+      if (document.getElementById('ger_form_paleta')) document.getElementById('ger_form_paleta').value = p.paleta || '';
+      if (document.getElementById('ger_form_estilo')) document.getElementById('ger_form_estilo').value = p.estilo || '';
+      if (document.getElementById('ger_form_prazo_imagem')) document.getElementById('ger_form_prazo_imagem').value = p.prazo_imagem || '';
+      if (document.getElementById('ger_form_data_maxima_divulgacao')) document.getElementById('ger_form_data_maxima_divulgacao').value = p.data_maxima_divulgacao || '';
+      if (document.getElementById('ger_form_tesouraria')) document.getElementById('ger_form_tesouraria').value = p.precisa_valor_ministerio || 'nao';
+      if (document.getElementById('ger_form_inscricao')) document.getElementById('ger_form_inscricao').value = p.precisa_inscricao || 'nao';
+      if (document.getElementById('ger_form_valor')) document.getElementById('ger_form_valor').value = p.valor_inscricao || '';
+      if (document.getElementById('ger_form_obs')) document.getElementById('ger_form_obs').value = p.observacoes || '';
+
+      toggleHorarioSalao();
+      toggleMidiaCampos();
+      toggleInscricaoValor();
+      irParaAbaWizard(1);
 
       voltarMenuGerenciar();
 
@@ -3781,6 +4080,45 @@ function renderGestaoHtml({ user }) {
 
     function fecharModalGerenciarEvento() {
       document.getElementById('modalGerenciarEvento').classList.remove('active');
+    }
+
+    function irParaAbaWizard(passo) {
+      for (let i = 1; i <= 4; i++) {
+        const tab = document.getElementById('wizardTab_' + i);
+        const sec = document.getElementById('wizardStepContent_' + i);
+        if (tab) {
+          if (i === passo) tab.classList.add('active');
+          else tab.classList.remove('active');
+        }
+        if (sec) {
+          if (i === passo) sec.classList.add('active');
+          else sec.classList.remove('active');
+        }
+      }
+    }
+
+    function toggleHorarioSalao() {
+      const el = document.getElementById('ger_form_uso_salao');
+      const box = document.getElementById('boxHorarioSalao');
+      if (el && box) {
+        box.style.display = el.value === 'sim' ? 'block' : 'none';
+      }
+    }
+
+    function toggleMidiaCampos() {
+      const el = document.getElementById('ger_form_midia_feita');
+      const box = document.getElementById('boxCamposMidia');
+      if (el && box) {
+        box.style.display = el.value === 'nao' ? 'block' : 'none';
+      }
+    }
+
+    function toggleInscricaoValor() {
+      const el = document.getElementById('ger_form_inscricao');
+      const box = document.getElementById('boxValorInscricao');
+      if (el && box) {
+        box.style.display = el.value === 'sim' ? 'block' : 'none';
+      }
     }
 
     function voltarMenuGerenciar() {
@@ -3849,13 +4187,31 @@ function renderGestaoHtml({ user }) {
       const payload = {
         tipo: 'atualizar_formulario',
         nome_evento: eventoSendoGerenciado.titulo,
-        tema: document.getElementById('ger_form_tema').value,
-        versiculo: document.getElementById('ger_form_versiculo').value,
-        objetivo_espiritual: document.getElementById('ger_form_objetivo').value,
-        precisa_inscricao: document.getElementById('ger_form_inscricao').value,
-        valor_inscricao: document.getElementById('ger_form_valor').value,
-        precisa_valor_ministerio: document.getElementById('ger_form_tesouraria').value,
-        observacoes: document.getElementById('ger_form_obs').value
+        departamento: eventoSendoGerenciado.departamento,
+        data: eventoSendoGerenciado.data,
+        tema: document.getElementById('ger_form_tema') ? document.getElementById('ger_form_tema').value : '',
+        versiculo: document.getElementById('ger_form_versiculo') ? document.getElementById('ger_form_versiculo').value : '',
+        objetivo_espiritual: document.getElementById('ger_form_objetivo') ? document.getElementById('ger_form_objetivo').value : '',
+        publico: document.getElementById('ger_form_publico') ? document.getElementById('ger_form_publico').value : '',
+        responsavel_geral: document.getElementById('ger_form_responsavel') ? document.getElementById('ger_form_responsavel').value : '',
+        uso_salao: document.getElementById('ger_form_uso_salao') ? document.getElementById('ger_form_uso_salao').value : 'nao',
+        horario_total: document.getElementById('ger_form_horario_total') ? document.getElementById('ger_form_horario_total').value : '',
+        materiais: document.getElementById('ger_form_materiais') ? document.getElementById('ger_form_materiais').value : '',
+        decoracao: document.getElementById('ger_form_decoracao') ? document.getElementById('ger_form_decoracao').value : '',
+        alimentacao: document.getElementById('ger_form_alimentacao') ? document.getElementById('ger_form_alimentacao').value : '',
+        equipe: document.getElementById('ger_form_equipe') ? document.getElementById('ger_form_equipe').value : '',
+        louvor: document.getElementById('ger_form_louvor') ? document.getElementById('ger_form_louvor').value : 'sim',
+        convidado: document.getElementById('ger_form_convidado') ? document.getElementById('ger_form_convidado').value : '',
+        cronograma: document.getElementById('ger_form_cronograma') ? document.getElementById('ger_form_cronograma').value : '',
+        midia_ja_feita: document.getElementById('ger_form_midia_feita') ? document.getElementById('ger_form_midia_feita').value : 'sim',
+        paleta: document.getElementById('ger_form_paleta') ? document.getElementById('ger_form_paleta').value : '',
+        estilo: document.getElementById('ger_form_estilo') ? document.getElementById('ger_form_estilo').value : '',
+        prazo_imagem: document.getElementById('ger_form_prazo_imagem') ? document.getElementById('ger_form_prazo_imagem').value : '',
+        data_maxima_divulgacao: document.getElementById('ger_form_data_maxima_divulgacao') ? document.getElementById('ger_form_data_maxima_divulgacao').value : '',
+        precisa_valor_ministerio: document.getElementById('ger_form_tesouraria') ? document.getElementById('ger_form_tesouraria').value : 'nao',
+        precisa_inscricao: document.getElementById('ger_form_inscricao') ? document.getElementById('ger_form_inscricao').value : 'nao',
+        valor_inscricao: document.getElementById('ger_form_valor') ? document.getElementById('ger_form_valor').value : '',
+        observacoes: document.getElementById('ger_form_obs') ? document.getElementById('ger_form_obs').value : ''
       };
 
       try {
@@ -3866,7 +4222,7 @@ function renderGestaoHtml({ user }) {
         });
         const ret = await res.json();
         if (ret.ok) {
-          alert('✅ Ficha atualizada com sucesso!');
+          alert('✅ ' + (ret.mensagem || ret.message || 'Formulário completo do evento salvo e atualizado com sucesso!'));
           fecharModalGerenciarEvento();
           carregarFichasServidor();
         } else {
