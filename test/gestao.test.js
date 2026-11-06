@@ -786,6 +786,74 @@ test("Cache de Calendário: listarEventosCalendario armazena dados em memória p
   assert.ok(t2 - t1 < 50, `Segunda chamada deve responder via cache instantaneamente (${t2 - t1}ms)`);
 });
 
+test("Segurança de Rotas: líder comum acessando /secretaria é redirecionado para /gestao", async () => {
+  const tokenLider = createSession("lider.teste2", "lider", "active");
+
+  const res = await fetch(`${baseUrl}/secretaria`, {
+    headers: { Cookie: `whatsapp_control_session=${tokenLider}` },
+    redirect: "manual"
+  });
+
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get("location"), "/gestao");
+});
+
+test("Logout: /logout e /secretaria/logout limpam sessão e redirecionam para /secretaria/login", async () => {
+  const token = createSession("lider.logout", "lider", "active");
+
+  const res1 = await fetch(`${baseUrl}/logout`, {
+    headers: { Cookie: `whatsapp_control_session=${token}` },
+    redirect: "manual"
+  });
+  assert.equal(res1.status, 302);
+  assert.equal(res1.headers.get("location"), "/secretaria/login");
+
+  const res2 = await fetch(`${baseUrl}/secretaria/logout`, {
+    headers: { Cookie: `whatsapp_control_session=${token}` },
+    redirect: "manual"
+  });
+  assert.equal(res2.status, 302);
+  assert.equal(res2.headers.get("location"), "/secretaria/login");
+});
+
+test("Recuperar Senha: líder cadastrado consegue redefinir senha informando WhatsApp e Nome", async () => {
+  addLider({
+    nome: "Débora Líder",
+    telefone: "5511977778899",
+    cargos: ["lider"],
+    departamentos: ["Dança"]
+  });
+
+  const res = await fetch(`${baseUrl}/secretaria/recuperar-senha`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      telefone: "(11) 97777-8899",
+      nome: "Débora Líder",
+      password: "novaSenhaSegura123",
+      confirmPassword: "novaSenhaSegura123"
+    })
+  });
+
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.match(data.message, /Senha redefinida/);
+
+  // Login com a nova senha
+  const loginRes = await fetch(`${baseUrl}/secretaria/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: "11977778899",
+      password: "novaSenhaSegura123"
+    })
+  });
+  assert.equal(loginRes.status, 200);
+  const loginData = await loginRes.json();
+  assert.equal(loginData.redirect, "/gestao");
+});
+
 
 
 

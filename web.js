@@ -5,7 +5,7 @@ const { URL } = require("url");
 const { loadUsers, saveUser, deleteUser } = require("./web/users");
 const { listLideres, addLider, updateLider, removeLider, loadLideres } = require("./web/lideres");
 const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
-const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
+const { renderLoginHtml, renderRegisterHtml, renderRecuperarSenhaHtml, renderIndexHtml } = require("./web/views");
 const { createRateLimiter } = require("./web/rateLimiter");
 const { getClientIp } = require("./web/clientIp");
 const cultoMulheres = require("./web/culto_mulheres");
@@ -1175,7 +1175,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
               loginRateLimiter.reset(ip);
               setSessionCookie(res, token);
               console.log(`[Web] Login bem-sucedido: ${sanitizarParaLog(nomeSessao)} (${sanitizarParaLog(user.username)}) (IP: ${sanitizarParaLog(ip)})`); // NOSONAR
-              return sendJson(res, 200, { ok: true });
+              const destino = roleSessao === 'admin' ? '/secretaria' : '/gestao';
+              return sendJson(res, 200, { ok: true, role: roleSessao, redirect: destino });
             } else if (!isPasswordValid) {
               console.warn(`[Web] Login falhou: Senha incorreta para o usuário '${sanitizarParaLog(username)}' (IP: ${sanitizarParaLog(ip)}). Verifique o hash no log de Auth.`); // NOSONAR
             } else {
@@ -1191,7 +1192,12 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       }
       // O gate de autenticação só se aplica a rotas dentro de /secretaria — outras
       // rotas (ex: uma futura landing page em "/") ficam livres, sem exigir login.
-      if (pathname.startsWith('/secretaria') && pathname !== '/secretaria/login' && pathname !== '/secretaria/register' && !isAuthenticated(req)) {
+      if (pathname.startsWith('/secretaria') && 
+          pathname !== '/secretaria/login' && 
+          pathname !== '/secretaria/register' && 
+          pathname !== '/secretaria/recuperar-senha' && 
+          pathname !== '/secretaria/logout' && 
+          !isAuthenticated(req)) {
         if (req.method === 'GET') {
           res.writeHead(302, { Location: '/secretaria/login' });
           return res.end();
@@ -1201,7 +1207,114 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       }
       if (req.method === 'GET' && pathname === '/secretaria/register') {
         return sendHtml(res, renderRegisterHtml());
+      }
+      if (req.method === 'GET' && pathname === '/secretaria/recuperar-senha') {
+        return sendHtml(res, renderRecuperarSenhaHtml());
+      }
+      if (req.method === 'POST' && pathname === '/secretaria/recuperar-senha') {
+        try {
+          const body = await parseRequestBody(req);
+          const { telefone, nome, password } = body;
 
+          if (!password || password.length < 6) {
+            return sendJson(res, 400, { ok: false, message: "A nova senha deve ter no mínimo 6 caracteres." });
+          }
+
+          const telEntrada = String(telefone || "").trim();
+          const nomeEntrada = String(nome || "").trim();
+          const digitosTel = telEntrada.replace(/\D/g, "");
+
+          if (!digitosTel || nomeEntrada.length < 2) {
+            return sendJson(res, 400, { ok: false, message: "Informe seu WhatsApp e Nome Completo cadastrados." });
+          }
+
+          // Busca líder correspondente
+          const lideres = loadLideres();
+          let liderEncontrado = null;
+          for (const l of Object.values(lideres)) {
+            const lTel = String(l.telefone || "").replace(/\D/g, "");
+            if (lTel === digitosTel || (digitosTel.length >= 8 && lTel.endsWith(digitosTel.slice(-8)))) {
+              liderEncontrado = l;
+              break;
+            }
+          }
+
+          const nLow = nomeEntrada.toLowerCase();
+          if (!liderEncontrado) {
+            if (digitosTel.endsWith('942685501') || nLow.includes('diniz')) {
+              liderEncontrado = { nome: "Gabriela Diniz", telefone: "5511942685501", cargos: ["admin", "secretaria"] };
+            } else if (digitosTel.endsWith('970498716') || nLow.includes('isabelly')) {
+              liderEncontrado = { nome: "Isabelly Lacerda", telefone: "5511970498716", cargos: ["secretaria", "diretoria"] };
+            }
+          }
+
+          if (!liderEncontrado) {
+            return sendJson(res, 404, {
+              ok: false,
+              message: "Cadastro não localizado. Verifique se o WhatsApp informado está cadastrado na liderança da igreja."
+            });
+          }
+
+          // Valida se o nome confere
+          const nomeCadastrado = (liderEncontrado.nome || "").toLowerCase().trim();
+          const primeiroNomeCad = nomeCadastrado.split(/\s+/)[0];
+          const primeiroNomeDig = nLow.split(/\s+/)[0];
+          if (primeiroNomeCad !== primeiroNomeDig && !nomeCadastrado.includes(nLow) && !nLow.includes(primeiroNomeCad)) {
+            return sendJson(res, 400, {
+              ok: false,
+              message: "O nome informado não confere com o cadastro deste número. Verifique o nome completo digitado."
+            });
+          }
+
+          // Gera nova senha
+          const { salt, hash } = await hashPassword(password);
+          const users = loadUsers();
+          const telOficial = liderEncontrado.telefone;
+
+          let userPrinc = users[telOficial] || Object.values(users).find(u => {
+            const uTel = String(u.telefone || u.username || "").replace(/\D/g, "");
+            return uTel && uTel === String(telOficial).replace(/\D/g, "");
+          });
+
+          let role = userPrinc?.role || 'lider';
+          if (liderEncontrado.cargos?.some(c => String(c).toLowerCase().includes('admin') || String(c).toLowerCase().includes('secretaria'))) {
+            role = 'admin';
+          }
+
+          saveUser({
+            username: userPrinc?.username || telOficial,
+            nome: liderEncontrado.nome,
+            telefone: telOficial,
+            salt,
+            hash,
+            status: 'active',
+            role,
+            primeiroAcessoEm: userPrinc?.primeiroAcessoEm || new Date().toISOString(),
+            createdAt: userPrinc?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+
+          // Atualiza também logins vinculados pelo mesmo telefone (apelido / customUsername)
+          for (const u of Object.values(users)) {
+            const uTel = String(u.telefone || "").replace(/\D/g, "");
+            if (uTel && uTel === String(telOficial).replace(/\D/g, "") && u.username !== telOficial) {
+              saveUser({
+                ...u,
+                salt,
+                hash,
+                updatedAt: new Date().toISOString()
+              });
+            }
+          }
+
+          return sendJson(res, 200, {
+            ok: true,
+            message: "Senha redefinida com sucesso! Agora você já pode fazer login."
+          });
+        } catch (err) {
+          console.error(`[Web] Erro ao recuperar senha: ${err.message}`);
+          return sendJson(res, 500, { ok: false, message: "Erro ao redefinir senha." });
+        }
       }
       if (req.method === 'POST' && pathname === '/secretaria/register') {
         try {
@@ -1501,6 +1614,16 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         }
 
         if (req.method === 'GET' && pathname === '/secretaria') {
+          const session = getSession(req);
+          if (!session || !session.username) {
+            res.writeHead(302, { Location: '/secretaria/login' });
+            return res.end();
+          }
+          // Líderes comuns não têm acesso à gestão do bot/secretaria, apenas ao portal de Gestão (/gestao)
+          if (session.role !== 'admin') {
+            res.writeHead(302, { Location: '/gestao' });
+            return res.end();
+          }
           try {
             let html = renderIndexHtml();
             html = limpezaEventos.filtrarHtmlEventosExpirados(html);
@@ -1810,6 +1933,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           const prefix = pathname.startsWith('/secretaria/api/admin/lideres/') ? '/secretaria/api/admin/lideres/' : '/secretaria/api/admin/usuarios/';
           const target = decodeURIComponent(pathname.replace(prefix, ''));
           const result = removeLider(target);
+          try {
+            deleteUser(target);
+          } catch (_) {}
           return sendJson(res, result.ok ? 200 : 404, result);
         }
 
@@ -1854,10 +1980,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           await startClient({ forceClean: true });
           return sendJson(res, 200, { ok: true, message: 'Sessão reiniciada do zero.' });
         }
-        if (req.method === 'POST' && pathname === '/secretaria/logout') {
+        if (pathname === '/secretaria/logout' || pathname === '/logout') {
           const sessionId = getSessionId(req);
           clearSessionCookie(res, sessionId);
-          return sendJson(res, 200, { ok: true });
+          if (req.method === 'POST') {
+            return sendJson(res, 200, { ok: true });
+          }
+          res.writeHead(302, { Location: '/secretaria/login' });
+          return res.end();
         }
         // Rota não encontrada
         console.warn(`[Web] 404 Not Found: ${req.method} ${sanitizarParaLog(pathname)}`); // NOSONAR

@@ -213,6 +213,9 @@ function renderLoginHtml(message = "") {
         <input id="password" name="password" type="password" placeholder="Digite sua senha" required autocomplete="current-password" />
         <span id="togglePassword" class="toggle-password" title="Ver senha">👀</span>
       </div>
+      <div style="display:flex; justify-content: flex-end; margin-top: 4px; margin-bottom: 6px;">
+        <a href="/secretaria/recuperar-senha" style="color: #a1a1aa; font-size: 0.82rem; text-decoration: underline;">Esqueci minha senha</a>
+      </div>
       
       <div style="display:flex; align-items:center; gap:8px; margin: 12px 0 16px 0; font-size: 0.85rem; color: #a1a1aa;">
         <input type="checkbox" id="rememberMe" name="rememberMe" checked style="width: auto; margin: 0; cursor: pointer;" />
@@ -233,11 +236,23 @@ function renderLoginHtml(message = "") {
   <script>
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
-    togglePassword.addEventListener('click', () => {
-      const type = passwordInput.type === 'password' ? 'text' : 'password';
-      passwordInput.type = type;
-      togglePassword.textContent = type === 'password' ? '👀' : '🙈';
-    });
+    if (togglePassword && passwordInput) {
+      togglePassword.addEventListener('click', () => {
+        const type = passwordInput.type === 'password' ? 'text' : 'password';
+        passwordInput.type = type;
+        togglePassword.textContent = type === 'password' ? '👀' : '🙈';
+      });
+    }
+
+    const toggleConfirm = document.getElementById('toggleConfirmPassword');
+    const confirmInput = document.getElementById('confirmPassword');
+    if (toggleConfirm && confirmInput) {
+      toggleConfirm.addEventListener('click', () => {
+        const type = confirmInput.type === 'password' ? 'text' : 'password';
+        confirmInput.type = type;
+        toggleConfirm.textContent = type === 'password' ? '👀' : '🙈';
+      });
+    }
 
     const urlParams = new URLSearchParams(window.location.search);
     const msg = urlParams.get('message');
@@ -267,13 +282,22 @@ function renderLoginHtml(message = "") {
       });
       if (res.ok) {
         console.log('Login bem-sucedido.');
+        const json = await res.json();
         const rememberEl = document.getElementById('rememberMe');
         if (rememberEl && rememberEl.checked) {
           localStorage.setItem('curados_secretaria_usuario', data.username || '');
         } else {
           localStorage.removeItem('curados_secretaria_usuario');
         }
-        const redirectUrl = urlParams.get('redirect') || '/secretaria';
+        const paramRedirect = urlParams.get('redirect');
+        let redirectUrl = json.redirect || (json.role === 'admin' ? '/secretaria' : '/gestao');
+        if (paramRedirect) {
+          if (paramRedirect.startsWith('/secretaria') && json.role !== 'admin') {
+            redirectUrl = '/gestao';
+          } else {
+            redirectUrl = paramRedirect;
+          }
+        }
         window.location.href = redirectUrl;
       } else {
         const json = await res.json();
@@ -493,7 +517,7 @@ function renderRegisterHtml(message = "") {
       <input id="regNome" name="nome" placeholder="Seu nome completo cadastrado" autocomplete="name" />
 
       <label class="input-label" for="regUsername">Nome de Usuário Desejado (Login)</label>
-      <input id="regUsername" name="customUsername" placeholder="Ex: isabelly, diniz, pastor.silvano" autocomplete="username" />
+      <input id="regUsername" name="customUsername" placeholder="Digite seu nome de usuário desejado (opcional)" autocomplete="username" />
       <div style="font-size: 0.78rem; color: #a1a1aa; margin-top: -6px; margin-bottom: 14px;">
         💡 Opcional: escolha o nome que você prefere digitar ao entrar no painel. Se deixar em branco, você poderá entrar com o WhatsApp.
       </div>
@@ -505,7 +529,10 @@ function renderRegisterHtml(message = "") {
       </div>
 
       <label class="input-label" for="confirmPassword">Confirmar Nova Senha *</label>
-      <input id="confirmPassword" name="confirmPassword" type="password" placeholder="Repita a nova senha" required minlength="6" autocomplete="new-password" />
+      <div class="password-wrapper">
+        <input id="confirmPassword" name="confirmPassword" type="password" placeholder="Repita a nova senha" required minlength="6" autocomplete="new-password" />
+        <span id="toggleConfirmPassword" class="toggle-password" title="Ver senha">👀</span>
+      </div>
       
       <button type="submit" id="btnSubmitReg">Cadastrar Usuário e Criar Senha</button>
       <div class="links">
@@ -516,19 +543,34 @@ function renderRegisterHtml(message = "") {
   <script>
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
-    togglePassword.addEventListener('click', () => {
-      const type = passwordInput.type === 'password' ? 'text' : 'password';
-      passwordInput.type = type;
-      togglePassword.textContent = type === 'password' ? '👀' : '🙈';
-    });
+    if (togglePassword && passwordInput) {
+      togglePassword.addEventListener('click', () => {
+        const type = passwordInput.type === 'password' ? 'text' : 'password';
+        passwordInput.type = type;
+        togglePassword.textContent = type === 'password' ? '👀' : '🙈';
+      });
+    }
+
+    const toggleConfirm = document.getElementById('toggleConfirmPassword');
+    const confirmInput = document.getElementById('confirmPassword');
+    if (toggleConfirm && confirmInput) {
+      toggleConfirm.addEventListener('click', () => {
+        const type = confirmInput.type === 'password' ? 'text' : 'password';
+        confirmInput.type = type;
+        toggleConfirm.textContent = type === 'password' ? '👀' : '🙈';
+      });
+    }
 
     const telInput = document.getElementById('regTelefone');
     if (telInput) {
       telInput.addEventListener('input', function(e) {
-        let v = e.target.value.replace(/[^0-9]/g, '');
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.startsWith('55') && v.length > 11) v = v.substring(2);
         if (v.length > 11) v = v.substring(0, 11);
-        if (v.length > 6) {
+        if (v.length > 10) {
           e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
+        } else if (v.length > 6) {
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
         } else if (v.length > 2) {
           e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2);
         } else if (v.length > 0) {
@@ -538,7 +580,7 @@ function renderRegisterHtml(message = "") {
         }
       });
       telInput.addEventListener('blur', function(e) {
-        let v = e.target.value.replace(/[^0-9]/g, '');
+        let v = e.target.value.replace(/\D/g, '');
         if (v.startsWith('55') && v.length > 11) v = v.substring(2);
         if (v.length === 11) {
           e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
@@ -589,6 +631,302 @@ function renderRegisterHtml(message = "") {
       else {
         console.error('Erro no cadastro:', json.message);
         msgEl.textContent = json.message;
+        msgEl.className = 'error';
+      }
+    });
+  </script>
+</body></html>`;
+}
+
+function renderRecuperarSenhaHtml(message = "") {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recuperar Senha - Comunidade Cristã Curados</title>
+  <link rel="icon" type="image/png" href="/images/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cor-ciano: #00bcd4;
+      --cor-roxo: #7b2cbf;
+      --cor-laranja: #ff7d00;
+      --cor-magenta: #e01a4f;
+      --cor-escuro: #101014;
+      --cor-card: #18181e;
+      --cor-borda: rgba(255, 255, 255, 0.09);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
+    body {
+      background: radial-gradient(circle at 10% 20%, #171123 0%, #0d0c13 90%);
+      color: #f3f4f6;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    .container {
+      background: var(--cor-card);
+      border: 1px solid var(--cor-borda);
+      border-radius: 20px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      position: relative;
+    }
+    .container::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 40px; right: 40px; height: 3px;
+      background: linear-gradient(90deg, var(--cor-laranja), var(--cor-magenta));
+      border-radius: 0 0 4px 4px;
+    }
+    .brand-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .brand-logo {
+      width: 58px;
+      height: 58px;
+      margin-bottom: 0.8rem;
+    }
+    .brand-title {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+    .brand-subtitle {
+      font-size: 0.82rem;
+      color: #a1a1aa;
+      font-weight: 500;
+      margin-top: 0.2rem;
+    }
+    .input-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #d1d5db;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    input {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      background: #101014;
+      border: 1px solid #27272a;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.95rem;
+      margin-bottom: 1.2rem;
+      transition: all 0.2s;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--cor-laranja);
+      box-shadow: 0 0 0 3px rgba(255, 125, 0, 0.2);
+    }
+    .password-wrapper {
+      position: relative;
+      width: 100%;
+    }
+    .password-wrapper input {
+      padding-right: 40px;
+    }
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 14px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 1.1rem;
+    }
+    button {
+      width: 100%;
+      padding: 0.9rem;
+      background: linear-gradient(135deg, var(--cor-laranja) 0%, var(--cor-magenta) 100%);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(224, 26, 79, 0.35);
+      transition: all 0.2s;
+      margin-top: 0.5rem;
+    }
+    button:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+    .info {
+      background: rgba(0, 188, 212, 0.1);
+      border: 1px solid rgba(0, 188, 212, 0.2);
+      color: var(--cor-ciano);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 1.2rem;
+      line-height: 1.4;
+    }
+    .error {
+      background: rgba(224, 26, 79, 0.1);
+      border: 1px solid rgba(224, 26, 79, 0.2);
+      color: #f87171;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 1.2rem;
+    }
+    .success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 1.2rem;
+    }
+    .links {
+      text-align: center;
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: #a1a1aa;
+    }
+    .links a {
+      color: var(--cor-laranja);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .links a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand-header">
+      <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
+      <h1 class="brand-title"><span>CURADOS</span></h1>
+      <p class="brand-subtitle">Recuperar Senha de Acesso</p>
+    </div>
+
+    <div id="recMessage" class="${message ? 'error' : 'info'}">${message || 'Informe seu WhatsApp e Nome cadastrados para validar sua identidade e redefinir sua senha.'}</div>
+    <form id="recForm">
+      <label class="input-label" for="recTelefone">Seu WhatsApp *</label>
+      <input id="recTelefone" name="telefone" placeholder="(11) 99999-9999" required autocomplete="tel" inputmode="numeric" />
+
+      <label class="input-label" for="recNome">Nome Completo *</label>
+      <input id="recNome" name="nome" placeholder="Seu nome completo cadastrado" required autocomplete="name" />
+      
+      <label class="input-label" for="password">Nova Senha *</label>
+      <div class="password-wrapper">
+        <input id="password" name="password" type="password" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="new-password" />
+        <span id="togglePassword" class="toggle-password" title="Ver senha">👀</span>
+      </div>
+
+      <label class="input-label" for="confirmPassword">Confirmar Nova Senha *</label>
+      <div class="password-wrapper">
+        <input id="confirmPassword" name="confirmPassword" type="password" placeholder="Repita a nova senha" required minlength="6" autocomplete="new-password" />
+        <span id="toggleConfirmPassword" class="toggle-password" title="Ver senha">👀</span>
+      </div>
+      
+      <button type="submit" id="btnSubmitRec">Redefinir Minha Senha</button>
+      <div class="links">
+        Lembrou da senha? <a href="/secretaria/login">Fazer login</a>
+      </div>
+    </form>
+  </div>
+  <script>
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    if (togglePassword && passwordInput) {
+      togglePassword.addEventListener('click', () => {
+        const type = passwordInput.type === 'password' ? 'text' : 'password';
+        passwordInput.type = type;
+        togglePassword.textContent = type === 'password' ? '👀' : '🙈';
+      });
+    }
+
+    const toggleConfirm = document.getElementById('toggleConfirmPassword');
+    const confirmInput = document.getElementById('confirmPassword');
+    if (toggleConfirm && confirmInput) {
+      toggleConfirm.addEventListener('click', () => {
+        const type = confirmInput.type === 'password' ? 'text' : 'password';
+        confirmInput.type = type;
+        toggleConfirm.textContent = type === 'password' ? '👀' : '🙈';
+      });
+    }
+
+    const telInput = document.getElementById('recTelefone');
+    if (telInput) {
+      telInput.addEventListener('input', function(e) {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.startsWith('55') && v.length > 11) v = v.substring(2);
+        if (v.length > 11) v = v.substring(0, 11);
+        if (v.length > 10) {
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
+        } else if (v.length > 6) {
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
+        } else if (v.length > 2) {
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2);
+        } else if (v.length > 0) {
+          e.target.value = '(' + v;
+        } else {
+          e.target.value = '';
+        }
+      });
+      telInput.addEventListener('blur', function(e) {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.startsWith('55') && v.length > 11) v = v.substring(2);
+        if (v.length === 11) {
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
+        } else if (v.length === 10) {
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
+        }
+      });
+    }
+
+    document.getElementById('recForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      const msgEl = document.getElementById('recMessage');
+
+      if (data.password !== data.confirmPassword) {
+        msgEl.textContent = 'As senhas não coincidem.';
+        msgEl.className = 'error';
+        return;
+      }
+
+      if (data.telefone) {
+        data.telefone = data.telefone.replace(/[^0-9]/g, '');
+        if (data.telefone.startsWith('55') && data.telefone.length > 11) {
+          data.telefone = data.telefone.substring(2);
+        }
+      }
+
+      const res = await fetch('/secretaria/recuperar-senha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        msgEl.textContent = json.message || 'Senha redefinida com sucesso! Redirecionando...';
+        msgEl.className = 'success';
+        const msgRedirect = encodeURIComponent(json.message || 'Senha atualizada com sucesso! Agora você já pode fazer login.');
+        setTimeout(() => window.location.href = '/secretaria/login?message=' + msgRedirect, 1800);
+      } else {
+        msgEl.textContent = json.message || 'Erro ao redefinir senha.';
         msgEl.className = 'error';
       }
     });
@@ -4422,4 +4760,4 @@ function renderIndexHtml() {
 </body></html>`;
 }
 
-module.exports = { renderLoginHtml, renderRegisterHtml, renderIndexHtml };
+module.exports = { renderLoginHtml, renderRegisterHtml, renderRecuperarSenhaHtml, renderIndexHtml };

@@ -97,13 +97,23 @@ function saveUser(user) {
 
 function deleteUser(username) {
   const normalized = username?.toLowerCase().trim();
-  const existing = db.prepare("SELECT username FROM users WHERE username = ?").get(normalized);
+  if (normalized === "gabriela" || normalized === "gabrieladiniz" || normalized === "5511942685501") {
+    return { ok: false, message: "A conta principal da Secretaria não pode ser excluída." };
+  }
+  const cleanPhone = normalized ? normalized.replace(/\D/g, '') : '';
+  const existing = db.prepare("SELECT username, telefone FROM users WHERE username = ? OR (telefone IS NOT NULL AND (telefone = ? OR telefone = ?))").get(normalized, normalized, cleanPhone);
   if (!existing) {
     console.warn(`[Users] Tentativa de excluir usuário inexistente: '${normalized}'`);
     return { ok: false, message: "Usuário não encontrado." };
   }
-  db.prepare("DELETE FROM users WHERE username = ?").run(normalized);
-  console.log(`[Users] Usuário '${normalized}' removido.`);
+  db.prepare("DELETE FROM users WHERE username = ?").run(existing.username);
+  if (existing.telefone) {
+    db.prepare("DELETE FROM users WHERE username = ? OR telefone = ?").run(existing.telefone, existing.telefone);
+  }
+  try {
+    db.exec("PRAGMA wal_checkpoint(PASSIVE);");
+  } catch (_) {}
+  console.log(`[Users] Usuário '${existing.username}' (tel: ${existing.telefone || '-'}) removido.`);
   return { ok: true, message: "Usuário excluído com sucesso." };
 }
 

@@ -2475,7 +2475,7 @@ function renderGestaoHtml({ user }) {
         <div class="name">${perfil?.nome || 'Líder'}</div>
         <span class="role-pill ${perfil?.perfilTitulo?.toLowerCase()}">${perfil?.perfilTitulo || 'Líder'}</span>
       </div>
-      <a href="/logout" class="btn-sair">Sair</a>
+      <a href="/secretaria/logout" class="btn-sair">Sair</a>
     </div>
   </header>
 
