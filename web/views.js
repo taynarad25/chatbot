@@ -513,19 +513,26 @@ function renderRegisterHtml(message = "") {
 
     const telInput = document.getElementById('regTelefone');
     if (telInput) {
-      telInput.addEventListener('input', (e) => {
-        let raw = e.target.value;
-        let limpo = raw.replace(/[^\d\s\(\)\+\-]/g, '');
-        if (raw !== limpo) e.target.value = limpo;
+      telInput.addEventListener('input', function(e) {
+        let v = e.target.value.replace(/[^0-9]/g, '');
+        if (v.length > 11) v = v.substring(0, 11);
+        if (v.length > 6) {
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
+        } else if (v.length > 2) {
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2);
+        } else if (v.length > 0) {
+          e.target.value = '(' + v;
+        } else {
+          e.target.value = '';
+        }
       });
-      telInput.addEventListener('blur', (e) => {
-        let v = e.target.value.replace(/\D/g, '');
-        if (v.startsWith('55') && v.length > 11) v = v.slice(2);
-        if (v.length > 11) v = v.slice(0, 11);
+      telInput.addEventListener('blur', function(e) {
+        let v = e.target.value.replace(/[^0-9]/g, '');
+        if (v.startsWith('55') && v.length > 11) v = v.substring(2);
         if (v.length === 11) {
-          e.target.value = '(' + v.slice(0, 2) + ') ' + v.slice(2, 7) + '-' + v.slice(7);
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
         } else if (v.length === 10) {
-          e.target.value = '(' + v.slice(0, 2) + ') ' + v.slice(2, 6) + '-' + v.slice(6);
+          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
         }
       });
     }
@@ -544,9 +551,9 @@ function renderRegisterHtml(message = "") {
 
       // Se informou telefone, limpa e define username para compatibilidade
       if (data.telefone) {
-        data.telefone = data.telefone.replace(/\D/g, '');
+        data.telefone = data.telefone.replace(/[^0-9]/g, '');
         if (data.telefone.startsWith('55') && data.telefone.length > 11) {
-          data.telefone = data.telefone.slice(2);
+          data.telefone = data.telefone.substring(2);
         }
         data.username = data.telefone;
       }
