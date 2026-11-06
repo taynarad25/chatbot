@@ -133,6 +133,7 @@ function loadLideres() {
         updatedAt: row.updatedAt,
       };
     }
+
     console.log(`[Lideres] Banco carregado. ${Object.keys(lideres).length} usuário(s)/líder(es) detectado(s).`);
     sincronizarTelefones();
     return lideres;

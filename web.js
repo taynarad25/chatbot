@@ -91,10 +91,32 @@ function findUser(username) {
     }
   }
 
-  // 3. Busca por nome no cadastro de usuários
+  // 3. Busca por nome no cadastro de usuários (exato, primeiro nome ou apelido)
   for (const u of Object.values(users)) {
-    if (u.nome && u.nome.toLowerCase().trim() === normalized) {
+    if (!u.nome) continue;
+    const nomeNorm = u.nome.toLowerCase().trim();
+    const partesNome = nomeNorm.split(/\s+/);
+    if (nomeNorm === normalized || partesNome[0] === normalized || (normalized.length >= 4 && nomeNorm.includes(normalized))) {
       return u;
+    }
+  }
+
+  // 4. Aliases oficiais das secretárias e liderança
+  if (normalized === 'isabelly' || normalized === 'isabellylacerda') {
+    for (const u of Object.values(users)) {
+      const uTel = String(u.telefone || u.username || "").replace(/\D/g, "");
+      if (uTel.endsWith('970498716') || (u.nome && u.nome.toLowerCase().includes('isabelly'))) {
+        return u;
+      }
+    }
+  }
+
+  if (normalized === 'gabriela' || normalized === 'gabrieladiniz') {
+    for (const u of Object.values(users)) {
+      const uTel = String(u.telefone || u.username || "").replace(/\D/g, "");
+      if (uTel.endsWith('942685501') || (u.nome && u.nome.toLowerCase().includes('diniz'))) {
+        return u;
+      }
     }
   }
 
@@ -1122,7 +1144,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
                   c === 'diretor' || c === 'diretoria' || c === 'secretaria' || 
                   c === 'admin' || c === 'administrador'
                 );
-                const ehAdmin = user.role === 'admin' || user.username === 'gabriela' || (lider.nome && lider.nome.toLowerCase().includes('diniz'));
+                const ehAdmin = user.role === 'admin' || user.username === 'gabriela' || user.username === 'isabelly' || (lider.nome && (lider.nome.toLowerCase().includes('diniz') || lider.nome.toLowerCase().includes('isabelly')));
                 if (!temLideranca && !ehAdmin) {
                   return sendJson(res, 403, {
                     ok: false,
@@ -1139,6 +1161,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
               if (user.username === 'gabriela' || user.username === 'gabrieladiniz' || telSessao === '5511942685501' || (nomeSessao && nomeSessao.toLowerCase().includes('diniz'))) {
                 nomeSessao = 'Gabriela Diniz';
                 telSessao = '5511942685501';
+                roleSessao = 'admin';
+              }
+
+              // Caso especial: Isabelly Lacerda (Secretaria & Diretora)
+              if (user.username === 'isabelly' || user.username === 'isabellylacerda' || telSessao === '5511970498716' || (nomeSessao && nomeSessao.toLowerCase().includes('isabelly'))) {
+                nomeSessao = 'Isabelly Lacerda';
+                telSessao = '5511970498716';
                 roleSessao = 'admin';
               }
 
@@ -1212,6 +1241,25 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             }
           }
 
+          if (!liderEncontrado) {
+            const nLow = nomeEntrada.toLowerCase();
+            if (digitosTel.endsWith('970498716') || nLow.includes('isabelly')) {
+              liderEncontrado = {
+                nome: "Isabelly Lacerda",
+                telefone: "5511970498716",
+                cargos: ["secretaria", "diretoria", "diretor", "lider"],
+                departamento: "Secretaria, Diretoria"
+              };
+            } else if (digitosTel.endsWith('942685501') || nLow.includes('diniz')) {
+              liderEncontrado = {
+                nome: "Gabriela Diniz",
+                telefone: "5511942685501",
+                cargos: ["secretaria", "admin", "diretoria", "diretor", "lider"],
+                departamento: "Secretaria, Diretoria"
+              };
+            }
+          }
+
           // Fallback para usuário pré-cadastrado no modo legado (ex: testes unitários ou convite por admin)
           const users = loadUsers();
           const normalizedLegacy = telEntrada.toLowerCase();
@@ -1250,7 +1298,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           if (userExistente && userExistente.status === 'active' && userExistente.hash) {
             return sendJson(res, 400, {
               ok: false,
-              message: "Este usuário já concluiu o cadastro anteriormente."
+              message: "Este usuário já concluiu o cadastro anteriormente. Utilize a tela de login."
             });
           }
 
@@ -1260,7 +1308,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           if (liderEncontrado) {
             const cargos = (liderEncontrado.cargos || []).map(c => String(c).toLowerCase().trim());
             const nomeLower = (liderEncontrado.nome || "").toLowerCase();
-            if (cargos.includes('admin') || cargos.includes('secretaria') || nomeLower.includes('diniz')) {
+            if (cargos.includes('admin') || cargos.includes('secretaria') || nomeLower.includes('diniz') || nomeLower.includes('isabelly')) {
               role = 'admin';
             } else if (cargos.includes('pastor') || cargos.includes('pastora')) {
               role = 'pastor';
@@ -1283,10 +1331,34 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             hash,
             status: 'active',
             role,
-            primeiroAcessoEm: new Date().toISOString(),
+            primeiroAcessoEm: userExistente?.primeiroAcessoEm || new Date().toISOString(),
             createdAt: userExistente?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString()
           });
+
+          // Grava também alias amigável para secretárias oficiais (login por nome direto)
+          const nLow = (nomeFinal || '').toLowerCase();
+          let aliasSimples = null;
+          if (nLow.includes('isabelly') || telefoneFinal.endsWith('970498716')) {
+            aliasSimples = 'isabelly';
+          } else if (nLow.includes('diniz') || telefoneFinal.endsWith('942685501')) {
+            aliasSimples = 'gabriela';
+          }
+
+          if (aliasSimples && aliasSimples !== usernameFinal) {
+            saveUser({
+              username: aliasSimples,
+              nome: nomeFinal,
+              telefone: telefoneFinal,
+              salt,
+              hash,
+              status: 'active',
+              role,
+              primeiroAcessoEm: userExistente?.primeiroAcessoEm || new Date().toISOString(),
+              createdAt: userExistente?.createdAt || new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+          }
 
           return sendJson(res, 200, {
             ok: true,

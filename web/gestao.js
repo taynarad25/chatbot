@@ -63,7 +63,7 @@ function obterPerfilGestao(session) {
   const sessionTel = String(session.telefone || "").replace(/\D/g, "");
   const sessionNome = String(session.nome || "").trim();
 
-  // 1. CASO ESPECIAL PRIORITÁRIO: GABRIELA DINIZ (Secretária e Administradora Oficial)
+  // 1. CASO ESPECIAL PRIORITÁRIO: GABRIELA DINIZ E ISABELLY LACERDA (Secretárias e Diretoras Oficiais)
   // Sob nenhuma hipótese deve ser confundida com Gabriela Henrique!
   const ehGabrielaDiniz = username === 'gabriela' || 
                           username === 'gabrieladiniz' || 
@@ -78,6 +78,28 @@ function obterPerfilGestao(session) {
       nome: 'Gabriela Diniz',
       telefone: '5511942685501',
       perfilTitulo: 'Administrador',
+      nivelAcesso: 4,
+      isAdmin: true,
+      isPastor: true,
+      isDiretor: true,
+      isLider: true,
+      departamentos: [...LISTA_TODOS_DEPARTAMENTOS]
+    };
+  }
+
+  const ehIsabellyLacerda = username === 'isabelly' || 
+                            username === 'isabellylacerda' || 
+                            sessionTel === '5511970498716' || 
+                            sessionTel === '11970498716' ||
+                            sessionNome.toLowerCase().includes('isabelly');
+
+  if (ehIsabellyLacerda) {
+    return {
+      username: session.username || 'isabelly',
+      role: 'admin',
+      nome: 'Isabelly Lacerda',
+      telefone: '5511970498716',
+      perfilTitulo: 'Secretaria / Diretora',
       nivelAcesso: 4,
       isAdmin: true,
       isPastor: true,

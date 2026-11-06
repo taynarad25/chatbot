@@ -8,6 +8,9 @@ services:
     env_file: .env
     volumes:
       - ./bot:/usr/src/app/bot
+      - ./web:/usr/src/app/web
+      - ./web.js:/usr/src/app/web.js
+      - ./db.js:/usr/src/app/db.js
       - ./.wwebjs_auth:/usr/src/app/.wwebjs_auth
       - ./combined.log:/usr/src/app/combined.log
       - ./dados.db:/usr/src/app/dados.db

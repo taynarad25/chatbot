@@ -16,6 +16,13 @@ function loadUsers() {
         role = "admin";
       }
 
+      // Garantia oficial: Isabelly Lacerda (Secretaria & Diretora)
+      if (row.username === "isabelly" || row.username === "isabellylacerda" || telefone === "5511970498716") {
+        nome = "Isabelly Lacerda";
+        telefone = "5511970498716";
+        role = "admin";
+      }
+
       users[row.username] = {
         username: row.username,
         nome,
@@ -49,6 +56,12 @@ function saveUser(user) {
       role = "admin";
     }
 
+    if (user.username === "isabelly" || user.username === "isabellylacerda" || telefone === "5511970498716") {
+      nome = "Isabelly Lacerda";
+      telefone = "5511970498716";
+      role = "admin";
+    }
+
     db.prepare(`
       INSERT INTO users (username, salt, hash, status, role, telefone, nome, primeiroAcessoEm, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -73,6 +86,10 @@ function saveUser(user) {
       user.createdAt ?? null,
       user.updatedAt ?? null
     );
+
+    try {
+      db.exec("PRAGMA wal_checkpoint(PASSIVE);");
+    } catch (_) {}
   } catch (err) {
     console.error("[ALERTA:persistencia] Erro ao gravar usuário:", err);
   }
