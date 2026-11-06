@@ -1647,12 +1647,13 @@ function renderGestaoHtml({ user }) {
       white-space: normal;
       min-width: 0;
       max-width: 100%;
-      cursor: pointer;
-      transition: transform 0.1s ease, filter 0.1s ease;
+      cursor: default;
+      pointer-events: none;
+      user-select: none;
     }
-    .event-chip:hover {
-      filter: brightness(0.93);
-      transform: scale(0.98);
+    .cal-day .event-chip {
+      pointer-events: none;
+      cursor: default;
     }
     .event-chip.confirmado { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .event-chip.pendente { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
@@ -3026,11 +3027,11 @@ function renderGestaoHtml({ user }) {
           else if (ev.tipo === 'atendimento') chipClass = 'pastoral';
           else if (ev.isOcupacaoExterna) chipClass = 'bloqueio';
 
-          chipsHtml += \`<span class="event-chip \${chipClass}" onclick="event.stopPropagation(); selecionarDia(\${d}); abrirGerenciadorPorEventoData(\${d}, \${idx});" title="\${ev.titulo} (Toque para gerenciar)">\${ev.titulo}</span>\`;
+          chipsHtml += \`<span class="event-chip \${chipClass}" title="\${ev.titulo}">\${ev.titulo}</span>\`;
         });
         if (eventosDia.length > maxChipsVisiveis) {
           const restantes = eventosDia.length - maxChipsVisiveis;
-          chipsHtml += \`<span class="event-chip bloqueio" onclick="event.stopPropagation(); selecionarDia(\${d});">+\${restantes} mais</span>\`;
+          chipsHtml += \`<span class="event-chip bloqueio">+\${restantes} mais</span>\`;
         }
 
         cell.innerHTML = \`<div class="day-num">\${d}</div><div class="day-events">\${chipsHtml}</div>\`;
