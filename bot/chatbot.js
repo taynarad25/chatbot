@@ -315,7 +315,16 @@ function limparSessaoResidual(id = clientId) {
   try {
     if (fs.existsSync(sessionDir)) {
       console.log(`[Browser] 🧹 Limpando dados da sessão residual em ${sessionDir}...`);
-      fs.rmSync(sessionDir, { recursive: true, force: true, maxRetries: 5 });
+      for (let i = 0; i < 5; i++) {
+        try {
+          fs.rmSync(sessionDir, { recursive: true, force: true });
+          break;
+        } catch (e) {
+          if (i === 4) throw e;
+          const waitUntil = Date.now() + 250;
+          while (Date.now() < waitUntil) {}
+        }
+      }
       console.log(`[Browser] ✨ Sessão residual limpa com sucesso.`);
     }
   } catch (err) {
@@ -346,7 +355,11 @@ function criarClient() {
       '--disable-renderer-backgrounding',
       '--disable-ipc-flooding-protection',
       '--memory-pressure-off',
-      '--disable-features=CalculateNativeWinOcclusion,InterestFeedContentSuggestions,BlinkLifecycleScriptForbidden',
+      '--disable-breakpad',
+      '--disable-component-update',
+      '--disable-default-apps',
+      '--disable-domain-reliability',
+      '--disable-features=CalculateNativeWinOcclusion,InterestFeedContentSuggestions,BlinkLifecycleScriptForbidden,AudioServiceOutOfProcess,IsolateOrigins,site-per-process',
     ]
   };
 
@@ -393,10 +406,11 @@ function criarClient() {
     console.log(`[Config] webVersionCache local configurado em .wwebjs_cache`);
   }
 
-  client = new Client(clientOptions);
-  aplicarResilienciaClient(client);
+  const clientInstance = new Client(clientOptions);
+  client = clientInstance;
+  aplicarResilienciaClient(clientInstance);
 
-  client.on("qr", async (qr) => {
+  clientInstance.on("qr", async (qr) => {
     console.log("✅ QR Code gerado com sucesso.");
     clientAuthenticated = false;
     loadingPercent = 0;
@@ -409,24 +423,24 @@ function criarClient() {
     }
   });
 
-  client.on("authenticated", () => {
+  clientInstance.on("authenticated", () => {
     clientAuthenticated = true;
     pendingQr = null; // Remove o QR Code da tela imediatamente após a leitura
     isGeneratingQr = false;
     console.log("✅ Autenticado no WhatsApp com sucesso! Sincronizando dados e conversas...");
   });
 
-  client.on("loading_screen", async (percent, message) => {
+  clientInstance.on("loading_screen", async (percent, message) => {
     loadingPercent = percent;
     loadingMessage = message || "WhatsApp";
     console.log(`[WhatsApp] ⏳ Sincronizando dados: ${percent}% (${message || 'Carregando'})`);
 
     // Quando atinge 100% de sincronização offline, garante o avanço imediato para ready/authenticated
-    if (percent >= 100 && !clientReady && client?.pupPage) {
+    if (percent >= 100 && !clientReady && clientInstance?.pupPage) {
       try {
-        if (!client.pupPage.isClosed?.()) {
+        if (!clientInstance.pupPage.isClosed?.()) {
           console.log("[WhatsApp] 🔄 100% de sincronização atingido. Garantindo avanço para estado pronto...");
-          await client.pupPage.evaluate(() => {
+          await clientInstance.pupPage.evaluate(() => {
             if (!window._hasSyncedHandled && typeof window.onAppStateHasSyncedEvent === 'function') {
               window._hasSyncedHandled = true;
               window.onAppStateHasSyncedEvent();
@@ -439,12 +453,13 @@ function criarClient() {
     }
   });
 
-  client.on("change_state", (state) => {
+  clientInstance.on("change_state", (state) => {
     console.log(`[WhatsApp] 📶 Estado da sessão alterado para: ${state}`);
   });
 
-  client.on("ready", async () => {
+  clientInstance.on("ready", async () => {
     pararSyncWatchdog();
+    client = clientInstance; // Restaura explicitamente a referência global para a instância ativa
     clientReady = true;
     clientAuthenticated = true;
     pendingQr = null;
@@ -454,7 +469,7 @@ function criarClient() {
     console.log("✅ Bot conectado e pronto para uso!");
 
     try {
-      const waVersion = await client.getWWebVersion();
+      const waVersion = await clientInstance.getWWebVersion();
       console.log(`[WhatsApp] Versão do WhatsApp Web ativa no navegador: ${waVersion}`);
     } catch (errVer) {
       console.warn(`[WhatsApp] Não foi possível consultar a versão do WhatsApp Web: ${errVer.message}`);
@@ -462,8 +477,8 @@ function criarClient() {
 
     // Injeta patch de compatibilidade para serialização de IDs no WhatsApp Web (formato 2.3000.x e $1)
     try {
-      if (client.pupPage && !client.pupPage.isClosed?.()) {
-        await client.pupPage.evaluate(() => {
+      if (clientInstance.pupPage && !clientInstance.pupPage.isClosed?.()) {
+        await clientInstance.pupPage.evaluate(() => {
           if (window.WWebJS && window.WWebJS.getMessageModel && !window.WWebJS._patchedIdSerialization) {
             const originalGetModel = window.WWebJS.getMessageModel;
             window.WWebJS.getMessageModel = function (message) {
@@ -478,7 +493,7 @@ function criarClient() {
             window.WWebJS._patchedIdSerialization = true;
           }
         });
-        await injetarPatchesCompatibilidade(client.pupPage);
+        await injetarPatchesCompatibilidade(clientInstance.pupPage);
         console.log("[WhatsApp] 🛡️ Patches de serialização e resiliência de mensagens injetados no navegador.");
       }
     } catch (errPatch) {
@@ -492,7 +507,7 @@ function criarClient() {
       
       console.log('=============== RESOLVENDO GRUPOS POR CONVITE ===============');
       try {
-        const info = await client.getInviteInfo(inviteSec);
+        const info = await clientInstance.getInviteInfo(inviteSec);
         const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
         console.log(`NOME: "Mensagens Secretaria"  --->  JID RESOLVIDO: "${jid}"`);
         if (jid) {
@@ -504,7 +519,7 @@ function criarClient() {
       }
       
       try {
-        const info = await client.getInviteInfo(invitePas);
+        const info = await clientInstance.getInviteInfo(invitePas);
         const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
         console.log(`NOME: "Atendimento Pastoral"  --->  JID RESOLVIDO: "${jid}"`);
         if (jid) {
@@ -516,7 +531,7 @@ function criarClient() {
       }
 
       try {
-        const info = await client.getInviteInfo(inviteMul);
+        const info = await clientInstance.getInviteInfo(inviteMul);
         const jid = info && info.id ? (typeof info.id === "object" ? info.id._serialized : info.id) : null;
         console.log(`NOME: "MULTIMÍDIAS"  --->  JID RESOLVIDO: "${jid}"`);
         if (jid) {
@@ -535,7 +550,7 @@ function criarClient() {
     try {
       const { iniciarAgendadorLembretes } = require("./lembretes");
       iniciarAgendadorLembretes({
-        client,
+        client: clientInstance,
         buscarEventos,
         agendasParaLer,
         horaExecucao: 9,
@@ -549,45 +564,49 @@ function criarClient() {
 
   // Heartbeat periódico unref'd para manter o contexto do Puppeteer ativo contra idle discard do navegador
   setInterval(async () => {
-    if (client && clientReady && client.pupPage) {
+    if (clientInstance && clientReady && clientInstance.pupPage) {
       try {
-        if (typeof client.pupPage.isClosed !== "function" || !client.pupPage.isClosed()) {
-          await client.pupPage.evaluate(() => typeof window !== "undefined" && Boolean(window.WWebJS));
+        if (typeof clientInstance.pupPage.isClosed !== "function" || !clientInstance.pupPage.isClosed()) {
+          await clientInstance.pupPage.evaluate(() => typeof window !== "undefined" && Boolean(window.WWebJS));
         }
       } catch (_) {}
     }
   }, 3 * 60 * 1000).unref();
 
-  client.on("auth_failure", (msg) => {
+  clientInstance.on("auth_failure", (msg) => {
     pararSyncWatchdog();
     console.error("Falha na autenticação:", msg);
-    clientReady = false;
-    clientAuthenticated = false;
-    loadingPercent = 0;
-    pendingQr = null;
-    isGeneratingQr = false;
-    isInitializing = false;
-    saveBotState(false); // Se a sessão no cache falhou, paramos o bot para evitar loops
+    if (client === clientInstance) {
+      clientReady = false;
+      clientAuthenticated = false;
+      loadingPercent = 0;
+      pendingQr = null;
+      isGeneratingQr = false;
+      isInitializing = false;
+      saveBotState(false); // Se a sessão no cache falhou, paramos o bot para evitar loops
+      client = null;
+    }
   });
 
-  client.on("disconnected", async (reason) => {
+  clientInstance.on("disconnected", async (reason) => {
     pararSyncWatchdog();
-    clientReady = false;
-    clientAuthenticated = false;
-    loadingPercent = 0;
-    pendingQr = null;
-    isGeneratingQr = false;
-    isInitializing = false;
-    saveBotState(false); // Salva como inativo ao desconectar
     console.warn(`[WhatsApp] Cliente desconectado. Motivo: ${reason}`);
 
-    const oldClient = client;
-    client = null;
-    if (oldClient) {
-      try {
-        await oldClient.destroy();
-      } catch (errDestroy) {}
+    // Só desativa o estado global se o evento de desconexão veio da instância ativa!
+    if (client === clientInstance) {
+      clientReady = false;
+      clientAuthenticated = false;
+      loadingPercent = 0;
+      pendingQr = null;
+      isGeneratingQr = false;
+      isInitializing = false;
+      saveBotState(false); // Salva como inativo ao desconectar
+      client = null;
     }
+
+    try {
+      await clientInstance.destroy();
+    } catch (errDestroy) {}
 
     // Apenas limpa a pasta da sessão se o usuário solicitou cancelamento deliberado
     if (isCanceling) {
@@ -596,7 +615,7 @@ function criarClient() {
   });
 
   const handleMessage = createMessageHandler({
-    client,
+    client: clientInstance,
     calendar,
     agendasParaLer,
     lideres,
@@ -605,7 +624,9 @@ function criarClient() {
     listLideres,
     tempoEsperaRetornoMs: 3500,
   });
-  client.on("message", handleMessage);
+  clientInstance.on("message", handleMessage);
+
+  return clientInstance;
 }
 
 // PERSISTÊNCIA DE ESTADO (ATIVO/PARADO)
@@ -634,28 +655,38 @@ const loadBotState = () => {
 };
 
 async function startClient(options = {}) {
-  if (clientReady || isInitializing) return;
-  console.log("🚀 Iniciando processo de inicialização do cliente...");
-  console.time("client_init");
+  if (clientReady || isInitializing) {
+    console.log("[WhatsApp] Tentativa de inicialização ignorada: cliente já está iniciando ou ativo.");
+    return;
+  }
+  isInitializing = true;
+  isGeneratingQr = true;
+  pendingQr = null;
 
-  // Se já havia uma referência ativa de client desconectada ou quebrada, destrói antes
+  console.log("🚀 Iniciando processo de inicialização do cliente...");
+  const initStartTime = Date.now();
+
+  // Se já havia uma referência ativa de client desconectada ou quebrada, destrói antes com timeout
   if (client) {
     try {
       console.log("[Browser] Encerrando cliente anterior antes de reiniciar...");
-      await client.destroy();
+      const oldClient = client;
+      client = null;
+      await Promise.race([
+        oldClient.destroy(),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
     } catch (e) {}
     client = null;
   }
 
-  // Força o encerramento de processos zumbis do Chromium antes de iniciar.
-  // Caminho absoluto (não "pkill" solto) para não depender da resolução via
-  // PATH — é onde o pacote "procps" instala o binário na imagem node:20-slim
-  // usada pelo Dockerfile.
-  try {
-    console.log("[Browser] Limpando processos antigos do Chromium...");
-    execSync("/usr/bin/pkill -9 -f chromium", { stdio: 'ignore' });
-  } catch (e) {
-    // Silencia o erro se o pkill não encontrar nada (ou não existir nesse caminho, fora do Docker)
+  // Força o encerramento de processos zumbis do Chromium e aguarda liberação de portas e descritores no Linux
+  if (process.platform !== 'win32') {
+    try {
+      console.log("[Browser] Limpando processos antigos do Chromium...");
+      execSync("/usr/bin/pkill -9 -f chromium", { stdio: 'ignore' });
+      await new Promise(r => setTimeout(r, 600));
+    } catch (e) {}
   }
 
   // Remove o arquivo SingletonLock do Chromium se ele existir. 
@@ -666,34 +697,35 @@ async function startClient(options = {}) {
     limparSessaoResidual(clientId);
   }
 
-  isInitializing = true;
-  isGeneratingQr = true;
-  pendingQr = null;
-  criarClient();
-  iniciarSyncWatchdog(client);
+  const clientInstance = criarClient();
+  iniciarSyncWatchdog(clientInstance);
   try {
     console.log("[WhatsApp] Tentando inicializar o cliente Puppeteer...");
-    await client.initialize();
-    console.timeEnd("client_init");
+    await clientInstance.initialize();
+    console.log(`[WhatsApp] Inicialização concluída em ${((Date.now() - initStartTime) / 1000).toFixed(1)}s`);
     return;
   } catch (err) {
-    console.timeEnd("client_init");
+    const elapsed = ((Date.now() - initStartTime) / 1000).toFixed(1);
+    console.warn(`[WhatsApp] Falha na inicialização após ${elapsed}s: ${err?.message || err}`);
     const message = err?.message || "";
     if (message.includes("already running") || message.includes("Use a different `userDataDir`") || message.includes("already in use") || message.includes("Code: 21")) {
       console.warn("⚠️ Sessão do Chrome bloqueada. O PM2 reiniciará o processo para tentar liberar o lock.");
       try {
-        if (client) await client.destroy();
+        if (clientInstance) await clientInstance.destroy();
       } catch (destroyErr) {
         console.warn("❌ Falha ao destruir o cliente antigo:", destroyErr?.message || destroyErr);
       }
       isInitializing = false;
+      limparTravasChromium(clientId);
       process.exit(1); // Força o PM2 a reiniciar o bot do zero
     } else {
       console.error("❌ Erro ao iniciar o WhatsApp:", err);
+      limparTravasChromium(clientId);
       await cancelQr();
     }
   } finally {
     isInitializing = false;
+    isGeneratingQr = false;
   }
 }
 
