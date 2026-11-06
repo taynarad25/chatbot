@@ -1137,12 +1137,63 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     };
   }
 
+  function verificarPermissaoGerenciarEvento(nomeEv) {
+    if (perfil?.isPastor || perfil?.isDiretor || perfil?.isAdmin) {
+      return true;
+    }
+
+    const nomeNorm = String(nomeEv || '').trim().toLowerCase();
+    if (!nomeNorm) return true;
+
+    let deptoEvento = '';
+    try {
+      const rowDesc = db.prepare("SELECT departamento FROM descricoes_eventos WHERE LOWER(TRIM(evento)) = ? ORDER BY id DESC LIMIT 1").get(nomeNorm);
+      if (rowDesc && rowDesc.departamento) deptoEvento = rowDesc.departamento;
+
+      if (!deptoEvento) {
+        const rowForm = db.prepare("SELECT departamento FROM formularios_eventos WHERE LOWER(TRIM(evento)) = ? ORDER BY id DESC LIMIT 1").get(nomeNorm);
+        if (rowForm && rowForm.departamento) deptoEvento = rowForm.departamento;
+      }
+
+      if (!deptoEvento) {
+        const rowPend = db.prepare("SELECT departamento, rede FROM pendentes WHERE LOWER(TRIM(evento)) = ? OR LOWER(TRIM(nomeEvento)) = ? ORDER BY rowid DESC LIMIT 1").get(nomeNorm, nomeNorm);
+        if (rowPend) deptoEvento = rowPend.rede || rowPend.departamento || '';
+      }
+    } catch (_) {}
+
+    if (!deptoEvento && corpo.departamento) {
+      deptoEvento = corpo.departamento;
+    }
+    if (!deptoEvento) {
+      const inf = inferirDepartamentoDeTitulo(nomeEv);
+      if (inf && inf !== 'Geral') deptoEvento = inf;
+    }
+
+    deptoEvento = String(deptoEvento || '').toLowerCase().trim();
+
+    if (deptoEvento && deptoEvento !== 'geral') {
+      const deptosLider = (perfil?.departamentos || [])
+        .map(d => String(d).toLowerCase().trim())
+        .filter(d => d && d !== 'geral');
+
+      if (deptosLider.length > 0) {
+        const pertenceAoLider = deptosLider.some(d => deptoEvento.includes(d) || d.includes(deptoEvento));
+        if (!pertenceAoLider) {
+          throw new Error(`Permissão negada: Líderes só podem alterar ou cancelar eventos do seu próprio ministério (${perfil?.departamentos?.join(', ') || 'seu departamento'}). Somente Diretores e Pastores podem alterar todos os eventos.`);
+        }
+      }
+    }
+    return true;
+  }
+
   // 4. ALTERAR EVENTO
   if (tipoAcao === 'alterar') {
     const { nome_evento, campo_alterar, novo_valor, motivo } = corpo;
     if (!nome_evento || !campo_alterar || !novo_valor) {
       throw new Error('Informe o evento, o campo que deseja alterar e a nova informação.');
     }
+
+    verificarPermissaoGerenciarEvento(nome_evento);
 
     const dadosAlteracao = {
       tipo: 'alterar',
@@ -1189,6 +1240,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     if (!nome_evento || !motivo) {
       throw new Error('Informe o nome do evento e o motivo do cancelamento.');
     }
+
+    verificarPermissaoGerenciarEvento(nome_evento);
 
     const dadosCancelamento = {
       tipo: 'cancelar',
@@ -1255,6 +1308,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     } = corpo;
 
     if (!nome_evento) throw new Error('Nome do evento é obrigatório.');
+
+    verificarPermissaoGerenciarEvento(nome_evento);
 
     try {
       const rowForm = db.prepare("SELECT id, payload FROM formularios_eventos WHERE LOWER(TRIM(evento)) = LOWER(TRIM(?)) ORDER BY id DESC LIMIT 1").get(nome_evento);
@@ -4078,6 +4133,24 @@ function renderGestaoHtml({ user }) {
       abrirGerenciadorPorObjeto(ev);
     }
 
+    function verificarPodeEditarEventoAtual(ev) {
+      if (!ev) return false;
+      const ehPrivilegiado = Boolean(
+        usuarioLogado?.isAdmin || 
+        usuarioLogado?.isPastor || 
+        usuarioLogado?.isDiretor
+      );
+      if (ehPrivilegiado) return true;
+      if (ev.isOcupacaoExterna) return false;
+
+      const deptosLider = (usuarioLogado?.departamentos || [])
+        .map(d => String(d).toLowerCase().trim())
+        .filter(d => d && d !== 'geral');
+
+      const deptoEv = String(ev.departamento || '').toLowerCase().trim();
+      return deptosLider.length > 0 && deptoEv && deptosLider.some(d => deptoEv.includes(d) || d.includes(deptoEv));
+    }
+
     function fecharModalGerenciarEvento() {
       document.getElementById('modalGerenciarEvento').classList.remove('active');
     }
@@ -4122,9 +4195,22 @@ function renderGestaoHtml({ user }) {
     }
 
     function voltarMenuGerenciar() {
+      const podeEditar = verificarPodeEditarEventoAtual(eventoSendoGerenciado);
       const aviso = document.getElementById('avisoOcupacaoExterna');
-      if (aviso) aviso.style.display = 'none';
-      document.getElementById('acoesEventoMenu').style.display = 'grid';
+      const menu = document.getElementById('acoesEventoMenu');
+
+      if (!podeEditar) {
+        if (aviso) {
+          const depNome = eventoSendoGerenciado?.departamento || 'outro ministério';
+          aviso.innerText = 'ℹ️ Este evento pertence ao departamento "' + depNome + '". Líderes só podem alterar eventos do seu próprio ministério. Somente Diretores e Pastores podem alterar todos os eventos.';
+          aviso.style.display = 'flex';
+        }
+        if (menu) menu.style.display = 'none';
+      } else {
+        if (aviso) aviso.style.display = 'none';
+        if (menu) menu.style.display = 'grid';
+      }
+
       document.getElementById('subtelaAlterar').style.display = 'none';
       document.getElementById('subtelaFormulario').style.display = 'none';
       document.getElementById('subtelaCancelar').style.display = 'none';
@@ -4132,7 +4218,7 @@ function renderGestaoHtml({ user }) {
       if (eventoSendoGerenciado) {
         const btnF = document.getElementById('btnAcaoFormulario');
         if (btnF) {
-          const ehEv = (eventoSendoGerenciado.tipo === 'evento' || !eventoSendoGerenciado.tipo) && !eventoSendoGerenciado.isOcupacaoExterna;
+          const ehEv = (eventoSendoGerenciado.tipo === 'evento' || !eventoSendoGerenciado.tipo) && podeEditar;
           btnF.style.display = ehEv ? 'flex' : 'none';
         }
       }
@@ -4152,6 +4238,10 @@ function renderGestaoHtml({ user }) {
     async function submeterAlterarEventoSelecionado(e) {
       e.preventDefault();
       if (!eventoSendoGerenciado) return;
+      if (!verificarPodeEditarEventoAtual(eventoSendoGerenciado)) {
+        alert('❌ Permissão negada: Líderes só podem alterar eventos do seu próprio ministério. Somente Diretores e Pastores podem alterar todos os eventos.');
+        return;
+      }
 
       const payload = {
         tipo: 'alterar',
@@ -4183,6 +4273,10 @@ function renderGestaoHtml({ user }) {
     async function submeterAtualizarFormularioSelecionado(e) {
       e.preventDefault();
       if (!eventoSendoGerenciado) return;
+      if (!verificarPodeEditarEventoAtual(eventoSendoGerenciado)) {
+        alert('❌ Permissão negada: Líderes só podem alterar o formulário de eventos do seu próprio ministério. Somente Diretores e Pastores podem alterar todos os eventos.');
+        return;
+      }
 
       const payload = {
         tipo: 'atualizar_formulario',
@@ -4236,6 +4330,10 @@ function renderGestaoHtml({ user }) {
     async function submeterCancelarEventoSelecionado(e) {
       e.preventDefault();
       if (!eventoSendoGerenciado) return;
+      if (!verificarPodeEditarEventoAtual(eventoSendoGerenciado)) {
+        alert('❌ Permissão negada: Líderes só podem cancelar eventos do seu próprio ministério. Somente Diretores e Pastores podem alterar todos os eventos.');
+        return;
+      }
 
       const payload = {
         tipo: 'cancelar',

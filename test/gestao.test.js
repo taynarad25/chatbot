@@ -9,6 +9,7 @@ fs.writeFileSync(process.env.COMBINED_LOG_PATH, "linha de log\n");
 
 const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
+const db = require("../db");
 const { startWebServer, addUser } = require("../web");
 const { addLider } = require("../web/lideres");
 const gestao = require("../web/gestao");
@@ -259,6 +260,82 @@ test("POST /gestao/api/solicitar: suporta reunião, alteração e cancelamento d
   const dataCancelar = await resCancelar.json();
   assert.equal(dataCancelar.ok, true);
   assert.ok(dataCancelar.codigo);
+});
+
+test("POST /gestao/api/solicitar: lider só altera eventos do seu ministério, pastores e diretores alteram todos", async () => {
+  const tokenLiderHomens = createSession("lider.teste", "lider", "active"); // Rede de Homens
+  const tokenPastor = createSession("pastor.teste", "pastor", "active");
+  const tokenDiretor = createSession("diretor.teste", "diretor", "active");
+
+  // Cadastra evento da Rede de Mulheres no banco
+  db.prepare(`
+    INSERT INTO descricoes_eventos (evento, departamento, local, tipoDuracao, horariosJson, descricao, criadoEm, atualizadoEm)
+    VALUES (?, ?, ?, 'unico', ?, ?, datetime('now'), datetime('now'))
+  `).run(
+    "Chá das Mulheres Vitoriosas",
+    "Rede de Mulheres",
+    "Igreja",
+    JSON.stringify([{ data: "20/11/2026", inicio: "19:00", fim: "21:30" }]),
+    "Evento exclusivo de mulheres"
+  );
+
+  // 1. Líder de Homens tenta alterar evento da Rede de Mulheres -> Bloqueado 400
+  const resLiderBloqueado = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenLiderHomens}`
+    },
+    body: JSON.stringify({
+      tipo: "alterar",
+      nome_evento: "Chá das Mulheres Vitoriosas",
+      campo_alterar: "Data",
+      novo_valor: "25/11/2026",
+      motivo: "Tentativa de troca por outro líder"
+    })
+  });
+  assert.equal(resLiderBloqueado.status, 400);
+  const dataBloqueado = await resLiderBloqueado.json();
+  assert.equal(dataBloqueado.ok, false);
+  assert.ok(dataBloqueado.message.includes("Permissão negada"));
+
+  // 2. Pastor pode alterar evento de qualquer ministério -> 200
+  const resPastor = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenPastor}`
+    },
+    body: JSON.stringify({
+      tipo: "alterar",
+      nome_evento: "Chá das Mulheres Vitoriosas",
+      campo_alterar: "Horário",
+      novo_valor: "19:30 às 22:00",
+      motivo: "Ajuste pastoral"
+    })
+  });
+  assert.equal(resPastor.status, 200);
+  const dataPastor = await resPastor.json();
+  assert.equal(dataPastor.ok, true);
+
+  // 3. Diretor pode alterar evento de qualquer ministério -> 200
+  const resDiretor = await fetch(`${baseUrl}/gestao/api/solicitar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `whatsapp_control_session=${tokenDiretor}`
+    },
+    body: JSON.stringify({
+      tipo: "alterar",
+      nome_evento: "Chá das Mulheres Vitoriosas",
+      campo_alterar: "Local",
+      novo_valor: "Salão Nobre",
+      motivo: "Ajuste diretoria"
+    })
+  });
+  assert.equal(resDiretor.status, 200);
+  const dataDiretor = await resDiretor.json();
+  assert.equal(dataDiretor.ok, true);
 });
 
 test("POST /gestao/api/solicitar: atendimento pastoral restrito a pastores", async () => {
