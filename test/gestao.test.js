@@ -624,6 +624,64 @@ test("Primeiro Acesso: líder cadastrado cria senha pelo WhatsApp e nome", async
   assert.match(html, /Carlos Eduardo/);
 });
 
+test("Primeiro Acesso: líder escolhe nome de usuário personalizado e consegue logar com ele", async () => {
+  addLider({
+    nome: "Juliana Santos",
+    telefone: "5511977771122",
+    cargos: ["lider"],
+    departamentos: ["Rede de Mulheres"]
+  });
+
+  const regRes = await fetch(`${baseUrl}/secretaria/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      telefone: "(11) 97777-1122",
+      nome: "Juliana Santos",
+      customUsername: "julianasantos",
+      password: "senhaJu123"
+    })
+  });
+
+  assert.equal(regRes.status, 200);
+  const regData = await regRes.json();
+  assert.equal(regData.ok, true);
+  assert.match(regData.message, /julianasantos/);
+
+  // Login com o nome de usuário escolhido
+  const loginRes = await fetch(`${baseUrl}/secretaria/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: "julianasantos",
+      password: "senhaJu123"
+    })
+  });
+  assert.equal(loginRes.status, 200);
+
+  // Impede que outro líder pegue o mesmo nome de usuário
+  addLider({
+    nome: "Outro Líder",
+    telefone: "5511988880000",
+    cargos: ["lider"],
+    departamentos: ["Música"]
+  });
+
+  const regConflito = await fetch(`${baseUrl}/secretaria/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      telefone: "5511988880000",
+      nome: "Outro Líder",
+      customUsername: "julianasantos",
+      password: "outraSenha123"
+    })
+  });
+  assert.equal(regConflito.status, 400);
+  const conflitoData = await regConflito.json();
+  assert.match(conflitoData.message, /já está em uso/);
+});
+
 test("Controle de Acesso: membro cadastrado não tem acesso ao painel de liderança", async () => {
   addLider({
     nome: "Marcos Membro",

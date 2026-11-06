@@ -76,7 +76,7 @@ function findUser(username) {
   const raw = String(username).trim();
   const normalized = raw.toLowerCase();
   console.log(`[Web] Buscando usuário: '${sanitizarParaLog(normalized)}' dentro das chaves: [${Object.keys(users).join(", ")}]`); // NOSONAR
-  
+
   // 1. Busca direta por chave username
   if (users[normalized]) return users[normalized];
 
@@ -137,7 +137,7 @@ async function addUser(arg1, arg2, arg3 = 'user', arg4 = 'active') {
   const normalizedUser = username?.toLowerCase().trim();
   if (!normalizedUser) return { ok: false, message: "Nome de usuário inválido." };
   if (users[normalizedUser]) return { ok: false, message: "Usuário já existe" };
-  
+
   let salt = null;
   let hash = null;
   let userStatus = status;
@@ -172,7 +172,7 @@ function sendJson(res, status, data) {
 function sendHtml(res, html) {
   if (res.headersSent) return;
   // Configura os cabeçalhos de segurança antes de enviar para evitar ERR_HTTP_HEADERS_SENT
-  res.writeHead(200, { 
+  res.writeHead(200, {
     "Content-Type": "text/html; charset=utf-8",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
@@ -584,7 +584,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
       // API: Excluir inscrição (/mulheres/api/excluir-inscricao ou DELETE /mulheres/api/inscricoes/:id)
       if ((req.method === 'POST' && pathname === '/mulheres/api/excluir-inscricao') ||
-          (req.method === 'DELETE' && pathname.startsWith('/mulheres/api/inscricoes/'))) {
+        (req.method === 'DELETE' && pathname.startsWith('/mulheres/api/inscricoes/'))) {
         try {
           let termo = null;
           if (req.method === 'DELETE') {
@@ -600,7 +600,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           const removido = cultoMulheres.excluirInscricaoMulheres(termo);
           if (removido) {
             if (typeof cultoMulheres.excluirInscricaoPlanilhaMulheres === 'function') {
-              cultoMulheres.excluirInscricaoPlanilhaMulheres(inscricaoParaExcluir).catch(() => {});
+              cultoMulheres.excluirInscricaoPlanilhaMulheres(inscricaoParaExcluir).catch(() => { });
             }
             return sendJson(res, 200, { ok: true, message: 'Inscrição removida com sucesso.' });
           } else {
@@ -666,7 +666,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
       // API: Excluir inscrição de criança (/criancas/api/excluir-inscricao ou DELETE /criancas/api/inscricoes/:id)
       if ((req.method === 'POST' && pathname === '/criancas/api/excluir-inscricao') ||
-          (req.method === 'DELETE' && pathname.startsWith('/criancas/api/inscricoes/'))) {
+        (req.method === 'DELETE' && pathname.startsWith('/criancas/api/inscricoes/'))) {
         try {
           let termo = null;
           if (req.method === 'DELETE') {
@@ -853,7 +853,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
       // API: Excluir inscrição (/saude-mulher/api/excluir-inscricao ou DELETE /saude-mulher/api/inscricoes/:id)
       if ((req.method === 'POST' && pathname === '/saude-mulher/api/excluir-inscricao') ||
-          (req.method === 'DELETE' && pathname.startsWith('/saude-mulher/api/inscricoes/'))) {
+        (req.method === 'DELETE' && pathname.startsWith('/saude-mulher/api/inscricoes/'))) {
         try {
           let termo = null;
           if (req.method === 'DELETE') {
@@ -1068,7 +1068,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
       // API: Excluir inscrição (/intercessao/api/excluir-inscricao ou DELETE /intercessao/api/inscricoes/:id)
       if ((req.method === 'POST' && pathname === '/intercessao/api/excluir-inscricao') ||
-          (req.method === 'DELETE' && pathname.startsWith('/intercessao/api/inscricoes/'))) {
+        (req.method === 'DELETE' && pathname.startsWith('/intercessao/api/inscricoes/'))) {
         try {
           let termo = null;
           if (req.method === 'DELETE') {
@@ -1102,8 +1102,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           const password = body.password?.trim();
 
           if (loginRateLimiter.isBlocked(ip)) {
-              console.warn(`[Web] Rate limit atingido para o IP: ${sanitizarParaLog(ip)}`); // NOSONAR
-              return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
+            console.warn(`[Web] Rate limit atingido para o IP: ${sanitizarParaLog(ip)}`); // NOSONAR
+            return sendJson(res, 429, { ok: false, message: 'Muitas tentativas. Tente novamente mais tarde.' });
           }
 
           const user = findUser(username);
@@ -1135,13 +1135,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
                     }
                   }
                 }
-              } catch (_) {}
+              } catch (_) { }
 
               if (lider) {
                 const cargos = (lider.cargos || []).map(c => String(c).toLowerCase().trim());
-                const temLideranca = cargos.some(c => 
-                  c === 'lider' || c === 'pastor' || c === 'pastora' || 
-                  c === 'diretor' || c === 'diretoria' || c === 'secretaria' || 
+                const temLideranca = cargos.some(c =>
+                  c === 'lider' || c === 'pastor' || c === 'pastora' ||
+                  c === 'diretor' || c === 'diretoria' || c === 'secretaria' ||
                   c === 'admin' || c === 'administrador'
                 );
                 const ehAdmin = user.role === 'admin' || user.username === 'gabriela' || user.username === 'isabelly' || (lider.nome && (lider.nome.toLowerCase().includes('diniz') || lider.nome.toLowerCase().includes('isabelly')));
@@ -1207,7 +1207,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         try {
           const body = await parseRequestBody(req);
           const { username, nome, telefone, password } = body;
-          
+
           if (!password || password.length < 6) {
             return sendJson(res, 400, { ok: false, message: "A senha deve ter no mínimo 6 caracteres." });
           }
@@ -1275,9 +1275,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           // 2. Validação de Cargos: membro não tem acesso!
           if (liderEncontrado) {
             const cargos = (liderEncontrado.cargos || []).map(c => String(c).toLowerCase().trim());
-            const ehLiderOuSuperior = cargos.some(c => 
-              c === 'lider' || c === 'pastor' || c === 'pastora' || 
-              c === 'diretor' || c === 'diretoria' || c === 'secretaria' || 
+            const ehLiderOuSuperior = cargos.some(c =>
+              c === 'lider' || c === 'pastor' || c === 'pastora' ||
+              c === 'diretor' || c === 'diretoria' || c === 'secretaria' ||
               c === 'admin' || c === 'administrador'
             );
             if (!ehLiderOuSuperior) {
@@ -1295,15 +1295,42 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             return uTel && uTel === String(liderEncontrado.telefone).replace(/\D/g, "");
           }));
 
+          // Normaliza nome de usuário customizado (se informado)
+          const rawCustom = String(body.customUsername || body.usernamePersonalizado || "").trim();
+          let customUsername = rawCustom ? rawCustom.toLowerCase().replace(/[^a-z0-9._-]/g, "") : null;
+          if (customUsername && customUsername.length >= 3) {
+            const outroUser = users[customUsername];
+            if (outroUser) {
+              const outroTel = String(outroUser.telefone || outroUser.username || "").replace(/\D/g, "");
+              const meuTel = String(liderEncontrado?.telefone || telEntrada).replace(/\D/g, "");
+              if (outroTel && meuTel && outroTel !== meuTel && !meuTel.endsWith(outroTel.slice(-8)) && !outroTel.endsWith(meuTel.slice(-8))) {
+                return sendJson(res, 400, {
+                  ok: false,
+                  message: `O nome de usuário "${customUsername}" já está em uso por outro líder. Por favor, escolha outro.`
+                });
+              }
+            }
+          } else {
+            customUsername = null;
+          }
+
           if (userExistente && userExistente.status === 'active' && userExistente.hash) {
-            return sendJson(res, 400, {
-              ok: false,
-              message: "Este usuário já concluiu o cadastro anteriormente. Utilize a tela de login."
-            });
+            // Se o usuário já concluiu o cadastro, só permite definir/atualizar customUsername se a senha digitada for a correta
+            const senhaCorreta = await validatePassword(password, userExistente.salt, userExistente.hash);
+            if (!senhaCorreta || !customUsername) {
+              return sendJson(res, 400, {
+                ok: false,
+                message: "Este usuário já concluiu o cadastro anteriormente. Utilize a tela de login."
+              });
+            }
           }
 
           // 4. Conclusão do cadastro / primeiro acesso
-          const { salt, hash } = await hashPassword(password);
+          const jaTemCredenciais = userExistente && userExistente.hash && (await validatePassword(password, userExistente.salt, userExistente.hash));
+          const { salt, hash } = jaTemCredenciais
+            ? { salt: userExistente.salt, hash: userExistente.hash }
+            : await hashPassword(password);
+
           let role = 'lider';
           if (liderEncontrado) {
             const cargos = (liderEncontrado.cargos || []).map(c => String(c).toLowerCase().trim());
@@ -1336,18 +1363,10 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             updatedAt: new Date().toISOString()
           });
 
-          // Grava também alias amigável para secretárias oficiais (login por nome direto)
-          const nLow = (nomeFinal || '').toLowerCase();
-          let aliasSimples = null;
-          if (nLow.includes('isabelly') || telefoneFinal.endsWith('970498716')) {
-            aliasSimples = 'isabelly';
-          } else if (nLow.includes('diniz') || telefoneFinal.endsWith('942685501')) {
-            aliasSimples = 'gabriela';
-          }
-
-          if (aliasSimples && aliasSimples !== usernameFinal) {
+          // Grava o nome de usuário escolhido pelo líder
+          if (customUsername && customUsername !== usernameFinal) {
             saveUser({
-              username: aliasSimples,
+              username: customUsername,
               nome: nomeFinal,
               telefone: telefoneFinal,
               salt,
@@ -1360,29 +1379,57 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             });
           }
 
-          return sendJson(res, 200, {
-            ok: true,
-            message: "Cadastro concluído! Agora você já pode fazer login."
-          });
-        } catch (err) {
-          console.error(`[Web] Erro no registro: ${err.message}`);
-          return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+          // Grava também alias amigável para secretárias oficiais (login por nome direto)
+          const nLow = (nomeFinal || '').toLowerCase();
+          let aliasSimples = null;
+          if (nLow.includes('isabelly') || telefoneFinal.endsWith('970498716')) {
+            aliasSimples = 'isabelly';
+          } else if (nLow.includes('diniz') || telefoneFinal.endsWith('942685501')) {
+            aliasSimples = 'gabriela';
+          }
+
+            if (aliasSimples && aliasSimples !== usernameFinal && aliasSimples !== customUsername) {
+              saveUser({
+                username: aliasSimples,
+                nome: nomeFinal,
+                telefone: telefoneFinal,
+                salt,
+                hash,
+                status: 'active',
+                role,
+                primeiroAcessoEm: userExistente?.primeiroAcessoEm || new Date().toISOString(),
+                createdAt: userExistente?.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              });
+            }
+
+            const msgRetorno = customUsername
+              ? `Cadastro concluído com sucesso! Agora você pode entrar usando seu usuário "${customUsername}" ou seu WhatsApp.`
+              : "Cadastro concluído! Agora você já pode fazer login.";
+
+            return sendJson(res, 200, {
+              ok: true,
+            message: msgRetorno
+            });
+          } catch (err) {
+            console.error(`[Web] Erro no registro: ${err.message}`);
+            return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+          }
         }
-      }
 
       // ==========================================
       // NOVA ÁREA: GESTÃO DE EVENTOS (/gestao ou /eventos)
       // ==========================================
       if (req.method === 'GET' && (pathname === '/gestao' || pathname === '/gestao/' || pathname === '/eventos' || pathname === '/eventos/')) {
-        if (!isAuthenticated(req)) {
-          res.writeHead(302, { Location: '/secretaria/login?redirect=/gestao' });
-          return res.end();
-        }
-        const session = getSession(req);
-        const perfil = gestao.obterPerfilGestao(session);
-        if (perfil && perfil.nivelAcesso === 0) {
-          res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
-          return res.end(`
+          if (!isAuthenticated(req)) {
+            res.writeHead(302, { Location: '/secretaria/login?redirect=/gestao' });
+            return res.end();
+          }
+          const session = getSession(req);
+          const perfil = gestao.obterPerfilGestao(session);
+          if (perfil && perfil.nivelAcesso === 0) {
+            res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
+            return res.end(`
             <!DOCTYPE html>
             <html lang="pt-BR">
             <head><meta charset="utf-8"><title>Acesso Não Autorizado</title><style>body{font-family:sans-serif;background:#09090b;color:#f43f5e;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;text-align:center;}div{background:#18181b;padding:30px;border-radius:14px;border:1px solid #27272a;max-width:440px;}h2{color:#f43f5e;margin-top:0;}p{color:#a1a1aa;font-size:0.95rem;line-height:1.5;}a{display:inline-block;margin-top:16px;background:#7c3aed;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:700;}</style></head>
@@ -1395,435 +1442,435 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             </body>
             </html>
           `);
-        }
-        const html = gestao.renderGestaoHtml({ user: session });
-        return sendHtml(res, html);
-      }
-
-      // API: Informações do Perfil de Gestão
-      if (req.method === 'GET' && pathname === '/gestao/api/user-info') {
-        if (!isAuthenticated(req)) return sendJson(res, 401, { ok: false, message: 'Não autorizado' });
-        const session = getSession(req);
-        const perfil = gestao.obterPerfilGestao(session);
-        return sendJson(res, 200, { ok: true, perfil, user: perfil });
-      }
-
-      // API: Listar Eventos para o Calendário
-      if (req.method === 'GET' && pathname === '/gestao/api/eventos') {
-        const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-        const mes = urlObj.searchParams.get('mes');
-        const ano = urlObj.searchParams.get('ano');
-        const session = getSession(req);
-        const perfil = gestao.obterPerfilGestao(session);
-        const eventos = await gestao.listarEventosCalendario({ user: perfil, mes, ano });
-        res.setHeader('Cache-Control', 'private, max-age=60');
-        return sendJson(res, 200, { ok: true, eventos });
-      }
-
-      // API: Listar Solicitações de Eventos
-      if (req.method === 'GET' && pathname === '/gestao/api/solicitacoes') {
-        const session = getSession(req);
-        const perfil = gestao.obterPerfilGestao(session);
-        const solicitacoes = gestao.listarSolicitacoes({ user: perfil });
-        return sendJson(res, 200, { ok: true, solicitacoes });
-      }
-
-      // API: Listar Fichas de Eventos Preenchidas
-      if (req.method === 'GET' && pathname === '/gestao/api/fichas') {
-        const session = getSession(req);
-        const perfil = gestao.obterPerfilGestao(session);
-        const fichas = gestao.listarFichas({ user: perfil });
-        return sendJson(res, 200, { ok: true, fichas });
-      }
-
-      // API: Enviar Nova Solicitação de Evento via Web
-      if (req.method === 'POST' && pathname === '/gestao/api/solicitar') {
-        try {
-          const body = await parseRequestBody(req);
-          const session = getSession(req) || { username: 'Líder Conectado' };
-          const perfil = gestao.obterPerfilGestao(session);
-          if (perfil && perfil.nivelAcesso === 0) {
-            return sendJson(res, 403, { ok: false, message: 'Acesso exclusivo para líderes, pastores e diretores. Membros não possuem permissão.' });
           }
-          const resultado = await gestao.criarSolicitacaoEventoWeb(body, session, getClient);
-          return sendJson(res, 200, resultado);
-        } catch (errSol) {
-          console.error('[Gestão API] Erro ao registrar solicitação:', errSol.message);
-          return sendJson(res, 400, { ok: false, message: errSol.message });
-        }
-      }
-
-      if (req.method === 'GET' && pathname === '/secretaria') {
-        try {
-          let html = renderIndexHtml();
-          html = limpezaEventos.filtrarHtmlEventosExpirados(html);
+          const html = gestao.renderGestaoHtml({ user: session });
           return sendHtml(res, html);
-        } catch (renderErr) {
-          console.error(`[Web] Erro ao renderizar Index:`, renderErr);
-          throw renderErr; // Repassa para o catch global
         }
-      }
-      if (req.method === 'GET' && pathname === '/secretaria/status') {
-        return sendJson(res, 200, getStatus());
-      }
 
-      // API: Informações do Usuário Logado
-      if (req.method === 'GET' && pathname === '/secretaria/api/user-info') {
-        const session = getSession(req);
-        if (!session) return sendJson(res, 401, { ok: false, message: 'Não autorizado' });
-
-        const pastoralMap = {
-          'mauricio': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
-          'pr.mauricio': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
-          'mauriciolopes': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
-          'cintia': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
-          'pra.cintia': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
-          'cintialopes': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
-          'idel': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
-          'pr.idel': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
-          'idelnascimento': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
-          'fernanda': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
-          'pra.fernanda': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
-          'fernandanascimento': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
-        };
-        const u = session.username?.toLowerCase() || '';
-        const pastoral = pastoralMap[u] || null;
-        return sendJson(res, 200, { ok: true, user: { ...session, pastoral } });
-      }
-
-      // API: Listar Eventos Cadastrados (limpa eventos expirados automaticamente)
-      if (req.method === 'GET' && pathname === '/secretaria/api/eventos') {
-        limpezaEventos.limparTodosEventosExpirados();
-        const eventos = listarDescricoesEventos();
-        return sendJson(res, 200, { ok: true, eventos });
-      }
-
-      // API: Gerar Descrição Automática (IA) para Evento
-      if (req.method === 'POST' && pathname === '/secretaria/api/eventos/gerar-descricao') {
-        try {
-          const body = await parseRequestBody(req);
-          const { evento, tipoDuracao, horarios, departamento, local, tema, publico, observacoes } = body;
-          if (!evento || !evento.trim()) {
-            return sendJson(res, 400, { ok: false, message: 'Nome do evento é obrigatório.' });
-          }
-          const descricao = gerarDescricaoEvento({
-            evento,
-            tipoDuracao: tipoDuracao || "unico",
-            horarios,
-            departamento: departamento || "Comunidade Cristã Curados",
-            local: local || "Comunidade Cristã Curados",
-            tema,
-            publico,
-            observacoes
-          });
-          return sendJson(res, 200, { ok: true, descricao });
-        } catch (err) {
-          console.error('[Web] Erro ao gerar descrição IA:', err.message);
-          return sendJson(res, 500, { ok: false, message: 'Erro ao gerar descrição do evento.' });
+        // API: Informações do Perfil de Gestão
+        if (req.method === 'GET' && pathname === '/gestao/api/user-info') {
+          if (!isAuthenticated(req)) return sendJson(res, 401, { ok: false, message: 'Não autorizado' });
+          const session = getSession(req);
+          const perfil = gestao.obterPerfilGestao(session);
+          return sendJson(res, 200, { ok: true, perfil, user: perfil });
         }
-      }
 
-      // API: Cadastrar e Agendar Evento
-      if (req.method === 'POST' && pathname === '/secretaria/api/eventos') {
-        try {
-          const body = await parseRequestBody(req);
-          const { evento, departamento, local, tipoDuracao, horarios, descricao, tema, publico, observacoes } = body;
-          if (!evento || !evento.trim()) {
-            return sendJson(res, 400, { ok: false, message: 'Nome do evento é obrigatório.' });
+        // API: Listar Eventos para o Calendário
+        if (req.method === 'GET' && pathname === '/gestao/api/eventos') {
+          const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+          const mes = urlObj.searchParams.get('mes');
+          const ano = urlObj.searchParams.get('ano');
+          const session = getSession(req);
+          const perfil = gestao.obterPerfilGestao(session);
+          const eventos = await gestao.listarEventosCalendario({ user: perfil, mes, ano });
+          res.setHeader('Cache-Control', 'private, max-age=60');
+          return sendJson(res, 200, { ok: true, eventos });
+        }
+
+        // API: Listar Solicitações de Eventos
+        if (req.method === 'GET' && pathname === '/gestao/api/solicitacoes') {
+          const session = getSession(req);
+          const perfil = gestao.obterPerfilGestao(session);
+          const solicitacoes = gestao.listarSolicitacoes({ user: perfil });
+          return sendJson(res, 200, { ok: true, solicitacoes });
+        }
+
+        // API: Listar Fichas de Eventos Preenchidas
+        if (req.method === 'GET' && pathname === '/gestao/api/fichas') {
+          const session = getSession(req);
+          const perfil = gestao.obterPerfilGestao(session);
+          const fichas = gestao.listarFichas({ user: perfil });
+          return sendJson(res, 200, { ok: true, fichas });
+        }
+
+        // API: Enviar Nova Solicitação de Evento via Web
+        if (req.method === 'POST' && pathname === '/gestao/api/solicitar') {
+          try {
+            const body = await parseRequestBody(req);
+            const session = getSession(req) || { username: 'Líder Conectado' };
+            const perfil = gestao.obterPerfilGestao(session);
+            if (perfil && perfil.nivelAcesso === 0) {
+              return sendJson(res, 403, { ok: false, message: 'Acesso exclusivo para líderes, pastores e diretores. Membros não possuem permissão.' });
+            }
+            const resultado = await gestao.criarSolicitacaoEventoWeb(body, session, getClient);
+            return sendJson(res, 200, resultado);
+          } catch (errSol) {
+            console.error('[Gestão API] Erro ao registrar solicitação:', errSol.message);
+            return sendJson(res, 400, { ok: false, message: errSol.message });
           }
+        }
 
-          // Validação rigorosa: horário de início obrigatório (sem 'dia todo' ou genérico)
-          if (tipoDuracao === "unico") {
-            const h = Array.isArray(horarios) ? horarios[0] : horarios;
-            if (!h || !h.data || !h.inicio || !h.fim) {
-              return sendJson(res, 400, { ok: false, message: 'Para evento de 1 dia, data, horário de início e término são obrigatórios.' });
+        if (req.method === 'GET' && pathname === '/secretaria') {
+          try {
+            let html = renderIndexHtml();
+            html = limpezaEventos.filtrarHtmlEventosExpirados(html);
+            return sendHtml(res, html);
+          } catch (renderErr) {
+            console.error(`[Web] Erro ao renderizar Index:`, renderErr);
+            throw renderErr; // Repassa para o catch global
+          }
+        }
+        if (req.method === 'GET' && pathname === '/secretaria/status') {
+          return sendJson(res, 200, getStatus());
+        }
+
+        // API: Informações do Usuário Logado
+        if (req.method === 'GET' && pathname === '/secretaria/api/user-info') {
+          const session = getSession(req);
+          if (!session) return sendJson(res, 401, { ok: false, message: 'Não autorizado' });
+
+          const pastoralMap = {
+            'mauricio': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
+            'pr.mauricio': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
+            'mauriciolopes': { nome: 'Pr. Maurício Lopes', foto: '/images/pastor-mauricio-lopes.jpg', cargo: 'Pastor' },
+            'cintia': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
+            'pra.cintia': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
+            'cintialopes': { nome: 'Pra. Cíntia Lopes', foto: '/images/pastora-cintia-lopes.jpg', cargo: 'Pastora' },
+            'idel': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
+            'pr.idel': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
+            'idelnascimento': { nome: 'Pr. Idel Nascimento', foto: '/images/pastor-idel-nascimento.jpg', cargo: 'Pastor' },
+            'fernanda': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
+            'pra.fernanda': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
+            'fernandanascimento': { nome: 'Pra. Fernanda Nascimento', foto: '/images/pastora-fernanda-nascimento.jpg', cargo: 'Pastora' },
+          };
+          const u = session.username?.toLowerCase() || '';
+          const pastoral = pastoralMap[u] || null;
+          return sendJson(res, 200, { ok: true, user: { ...session, pastoral } });
+        }
+
+        // API: Listar Eventos Cadastrados (limpa eventos expirados automaticamente)
+        if (req.method === 'GET' && pathname === '/secretaria/api/eventos') {
+          limpezaEventos.limparTodosEventosExpirados();
+          const eventos = listarDescricoesEventos();
+          return sendJson(res, 200, { ok: true, eventos });
+        }
+
+        // API: Gerar Descrição Automática (IA) para Evento
+        if (req.method === 'POST' && pathname === '/secretaria/api/eventos/gerar-descricao') {
+          try {
+            const body = await parseRequestBody(req);
+            const { evento, tipoDuracao, horarios, departamento, local, tema, publico, observacoes } = body;
+            if (!evento || !evento.trim()) {
+              return sendJson(res, 400, { ok: false, message: 'Nome do evento é obrigatório.' });
             }
-            if (/dia\s*(todo|inteiro)/i.test(h.inicio)) {
-              return sendJson(res, 400, { ok: false, message: 'O horário de início é obrigatório mesmo para eventos de dia todo. Informe no formato HH:MM.' });
+            const descricao = gerarDescricaoEvento({
+              evento,
+              tipoDuracao: tipoDuracao || "unico",
+              horarios,
+              departamento: departamento || "Comunidade Cristã Curados",
+              local: local || "Comunidade Cristã Curados",
+              tema,
+              publico,
+              observacoes
+            });
+            return sendJson(res, 200, { ok: true, descricao });
+          } catch (err) {
+            console.error('[Web] Erro ao gerar descrição IA:', err.message);
+            return sendJson(res, 500, { ok: false, message: 'Erro ao gerar descrição do evento.' });
+          }
+        }
+
+        // API: Cadastrar e Agendar Evento
+        if (req.method === 'POST' && pathname === '/secretaria/api/eventos') {
+          try {
+            const body = await parseRequestBody(req);
+            const { evento, departamento, local, tipoDuracao, horarios, descricao, tema, publico, observacoes } = body;
+            if (!evento || !evento.trim()) {
+              return sendJson(res, 400, { ok: false, message: 'Nome do evento é obrigatório.' });
             }
-          } else if (tipoDuracao === "consecutivo") {
-            const h = Array.isArray(horarios) ? horarios[0] : horarios;
-            if (!h || !h.dataInicio || !h.horaInicio || !h.dataFim || !h.horaFim) {
-              return sendJson(res, 400, { ok: false, message: 'Para evento consecutivo, data/hora de início e data/hora de término são obrigatórias.' });
-            }
-            if (/dia\s*(todo|inteiro)/i.test(h.horaInicio)) {
-              return sendJson(res, 400, { ok: false, message: 'O horário de início é obrigatório. Informe no formato HH:MM.' });
-            }
-          } else if (tipoDuracao === "multiplo") {
-            const blocos = Array.isArray(horarios) ? horarios : [horarios];
-            if (!blocos || blocos.length === 0) {
-              return sendJson(res, 400, { ok: false, message: 'Adicione ao menos um bloco de horário.' });
-            }
-            for (let i = 0; i < blocos.length; i++) {
-              const b = blocos[i];
-              if (!b.data || !b.inicio || !b.fim) {
-                return sendJson(res, 400, { ok: false, message: `O bloco ${i + 1} está incompleto (data, início e fim são obrigatórios).` });
+
+            // Validação rigorosa: horário de início obrigatório (sem 'dia todo' ou genérico)
+            if (tipoDuracao === "unico") {
+              const h = Array.isArray(horarios) ? horarios[0] : horarios;
+              if (!h || !h.data || !h.inicio || !h.fim) {
+                return sendJson(res, 400, { ok: false, message: 'Para evento de 1 dia, data, horário de início e término são obrigatórios.' });
               }
-              if (/dia\s*(todo|inteiro)/i.test(b.inicio)) {
-                return sendJson(res, 400, { ok: false, message: `O bloco ${i + 1} exige um horário de início específico no formato HH:MM.` });
+              if (/dia\s*(todo|inteiro)/i.test(h.inicio)) {
+                return sendJson(res, 400, { ok: false, message: 'O horário de início é obrigatório mesmo para eventos de dia todo. Informe no formato HH:MM.' });
+              }
+            } else if (tipoDuracao === "consecutivo") {
+              const h = Array.isArray(horarios) ? horarios[0] : horarios;
+              if (!h || !h.dataInicio || !h.horaInicio || !h.dataFim || !h.horaFim) {
+                return sendJson(res, 400, { ok: false, message: 'Para evento consecutivo, data/hora de início e data/hora de término são obrigatórias.' });
+              }
+              if (/dia\s*(todo|inteiro)/i.test(h.horaInicio)) {
+                return sendJson(res, 400, { ok: false, message: 'O horário de início é obrigatório. Informe no formato HH:MM.' });
+              }
+            } else if (tipoDuracao === "multiplo") {
+              const blocos = Array.isArray(horarios) ? horarios : [horarios];
+              if (!blocos || blocos.length === 0) {
+                return sendJson(res, 400, { ok: false, message: 'Adicione ao menos um bloco de horário.' });
+              }
+              for (let i = 0; i < blocos.length; i++) {
+                const b = blocos[i];
+                if (!b.data || !b.inicio || !b.fim) {
+                  return sendJson(res, 400, { ok: false, message: `O bloco ${i + 1} está incompleto (data, início e fim são obrigatórios).` });
+                }
+                if (/dia\s*(todo|inteiro)/i.test(b.inicio)) {
+                  return sendJson(res, 400, { ok: false, message: `O bloco ${i + 1} exige um horário de início específico no formato HH:MM.` });
+                }
               }
             }
+
+            const descFinal = descricao || gerarDescricaoEvento({
+              evento,
+              tipoDuracao: tipoDuracao || "unico",
+              horarios,
+              departamento,
+              local,
+              tema,
+              publico,
+              observacoes
+            });
+
+            const id = salvarDescricaoEvento({
+              evento,
+              departamento: departamento || "",
+              local: local || "",
+              tipoDuracao: tipoDuracao || "unico",
+              horarios,
+              descricao: descFinal
+            });
+
+            return sendJson(res, 200, {
+              ok: true,
+              message: 'Evento cadastrado e descrição gerada com sucesso!',
+              id,
+              descricao: descFinal
+            });
+          } catch (err) {
+            console.error('[Web] Erro ao cadastrar evento:', err.message);
+            return sendJson(res, 500, { ok: false, message: 'Erro ao cadastrar evento no sistema.' });
           }
-
-          const descFinal = descricao || gerarDescricaoEvento({
-            evento,
-            tipoDuracao: tipoDuracao || "unico",
-            horarios,
-            departamento,
-            local,
-            tema,
-            publico,
-            observacoes
-          });
-
-          const id = salvarDescricaoEvento({
-            evento,
-            departamento: departamento || "",
-            local: local || "",
-            tipoDuracao: tipoDuracao || "unico",
-            horarios,
-            descricao: descFinal
-          });
-
-          return sendJson(res, 200, { 
-            ok: true, 
-            message: 'Evento cadastrado e descrição gerada com sucesso!', 
-            id,
-            descricao: descFinal 
-          });
-        } catch (err) {
-          console.error('[Web] Erro ao cadastrar evento:', err.message);
-          return sendJson(res, 500, { ok: false, message: 'Erro ao cadastrar evento no sistema.' });
         }
-      }
 
-      // ==========================================
-      // APIs: GERENCIADOR DINÂMICO DE EVENTOS
-      // ==========================================
+        // ==========================================
+        // APIs: GERENCIADOR DINÂMICO DE EVENTOS
+        // ==========================================
 
-      // API: Listar eventos dinâmicos do painel da secretaria
-      if (req.method === 'GET' && pathname === '/secretaria/api/eventos-painel') {
-        const eventos = eventosGerenciador.listarEventosPainel();
-        return sendJson(res, 200, { ok: true, eventos });
-      }
-
-      // API: Salvar ou atualizar evento dinâmico
-      if (req.method === 'POST' && pathname === '/secretaria/api/eventos-painel') {
-        try {
-          const body = await parseRequestBody(req);
-          const evSalvo = eventosGerenciador.salvarEventoPainel(body);
-          return sendJson(res, 200, { ok: true, evento: evSalvo, message: 'Evento salvo com sucesso!' });
-        } catch (errSave) {
-          console.error('[Web] Erro ao salvar evento no painel:', errSave.message);
-          return sendJson(res, 400, { ok: false, message: errSave.message });
+        // API: Listar eventos dinâmicos do painel da secretaria
+        if (req.method === 'GET' && pathname === '/secretaria/api/eventos-painel') {
+          const eventos = eventosGerenciador.listarEventosPainel();
+          return sendJson(res, 200, { ok: true, eventos });
         }
-      }
 
-      // API: Excluir evento dinâmico
-      if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/eventos-painel/')) {
-        const evId = decodeURIComponent(pathname.replace('/secretaria/api/eventos-painel/', ''));
-        const ok = eventosGerenciador.excluirEventoPainel(evId);
-        return sendJson(res, ok ? 200 : 404, { ok, message: ok ? 'Evento excluído com sucesso!' : 'Evento não encontrado.' });
-      }
-
-      // API: Alternar status ativo/pausado do evento
-      if (req.method === 'POST' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/toggle')) {
-        const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/toggle', '');
-        const ok = eventosGerenciador.alternarStatusEventoPainel(evId);
-        return sendJson(res, ok ? 200 : 404, { ok });
-      }
-
-      // API: Listar inscrições de um evento específico
-      if (req.method === 'GET' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/inscricoes')) {
-        const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/inscricoes', '');
-        const evento = eventosGerenciador.buscarEventoPainelPorId(evId);
-        const inscricoes = eventosGerenciador.listarInscricoesEventoPainel(evId);
-        return sendJson(res, 200, { ok: true, evento, inscricoes });
-      }
-
-      // API: Excluir uma inscrição de evento dinâmico
-      if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/eventos-inscricoes/')) {
-        const insId = decodeURIComponent(pathname.replace('/secretaria/api/eventos-inscricoes/', ''));
-        const ok = eventosGerenciador.excluirInscricaoEventoPainel(insId);
-        return sendJson(res, ok ? 200 : 404, { ok });
-      }
-
-      // API: Relatório PDF / Impressão de inscritos de um evento dinâmico
-      if (req.method === 'GET' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/relatorio-pdf')) {
-        const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/relatorio-pdf', '');
-        const evento = eventosGerenciador.buscarEventoPainelPorId(evId);
-        if (!evento) return sendJson(res, 404, { ok: false, message: 'Evento não encontrado.' });
-        const inscricoes = eventosGerenciador.listarInscricoesEventoPainel(evId);
-        const html = eventosGerenciador.renderPdfInscritosEventoHtml(evento, inscricoes);
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end(html);
-      }
-
-      // API: Upload de Banner / Fotos do Evento
-      if (req.method === 'POST' && pathname === '/secretaria/api/eventos-painel/upload') {
-        try {
-          const body = await parseRequestBody(req);
-          const { imagemBase64, nomeArquivo } = body || {};
-          if (!imagemBase64) {
-            return sendJson(res, 400, { ok: false, message: 'Nenhuma imagem enviada.' });
+        // API: Salvar ou atualizar evento dinâmico
+        if (req.method === 'POST' && pathname === '/secretaria/api/eventos-painel') {
+          try {
+            const body = await parseRequestBody(req);
+            const evSalvo = eventosGerenciador.salvarEventoPainel(body);
+            return sendJson(res, 200, { ok: true, evento: evSalvo, message: 'Evento salvo com sucesso!' });
+          } catch (errSave) {
+            console.error('[Web] Erro ao salvar evento no painel:', errSave.message);
+            return sendJson(res, 400, { ok: false, message: errSave.message });
           }
+        }
 
-          const matches = imagemBase64.match(/^data:image\/([a-zA-Z0-9\+\.]+);base64,(.+)$/);
-          let extensao = 'jpg';
-          let buffer = null;
+        // API: Excluir evento dinâmico
+        if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/eventos-painel/')) {
+          const evId = decodeURIComponent(pathname.replace('/secretaria/api/eventos-painel/', ''));
+          const ok = eventosGerenciador.excluirEventoPainel(evId);
+          return sendJson(res, ok ? 200 : 404, { ok, message: ok ? 'Evento excluído com sucesso!' : 'Evento não encontrado.' });
+        }
 
-          if (matches) {
-            extensao = matches[1].replace('jpeg', 'jpg');
-            buffer = Buffer.from(matches[2], 'base64');
-          } else {
-            buffer = Buffer.from(imagemBase64, 'base64');
+        // API: Alternar status ativo/pausado do evento
+        if (req.method === 'POST' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/toggle')) {
+          const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/toggle', '');
+          const ok = eventosGerenciador.alternarStatusEventoPainel(evId);
+          return sendJson(res, ok ? 200 : 404, { ok });
+        }
+
+        // API: Listar inscrições de um evento específico
+        if (req.method === 'GET' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/inscricoes')) {
+          const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/inscricoes', '');
+          const evento = eventosGerenciador.buscarEventoPainelPorId(evId);
+          const inscricoes = eventosGerenciador.listarInscricoesEventoPainel(evId);
+          return sendJson(res, 200, { ok: true, evento, inscricoes });
+        }
+
+        // API: Excluir uma inscrição de evento dinâmico
+        if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/eventos-inscricoes/')) {
+          const insId = decodeURIComponent(pathname.replace('/secretaria/api/eventos-inscricoes/', ''));
+          const ok = eventosGerenciador.excluirInscricaoEventoPainel(insId);
+          return sendJson(res, ok ? 200 : 404, { ok });
+        }
+
+        // API: Relatório PDF / Impressão de inscritos de um evento dinâmico
+        if (req.method === 'GET' && pathname.startsWith('/secretaria/api/eventos-painel/') && pathname.endsWith('/relatorio-pdf')) {
+          const evId = pathname.replace('/secretaria/api/eventos-painel/', '').replace('/relatorio-pdf', '');
+          const evento = eventosGerenciador.buscarEventoPainelPorId(evId);
+          if (!evento) return sendJson(res, 404, { ok: false, message: 'Evento não encontrado.' });
+          const inscricoes = eventosGerenciador.listarInscricoesEventoPainel(evId);
+          const html = eventosGerenciador.renderPdfInscritosEventoHtml(evento, inscricoes);
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(html);
+        }
+
+        // API: Upload de Banner / Fotos do Evento
+        if (req.method === 'POST' && pathname === '/secretaria/api/eventos-painel/upload') {
+          try {
+            const body = await parseRequestBody(req);
+            const { imagemBase64, nomeArquivo } = body || {};
+            if (!imagemBase64) {
+              return sendJson(res, 400, { ok: false, message: 'Nenhuma imagem enviada.' });
+            }
+
+            const matches = imagemBase64.match(/^data:image\/([a-zA-Z0-9\+\.]+);base64,(.+)$/);
+            let extensao = 'jpg';
+            let buffer = null;
+
+            if (matches) {
+              extensao = matches[1].replace('jpeg', 'jpg');
+              buffer = Buffer.from(matches[2], 'base64');
+            } else {
+              buffer = Buffer.from(imagemBase64, 'base64');
+            }
+
+            const uploadsDir = path.join(__dirname, 'public', 'images', 'eventos');
+            if (!fs.existsSync(uploadsDir)) {
+              fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+
+            const safeNome = (nomeArquivo || 'banner')
+              .replace(/[^a-zA-Z0-9_-]/g, '_')
+              .slice(0, 30);
+            const fileName = `${Date.now()}_${safeNome}.${extensao}`;
+            const filePath = path.join(uploadsDir, fileName);
+
+            fs.writeFileSync(filePath, buffer);
+            const urlRelativa = `/images/eventos/${fileName}`;
+
+            return sendJson(res, 200, { ok: true, url: urlRelativa });
+          } catch (errUp) {
+            console.error('[Web] Erro no upload de imagem:', errUp.message);
+            return sendJson(res, 500, { ok: false, message: 'Erro ao salvar imagem.' });
           }
+        }
 
-          const uploadsDir = path.join(__dirname, 'public', 'images', 'eventos');
-          if (!fs.existsSync(uploadsDir)) {
-            fs.mkdirSync(uploadsDir, { recursive: true });
+        // API: Deletar Usuário (Apenas Admin)
+        if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/admin/users/') && isAdmin(req)) {
+          const target = decodeURIComponent(pathname.replace('/secretaria/api/admin/users/', ''));
+          const result = deleteUser(target);
+          return sendJson(res, result.ok ? 200 : 404, result);
+        }
+
+        // API: Listar Usuários (Apenas Admin)
+        if (req.method === 'GET' && pathname === '/secretaria/api/admin/users' && isAdmin(req)) {
+          const users = loadUsers();
+          const userList = Object.values(users).map(u => ({ username: u.username, role: u.role }));
+          return sendJson(res, 200, { ok: true, users: userList });
+        }
+
+        // API: Criar Usuário (Apenas Admin)
+        if (req.method === 'POST' && pathname === '/secretaria/api/admin/users' && isAdmin(req)) {
+          try {
+            const body = await parseRequestBody(req);
+            const result = await addUser(body);
+            return sendJson(res, result.ok ? 200 : 400, result);
+          } catch (err) {
+            console.error(`[Web] Erro ao criar usuário via Admin: ${err.message}`);
+            return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
           }
-
-          const safeNome = (nomeArquivo || 'banner')
-            .replace(/[^a-zA-Z0-9_-]/g, '_')
-            .slice(0, 30);
-          const fileName = `${Date.now()}_${safeNome}.${extensao}`;
-          const filePath = path.join(uploadsDir, fileName);
-
-          fs.writeFileSync(filePath, buffer);
-          const urlRelativa = `/images/eventos/${fileName}`;
-
-          return sendJson(res, 200, { ok: true, url: urlRelativa });
-        } catch (errUp) {
-          console.error('[Web] Erro no upload de imagem:', errUp.message);
-          return sendJson(res, 500, { ok: false, message: 'Erro ao salvar imagem.' });
         }
-      }
 
-      // API: Deletar Usuário (Apenas Admin)
-      if (req.method === 'DELETE' && pathname.startsWith('/secretaria/api/admin/users/') && isAdmin(req)) {
-        const target = decodeURIComponent(pathname.replace('/secretaria/api/admin/users/', ''));
-        const result = deleteUser(target);
-        return sendJson(res, result.ok ? 200 : 404, result);
-      }
-
-      // API: Listar Usuários (Apenas Admin)
-      if (req.method === 'GET' && pathname === '/secretaria/api/admin/users' && isAdmin(req)) {
-        const users = loadUsers();
-        const userList = Object.values(users).map(u => ({ username: u.username, role: u.role }));
-        return sendJson(res, 200, { ok: true, users: userList });
-      }
-
-      // API: Criar Usuário (Apenas Admin)
-      if (req.method === 'POST' && pathname === '/secretaria/api/admin/users' && isAdmin(req)) {
-        try {
-          const body = await parseRequestBody(req);
-          const result = await addUser(body);
-          return sendJson(res, result.ok ? 200 : 400, result);
-        } catch (err) {
-          console.error(`[Web] Erro ao criar usuário via Admin: ${err.message}`);
-          return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+        // API: Listar Líderes e Usuários por Telefone (Apenas Admin)
+        if (req.method === 'GET' && (pathname === '/secretaria/api/admin/lideres' || pathname === '/secretaria/api/admin/usuarios') && isAdmin(req)) {
+          const lideres = listLideres();
+          return sendJson(res, 200, { ok: true, lideres, usuarios: lideres });
         }
-      }
 
-      // API: Listar Líderes e Usuários por Telefone (Apenas Admin)
-      if (req.method === 'GET' && (pathname === '/secretaria/api/admin/lideres' || pathname === '/secretaria/api/admin/usuarios') && isAdmin(req)) {
-        const lideres = listLideres();
-        return sendJson(res, 200, { ok: true, lideres, usuarios: lideres });
-      }
-
-      // API: Adicionar Líder / Usuário (Apenas Admin)
-      if (req.method === 'POST' && (pathname === '/secretaria/api/admin/lideres' || pathname === '/secretaria/api/admin/usuarios') && isAdmin(req)) {
-        try {
-          const body = await parseRequestBody(req);
-          const result = addLider(body);
-          return sendJson(res, result.ok ? 200 : 400, result);
-        } catch (err) {
-          console.error(`[Web] Erro ao adicionar usuário/líder via Admin: ${err.message}`);
-          return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+        // API: Adicionar Líder / Usuário (Apenas Admin)
+        if (req.method === 'POST' && (pathname === '/secretaria/api/admin/lideres' || pathname === '/secretaria/api/admin/usuarios') && isAdmin(req)) {
+          try {
+            const body = await parseRequestBody(req);
+            const result = addLider(body);
+            return sendJson(res, result.ok ? 200 : 400, result);
+          } catch (err) {
+            console.error(`[Web] Erro ao adicionar usuário/líder via Admin: ${err.message}`);
+            return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+          }
         }
-      }
 
-      // API: Editar Líder / Usuário (Apenas Admin)
-      if (req.method === 'PUT' && (pathname.startsWith('/secretaria/api/admin/lideres/') || pathname.startsWith('/secretaria/api/admin/usuarios/')) && isAdmin(req)) {
-        try {
+        // API: Editar Líder / Usuário (Apenas Admin)
+        if (req.method === 'PUT' && (pathname.startsWith('/secretaria/api/admin/lideres/') || pathname.startsWith('/secretaria/api/admin/usuarios/')) && isAdmin(req)) {
+          try {
+            const prefix = pathname.startsWith('/secretaria/api/admin/lideres/') ? '/secretaria/api/admin/lideres/' : '/secretaria/api/admin/usuarios/';
+            const target = decodeURIComponent(pathname.replace(prefix, ''));
+            const body = await parseRequestBody(req);
+            const result = updateLider(target, body);
+            return sendJson(res, result.ok ? 200 : 400, result);
+          } catch (err) {
+            console.error(`[Web] Erro ao editar usuário/líder via Admin: ${err.message}`);
+            return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+          }
+        }
+
+        // API: Remover Líder / Usuário (Apenas Admin)
+        if (req.method === 'DELETE' && (pathname.startsWith('/secretaria/api/admin/lideres/') || pathname.startsWith('/secretaria/api/admin/usuarios/')) && isAdmin(req)) {
           const prefix = pathname.startsWith('/secretaria/api/admin/lideres/') ? '/secretaria/api/admin/lideres/' : '/secretaria/api/admin/usuarios/';
           const target = decodeURIComponent(pathname.replace(prefix, ''));
-          const body = await parseRequestBody(req);
-          const result = updateLider(target, body);
-          return sendJson(res, result.ok ? 200 : 400, result);
-        } catch (err) {
-          console.error(`[Web] Erro ao editar usuário/líder via Admin: ${err.message}`);
-          return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
+          const result = removeLider(target);
+          return sendJson(res, result.ok ? 200 : 404, result);
         }
-      }
 
-      // API: Remover Líder / Usuário (Apenas Admin)
-      if (req.method === 'DELETE' && (pathname.startsWith('/secretaria/api/admin/lideres/') || pathname.startsWith('/secretaria/api/admin/usuarios/')) && isAdmin(req)) {
-        const prefix = pathname.startsWith('/secretaria/api/admin/lideres/') ? '/secretaria/api/admin/lideres/' : '/secretaria/api/admin/usuarios/';
-        const target = decodeURIComponent(pathname.replace(prefix, ''));
-        const result = removeLider(target);
-        return sendJson(res, result.ok ? 200 : 404, result);
-      }
-
-      // API: Ler Logs (Apenas Admin)
-      if (req.method === 'GET' && pathname === '/secretaria/api/logs' && isAdmin(req)) {
-        try {
-          const content = fs.readFileSync(LOG_FILE, 'utf8');
-          return sendJson(res, 200, { ok: true, logs: content });
-        } catch (e) {
-          return sendJson(res, 500, { ok: false, message: 'Erro ao ler arquivo de log' });
+        // API: Ler Logs (Apenas Admin)
+        if (req.method === 'GET' && pathname === '/secretaria/api/logs' && isAdmin(req)) {
+          try {
+            const content = fs.readFileSync(LOG_FILE, 'utf8');
+            return sendJson(res, 200, { ok: true, logs: content });
+          } catch (e) {
+            return sendJson(res, 500, { ok: false, message: 'Erro ao ler arquivo de log' });
+          }
         }
-      }
 
-      // API: Limpar Logs (Apenas Admin)
-      if (req.method === 'DELETE' && pathname === '/secretaria/api/logs' && isAdmin(req)) {
-        try {
-          fs.writeFileSync(LOG_FILE, '');
+        // API: Limpar Logs (Apenas Admin)
+        if (req.method === 'DELETE' && pathname === '/secretaria/api/logs' && isAdmin(req)) {
+          try {
+            fs.writeFileSync(LOG_FILE, '');
+            return sendJson(res, 200, { ok: true });
+          } catch (e) {
+            return sendJson(res, 500, { ok: false });
+          }
+        }
+
+        if (req.method === 'POST' && pathname === '/secretaria/request-qr') {
+          const status = getStatus();
+          if (status.connected) {
+            return sendJson(res, 200, { ok: false, message: 'Bot conectado.' });
+          }
+          await startClient();
           return sendJson(res, 200, { ok: true });
-        } catch (e) {
-          return sendJson(res, 500, { ok: false });
+        }
+        if (req.method === 'POST' && pathname === '/secretaria/cancel-qr') {
+          await cancelQr();
+          return sendJson(res, 200, { ok: true });
+        }
+        if (req.method === 'POST' && pathname === '/secretaria/disconnect') {
+          const result = await disconnectClient(true);
+          return sendJson(res, result.ok ? 200 : 500, result);
+        }
+        if (req.method === 'POST' && pathname === '/secretaria/reset-session') {
+          await disconnectClient(true);
+          await startClient({ forceClean: true });
+          return sendJson(res, 200, { ok: true, message: 'Sessão reiniciada do zero.' });
+        }
+        if (req.method === 'POST' && pathname === '/secretaria/logout') {
+          const sessionId = getSessionId(req);
+          clearSessionCookie(res, sessionId);
+          return sendJson(res, 200, { ok: true });
+        }
+        // Rota não encontrada
+        console.warn(`[Web] 404 Not Found: ${req.method} ${sanitizarParaLog(pathname)}`); // NOSONAR
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not found');
+      } catch (globalErr) {
+        console.error(`[ALERTA:web] 500 Internal Server Error em ${sanitizarParaLog(req.url)}:`, globalErr); // NOSONAR
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, message: 'Erro interno no servidor.' }));
         }
       }
-
-      if (req.method === 'POST' && pathname === '/secretaria/request-qr') {
-        const status = getStatus();
-        if (status.connected) {
-          return sendJson(res, 200, { ok: false, message: 'Bot conectado.' });
-        }
-        await startClient();
-        return sendJson(res, 200, { ok: true });
-      }
-      if (req.method === 'POST' && pathname === '/secretaria/cancel-qr') {
-        await cancelQr();
-        return sendJson(res, 200, { ok: true });
-      }
-      if (req.method === 'POST' && pathname === '/secretaria/disconnect') {
-        const result = await disconnectClient(true);
-        return sendJson(res, result.ok ? 200 : 500, result);
-      }
-      if (req.method === 'POST' && pathname === '/secretaria/reset-session') {
-        await disconnectClient(true);
-        await startClient({ forceClean: true });
-        return sendJson(res, 200, { ok: true, message: 'Sessão reiniciada do zero.' });
-      }
-      if (req.method === 'POST' && pathname === '/secretaria/logout') {
-        const sessionId = getSessionId(req);
-        clearSessionCookie(res, sessionId);
-        return sendJson(res, 200, { ok: true });
-      }
-      // Rota não encontrada
-      console.warn(`[Web] 404 Not Found: ${req.method} ${sanitizarParaLog(pathname)}`); // NOSONAR
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not found');
-    } catch (globalErr) {
-      console.error(`[ALERTA:web] 500 Internal Server Error em ${sanitizarParaLog(req.url)}:`, globalErr); // NOSONAR
-      if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, message: 'Erro interno no servidor.' }));
-      }
-    }
-  });
+    });
 
   // Captura erros globais do servidor para evitar crash e logar Erro 500
   server.on('error', (err) => {

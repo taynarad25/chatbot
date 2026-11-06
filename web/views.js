@@ -220,8 +220,13 @@ function renderLoginHtml(message = "") {
       </div>
       
       <button type="submit">Acessar Painel</button>
-      <div class="links">
-        Primeiro acesso como líder? <a href="/secretaria/register">Cadastrar minha senha</a>
+      <div class="links" style="margin-top: 16px; text-align: center;">
+        <span style="color: #a1a1aa; font-size: 0.88rem;">Primeiro acesso ou deseja cadastrar seu usuário?</span>
+        <div style="margin-top: 8px;">
+          <a href="/secretaria/register" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; color: #ff7e5f; text-decoration: none; font-weight: 600; font-size: 0.88rem; transition: background 0.2s;">
+            👤 Cadastrar Nome de Usuário e Senha
+          </a>
+        </div>
       </div>
     </form>
   </div>
@@ -476,16 +481,22 @@ function renderRegisterHtml(message = "") {
     <div class="brand-header">
       <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
       <h1 class="brand-title"><span>CURADOS</span></h1>
-      <p class="brand-subtitle">Primeiro Acesso de Líder</p>
+      <p class="brand-subtitle">Cadastro de Usuário & Primeiro Acesso</p>
     </div>
 
-    <div id="regMessage" class="info">${message || 'Informe seu WhatsApp e nome cadastrados para definir sua senha de acesso.'}</div>
+    <div id="regMessage" class="info">${message || 'Informe seu WhatsApp e nome cadastrados e escolha seu nome de usuário e senha.'}</div>
     <form id="regForm">
       <label class="input-label" for="regTelefone">Seu WhatsApp *</label>
       <input id="regTelefone" name="telefone" placeholder="(11) 99999-9999" required autocomplete="tel" inputmode="numeric" />
 
       <label class="input-label" for="regNome">Nome Completo</label>
       <input id="regNome" name="nome" placeholder="Seu nome completo cadastrado" autocomplete="name" />
+
+      <label class="input-label" for="regUsername">Nome de Usuário Desejado (Login)</label>
+      <input id="regUsername" name="customUsername" placeholder="Ex: isabelly, diniz, pastor.silvano" autocomplete="username" />
+      <div style="font-size: 0.78rem; color: #a1a1aa; margin-top: -6px; margin-bottom: 14px;">
+        💡 Opcional: escolha o nome que você prefere digitar ao entrar no painel. Se deixar em branco, você poderá entrar com o WhatsApp.
+      </div>
       
       <label class="input-label" for="password">Criar Nova Senha *</label>
       <div class="password-wrapper">
@@ -496,7 +507,7 @@ function renderRegisterHtml(message = "") {
       <label class="input-label" for="confirmPassword">Confirmar Nova Senha *</label>
       <input id="confirmPassword" name="confirmPassword" type="password" placeholder="Repita a nova senha" required minlength="6" autocomplete="new-password" />
       
-      <button type="submit" id="btnSubmitReg">Verificar Cadastro e Criar Senha</button>
+      <button type="submit" id="btnSubmitReg">Cadastrar Usuário e Criar Senha</button>
       <div class="links">
         Já possui senha? <a href="/secretaria/login">Fazer login</a>
       </div>
@@ -558,6 +569,10 @@ function renderRegisterHtml(message = "") {
         data.username = data.telefone;
       }
 
+      if (data.customUsername) {
+        data.customUsername = data.customUsername.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      }
+
       const res = await fetch('/secretaria/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -566,9 +581,10 @@ function renderRegisterHtml(message = "") {
       const json = await res.json();
       if (res.ok) {
         console.log('Conta criada com sucesso.');
-        msgEl.textContent = json.message || 'Senha definida com sucesso! Redirecionando...';
+        msgEl.textContent = json.message || 'Cadastro realizado com sucesso! Redirecionando...';
         msgEl.className = 'success';
-        setTimeout(() => window.location.href = '/secretaria/login?message=Primeiro acesso concluído! Faça login com seu WhatsApp e senha.', 2000);
+        const msgRedirect = encodeURIComponent(json.message || 'Cadastro concluído! Agora você já pode fazer login.');
+        setTimeout(() => window.location.href = '/secretaria/login?message=' + msgRedirect, 1800);
       }
       else {
         console.error('Erro no cadastro:', json.message);
