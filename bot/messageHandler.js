@@ -2138,6 +2138,94 @@ function createMessageHandler({
                     removerPendente(codigo);
 
                     let avisouLider = false;
+                    try {
+                      const jid = solicitanteId && (solicitanteId.includes('@') ? solicitanteId : `${solicitanteId.replace(/\D/g, '')}@c.us`);
+                      if (jid && jid.length > 5) {
+                        const feedback = `✅ *Reunião Confirmada e Agendada!*\n\nSua reunião foi aprovada pela secretaria e já consta na agenda de Reuniões. 🙏\n\n📋 *Ata de Reunião:*\nO arquivo da Ata de Reunião foi enviado em anexo e também pode ser acessado pelo link:\n${LINK_ATA_REUNIAO}\n\nEle deve ser impresso e preenchido com as informações da reunião e assinaturas, e depois entregue para uma das secretárias para arquivar.`;
+                        await enviarConfirmacaoReuniaoComAta(client, jid, feedback);
+                        avisouLider = true;
+                        console.log(`[Secretaria] Reunião agendada automaticamente para ${mascararTelefone(jid)}`);
+                      }
+                    } catch (sendErr) {
+                      console.error(`[ALERTA:whatsapp] Erro ao enviar confirmação de reunião para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                    }
+                    return msg.reply(`✅ Reunião gravada na agenda de *Reuniões*${avisouLider ? ' e líder notificado com a Ata' : ''}.`);
+                  } catch (err) {
+                    console.error("[ALERTA:secretaria] Erro no processamento da reunião:", err);
+                    return msg.reply("⚠️ Reunião processada com pendências. Verifique na agenda oficial.");
+                  }
+                } else {
+                  removerPendente(codigo);
+                  const feedback = "❌ *Aviso de Solicitação de Reunião*\n\nInfelizmente não pudemos confirmar sua solicitação de reunião para esta data. Por favor, entre em contato com a secretaria para verificar outras opções.\n\nDigite *menu* para voltar ao menu principal.";
+                  try {
+                    await client.sendMessage(solicitanteId, feedback);
+                    console.log(`[Secretaria] Feedback de recusa de reunião enviado para ${mascararTelefone(solicitanteId)}`);
+                  } catch (sendErr) {
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de reunião para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  }
+                  return msg.reply(`✅ Líder notificado sobre a recusa da reunião.`);
+                }
+              }
+
+              const { solicitanteId, rede } = dados;
+
+              if (isMarcar) {
+                try {
+                  const ano = moment().tz("America/Sao_Paulo").year();
+                  const agendaId = agendasParaLer[mapearRedeParaAgendaIndex(rede)];
+
+                  try {
+                    if (dados.tipoDuracao === "multiplo" && Array.isArray(dados.blocos)) {
+                      const resources = montarResourcesMultiplosBlocos(dados, ano);
+                      for (const resItem of resources) {
+                        await calendar.events.insert({ calendarId: agendaId, resource: resItem });
+                      }
+                    } else {
+                      const resource = montarResourceEvento(dados, ano);
+                      await calendar.events.insert({ calendarId: agendaId, resource });
+                    }
+                  } catch (calErr) {
+                    console.error("[ALERTA:google-calendar] Erro no agendamento automático:", calErr);
+                    return msg.reply("❌ Erro ao salvar na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
+                  }
+
+                  if (dados.descricao) {
+                    try {
+                      salvarDescricaoEvento({
+                        evento: dados.evento || dados.nomeEvento,
+                        departamento: rede,
+                        local: dados.local,
+                        tipoDuracao: dados.tipoDuracao || "unico",
+                        horarios: dados.blocos || { inicio: dados.horarioInicio, fim: dados.horarioFim },
+                        descricao: dados.descricao
+                      });
+                    } catch (eDesc) {
+                      console.error("[Secretaria] Erro ao registrar descrição do evento:", eDesc.message);
+                    }
+                  }
+                  try {
+                    salvarFormularioEvento({
+                      evento: dados.nomeEvento,
+                      departamento: rede,
+                      data: `${dados.dia}/${dados.mes}/${ano}`,
+                      solicitanteId: solicitanteId,
+                      payload: {
+                        nomeSolicitante: dados.solicitanteNome || "",
+                        nome_lider: dados.solicitanteNome || "",
+                        departamento: rede,
+                        data: `${dados.dia}/${dados.mes}/${ano}`,
+                        horario_inicio: dados.horarioInicio,
+                        horario_termino: dados.horarioFim,
+                        local: dados.local || "",
+                        criadoVia: dados.criadoVia || dados.payload?.criadoVia || "whatsapp"
+                      },
+                    });
+                  } catch (eForm) {
+                    console.error("[Secretaria] Erro ao registrar formulário inicial de evento:", eForm.message);
+                  }
+                  removerPendente(codigo);
+
+                  let avisouLider = false;
                   try {
                     const jid = solicitanteId && (solicitanteId.includes('@') ? solicitanteId : `${solicitanteId.replace(/\D/g, '')}@c.us`);
                     if (jid && jid.length > 5) {

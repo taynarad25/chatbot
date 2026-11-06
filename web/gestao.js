@@ -391,6 +391,19 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
       );
 
       if (!jaExiste) {
+        // Verifica se o evento está na tabela pendentes aguardando aprovação
+        let estaPendente = false;
+        try {
+          const rowPend = db.prepare("SELECT codigo, dados FROM pendentes").all();
+          estaPendente = rowPend.some(p => {
+            try {
+              const dp = JSON.parse(p.dados);
+              const nomeP = (dp.nomeEvento || dp.evento || dp.nome || '').trim().toLowerCase();
+              return nomeP === r.evento.toLowerCase().trim();
+            } catch (_) { return false; }
+          });
+        } catch (_) {}
+
         eventos.push({
           id: `form_${r.id}`,
           origem: 'formulario',
@@ -402,7 +415,7 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
           local: payload.local || ENDERECO_IGREJA,
           responsavel: payload.nome_lider || payload.solicitanteNome || '',
           docUrl: r.docUrl || '',
-          status: 'confirmado',
+          status: estaPendente ? 'pendente_secretaria' : 'confirmado',
           tipo: r.evento.toLowerCase().includes('ensaio') ? 'ensaio' : (r.evento.toLowerCase().includes('reunião') ? 'reuniao' : 'evento'),
           payload
         });
@@ -452,7 +465,7 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
       try {
         const d = JSON.parse(pend.dados);
         const nome = (d.nomeEvento || d.evento || d.nome || d.finalidade || '').trim();
-        if (!nome || /^(teste|test|gabi|gabriela)$/i.test(nome)) continue;
+        if (!nome) continue;
 
         const dataFormatada = d.dataFormatada || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
         if (!dataFormatada && !d.blocos && !d.dataInicio && d.tipo !== 'midia') continue;
@@ -1036,6 +1049,9 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
         if (observacoes) p.observacoes = observacoes;
 
         db.prepare("UPDATE formularios_eventos SET payload = ? WHERE id = ?").run(JSON.stringify(p), rowForm.id);
+      }
+      if (typeof db.marcarFormularioComoPreenchido === 'function') {
+        db.marcarFormularioComoPreenchido(nome_evento);
       }
     } catch (_) {}
 
@@ -3219,6 +3235,13 @@ function renderGestaoHtml({ user }) {
       document.getElementById('subtelaFormulario').style.display = 'none';
       document.getElementById('subtelaCancelar').style.display = 'none';
       document.getElementById('gerenciarEventoTitulo').innerText = '⚙️ Gerenciar Evento';
+      if (eventoSendoGerenciado) {
+        const btnF = document.getElementById('btnAcaoFormulario');
+        if (btnF) {
+          const ehEv = (eventoSendoGerenciado.tipo === 'evento' || !eventoSendoGerenciado.tipo) && !eventoSendoGerenciado.isOcupacaoExterna;
+          btnF.style.display = ehEv ? 'flex' : 'none';
+        }
+      }
     }
 
     function exibirSubtelaGerenciar(tipo) {

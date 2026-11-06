@@ -1548,7 +1548,7 @@ async function processarAniversariantesDoDia({
   return { processados: membros.length, aniversariantes: aniversariantes.length, enviados: totalEnviados };
 }
 
-const REGEX_A_DEFINIR = /\b(a\s*definir|em\s*defini[çc][ãa]o|ser[áa]\s*definid[oa]s?|vai\s*definir|ainda\s*n[ãa]o\s*definid[oa]s?|n[ãa]o\s*definid[oa]s?|indefinid[oa]s?|a\s*confirmar|pendente|ainda\s*vamos?\s*definir|a\s*decidir|ainda\s*a\s*decidir|em\s*decis[ãa]o|vai\s*decidir|ainda\s*n[ãa]o\s*decidid[oa]s?|n[ãa]o\s*decidid[oa]s?|indecis[oa]s?|a\s*combinar|ainda\s*a\s*combinar)\b/i;
+const REGEX_A_DEFINIR = /\b(a\s*definir|em\s*defini[çc][ãa]o|ser[áa]\s*definid[oa]s?|vai\s*definir|ainda\s*n[ãa]o\s*definid[oa]s?|n[ãa]o\s*definid[oa]s?|indefinid[oa]s?|a\s*confirmar|pendente|ainda\s*vamos?\s*definir|a\s*decidir|ainda\s*a\s*decidir|em\s*decis[ãa]o|vai\s*decidir|ainda\s*n[ãa]o\s*decidid[oa]s?|n[ãa]o\s*decidid[oa]s?|indecis[oa]s?|a\s*combinar|ainda\s*a\s*combinar|a\s*ver|ainda\s*a\s*ver|ver|a\s*checar|a\s*verificar)\b/i;
 
 const LABELS_CAMPOS_FORM = {
   nome_evento: "Nome do Evento",
@@ -1610,7 +1610,7 @@ function extrairItensADefinirFormulario(payload) {
 }
 
 
-function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens = [] } = {}) {
+function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens = [], diasAntecedencia = 5 } = {}) {
   const saudacao = nome ? `Olá, *${nome}*! Tudo bem?` : "Olá! Tudo bem?";
   const dataFormatada = formatarDataBrasil(data);
   const dataStr = dataFormatada ? ` em *${dataFormatada}*` : "";
@@ -1621,12 +1621,12 @@ function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens 
   }
 
   return (
-    `🔔 *Lembrete de Alinhamento - Faltam 7 dias!*\n\n` +
+    `🔔 *Lembrete de Alinhamento - Faltam ${diasAntecedencia} dias!*\n\n` +
     `${saudacao}\n\n` +
-    `Faltam apenas *7 dias* para a realização do evento *${evento}*${dataStr}!\n\n` +
-    `No formulário de agendamento, os seguintes itens haviam ficado marcados como *a definir*:\n` +
+    `Faltam apenas *${diasAntecedencia} dias* para a realização do evento *${evento}*${dataStr}!\n\n` +
+    `No formulário do evento, as seguintes informações ficaram pendentes de confirmação (a ver / a definir):\n` +
     `${listaItens}\n` +
-    `Eles já foram definidos? Se sim, você pode atualizar o formulário diretamente comigo respondendo aqui, ou nos enviar as definições para alinharmos tudo certinho!\n\n` +
+    `Elas já foram definidas? Você pode atualizar o formulário diretamente no portal (https://comunidadecristacurados.com.br/gestao) ou responder diretamente a esta mensagem com as definições para alinharmos tudo certinho!\n\n` +
     `_Seguimos à disposição e em oração pelo seu evento!_ 🙏✨`
   );
 }
@@ -1639,7 +1639,7 @@ async function processarLembretesItensADefinir({
   client,
   buscarEventos,
   agendasParaLer = [],
-  diasAntecedencia = 7,
+  diasAntecedencia = 5,
   dataBase = new Date(),
   notificarSecretariaFn = notificarSecretaria,
   etapas = null,
@@ -1661,7 +1661,7 @@ async function processarLembretesItensADefinir({
   const inicioDia = new Date(ano, targetDate.getMonth(), targetDate.getDate(), 0, 0, 0).toISOString();
   const fimDia = new Date(ano, targetDate.getMonth(), targetDate.getDate(), 23, 59, 59).toISOString();
 
-  console.log(`[Itens a Definir] Verificando eventos de ${dataAlvoStr} (7 dias)...`);
+  console.log(`[Itens a Definir] Verificando eventos de ${dataAlvoStr} (5 dias)...`);
 
   let eventos = [];
   try {
@@ -1676,7 +1676,7 @@ async function processarLembretesItensADefinir({
   }
 
   let totalEnviados = 0;
-  const tipoLembrete = `7_dias_itens_a_definir`;
+  const tipoLembrete = `${diasAntecedencia}_dias_itens_a_definir`;
 
   for (const ev of eventos) {
     if (ehEnsaio(ev) || ehReuniao(ev) || ehAtendimentoPastoral(ev)) {
@@ -1878,12 +1878,84 @@ function iniciarAgendadorLembretes({
         client,
       });
 
-      // 1. Lembretes de itens a definir no formulário (7 dias antes)
+      
+/**
+ * Cobrança de preenchimento obrigatório de formulário de evento:
+ * Se após 1 dia (24h) da aprovação da Secretaria o líder não tiver preenchido,
+ * o bot envia uma mensagem de cobrança pelo WhatsApp.
+ */
+async function processarCobrancasFormularioPendente({ client, forcar = false } = {}) {
+  try {
+    if (!db || typeof db.buscarPendenciasFormularioNaoPreenchidas !== 'function') {
+      return { processados: 0, enviados: 0 };
+    }
+
+    const pendentes = db.buscarPendenciasFormularioNaoPreenchidas(24);
+    if (!Array.isArray(pendentes) || pendentes.length === 0) {
+      return { processados: 0, enviados: 0 };
+    }
+
+    let enviados = 0;
+    for (const item of pendentes) {
+      // 1. Verifica se no meio tempo o formulário já foi preenchido
+      const form = obterFormularioEvento(item.evento);
+      if (form && form.payload) {
+        let p = typeof form.payload === 'string' ? JSON.parse(form.payload) : form.payload;
+        const tema = (p.tema || '').trim();
+        if (tema && !REGEX_A_DEFINIR.test(tema) && tema.toLowerCase() !== 'a definir') {
+          if (typeof db.marcarFormularioComoPreenchido === 'function') {
+            db.marcarFormularioComoPreenchido(item.evento);
+          }
+          continue;
+        }
+      }
+
+      let jid = item.solicitanteId;
+      if (!jid) continue;
+      jid = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@c.us`;
+
+      const nomeDest = item.solicitanteNome || 'Líder';
+      const msgCobranca =
+        `⚠️ *Lembrete: Preenchimento Obrigatório de Formulário de Evento*\n\n` +
+        `Olá, *${nomeDest}*!\n\n` +
+        `Já se passaram 24 horas desde que o seu evento *"${item.evento}"* (${item.dataEvento}) foi aprovado pela Secretaria, mas ainda identificamos que o formulário com os detalhes do evento não foi preenchido.\n\n` +
+        `📋 O preenchimento deste formulário é *obrigatório* para a organização da igreja e divulgação da mídia.\n\n` +
+        `👉 *Acesse agora para preencher:*\n` +
+        `🔗 https://comunidadecristacurados.com.br/gestao\n\n` +
+        `_(Acesse o portal com seu login, localize o evento no calendário ou na aba "Fichas de Eventos" e clique em "Terminar de Responder / Ver Formulário")_\n\n` +
+        `Contamos com a sua colaboração! 🙏✨`;
+
+      if (client && typeof client.sendMessage === 'function') {
+        try {
+          await client.sendMessage(jid, msgCobranca);
+          console.log(`[Formulário 24h] Cobrança de formulário enviada para ${jid} (${item.evento})`);
+          enviados++;
+        } catch (errSend) {
+          console.error(`[Formulário 24h] Erro ao enviar cobrança para ${jid}:`, errSend.message);
+        }
+      }
+
+      if (typeof db.marcarLembrete24hEnviado === 'function') {
+        db.marcarLembrete24hEnviado(item.id);
+      }
+    }
+
+    return { processados: pendentes.length, enviados };
+  } catch (err) {
+    console.error('[Formulário 24h] Erro ao processar cobranças:', err.message);
+    return { processados: 0, enviados: 0, erro: err.message };
+  }
+}
+
+      // Cobrança de formulários pendentes (24h após aprovação)
+      await processarCobrancasFormularioPendente({ client });
+
+      // 1. Lembretes de itens a definir no formulário (5 dias antes)
       await processarLembretesItensADefinir({
         client,
         buscarEventos,
         agendasParaLer,
-        diasAntecedencia: 7,
+        diasAntecedencia: 5,
         etapas,
       });
 
@@ -2015,6 +2087,7 @@ module.exports = {
   processarEnvioAgendaSecretarias,
   processarAniversariantesDoDia,
   processarLembretesItensADefinir,
+  processarCobrancasFormularioPendente,
   iniciarAgendadorLembretes,
   extrairDatasEvento,
   normalizarDataParaIso,
