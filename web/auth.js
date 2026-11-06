@@ -28,25 +28,27 @@ async function hashPassword(password) {
   return { salt, hash };
 }
 
-function createSession(username, role, status = 'active') {
+function createSession(username, role, status = 'active', nome = '', telefone = '') {
   const token = crypto.randomBytes(32).toString("hex");
   const now = Date.now();
   const expiresAt = now + SESSION_TTL;
-  const sessionData = { username, role, status, createdAt: now, expiresAt };
+  const sessionData = { username, role, status, nome: nome || '', telefone: telefone || '', createdAt: now, expiresAt };
   sessions[token] = sessionData;
 
   try {
     if (db) {
       db.prepare(`
-        INSERT INTO sessions (id, username, role, status, createdAt, expiresAt)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, username, role, status, nome, telefone, createdAt, expiresAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           username = excluded.username,
           role = excluded.role,
           status = excluded.status,
+          nome = excluded.nome,
+          telefone = excluded.telefone,
           createdAt = excluded.createdAt,
           expiresAt = excluded.expiresAt
-      `).run(token, username, role, status, now, expiresAt);
+      `).run(token, username, role, status, nome ?? null, telefone ?? null, now, expiresAt);
     }
   } catch (err) {
     console.error("[Auth] Erro ao persistir sessão no banco:", err.message);
@@ -82,6 +84,8 @@ function getSession(req) {
           username: row.username,
           role: row.role,
           status: row.status,
+          nome: row.nome || "",
+          telefone: row.telefone || "",
           createdAt: Number(row.createdAt),
           expiresAt: Number(row.expiresAt)
         };

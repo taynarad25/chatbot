@@ -274,6 +274,25 @@ try {
   if (!tcCols.some((c) => c.name === "dataLembreteDiaEvento")) {
     db.exec("ALTER TABLE the_chosen_inscricoes ADD COLUMN dataLembreteDiaEvento TEXT");
   }
+
+  const uCols = db.prepare("PRAGMA table_info(users)").all();
+  if (!uCols.some((c) => c.name === "telefone")) {
+    db.exec("ALTER TABLE users ADD COLUMN telefone TEXT");
+  }
+  if (!uCols.some((c) => c.name === "nome")) {
+    db.exec("ALTER TABLE users ADD COLUMN nome TEXT");
+  }
+  if (!uCols.some((c) => c.name === "primeiroAcessoEm")) {
+    db.exec("ALTER TABLE users ADD COLUMN primeiroAcessoEm TEXT");
+  }
+
+  const sCols = db.prepare("PRAGMA table_info(sessions)").all();
+  if (!sCols.some((c) => c.name === "nome")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN nome TEXT");
+  }
+  if (!sCols.some((c) => c.name === "telefone")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN telefone TEXT");
+  }
 } catch {
   // Tabela ainda sendo criada ou erro ignorável
 }

@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const { loadUsers, saveUser, deleteUser } = require("./web/users");
-const { listLideres, addLider, updateLider, removeLider } = require("./web/lideres");
+const { listLideres, addLider, updateLider, removeLider, loadLideres } = require("./web/lideres");
 const { validatePassword, hashPassword, createSession, isAuthenticated, getSession, setSessionCookie, clearSessionCookie, getSessionId, sessions, isAdmin } = require("./web/auth");
 const { renderLoginHtml, renderRegisterHtml, renderIndexHtml } = require("./web/views");
 const { createRateLimiter } = require("./web/rateLimiter");
@@ -72,15 +72,48 @@ function sanitizarParaLog(valor) {
 
 function findUser(username) {
   const users = loadUsers();
-  const normalized = username?.toLowerCase().trim();
+  if (!username) return null;
+  const raw = String(username).trim();
+  const normalized = raw.toLowerCase();
   console.log(`[Web] Buscando usuário: '${sanitizarParaLog(normalized)}' dentro das chaves: [${Object.keys(users).join(", ")}]`); // NOSONAR
-  return users[normalized] || null;
+  
+  // 1. Busca direta por chave username
+  if (users[normalized]) return users[normalized];
+
+  // 2. Se for número de telefone ou WhatsApp (dígitos)
+  const digitos = raw.replace(/\D/g, "");
+  if (digitos.length >= 8) {
+    for (const u of Object.values(users)) {
+      const uTel = String(u.telefone || u.username || "").replace(/\D/g, "");
+      if (uTel && (uTel === digitos || uTel.endsWith(digitos.slice(-8)) || digitos.endsWith(uTel.slice(-8)))) {
+        return u;
+      }
+    }
+  }
+
+  // 3. Busca por nome no cadastro de usuários
+  for (const u of Object.values(users)) {
+    if (u.nome && u.nome.toLowerCase().trim() === normalized) {
+      return u;
+    }
+  }
+
+  return null;
 }
 
-async function addUser({ username, password, role = 'user', status = 'active' }) {
-  // This function is used by the /register route.
+async function addUser(arg1, arg2, arg3 = 'user', arg4 = 'active') {
+  let username, password, role, status;
+  if (typeof arg1 === 'object' && arg1 !== null) {
+    ({ username, password, role = 'user', status = 'active' } = arg1);
+  } else {
+    username = arg1;
+    password = arg2;
+    role = arg3 || 'user';
+    status = arg4 || 'active';
+  }
   const users = loadUsers();
   const normalizedUser = username?.toLowerCase().trim();
+  if (!normalizedUser) return { ok: false, message: "Nome de usuário inválido." };
   if (users[normalizedUser]) return { ok: false, message: "Usuário já existe" };
   
   let salt = null;
@@ -1059,10 +1092,60 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
             const isActive = (user.status === 'active' || user.status === undefined);
 
             if (isPasswordValid && isActive) {
-              const token = createSession(username, user.role, user.status);
+              // Verifica elegibilidade de cargos em lideres (quem é apenas membro não tem acesso)
+              let lider = null;
+              try {
+                const lideres = loadLideres();
+                const telAlvo = String(user.telefone || user.username || "").replace(/\D/g, "");
+                for (const l of Object.values(lideres)) {
+                  const lTel = String(l.telefone || "").replace(/\D/g, "");
+                  if (lTel && (lTel === telAlvo || (telAlvo.length >= 8 && lTel.endsWith(telAlvo.slice(-8))))) {
+                    lider = l;
+                    break;
+                  }
+                }
+                if (!lider && user.nome) {
+                  const nNorm = user.nome.toLowerCase().trim();
+                  for (const l of Object.values(lideres)) {
+                    if (String(l.nome || "").toLowerCase().trim() === nNorm) {
+                      lider = l;
+                      break;
+                    }
+                  }
+                }
+              } catch (_) {}
+
+              if (lider) {
+                const cargos = (lider.cargos || []).map(c => String(c).toLowerCase().trim());
+                const temLideranca = cargos.some(c => 
+                  c === 'lider' || c === 'pastor' || c === 'pastora' || 
+                  c === 'diretor' || c === 'diretoria' || c === 'secretaria' || 
+                  c === 'admin' || c === 'administrador'
+                );
+                const ehAdmin = user.role === 'admin' || user.username === 'gabriela' || (lider.nome && lider.nome.toLowerCase().includes('diniz'));
+                if (!temLideranca && !ehAdmin) {
+                  return sendJson(res, 403, {
+                    ok: false,
+                    message: "❌ Acesso não autorizado: Seu cadastro consta como Membro da igreja. O acesso a este painel é exclusivo para Líderes, Pastores e Diretores."
+                  });
+                }
+              }
+
+              let nomeSessao = user.nome || lider?.nome || user.username;
+              let telSessao = user.telefone || lider?.telefone || '';
+              let roleSessao = user.role;
+
+              // Caso especial: Gabriela Diniz (Secretaria & Administradora)
+              if (user.username === 'gabriela' || user.username === 'gabrieladiniz' || telSessao === '5511942685501' || (nomeSessao && nomeSessao.toLowerCase().includes('diniz'))) {
+                nomeSessao = 'Gabriela Diniz';
+                telSessao = '5511942685501';
+                roleSessao = 'admin';
+              }
+
+              const token = createSession(user.username, roleSessao, user.status, nomeSessao, telSessao);
               loginRateLimiter.reset(ip);
               setSessionCookie(res, token);
-              console.log(`[Web] Login bem-sucedido: ${sanitizarParaLog(username)} (IP: ${sanitizarParaLog(ip)})`); // NOSONAR
+              console.log(`[Web] Login bem-sucedido: ${sanitizarParaLog(nomeSessao)} (${sanitizarParaLog(user.username)}) (IP: ${sanitizarParaLog(ip)})`); // NOSONAR
               return sendJson(res, 200, { ok: true });
             } else if (!isPasswordValid) {
               console.warn(`[Web] Login falhou: Senha incorreta para o usuário '${sanitizarParaLog(username)}' (IP: ${sanitizarParaLog(ip)}). Verifique o hash no log de Auth.`); // NOSONAR
@@ -1094,24 +1177,121 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       if (req.method === 'POST' && pathname === '/secretaria/register') {
         try {
           const body = await parseRequestBody(req);
-          const { username, password } = body;
-          const normalizedUser = username?.toLowerCase().trim();
+          const { username, nome, telefone, password } = body;
           
+          if (!password || password.length < 6) {
+            return sendJson(res, 400, { ok: false, message: "A senha deve ter no mínimo 6 caracteres." });
+          }
+
+          const telEntrada = String(telefone || username || "").trim();
+          const nomeEntrada = String(nome || "").trim();
+          const digitosTel = telEntrada.replace(/\D/g, "");
+
+          // 1. Busca na lista oficial de líderes (lideres)
+          const lideres = loadLideres();
+          let liderEncontrado = null;
+
+          if (digitosTel.length >= 8) {
+            for (const l of Object.values(lideres)) {
+              const lTel = String(l.telefone || "").replace(/\D/g, "");
+              if (lTel === digitosTel || lTel.endsWith(digitosTel.slice(-8)) || digitosTel.endsWith(lTel.slice(-8))) {
+                liderEncontrado = l;
+                break;
+              }
+            }
+          }
+
+          if (!liderEncontrado && nomeEntrada.length >= 3) {
+            const nNorm = nomeEntrada.toLowerCase().trim();
+            for (const l of Object.values(lideres)) {
+              const lNome = String(l.nome || "").toLowerCase().trim();
+              if (lNome === nNorm || (nNorm.length >= 6 && lNome.includes(nNorm))) {
+                liderEncontrado = l;
+                break;
+              }
+            }
+          }
+
+          // Fallback para usuário pré-cadastrado no modo legado (ex: testes unitários ou convite por admin)
           const users = loadUsers();
-          const user = users[normalizedUser];
+          const normalizedLegacy = telEntrada.toLowerCase();
+          const legacyUser = users[normalizedLegacy];
 
-          if (!user) {
-            return sendJson(res, 404, { ok: false, message: "Usuário não encontrado. Peça para o administrador criar sua conta primeiro." });
+          if (!liderEncontrado && !legacyUser) {
+            return sendJson(res, 404, {
+              ok: false,
+              message: "Cadastro não localizado. Verifique o número de WhatsApp informado ou procure a Secretaria para realizar o seu cadastro."
+            });
           }
 
-          if (user.status !== 'pending') {
-            return sendJson(res, 400, { ok: false, message: "Este usuário já concluiu o cadastro anteriormente." });
+          // 2. Validação de Cargos: membro não tem acesso!
+          if (liderEncontrado) {
+            const cargos = (liderEncontrado.cargos || []).map(c => String(c).toLowerCase().trim());
+            const ehLiderOuSuperior = cargos.some(c => 
+              c === 'lider' || c === 'pastor' || c === 'pastora' || 
+              c === 'diretor' || c === 'diretoria' || c === 'secretaria' || 
+              c === 'admin' || c === 'administrador'
+            );
+            if (!ehLiderOuSuperior) {
+              return sendJson(res, 403, {
+                ok: false,
+                message: "❌ Acesso não autorizado: Seu cadastro consta como Membro da igreja. O acesso a este portal é exclusivo para Líderes, Pastores e Diretores."
+              });
+            }
           }
 
+          // 3. Verificação de Primeiro Acesso já concluído
+          const telOficial = liderEncontrado ? liderEncontrado.telefone : normalizedLegacy;
+          const userExistente = users[telOficial] || (liderEncontrado && Object.values(users).find(u => {
+            const uTel = String(u.telefone || u.username || "").replace(/\D/g, "");
+            return uTel && uTel === String(liderEncontrado.telefone).replace(/\D/g, "");
+          }));
+
+          if (userExistente && userExistente.status === 'active' && userExistente.hash) {
+            return sendJson(res, 400, {
+              ok: false,
+              message: "Este usuário já concluiu o cadastro anteriormente."
+            });
+          }
+
+          // 4. Conclusão do cadastro / primeiro acesso
           const { salt, hash } = await hashPassword(password);
-          
-          saveUser({ ...user, salt, hash, status: 'active', updatedAt: new Date().toISOString() });
-          return sendJson(res, 200, { ok: true, message: "Cadastro concluído! Agora você já pode fazer login." });
+          let role = 'lider';
+          if (liderEncontrado) {
+            const cargos = (liderEncontrado.cargos || []).map(c => String(c).toLowerCase().trim());
+            const nomeLower = (liderEncontrado.nome || "").toLowerCase();
+            if (cargos.includes('admin') || cargos.includes('secretaria') || nomeLower.includes('diniz')) {
+              role = 'admin';
+            } else if (cargos.includes('pastor') || cargos.includes('pastora')) {
+              role = 'pastor';
+            } else if (cargos.includes('diretor') || cargos.includes('diretoria')) {
+              role = 'diretor';
+            }
+          } else if (legacyUser) {
+            role = legacyUser.role || 'user';
+          }
+
+          const usernameFinal = liderEncontrado ? liderEncontrado.telefone : normalizedLegacy;
+          const nomeFinal = liderEncontrado ? liderEncontrado.nome : (legacyUser?.nome || usernameFinal);
+          const telefoneFinal = liderEncontrado ? liderEncontrado.telefone : (legacyUser?.telefone || '');
+
+          saveUser({
+            username: usernameFinal,
+            nome: nomeFinal,
+            telefone: telefoneFinal,
+            salt,
+            hash,
+            status: 'active',
+            role,
+            primeiroAcessoEm: new Date().toISOString(),
+            createdAt: userExistente?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+
+          return sendJson(res, 200, {
+            ok: true,
+            message: "Cadastro concluído! Agora você já pode fazer login."
+          });
         } catch (err) {
           console.error(`[Web] Erro no registro: ${err.message}`);
           return sendJson(res, 400, { ok: false, message: 'Dados inválidos.' });
@@ -1127,6 +1307,23 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           return res.end();
         }
         const session = getSession(req);
+        const perfil = gestao.obterPerfilGestao(session);
+        if (perfil && perfil.nivelAcesso === 0) {
+          res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
+          return res.end(`
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head><meta charset="utf-8"><title>Acesso Não Autorizado</title><style>body{font-family:sans-serif;background:#09090b;color:#f43f5e;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;text-align:center;}div{background:#18181b;padding:30px;border-radius:14px;border:1px solid #27272a;max-width:440px;}h2{color:#f43f5e;margin-top:0;}p{color:#a1a1aa;font-size:0.95rem;line-height:1.5;}a{display:inline-block;margin-top:16px;background:#7c3aed;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:700;}</style></head>
+            <body>
+              <div>
+                <h2>Acesso Não Autorizado</h2>
+                <p>Seu cadastro consta como <strong>Membro</strong>. O painel de gestão de eventos é restrito a Líderes de Ministérios, Pastores e Diretoria.</p>
+                <a href="/secretaria/logout">Sair</a>
+              </div>
+            </body>
+            </html>
+          `);
+        }
         const html = gestao.renderGestaoHtml({ user: session });
         return sendHtml(res, html);
       }
@@ -1171,6 +1368,10 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         try {
           const body = await parseRequestBody(req);
           const session = getSession(req) || { username: 'Líder Conectado' };
+          const perfil = gestao.obterPerfilGestao(session);
+          if (perfil && perfil.nivelAcesso === 0) {
+            return sendJson(res, 403, { ok: false, message: 'Acesso exclusivo para líderes, pastores e diretores. Membros não possuem permissão.' });
+          }
           const resultado = await gestao.criarSolicitacaoEventoWeb(body, session, getClient);
           return sendJson(res, 200, resultado);
         } catch (errSol) {

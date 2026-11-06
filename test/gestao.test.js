@@ -10,6 +10,7 @@ fs.writeFileSync(process.env.COMBINED_LOG_PATH, "linha de log\n");
 const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { startWebServer, addUser } = require("../web");
+const { addLider } = require("../web/lideres");
 const gestao = require("../web/gestao");
 const { createSession } = require("../web/auth");
 const { montarResourceEvento } = require("../bot/agendamentoAutomatico");
@@ -475,5 +476,100 @@ test("Overnight calendar: montarResourceEvento calcula data de término no dia s
   assert.equal(dtInicio.getDate(), 28);
   assert.equal(dtFim.getDate(), 29, "Término às 01:00 deve cair no dia seguinte (29)");
 });
+
+test("Segurança de Identidade: usuário 'gabriela' sempre resolve para Gabriela Diniz (nunca Gabriela Henrique)", () => {
+  addLider({
+    nome: "Gabriela Henrique",
+    telefone: "5511999991111",
+    cargos: ["lider"],
+    departamentos: ["Departamento de Artes"]
+  });
+
+  const perfil = gestao.obterPerfilGestao({ username: "gabriela", role: "admin" });
+  assert.equal(perfil.nome, "Gabriela Diniz", "Deve resolver estritamente como Gabriela Diniz");
+  assert.equal(perfil.telefone, "5511942685501", "Deve usar o telefone oficial de Gabriela Diniz");
+  assert.equal(perfil.perfilTitulo, "Administrador");
+  assert.equal(perfil.isAdmin, true);
+});
+
+test("Primeiro Acesso: líder cadastrado cria senha pelo WhatsApp e nome", async () => {
+  addLider({
+    nome: "Carlos Eduardo",
+    telefone: "5511988887777",
+    cargos: ["lider"],
+    departamentos: ["Rede Ruach"]
+  });
+
+  const regRes = await fetch(`${baseUrl}/secretaria/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      telefone: "(11) 98888-7777",
+      nome: "Carlos Eduardo",
+      password: "senhaSegura123"
+    })
+  });
+
+  assert.equal(regRes.status, 200);
+  const regData = await regRes.json();
+  assert.equal(regData.ok, true);
+
+  // Tentativa de primeiro acesso repetido deve falhar
+  const regRepetido = await fetch(`${baseUrl}/secretaria/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      telefone: "5511988887777",
+      password: "outraSenha123"
+    })
+  });
+  assert.equal(regRepetido.status, 400);
+
+  // Login com o número de WhatsApp
+  const loginRes = await fetch(`${baseUrl}/secretaria/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: "11988887777",
+      password: "senhaSegura123"
+    })
+  });
+  assert.equal(loginRes.status, 200);
+  const cookie = loginRes.headers.get("set-cookie");
+  assert.ok(cookie);
+
+  // Acesso ao portal /gestao
+  const gestaoRes = await fetch(`${baseUrl}/gestao`, {
+    headers: { Cookie: cookie }
+  });
+  assert.equal(gestaoRes.status, 200);
+  const html = await gestaoRes.text();
+  assert.match(html, /Carlos Eduardo/);
+});
+
+test("Controle de Acesso: membro cadastrado não tem acesso ao painel de liderança", async () => {
+  addLider({
+    nome: "Marcos Membro",
+    telefone: "5511966665555",
+    cargos: ["membro"],
+    departamentos: []
+  });
+
+  // Primeiro acesso de membro deve ser rejeitado (403)
+  const regRes = await fetch(`${baseUrl}/secretaria/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      telefone: "5511966665555",
+      nome: "Marcos Membro",
+      password: "senhaMembro123"
+    })
+  });
+  assert.equal(regRes.status, 403);
+  const regData = await regRes.json();
+  assert.equal(regData.ok, false);
+  assert.match(regData.message, /Membro/);
+});
+
 
 

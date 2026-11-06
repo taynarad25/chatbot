@@ -205,8 +205,8 @@ function renderLoginHtml(message = "") {
 
     <div id="loginMessage" class="error">${message}</div>
     <form id="loginForm">
-      <label class="input-label" for="loginUsername">Usuário</label>
-      <input id="loginUsername" name="username" placeholder="Digite seu usuário" required autocomplete="username" />
+      <label class="input-label" for="loginUsername">WhatsApp ou Usuário</label>
+      <input id="loginUsername" name="username" placeholder="Seu WhatsApp (ex: 11 94268-5501) ou usuário" required autocomplete="username" />
       
       <label class="input-label" for="password">Senha</label>
       <div class="password-wrapper">
@@ -221,7 +221,7 @@ function renderLoginHtml(message = "") {
       
       <button type="submit">Acessar Painel</button>
       <div class="links">
-        Primeiro acesso como líder? <a href="/secretaria/register">Concluir cadastro</a>
+        Primeiro acesso como líder? <a href="/secretaria/register">Cadastrar minha senha</a>
       </div>
     </form>
   </div>
@@ -476,26 +476,29 @@ function renderRegisterHtml(message = "") {
     <div class="brand-header">
       <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
       <h1 class="brand-title"><span>CURADOS</span></h1>
-      <p class="brand-subtitle">Concluir Cadastro de Líder</p>
+      <p class="brand-subtitle">Primeiro Acesso de Líder</p>
     </div>
 
-    <div id="regMessage" class="info">${message || 'Defina sua senha pessoal para acessar o painel.'}</div>
+    <div id="regMessage" class="info">${message || 'Informe seu WhatsApp e nome cadastrados para definir sua senha de acesso.'}</div>
     <form id="regForm">
-      <label class="input-label" for="regUsername">Seu Usuário</label>
-      <input id="regUsername" name="username" placeholder="Usuário cadastrado pelo Admin" required autocomplete="username" />
+      <label class="input-label" for="regTelefone">Seu WhatsApp *</label>
+      <input id="regTelefone" name="telefone" placeholder="(11) 99999-9999" required autocomplete="tel" inputmode="numeric" />
+
+      <label class="input-label" for="regNome">Nome Completo</label>
+      <input id="regNome" name="nome" placeholder="Seu nome completo cadastrado" autocomplete="name" />
       
-      <label class="input-label" for="password">Nova Senha</label>
+      <label class="input-label" for="password">Criar Nova Senha *</label>
       <div class="password-wrapper">
         <input id="password" name="password" type="password" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="new-password" />
         <span id="togglePassword" class="toggle-password" title="Ver senha">👀</span>
       </div>
 
-      <label class="input-label" for="confirmPassword">Confirmar Nova Senha</label>
+      <label class="input-label" for="confirmPassword">Confirmar Nova Senha *</label>
       <input id="confirmPassword" name="confirmPassword" type="password" placeholder="Repita a nova senha" required minlength="6" autocomplete="new-password" />
       
-      <button type="submit">Definir Senha e Entrar</button>
+      <button type="submit" id="btnSubmitReg">Verificar Cadastro e Criar Senha</button>
       <div class="links">
-        Já possui senha? <a href="/secretaria/login">Voltar ao login</a>
+        Já possui senha? <a href="/secretaria/login">Fazer login</a>
       </div>
     </form>
   </div>
@@ -507,6 +510,21 @@ function renderRegisterHtml(message = "") {
       passwordInput.type = type;
       togglePassword.textContent = type === 'password' ? '👀' : '🙈';
     });
+
+    const telInput = document.getElementById('regTelefone');
+    if (telInput) {
+      telInput.addEventListener('input', (e) => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 11) v = v.slice(0, 11);
+        if (v.length > 6) {
+          e.target.value = '(' + v.slice(0, 2) + ') ' + v.slice(2, 7) + '-' + v.slice(7);
+        } else if (v.length > 2) {
+          e.target.value = '(' + v.slice(0, 2) + ') ' + v.slice(2);
+        } else if (v.length > 0) {
+          e.target.value = '(' + v;
+        }
+      });
+    }
 
     document.getElementById('regForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -520,6 +538,11 @@ function renderRegisterHtml(message = "") {
         return;
       }
 
+      // Se informou telefone, define também username para compatibilidade
+      if (data.telefone && !data.username) {
+        data.username = data.telefone;
+      }
+
       const res = await fetch('/secretaria/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -528,9 +551,9 @@ function renderRegisterHtml(message = "") {
       const json = await res.json();
       if (res.ok) {
         console.log('Conta criada com sucesso.');
-        msgEl.textContent = json.message || 'Senha definida! Redirecionando...';
+        msgEl.textContent = json.message || 'Senha definida com sucesso! Redirecionando...';
         msgEl.className = 'success';
-        setTimeout(() => window.location.href = '/secretaria/login?message=Conta criada com sucesso!', 2000);
+        setTimeout(() => window.location.href = '/secretaria/login?message=Primeiro acesso concluído! Faça login com seu WhatsApp e senha.', 2000);
       }
       else {
         console.error('Erro no cadastro:', json.message);

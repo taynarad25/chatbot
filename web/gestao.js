@@ -58,6 +58,32 @@ function obterPerfilGestao(session) {
   if (!session) return null;
   const username = String(session.username || "").toLowerCase().trim();
   const role = String(session.role || "").toLowerCase().trim();
+  const sessionTel = String(session.telefone || "").replace(/\D/g, "");
+  const sessionNome = String(session.nome || "").trim();
+
+  // 1. CASO ESPECIAL PRIORITÁRIO: GABRIELA DINIZ (Secretária e Administradora Oficial)
+  // Sob nenhuma hipótese deve ser confundida com Gabriela Henrique!
+  const ehGabrielaDiniz = username === 'gabriela' || 
+                          username === 'gabrieladiniz' || 
+                          sessionTel === '5511942685501' || 
+                          sessionTel === '11942685501' ||
+                          sessionNome.toLowerCase().includes('diniz');
+
+  if (ehGabrielaDiniz) {
+    return {
+      username: session.username || 'gabriela',
+      role: 'admin',
+      nome: 'Gabriela Diniz',
+      telefone: '5511942685501',
+      perfilTitulo: 'Administrador',
+      nivelAcesso: 4,
+      isAdmin: true,
+      isPastor: true,
+      isDiretor: true,
+      isLider: true,
+      departamentos: [...LISTA_TODOS_DEPARTAMENTOS]
+    };
+  }
 
   const pastoralMap = {
     'mauricio': { nome: 'Pr. Maurício Lopes', cargo: 'Pastor', departamento: 'Pastoral' },
@@ -82,20 +108,56 @@ function obterPerfilGestao(session) {
   let liderEncontrado = null;
   try {
     const lideres = loadLideres();
-    for (const l of Object.values(lideres)) {
-      const nomeNorm = String(l.nome || "").toLowerCase().trim();
-      if (nomeNorm.includes(username) || username.includes(nomeNorm) || l.telefone === username) {
-        liderEncontrado = l;
-        break;
+    const telAlvo = sessionTel || username.replace(/\D/g, "");
+    if (telAlvo.length >= 8) {
+      for (const l of Object.values(lideres)) {
+        const lTel = String(l.telefone || "").replace(/\D/g, "");
+        if (lTel === telAlvo || lTel.endsWith(telAlvo.slice(-8)) || telAlvo.endsWith(lTel.slice(-8))) {
+          liderEncontrado = l;
+          break;
+        }
+      }
+    }
+    if (!liderEncontrado && (sessionNome || username)) {
+      const nomeBusca = (sessionNome || username).toLowerCase().trim();
+      for (const l of Object.values(lideres)) {
+        const lNome = String(l.nome || "").toLowerCase().trim();
+        if (lNome === nomeBusca) {
+          liderEncontrado = l;
+          break;
+        }
       }
     }
   } catch (_) {}
 
   const cargos = (liderEncontrado?.cargos || []).map(c => String(c).toLowerCase().trim());
-  const isAdmin = role === 'admin' || username === 'admin' || username === 'gabriela';
+  const temPermissaoLideranca = cargos.some(c => 
+    c === 'lider' || c === 'pastor' || c === 'pastora' || 
+    c === 'diretor' || c === 'diretoria' || c === 'secretaria' || 
+    c === 'admin' || c === 'administrador'
+  );
+
+  const isAdmin = role === 'admin' || username === 'admin';
   const isPastor = isAdmin || role === 'pastor' || Boolean(dadosPastoral && dadosPastoral.cargo.toLowerCase().includes('pastor')) || cargos.includes('pastor');
   const isDiretor = isPastor || role === 'diretor' || cargos.includes('diretor') || username.includes('diretor');
-  const isLider = true;
+  const isLider = isAdmin || isPastor || isDiretor || role === 'lider' || temPermissaoLideranca || username.startsWith('lider.');
+
+  // Se o usuário estiver na lista apenas como membro sem nenhum cargo de liderança:
+  if (liderEncontrado && !isLider && cargos.includes('membro')) {
+    return {
+      username,
+      role: 'membro',
+      nome: liderEncontrado.nome,
+      telefone: liderEncontrado.telefone,
+      perfilTitulo: 'Membro',
+      nivelAcesso: 0,
+      isAdmin: false,
+      isPastor: false,
+      isDiretor: false,
+      isLider: false,
+      departamentos: []
+    };
+  }
 
   let perfilTitulo = 'Líder';
   let nivelAcesso = 1;
@@ -110,8 +172,8 @@ function obterPerfilGestao(session) {
     nivelAcesso = 2;
   }
 
-  const nomeExibicao = dadosPastoral?.nome || liderEncontrado?.nome || session.username;
-  const telefone = liderEncontrado?.telefone || session.telefone || '';
+  const nomeExibicao = dadosPastoral?.nome || sessionNome || liderEncontrado?.nome || session.username;
+  const telefone = liderEncontrado?.telefone || sessionTel || '';
   
   let departamentos = [];
   if (liderEncontrado?.departamentos && Array.isArray(liderEncontrado.departamentos)) {
