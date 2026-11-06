@@ -1,6 +1,7 @@
 const fs = require("fs");
 const db = require("../db");
 const { carregarMidiaDeDisco } = require("./mediaStorage");
+const { enviarMensagemResiliente } = require("./senderResiliente");
 let MessageMedia;
 try {
   MessageMedia = require("whatsapp-web.js").MessageMedia;
@@ -140,15 +141,20 @@ async function notificarSecretaria(client, mensagem) {
 
     if (cachedJid && cachedJid.includes("@")) {
       try {
-        await client.sendMessage(cachedJid, mensagem);
-        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_SECRETARIA}' via JID.`);
+        await enviarMensagemResiliente(client, cachedJid, mensagem);
+        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_SECRETARIA}' via JID resiliente.`);
         return true;
       } catch (err) {
         console.warn(`[Aviso] Falha ao enviar para o grupo 'Mensagens Secretaria' pelo JID cached ${cachedJid}:`, err.message);
       }
     }
 
-    // Fallback lento/legado em caso de falha no JID direto
+    // Se já temos um JID direto válido (@g.us), NÃO chama getChats() pois trava o Chromium
+    if (cachedJid && cachedJid.includes("@g.us")) {
+      console.warn(`[Aviso] Falha definitiva no JID ${cachedJid} para '${NOME_GRUPO_SECRETARIA}'. Abortando busca getChats() para estabilidade.`);
+      return false;
+    }
+
     try {
       const chats = await client.getChats();
       const grupo = encontrarGrupoSecretaria(chats);
@@ -193,15 +199,19 @@ async function notificarPastoral(client, mensagem) {
 
     if (cachedJid && cachedJid.includes("@")) {
       try {
-        await client.sendMessage(cachedJid, mensagem);
-        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_PASTORAL}' via JID.`);
+        await enviarMensagemResiliente(client, cachedJid, mensagem);
+        console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_PASTORAL}' via JID resiliente.`);
         return true;
       } catch (err) {
         console.warn(`[Aviso] Falha ao enviar para o grupo 'Atendimento Pastoral' pelo JID cached ${cachedJid}:`, err.message);
       }
     }
 
-    // Fallback lento/legado em caso de falha no JID direto
+    if (cachedJid && cachedJid.includes("@g.us")) {
+      console.warn(`[Aviso] Falha definitiva no JID ${cachedJid} para '${NOME_GRUPO_PASTORAL}'. Abortando busca getChats() para estabilidade.`);
+      return false;
+    }
+
     try {
       const chats = await client.getChats();
       const grupo = encontrarGrupoPastoral(chats);
@@ -277,7 +287,7 @@ async function notificarMultimidia(client, mensagem, midiaAnexa = null) {
             }
           }
         } else {
-          await client.sendMessage(cachedJid, mensagem);
+          await enviarMensagemResiliente(client, cachedJid, mensagem);
         }
         console.log(`[Notificação] Mensagem enviada ao grupo '${NOME_GRUPO_MULTIMIDIA}' via JID.`);
         return true;
@@ -286,7 +296,11 @@ async function notificarMultimidia(client, mensagem, midiaAnexa = null) {
       }
     }
 
-    // Fallback de busca em chats
+    if (cachedJid && cachedJid.includes("@g.us")) {
+      console.warn(`[Aviso] Falha definitiva no JID ${cachedJid} para '${NOME_GRUPO_MULTIMIDIA}'. Abortando busca getChats() para estabilidade.`);
+      return false;
+    }
+
     try {
       const chats = await client.getChats();
       const grupo = encontrarGrupoMultimidia(chats);

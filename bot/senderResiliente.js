@@ -92,9 +92,54 @@ async function injetarPatchesCompatibilidade(pupPage) {
             };
             window.Store.Msg._patchedMemoizeSafe = true;
           }
+
+          // 3. Protege Store.User.getMaybeMePnUser / getMaybeMeLidUser e Store.WidFactory.asUserWidOrThrow
+          // contra valores undefined que quebram o envio em grupos no WhatsApp Web 2.3000.x (Cannot read properties of undefined reading 'isUser')
+          if (window.Store.User) {
+            const origPn = typeof window.Store.User.getMaybeMePnUser === "function" ? window.Store.User.getMaybeMePnUser.bind(window.Store.User) : null;
+            window.Store.User.getMaybeMePnUser = function () {
+              let res = null;
+              try { if (origPn) res = origPn(); } catch (_) {}
+              if (!res) {
+                res = (typeof window.Store.User.getMeUser === "function" ? window.Store.User.getMeUser() : null) || window.Store.Conn?.wid || null;
+              }
+              return res;
+            };
+
+            const origLid = typeof window.Store.User.getMaybeMeLidUser === "function" ? window.Store.User.getMaybeMeLidUser.bind(window.Store.User) : null;
+            window.Store.User.getMaybeMeLidUser = function () {
+              let res = null;
+              try { if (origLid) res = origLid(); } catch (_) {}
+              if (!res) {
+                res = (typeof window.Store.User.getMaybeMePnUser === "function" ? window.Store.User.getMaybeMePnUser() : null) ||
+                      (typeof window.Store.User.getMeUser === "function" ? window.Store.User.getMeUser() : null) ||
+                      window.Store.Conn?.wid || null;
+              }
+              return res;
+            };
+          }
+
+          if (window.Store.WidFactory && typeof window.Store.WidFactory.asUserWidOrThrow === "function" && !window.Store.WidFactory._patchedAsUserWidSafe) {
+            const origAsUserWidOrThrow = window.Store.WidFactory.asUserWidOrThrow.bind(window.Store.WidFactory);
+            window.Store.WidFactory.asUserWidOrThrow = function (wid) {
+              if (!wid) {
+                wid = (window.Store.User && typeof window.Store.User.getMaybeMePnUser === "function" ? window.Store.User.getMaybeMePnUser() : null) ||
+                      (window.Store.User && typeof window.Store.User.getMeUser === "function" ? window.Store.User.getMeUser() : null) ||
+                      window.Store.Conn?.wid;
+              }
+              try {
+                return origAsUserWidOrThrow(wid);
+              } catch (err) {
+                if (wid && typeof wid === "object") return wid;
+                if (window.Store.Conn?.wid) return window.Store.Conn.wid;
+                throw err;
+              }
+            };
+            window.Store.WidFactory._patchedAsUserWidSafe = true;
+          }
         }
 
-        // 3. Protege window.WWebJS.sendMessage para recuperar a mensagem enviada caso o getter final falhe
+        // 4. Protege window.WWebJS.sendMessage para recuperar a mensagem enviada caso o getter final falhe
         if (window.WWebJS && typeof window.WWebJS.sendMessage === "function" && !window.WWebJS.sendMessage._patchedMemoize) {
           const originalSendMessage = window.WWebJS.sendMessage;
           const patchedSendMessage = async function (chat, message, options = {}, sendMsgResult) {

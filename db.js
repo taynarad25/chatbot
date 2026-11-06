@@ -231,6 +231,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tc_codigo ON the_chosen_inscricoes(codigo);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expiresAt);
   CREATE INDEX IF NOT EXISTS idx_lembretes_espera_tel ON lembretes_aguardando_resposta(telefone);
+  CREATE TABLE IF NOT EXISTS pendencias_formulario (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evento TEXT NOT NULL,
+    departamento TEXT,
+    dataEvento TEXT,
+    solicitanteId TEXT NOT NULL,
+    solicitanteNome TEXT,
+    aprovadoEm TEXT NOT NULL,
+    preenchido INTEGER DEFAULT 0,
+    lembrete24hEnviado INTEGER DEFAULT 0,
+    lembrete5diasEnviado INTEGER DEFAULT 0
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_pendencias_form_evento ON pendencias_formulario(evento);
+  CREATE INDEX IF NOT EXISTS idx_pendencias_form_solicitante ON pendencias_formulario(solicitanteId);
+
 `);
 
 try {
@@ -262,4 +278,54 @@ try {
   // Tabela ainda sendo criada ou erro ignorável
 }
 
+
+// Funções auxiliares para cobrança de preenchimento obrigatório de formulários de eventos
+db.registrarPendenciaFormulario = function ({ evento, departamento = '', dataEvento = '', solicitanteId, solicitanteNome = '' }) {
+  try {
+    const agora = new Date().toISOString();
+    return db.prepare(`
+      INSERT INTO pendencias_formulario (evento, departamento, dataEvento, solicitanteId, solicitanteNome, aprovadoEm, preenchido, lembrete24hEnviado, lembrete5diasEnviado)
+      VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0)
+    `).run(evento, departamento, dataEvento, solicitanteId, solicitanteNome, agora);
+  } catch (err) {
+    console.error('[DB] Erro ao registrar pendencia_formulario:', err.message);
+    return null;
+  }
+};
+
+db.marcarFormularioComoPreenchido = function (evento) {
+  try {
+    if (!evento) return;
+    db.prepare("UPDATE pendencias_formulario SET preenchido = 1 WHERE LOWER(TRIM(evento)) = LOWER(TRIM(?))").run(evento);
+  } catch (err) {
+    console.error('[DB] Erro ao marcarFormularioComoPreenchido:', err.message);
+  }
+};
+
+db.buscarPendenciasFormularioNaoPreenchidas = function (horasAposAprovacao = 24) {
+  try {
+    // Retorna pendências de eventos aprovados há pelo menos X horas e ainda não preenchidos
+    return db.prepare(`
+      SELECT id, evento, departamento, dataEvento, solicitanteId, solicitanteNome, aprovadoEm, lembrete24hEnviado
+      FROM pendencias_formulario
+      WHERE preenchido = 0
+        AND lembrete24hEnviado = 0
+        AND datetime(aprovadoEm) <= datetime('now', '-' || ? || ' hours')
+      ORDER BY id ASC
+    `).all(horasAposAprovacao);
+  } catch (err) {
+    console.error('[DB] Erro ao buscarPendenciasFormularioNaoPreenchidas:', err.message);
+    return [];
+  }
+};
+
+db.marcarLembrete24hEnviado = function (id) {
+  try {
+    db.prepare("UPDATE pendencias_formulario SET lembrete24hEnviado = 1 WHERE id = ?").run(id);
+  } catch (err) {
+    console.error('[DB] Erro ao marcarLembrete24hEnviado:', err.message);
+  }
+};
+
 module.exports = db;
+
