@@ -1,12 +1,28 @@
 const { isEventoExpiradoData } = require('./limpeza_eventos');
 
-function renderLoginHtml(message = "") {
+function renderLoginHtml(message = "", options = {}) {
+  const portal = (typeof options === 'object' && options?.portal) || (typeof message === 'object' && message?.portal) || 'secretaria';
+  const msgText = typeof message === 'string' ? message : '';
+  const isGestao = portal === 'gestao';
+
+  const pageTitle = isGestao 
+    ? 'Gestão de Eventos - Comunidade Cristã Curados' 
+    : 'Secretaria - Comunidade Cristã Curados';
+
+  const subtitle = isGestao 
+    ? 'Gestão de Eventos & Ministérios' 
+    : 'Secretaria & Gestão Pastoral';
+
+  const registerUrl = isGestao ? '/gestao/register' : '/secretaria/register';
+  const forgotUrl = isGestao ? '/gestao/recuperar-senha' : '/secretaria/recuperar-senha';
+  const apiLoginUrl = isGestao ? '/gestao/login' : '/secretaria/login';
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Secretaria - Comunidade Cristã Curados</title>
+  <title>${pageTitle}</title>
   <link rel="icon" type="image/png" href="/images/logo.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVTSURBVFhH7ZYLbFNlFMevCig+wO32EXq7oRECIdnargwT1JBA104cRBRwXTeFvdjaTcNLQTCNtOwRGQy7rXsg0Q2QgILIGMpTIm9QYI++xrY4hqMbbZmDDRE4nu/uo1FnCdmDxMRf0tyb//fde873v+ecjfnPItxR84LgQHOS8FCLnq1qiKTyw0FQaVsoONjcLT7XDeILv4PwyK/A7nV+xmyDx+iWwUNQ5ZwuOtYOoqNtwFY6qtlK+1HhwV9A/HMXsFUuE902eAj2OPaTk7N7XVsZgEeIxlY5l4iOe0BQ5fCy39if4TcOFuweR73obCcEVzpVVGKCtp0dic7cFexrBMHuurFUHhwwgR96HHBuoBK64kwhnwWvHUH7G0ZSeeCIV5fNZ5geuwWVjrmiU76ewttjP4JBdwm+qwc+qSpnPv8A4jNwb9LbvjNlinGIVl20Nm3WDtBprJupzLC7bWbh4RYQV98Ccc0fIDqB33+vaydzuOkJsu7Rcxth+Wi4qpd8BEbmUf6hvpAaU/KkNqrop8QZmyBpxmaIjbJk0yV0wq7E6l8mONRsFO5r1FCZcaeN+hiWhAIsDQWPXnK+eaF0OF3qG7ro9SN0mpIz82PK4Z3pG+EtTdErdKkXnnTJ5JvvSQEWh0CHQXqhwyBh6VL/wCSk8ZoSL3FBG1VwjMq9aE/nfiQn78zgrrUuED9H5YEhVlWwODGmAuKjSyFumiWMyn48BmnYjcye07enSZZSeeCIVVkkceqibuJCnLoghcp+0P40cnqvXtLVlhI6isoDR6qyZKg2ytKaMnMrFmPh+1T2gxW/Ej4IhbY0rrlflR8Irco6VqcpvZUYswl0qgItlf1gAonEgWsGrvtqJiel8oMROzVf/IYq/74jFO3fTtoxLsp6U6cp7mVxa0bo8z49dweWhGD7cf4p+W/Uz5OENKQG9UzMhGkWNk5jPZPw6gZPnKbIP9/vMXt23nBsw9J5r30ByTO3YBcUrqNLvWgnAwhduL0whDiRCwzDT8+/4skY9VLXu9JWr4E74NYLn2Zw0qUveH07kNMlRJeRibdTqypKxqEzS6suXBGvLnbMx+BJ5PRq6wUynOi7etGcJA3GwI3EhbuLcBZkcGe86RK9L4ObikNp7jWDpAI14AfVh6MBOyeZMU45PCRWZdVie9lIm5FkyEnJPan4e7+E6NKTpBNorIBcWsCNvZHJ2YgTfCBMhjjC3+N4Jvr1TK7Jh8H/NiXnTDAOi4/eEIuJfK1TFzfp1NZOvHoTNGWnsfgWKZWpQ+lWpiEiN+aiImeNS571pUuR/XlDRM7yixHZSrrMnNQFj+jM5EwYyI51cRPtvo3OuHFAfX89U5rMW38/5szZNix+VrkoSV0WTCWe02ErxzVG5BxvnbgWfJMs8NukQv7njbRAU0QuXIzI2Xpq/DL/+CXt2LVIEtKNBXp36bj+/aNyTmbm6uVZl9sj18NlZR7Y5GZ3ndx01CY3ncL7660T14En8lNwyrOqq8Oyg+hjA0eNzLSLBGjEkzoVWSuaZMZn6RJTq8wJdSmyylqUa/gkamWrvqJLA4NTZpaTwO6J+VAnM/v/JP8TdKLiCjpxCROpDTe9TOX+gy/OJd8cr177uNyA39I2Pot1yFd3EBcw0S1U7j91MtOJjkkF+FLTt1QKiE1mLucTkJvcZ5XGgDPjgTkf/slTGLjNhwkQJ6gcENzzNilU0hV14dkKKvedOoVpNPY8dL9YTBxYReWA1MhNk0m9tCjz7tSEm2dQue8QB+zhZs2VyDXTSDJUDohrzPrHHcrV492KvDG1E4z3Hzj/wzDMn2N8oxpmYIOXAAAAAElFTkSuQmCC" />
   <link rel="manifest" href="/manifest.json" />
@@ -198,12 +214,12 @@ function renderLoginHtml(message = "") {
     <div class="brand-header">
       <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
       <h1 class="brand-title"><span>CURADOS</span></h1>
-      <p class="brand-subtitle">Secretaria & Gestão Pastoral</p>
+      <p class="brand-subtitle">${subtitle}</p>
     </div>
 
 
 
-    <div id="loginMessage" class="error">${message}</div>
+    <div id="loginMessage" class="error">${msgText}</div>
     <form id="loginForm">
       <label class="input-label" for="loginUsername">WhatsApp ou Usuário</label>
       <input id="loginUsername" name="username" placeholder="Seu WhatsApp (ex: 11 94268-5501) ou usuário" required autocomplete="username" />
@@ -214,7 +230,7 @@ function renderLoginHtml(message = "") {
         <span id="togglePassword" class="toggle-password" title="Ver senha">👀</span>
       </div>
       <div style="display:flex; justify-content: flex-end; margin-top: 4px; margin-bottom: 6px;">
-        <a href="/secretaria/recuperar-senha" style="color: #a1a1aa; font-size: 0.82rem; text-decoration: underline;">Esqueci minha senha</a>
+        <a href="${forgotUrl}" style="color: #a1a1aa; font-size: 0.82rem; text-decoration: underline;">Esqueci minha senha</a>
       </div>
       
       <div style="display:flex; align-items:center; gap:8px; margin: 12px 0 16px 0; font-size: 0.85rem; color: #a1a1aa;">
@@ -226,7 +242,7 @@ function renderLoginHtml(message = "") {
       <div class="links" style="margin-top: 16px; text-align: center;">
         <span style="color: #a1a1aa; font-size: 0.88rem;">Primeiro acesso ou deseja cadastrar seu usuário?</span>
         <div style="margin-top: 8px;">
-          <a href="/secretaria/register" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; color: #ff7e5f; text-decoration: none; font-weight: 600; font-size: 0.88rem; transition: background 0.2s;">
+          <a href="${registerUrl}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; color: #ff7e5f; text-decoration: none; font-weight: 600; font-size: 0.88rem; transition: background 0.2s;">
             👤 Cadastrar Nome de Usuário e Senha
           </a>
         </div>
@@ -275,7 +291,7 @@ function renderLoginHtml(message = "") {
       e.preventDefault();
       const formData = new FormData(e.target);
       const data = Object.fromEntries(formData);
-      const res = await fetch('/secretaria/login', {
+      const res = await fetch('${apiLoginUrl}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -290,7 +306,7 @@ function renderLoginHtml(message = "") {
           localStorage.removeItem('curados_secretaria_usuario');
         }
         const paramRedirect = urlParams.get('redirect');
-        let redirectUrl = json.redirect || (json.role === 'admin' ? '/secretaria' : '/gestao');
+        let redirectUrl = json.redirect || (${isGestao} ? '/gestao' : (json.role === 'admin' ? '/secretaria' : '/gestao'));
         if (paramRedirect) {
           if (paramRedirect.startsWith('/secretaria') && json.role !== 'admin') {
             redirectUrl = '/gestao';
@@ -310,13 +326,28 @@ function renderLoginHtml(message = "") {
 </body></html>`;
 }
 
-function renderRegisterHtml(message = "") {
+function renderRegisterHtml(message = "", options = {}) {
+  const portal = (typeof options === 'object' && options?.portal) || (typeof message === 'object' && message?.portal) || 'secretaria';
+  const msgText = typeof message === 'string' ? message : '';
+  const isGestao = portal === 'gestao';
+
+  const pageTitle = isGestao 
+    ? 'Primeiro Acesso de Líder - Gestão de Eventos' 
+    : 'Concluir Cadastro - Comunidade Cristã Curados';
+
+  const subtitle = isGestao 
+    ? 'Primeiro Acesso de Líder & Ministérios' 
+    : 'Cadastro de Usuário & Primeiro Acesso';
+
+  const loginUrl = isGestao ? '/gestao/login' : '/secretaria/login';
+  const apiRegisterUrl = isGestao ? '/gestao/register' : '/secretaria/register';
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Concluir Cadastro - Comunidade Cristã Curados</title>
+  <title>${pageTitle}</title>
   <link rel="icon" type="image/png" href="/images/logo.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVTSURBVFhH7ZYLbFNlFMevCig+wO32EXq7oRECIdnargwT1JBA104cRBRwXTeFvdjaTcNLQTCNtOwRGQy7rXsg0Q2QgILIGMpTIm9QYI++xrY4hqMbbZmDDRE4nu/uo1FnCdmDxMRf0tyb//fde873v+ecjfnPItxR84LgQHOS8FCLnq1qiKTyw0FQaVsoONjcLT7XDeILv4PwyK/A7nV+xmyDx+iWwUNQ5ZwuOtYOoqNtwFY6qtlK+1HhwV9A/HMXsFUuE902eAj2OPaTk7N7XVsZgEeIxlY5l4iOe0BQ5fCy39if4TcOFuweR73obCcEVzpVVGKCtp0dic7cFexrBMHuurFUHhwwgR96HHBuoBK64kwhnwWvHUH7G0ZSeeCIV5fNZ5geuwWVjrmiU76ewttjP4JBdwm+qwc+qSpnPv8A4jNwb9LbvjNlinGIVl20Nm3WDtBprJupzLC7bWbh4RYQV98Ccc0fIDqB33+vaydzuOkJsu7Rcxth+Wi4qpd8BEbmUf6hvpAaU/KkNqrop8QZmyBpxmaIjbJk0yV0wq7E6l8mONRsFO5r1FCZcaeN+hiWhAIsDQWPXnK+eaF0OF3qG7ro9SN0mpIz82PK4Z3pG+EtTdErdKkXnnTJ5JvvSQEWh0CHQXqhwyBh6VL/wCSk8ZoSL3FBG1VwjMq9aE/nfiQn78zgrrUuED9H5YEhVlWwODGmAuKjSyFumiWMyn48BmnYjcye07enSZZSeeCIVVkkceqibuJCnLoghcp+0P40cnqvXtLVlhI6isoDR6qyZKg2ytKaMnMrFmPh+1T2gxW/Ej4IhbY0rrlflR8Irco6VqcpvZUYswl0qgItlf1gAonEgWsGrvtqJiel8oMROzVf/IYq/74jFO3fTtoxLsp6U6cp7mVxa0bo8z49dweWhGD7cf4p+W/Uz5OENKQG9UzMhGkWNk5jPZPw6gZPnKbIP9/vMXt23nBsw9J5r30ByTO3YBcUrqNLvWgnAwhduL0whDiRCwzDT8+/4skY9VLXu9JWr4E74NYLn2Zw0qUveH07kNMlRJeRibdTqypKxqEzS6suXBGvLnbMx+BJ5PRq6wUynOi7etGcJA3GwI3EhbuLcBZkcGe86RK9L4ObikNp7jWDpAI14AfVh6MBOyeZMU45PCRWZdVie9lIm5FkyEnJPan4e7+E6NKTpBNorIBcWsCNvZHJ2YgTfCBMhjjC3+N4Jvr1TK7Jh8H/NiXnTDAOi4/eEIuJfK1TFzfp1NZOvHoTNGWnsfgWKZWpQ+lWpiEiN+aiImeNS571pUuR/XlDRM7yixHZSrrMnNQFj+jM5EwYyI51cRPtvo3OuHFAfX89U5rMW38/5szZNix+VrkoSV0WTCWe02ErxzVG5BxvnbgWfJMs8NukQv7njbRAU0QuXIzI2Xpq/DL/+CXt2LVIEtKNBXp36bj+/aNyTmbm6uVZl9sj18NlZR7Y5GZ3ndx01CY3ncL7660T14En8lNwyrOqq8Oyg+hjA0eNzLSLBGjEkzoVWSuaZMZn6RJTq8wJdSmyylqUa/gkamWrvqJLA4NTZpaTwO6J+VAnM/v/JP8TdKLiCjpxCROpDTe9TOX+gy/OJd8cr177uNyA39I2Pot1yFd3EBcw0S1U7j91MtOJjkkF+FLTt1QKiE1mLucTkJvcZ5XGgDPjgTkf/slTGLjNhwkQJ6gcENzzNilU0hV14dkKKvedOoVpNPY8dL9YTBxYReWA1MhNk0m9tCjz7tSEm2dQue8QB+zhZs2VyDXTSDJUDohrzPrHHcrV492KvDG1E4z3Hzj/wzDMn2N8oxpmYIOXAAAAAElFTkSuQmCC" />
   <link rel="manifest" href="/manifest.json" />
@@ -505,10 +536,10 @@ function renderRegisterHtml(message = "") {
     <div class="brand-header">
       <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
       <h1 class="brand-title"><span>CURADOS</span></h1>
-      <p class="brand-subtitle">Cadastro de Usuário & Primeiro Acesso</p>
+      <p class="brand-subtitle">${subtitle}</p>
     </div>
 
-    <div id="regMessage" class="info">${message || 'Informe seu WhatsApp e nome cadastrados e escolha seu nome de usuário e senha.'}</div>
+    <div id="regMessage" class="info">${msgText || 'Informe seu WhatsApp e nome cadastrados e escolha seu nome de usuário e senha.'}</div>
     <form id="regForm">
       <label class="input-label" for="regTelefone">Seu WhatsApp *</label>
       <input id="regTelefone" name="telefone" placeholder="(11) 99999-9999" required autocomplete="tel" inputmode="numeric" />
@@ -536,7 +567,7 @@ function renderRegisterHtml(message = "") {
       
       <button type="submit" id="btnSubmitReg">Cadastrar Usuário e Criar Senha</button>
       <div class="links">
-        Já possui senha? <a href="/secretaria/login">Fazer login</a>
+        Já possui senha? <a href="${loginUrl}">Fazer login</a>
       </div>
     </form>
   </div>
@@ -615,7 +646,7 @@ function renderRegisterHtml(message = "") {
         data.customUsername = data.customUsername.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
       }
 
-      const res = await fetch('/secretaria/register', {
+      const res = await fetch('${apiRegisterUrl}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -626,7 +657,7 @@ function renderRegisterHtml(message = "") {
         msgEl.textContent = json.message || 'Cadastro realizado com sucesso! Redirecionando...';
         msgEl.className = 'success';
         const msgRedirect = encodeURIComponent(json.message || 'Cadastro concluído! Agora você já pode fazer login.');
-        setTimeout(() => window.location.href = '/secretaria/login?message=' + msgRedirect, 1800);
+        setTimeout(() => window.location.href = '${loginUrl}?message=' + msgRedirect, 1800);
       }
       else {
         console.error('Erro no cadastro:', json.message);
@@ -638,13 +669,28 @@ function renderRegisterHtml(message = "") {
 </body></html>`;
 }
 
-function renderRecuperarSenhaHtml(message = "") {
+function renderRecuperarSenhaHtml(message = "", options = {}) {
+  const portal = (typeof options === 'object' && options?.portal) || (typeof message === 'object' && message?.portal) || 'secretaria';
+  const msgText = typeof message === 'string' ? message : '';
+  const isGestao = portal === 'gestao';
+
+  const pageTitle = isGestao 
+    ? 'Recuperar Senha - Gestão de Eventos' 
+    : 'Recuperar Senha - Comunidade Cristã Curados';
+
+  const subtitle = isGestao 
+    ? 'Recuperação de Senha de Líder' 
+    : 'Recuperar Senha de Acesso';
+
+  const loginUrl = isGestao ? '/gestao/login' : '/secretaria/login';
+  const apiRecuperarUrl = isGestao ? '/gestao/recuperar-senha' : '/secretaria/recuperar-senha';
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Recuperar Senha - Comunidade Cristã Curados</title>
+  <title>${pageTitle}</title>
   <link rel="icon" type="image/png" href="/images/logo.png" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -816,10 +862,10 @@ function renderRecuperarSenhaHtml(message = "") {
     <div class="brand-header">
       <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
       <h1 class="brand-title"><span>CURADOS</span></h1>
-      <p class="brand-subtitle">Recuperar Senha de Acesso</p>
+      <p class="brand-subtitle">${subtitle}</p>
     </div>
 
-    <div id="recMessage" class="${message ? 'error' : 'info'}">${message || 'Informe seu WhatsApp e Nome cadastrados para validar sua identidade e redefinir sua senha.'}</div>
+    <div id="recMessage" class="${msgText ? 'error' : 'info'}">${msgText || 'Informe seu WhatsApp e Nome cadastrados para validar sua identidade e redefinir sua senha.'}</div>
     <form id="recForm">
       <label class="input-label" for="recTelefone">Seu WhatsApp *</label>
       <input id="recTelefone" name="telefone" placeholder="(11) 99999-9999" required autocomplete="tel" inputmode="numeric" />
@@ -841,7 +887,7 @@ function renderRecuperarSenhaHtml(message = "") {
       
       <button type="submit" id="btnSubmitRec">Redefinir Minha Senha</button>
       <div class="links">
-        Lembrou da senha? <a href="/secretaria/login">Fazer login</a>
+        Lembrou da senha? <a href="${loginUrl}">Fazer login</a>
       </div>
     </form>
   </div>
@@ -914,7 +960,7 @@ function renderRecuperarSenhaHtml(message = "") {
         }
       }
 
-      const res = await fetch('/secretaria/recuperar-senha', {
+      const res = await fetch('${apiRecuperarUrl}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -924,7 +970,7 @@ function renderRecuperarSenhaHtml(message = "") {
         msgEl.textContent = json.message || 'Senha redefinida com sucesso! Redirecionando...';
         msgEl.className = 'success';
         const msgRedirect = encodeURIComponent(json.message || 'Senha atualizada com sucesso! Agora você já pode fazer login.');
-        setTimeout(() => window.location.href = '/secretaria/login?message=' + msgRedirect, 1800);
+        setTimeout(() => window.location.href = '${loginUrl}?message=' + msgRedirect, 1800);
       } else {
         msgEl.textContent = json.message || 'Erro ao redefinir senha.';
         msgEl.className = 'error';

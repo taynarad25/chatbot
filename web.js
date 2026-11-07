@@ -1095,7 +1095,10 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       if (req.method === 'GET' && pathname === '/secretaria/login') {
         return sendHtml(res, renderLoginHtml());
       }
-      if (req.method === 'POST' && pathname === '/secretaria/login') {
+      if (req.method === 'GET' && (pathname === '/gestao/login' || pathname === '/login')) {
+        return sendHtml(res, renderLoginHtml("", { portal: 'gestao' }));
+      }
+      if (req.method === 'POST' && (pathname === '/secretaria/login' || pathname === '/gestao/login')) {
         try {
           const body = await parseRequestBody(req);
           const username = body.username?.trim();
@@ -1175,7 +1178,8 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
               loginRateLimiter.reset(ip);
               setSessionCookie(res, token);
               console.log(`[Web] Login bem-sucedido: ${sanitizarParaLog(nomeSessao)} (${sanitizarParaLog(user.username)}) (IP: ${sanitizarParaLog(ip)})`); // NOSONAR
-              const destino = roleSessao === 'admin' ? '/secretaria' : '/gestao';
+              const isGestao = pathname.startsWith('/gestao');
+              const destino = isGestao ? '/gestao' : (roleSessao === 'admin' ? '/secretaria' : '/gestao');
               return sendJson(res, 200, { ok: true, role: roleSessao, redirect: destino });
             } else if (!isPasswordValid) {
               console.warn(`[Web] Login falhou: Senha incorreta para o usuário '${sanitizarParaLog(username)}' (IP: ${sanitizarParaLog(ip)}). Verifique o hash no log de Auth.`); // NOSONAR
@@ -1208,10 +1212,16 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       if (req.method === 'GET' && pathname === '/secretaria/register') {
         return sendHtml(res, renderRegisterHtml());
       }
+      if (req.method === 'GET' && pathname === '/gestao/register') {
+        return sendHtml(res, renderRegisterHtml("", { portal: 'gestao' }));
+      }
       if (req.method === 'GET' && pathname === '/secretaria/recuperar-senha') {
         return sendHtml(res, renderRecuperarSenhaHtml());
       }
-      if (req.method === 'POST' && pathname === '/secretaria/recuperar-senha') {
+      if (req.method === 'GET' && pathname === '/gestao/recuperar-senha') {
+        return sendHtml(res, renderRecuperarSenhaHtml({ portal: 'gestao' }));
+      }
+      if (req.method === 'POST' && (pathname === '/secretaria/recuperar-senha' || pathname === '/gestao/recuperar-senha')) {
         try {
           const body = await parseRequestBody(req);
           const { telefone, nome, password } = body;
@@ -1316,7 +1326,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           return sendJson(res, 500, { ok: false, message: "Erro ao redefinir senha." });
         }
       }
-      if (req.method === 'POST' && pathname === '/secretaria/register') {
+      if (req.method === 'POST' && (pathname === '/secretaria/register' || pathname === '/gestao/register')) {
         try {
           const body = await parseRequestBody(req);
           const { username, nome, telefone, password } = body;
@@ -1535,7 +1545,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
       // ==========================================
       if (req.method === 'GET' && (pathname === '/gestao' || pathname === '/gestao/' || pathname === '/eventos' || pathname === '/eventos/')) {
           if (!isAuthenticated(req)) {
-            res.writeHead(302, { Location: '/secretaria/login?redirect=/gestao' });
+            res.writeHead(302, { Location: '/gestao/login' });
             return res.end();
           }
           const session = getSession(req);
@@ -1550,7 +1560,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
               <div>
                 <h2>Acesso Não Autorizado</h2>
                 <p>Seu cadastro consta como <strong>Membro</strong>. O painel de gestão de eventos é restrito a Líderes de Ministérios, Pastores e Diretoria.</p>
-                <a href="/secretaria/logout">Sair</a>
+                <a href="/gestao/logout">Sair</a>
               </div>
             </body>
             </html>
@@ -1980,7 +1990,16 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           await startClient({ forceClean: true });
           return sendJson(res, 200, { ok: true, message: 'Sessão reiniciada do zero.' });
         }
-        if (pathname === '/secretaria/logout' || pathname === '/logout') {
+        if (pathname === '/gestao/logout' || pathname === '/logout') {
+          const sessionId = getSessionId(req);
+          clearSessionCookie(res, sessionId);
+          if (req.method === 'POST') {
+            return sendJson(res, 200, { ok: true });
+          }
+          res.writeHead(302, { Location: '/gestao/login' });
+          return res.end();
+        }
+        if (pathname === '/secretaria/logout') {
           const sessionId = getSessionId(req);
           clearSessionCookie(res, sessionId);
           if (req.method === 'POST') {

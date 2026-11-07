@@ -35,10 +35,10 @@ after(() => {
   } catch {}
 });
 
-test("GET /gestao sem autenticação: redireciona 302 para login", async () => {
+test("GET /gestao sem autenticação: redireciona 302 para /gestao/login", async () => {
   const res = await fetch(`${baseUrl}/gestao`, { redirect: "manual" });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get("location"), "/secretaria/login?redirect=/gestao");
+  assert.equal(res.headers.get("location"), "/gestao/login");
 });
 
 test("GET /gestao autenticado: retorna a página HTML com status 200 e componentes do painel", async () => {
@@ -798,7 +798,7 @@ test("Segurança de Rotas: líder comum acessando /secretaria é redirecionado p
   assert.equal(res.headers.get("location"), "/gestao");
 });
 
-test("Logout: /logout e /secretaria/logout limpam sessão e redirecionam para /secretaria/login", async () => {
+test("Logout: /gestao/logout e /logout redirecionam para /gestao/login; /secretaria/logout para /secretaria/login", async () => {
   const token = createSession("lider.logout", "lider", "active");
 
   const res1 = await fetch(`${baseUrl}/logout`, {
@@ -806,7 +806,14 @@ test("Logout: /logout e /secretaria/logout limpam sessão e redirecionam para /s
     redirect: "manual"
   });
   assert.equal(res1.status, 302);
-  assert.equal(res1.headers.get("location"), "/secretaria/login");
+  assert.equal(res1.headers.get("location"), "/gestao/login");
+
+  const resGestao = await fetch(`${baseUrl}/gestao/logout`, {
+    headers: { Cookie: `whatsapp_control_session=${token}` },
+    redirect: "manual"
+  });
+  assert.equal(resGestao.status, 302);
+  assert.equal(resGestao.headers.get("location"), "/gestao/login");
 
   const res2 = await fetch(`${baseUrl}/secretaria/logout`, {
     headers: { Cookie: `whatsapp_control_session=${token}` },
@@ -853,6 +860,29 @@ test("Recuperar Senha: líder cadastrado consegue redefinir senha informando Wha
   const loginData = await loginRes.json();
   assert.equal(loginData.redirect, "/gestao");
 });
+
+test("Portal de Gestão: /gestao/login, /gestao/register e /gestao/recuperar-senha possuem identidade própria", async () => {
+  const resLogin = await fetch(`${baseUrl}/gestao/login`);
+  assert.equal(resLogin.status, 200);
+  const htmlLogin = await resLogin.text();
+  assert.match(htmlLogin, /Gestão de Eventos/);
+  assert.match(htmlLogin, /Gestão de Eventos & Ministérios/);
+  assert.match(htmlLogin, /\/gestao\/register/);
+  assert.match(htmlLogin, /\/gestao\/recuperar-senha/);
+
+  const resReg = await fetch(`${baseUrl}/gestao/register`);
+  assert.equal(resReg.status, 200);
+  const htmlReg = await resReg.text();
+  assert.match(htmlReg, /Primeiro Acesso de Líder/);
+  assert.match(htmlReg, /\/gestao\/login/);
+
+  const resRec = await fetch(`${baseUrl}/gestao/recuperar-senha`);
+  assert.equal(resRec.status, 200);
+  const htmlRec = await resRec.text();
+  assert.match(htmlRec, /Recuperação de Senha de Líder/);
+  assert.match(htmlRec, /\/gestao\/login/);
+});
+
 
 
 
