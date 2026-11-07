@@ -831,6 +831,145 @@ function listarFichas({ user = null } = {}) {
 /**
  * Cria ou atualiza solicitação no portal web
  */
+
+/**
+ * Converte string de hora 'HH:MM' em minutos desde o início do dia
+ */
+function horaParaMinutos(strHora) {
+  if (!strHora) return 0;
+  const [h, m = 0] = String(strHora).trim().split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+/**
+ * Converte minutos desde o início do dia para 'HH:MM'
+ */
+function minutosParaHora(minutos) {
+  const h = Math.floor(Math.max(0, minutos) / 60) % 24;
+  const m = Math.max(0, minutos) % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Valida se um agendamento conflita com cultos de domingo e eventos existentes.
+ * Para eventos gerais da igreja (tipo: 'evento' ou 'acao'), aplica o bloqueio obrigatório de 2 horas (120 min)
+ * antes e depois de eventos existentes no mesmo dia.
+ * Para reuniões, ensaios, atendimentos e cultos temáticos, não exige o bloqueio de 2 horas.
+ */
+function verificarConflitoHorarioEvento({
+  data,
+  horarioInicio = '19:00',
+  horarioTermino = '21:30',
+  tipo = 'evento',
+  blocos = null,
+  eventosExistentes = []
+} = {}) {
+  const tipoNorm = String(tipo || 'evento').toLowerCase().trim();
+
+  // Reuniões, ensaios, atendimentos pastorais e cultos temáticos NÃO exigem o intervalo de 2 horas
+  const exigeIntervalo2Horas = (tipoNorm === 'evento' || tipoNorm === 'acao' || tipoNorm === 'venda');
+
+  // Monta lista de sessões/datas a validar
+  const sessoes = [];
+  if (Array.isArray(blocos) && blocos.length > 0) {
+    blocos.forEach(b => {
+      if (b && b.data) {
+        sessoes.push({
+          data: b.data,
+          inicio: b.inicio || horarioInicio || '19:00',
+          fim: b.fim || horarioTermino || '21:30'
+        });
+      }
+    });
+  } else if (data) {
+    sessoes.push({
+      data,
+      inicio: horarioInicio || '19:00',
+      fim: horarioTermino || '21:30'
+    });
+  }
+
+  const { verificarConflitoCultoDomingo } = require('../bot/disponibilidade');
+
+  for (const sessao of sessoes) {
+    const dataStr = sessao.data.trim();
+    const partes = dataStr.split('/');
+    if (partes.length >= 2) {
+      const diaNum = parseInt(partes[0], 10);
+      const mesNum = parseInt(partes[1], 10);
+      const anoNum = partes[2] ? parseInt(partes[2], 10) : moment().tz("America/Sao_Paulo").year();
+
+      // 1. Checa conflito com cultos de domingo (Ceia 1º domingo e Culto de Celebração)
+      const confDomingo = verificarConflitoCultoDomingo({
+        dia: diaNum,
+        mes: mesNum,
+        ano: anoNum,
+        horarioInicio: sessao.inicio,
+        horarioFim: sessao.fim
+      });
+      if (confDomingo && confDomingo.conflito) {
+        return {
+          conflito: true,
+          mensagem: confDomingo.mensagem
+        };
+      }
+
+      // 2. Checa conflito com eventos já agendados na data
+      if (Array.isArray(eventosExistentes) && eventosExistentes.length > 0) {
+        const minNovoIni = horaParaMinutos(sessao.inicio);
+        const minNovoFim = horaParaMinutos(sessao.fim);
+
+        for (const ev of eventosExistentes) {
+          if (!ev || ev.status === 'recusado' || ev.status === 'cancelado') continue;
+          if (ev.data !== dataStr) continue;
+
+          // Se o evento existente for um evento de salão / culto / ação
+          const tipoEvExistente = String(ev.tipo || 'evento').toLowerCase();
+          const ehEventoPrincipal = tipoEvExistente === 'evento' || tipoEvExistente === 'acao' || tipoEvExistente === 'culto_tematico' || !ev.tipo;
+
+          if (exigeIntervalo2Horas && ehEventoPrincipal) {
+            const minExistIni = horaParaMinutos(ev.horarioInicio || '19:00');
+            const minExistFim = horaParaMinutos(ev.horarioFim || ev.horarioTermino || '21:30');
+
+            // Regra do Bloqueio de 2 Horas (120 minutos de buffer antes e depois):
+            const minJanelaBloqueadaIni = Math.max(0, minExistIni - 120);
+            const minJanelaBloqueadaFim = Math.min(24 * 60, minExistFim + 120);
+
+            // Verifica se o novo evento invade a janela bloqueada
+            if (minNovoIni < minJanelaBloqueadaFim && minNovoFim > minJanelaBloqueadaIni) {
+              const tituloEv = ev.titulo || ev.evento || ev.nomeEvento || 'Evento existente';
+              const horaLivreAntes = minutosParaHora(minJanelaBloqueadaIni);
+              const horaLivreDepois = minutosParaHora(minJanelaBloqueadaFim);
+
+              return {
+                conflito: true,
+                eventoConflitante: tituloEv,
+                horarioExistente: `${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}`,
+                mensagem: `❌ Horário indisponível: Já existe o evento "${tituloEv}" agendado no dia ${dataStr} das ${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}. É obrigatório um intervalo mínimo de 2 horas entre eventos no salão (horário livre antes das ${horaLivreAntes} ou a partir das ${horaLivreDepois}).`
+              };
+            }
+          } else {
+            // Se o novo evento for reunião/ensaio OU o evento existente for reunião/ensaio,
+            // valida apenas sobreposição direta de horário (sem o buffer de 2 horas)
+            const minExistIni = horaParaMinutos(ev.horarioInicio || '19:00');
+            const minExistFim = horaParaMinutos(ev.horarioFim || ev.horarioTermino || '21:30');
+            if (minNovoIni < minExistFim && minNovoFim > minExistIni) {
+              const tituloEv = ev.titulo || ev.evento || 'Atividade existente';
+              return {
+                conflito: true,
+                eventoConflitante: tituloEv,
+                mensagem: `❌ Horário indisponível: Já existe "${tituloEv}" agendado no dia ${dataStr} das ${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}.`
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { conflito: false };
+}
+
 async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () => null) {
   const perfil = obterPerfilGestao(usuarioLogado);
   const tipoAcao = String(corpo.tipo || 'evento').toLowerCase().trim();
@@ -1000,6 +1139,71 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
       codigo,
       message: `Ação/Venda solicitada com sucesso (Código: ${codigo}) e enviada para aprovação da Secretaria!`,
       mensagem: `Ação/Venda solicitada com sucesso (Código: ${codigo}) e enviada para aprovação da Secretaria!`
+    };
+  }
+
+
+  // 1C. CULTO TEMÁTICO (Exclusivo Pastores e Diretores - Sem necessidade de ficha longa)
+  if (tipoAcao === 'culto_tematico') {
+    if (!perfil?.isPastor && !perfil?.isDiretor && !perfil?.isAdmin) {
+      throw new Error('Apenas pastores e diretores têm permissão para agendar Cultos Temáticos.');
+    }
+
+    const { tema_culto, data, horario_inicio, horario_termino, decoracao, louvor_diferente, observacoes } = corpo;
+    if (!tema_culto || !data || !horario_inicio || !horario_termino) {
+      throw new Error('Preencha o tema/nome do culto temático, a data e os horários de início e término.');
+    }
+
+    const [diaStr, mesStr, anoStr] = data.split('/');
+    const dadosCultoTematico = {
+      tipo: 'culto_tematico',
+      evento: tema_culto.trim(),
+      nomeEvento: tema_culto.trim(),
+      departamento: 'Geral',
+      rede: 'Geral',
+      dia: parseInt(diaStr, 10),
+      mes: parseInt(mesStr, 10),
+      ano: parseInt(anoStr, 10),
+      dataFormatada: data,
+      horarioInicio: horario_inicio,
+      horarioFim: horario_termino,
+      local: ENDERECO_IGREJA,
+      decoracao: decoracao?.trim() || 'Não',
+      louvorDiferente: louvor_diferente?.trim() || 'Não',
+      observacoes: observacoes?.trim() || 'Nenhuma',
+      solicitanteNome: perfil?.nome || 'Pastor/Diretor',
+      solicitanteId: perfil?.telefone || perfil?.username || '',
+      criadoVia: 'painel_web',
+      criadoEm: new Date().toISOString()
+    };
+
+    const codigo = salvarPendente(dadosCultoTematico);
+
+    const avisoGrupo =
+      `✨ *SOLICITAÇÃO DE CULTO TEMÁTICO*\n\n` +
+      `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
+      `📖 *Tema / Culto:* ${tema_culto.trim()}\n` +
+      `📆 *Data:* ${data}\n` +
+      `⏰ *Horário:* ${horario_inicio} às ${horario_termino}\n` +
+      `🎨 *Decoração Especial:* ${dadosCultoTematico.decoracao}\n` +
+      `🎵 *Louvor Diferente:* ${dadosCultoTematico.louvorDiferente}\n` +
+      (observacoes ? `📝 *Observações:* ${observacoes.trim()}\n` : '') +
+      `\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `_Responda a este resumo com "marcar evento" para confirmar ou "não marcar" para negar._\n\n` +
+      `_Código: ${codigo}_`;
+
+    try {
+      const client = typeof getClient === 'function' ? getClient() : null;
+      if (client && client.info) {
+        await notificarSecretaria(client, avisoGrupo);
+      }
+    } catch (_) {}
+
+    return {
+      ok: true,
+      codigo,
+      message: `Culto Temático solicitado com sucesso (Código: ${codigo}) e enviado para aprovação da Secretaria!`,
+      mensagem: `Culto Temático solicitado com sucesso (Código: ${codigo}) e enviado para aprovação da Secretaria!`
     };
   }
 
@@ -1389,6 +1593,27 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
   }
 
   // 7. NOVO EVENTO (Padrão)
+  {
+    const dataChecagem = corpo.data || (corpo.blocos_json ? '' : '');
+    const anoNumChecagem = dataChecagem && dataChecagem.split('/')[2] ? parseInt(dataChecagem.split('/')[2], 10) : moment().tz("America/Sao_Paulo").year();
+    const mesNumChecagem = dataChecagem && dataChecagem.split('/')[1] ? parseInt(dataChecagem.split('/')[1], 10) : moment().tz("America/Sao_Paulo").month() + 1;
+    let blocosCheck = null;
+    if (corpo.blocos_json) {
+      try { blocosCheck = JSON.parse(corpo.blocos_json); } catch (_) {}
+    }
+    const evsExistentes = listarEventosLocais(perfil, anoNumChecagem, mesNumChecagem);
+    const resultadoConflito = verificarConflitoHorarioEvento({
+      data: dataChecagem,
+      horarioInicio: corpo.horario_inicio || '19:00',
+      horarioTermino: corpo.horario_termino || '21:30',
+      tipo: 'evento',
+      blocos: blocosCheck,
+      eventosExistentes: evsExistentes
+    });
+    if (resultadoConflito && resultadoConflito.conflito) {
+      throw new Error(resultadoConflito.mensagem);
+    }
+  }
   const {
     nome_lider,
     telefone_lider,
@@ -2730,6 +2955,14 @@ function renderGestaoHtml({ user }) {
               <span class="desc">Feijoada, pastelada, cantina ou bazar. Formulário rápido sem ficha longa.</span>
             </button>
 
+            
+            ${(perfil?.isPastor || perfil?.isDiretor || perfil?.isAdmin) ? `
+            <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('culto_tematico')">
+              <span class="icone">✨</span>
+              <span class="titulo">Culto Temático</span>
+              <span class="desc">Cultos especiais aos domingos. Rápido, sem ficha e com perguntas direto à Secretaria.</span>
+            </button>
+            ` : ''}
             <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('reuniao')">
               <span class="icone">🤝</span>
               <span class="titulo">Reunião de Liderança</span>
@@ -2999,6 +3232,66 @@ function renderGestaoHtml({ user }) {
             <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
               <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
               <button type="submit" class="btn-principal" id="btnSalvarEnsaio">Solicitar Ensaio</button>
+            </div>
+          </form>
+        </div>
+
+        
+        <!-- PASSO 2F: FORMULÁRIO DE CULTO TEMÁTICO (EXCLUSIVO PASTORES E DIRETORES) -->
+        <div id="stepFormCultoTematico" class="form-step">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarParaEscolhaTipo()">← Escolher outro tipo</button>
+          
+          <form id="formNovoCultoTematico" onsubmit="submeterNovoCultoTematico(event)">
+            <div class="alert-banner info" style="background: rgba(168, 85, 247, 0.12); border-color: rgba(168, 85, 247, 0.3); color: #c084fc;">
+              ✨ <strong>Culto Temático:</strong> Modalidade exclusiva para Pastores e Diretores. O ideal é ser realizado aos domingos e não necessita de preenchimento de ficha de pós-evento.
+            </div>
+
+            <div class="form-group">
+              <label>Nome / Tema do Culto Temático *</label>
+              <input type="text" class="form-control" id="culto_tema" placeholder="Ex: Culto da Família, Culto de Missões, Culto da Gratidão..." required />
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Data * (Ideal no domingo)</label>
+                <input type="text" class="form-control" id="culto_data" placeholder="DD/MM/AAAA" required />
+              </div>
+              <div class="form-group">
+                <label>Local</label>
+                <input type="text" class="form-control" id="culto_local" value="${ENDERECO_IGREJA}" readonly />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Horário Início *</label>
+                <input type="time" class="form-control" id="culto_hora_ini" value="18:00" required />
+              </div>
+              <div class="form-group">
+                <label>Horário Término *</label>
+                <input type="time" class="form-control" id="culto_hora_fim" value="20:30" required />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Decoração Especial?</label>
+                <input type="text" class="form-control" id="culto_decoracao" placeholder="Ex: Não / Sim: Balões dourados, arranjos no altar..." />
+              </div>
+              <div class="form-group">
+                <label>Louvor Diferente / Especial?</label>
+                <input type="text" class="form-control" id="culto_louvor" placeholder="Ex: Não / Sim: Participação especial, hinos temáticos..." />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Observações Gerais</label>
+              <textarea class="form-control" id="culto_obs" rows="2" placeholder="Instruções adicionais ou detalhes para a secretaria..."></textarea>
+            </div>
+
+            <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
+              <button type="submit" class="btn-principal" id="btnSalvarCultoTematico">Solicitar Culto Temático</button>
             </div>
           </form>
         </div>
@@ -4030,6 +4323,13 @@ function renderGestaoHtml({ user }) {
           document.getElementById('modalAgendamentoTitulo').innerText = '🍲 Agendar Ação / Venda Beneficente';
           if (document.getElementById('acao_data')) document.getElementById('acao_data').value = dataStr;
         }
+      } else if (tipo === 'culto_tematico') {
+        const stepCulto = document.getElementById('stepFormCultoTematico');
+        if (stepCulto) {
+          stepCulto.classList.add('active');
+          document.getElementById('modalAgendamentoTitulo').innerText = '✨ Agendar Culto Temático';
+          if (document.getElementById('culto_data')) document.getElementById('culto_data').value = dataStr;
+        }
       } else if (tipo === 'reuniao') {
         document.getElementById('stepFormReuniao').classList.add('active');
         document.getElementById('modalAgendamentoTitulo').innerText = '🤝 Agendar Reunião de Liderança';
@@ -4411,6 +4711,47 @@ function renderGestaoHtml({ user }) {
       container.appendChild(div);
     }
 
+    
+    async function submeterNovoCultoTematico(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSalvarCultoTematico');
+      btn.disabled = true;
+      btn.innerText = 'Enviando...';
+
+      const payload = {
+        tipo: 'culto_tematico',
+        tema_culto: document.getElementById('culto_tema').value,
+        data: document.getElementById('culto_data').value,
+        horario_inicio: document.getElementById('culto_hora_ini').value,
+        horario_termino: document.getElementById('culto_hora_fim').value,
+        decoracao: document.getElementById('culto_decoracao')?.value || '',
+        louvor_diferente: document.getElementById('culto_louvor')?.value || '',
+        observacoes: document.getElementById('culto_obs')?.value || ''
+      };
+
+      try {
+        const res = await fetch('/gestao/api/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ret = await res.json();
+        if (ret.ok) {
+          alert('✅ ' + (ret.mensagem || 'Culto Temático solicitado com sucesso!'));
+          fecharModalAgendamento();
+          carregarEventosServidor();
+          carregarSolicitacoesServidor();
+        } else {
+          alert('❌ Erro: ' + ret.message);
+        }
+      } catch (_) {
+        alert('❌ Erro de conexão.');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Solicitar Culto Temático';
+      }
+    }
+
     async function submeterNovoEvento(e) {
       e.preventDefault();
       const btn = document.getElementById('btnSalvarEvento');
@@ -4427,6 +4768,41 @@ function renderGestaoHtml({ user }) {
             blocos.push({ data: inputs[0].value, inicio: inputs[1]?.value || '19:00', fim: inputs[2]?.value || '21:30' });
           }
         });
+      }
+
+      
+      // Validação rápida no cliente de intervalo mínimo de 2 horas para eventos
+      const dataEvCliente = document.getElementById('ev_data')?.value;
+      const horaIniCliente = document.getElementById('ev_hora_ini')?.value || '19:00';
+      const horaFimCliente = document.getElementById('ev_hora_fim')?.value || '21:30';
+
+      if (tipo === 'unico' && dataEvCliente && Array.isArray(todosEventos)) {
+        const evsNoDia = todosEventos.filter(ev => ev.data === dataEvCliente && ev.status !== 'recusado' && ev.status !== 'cancelado');
+        for (const ev of evsNoDia) {
+          const ehEvPrincipal = ev.tipo === 'evento' || ev.tipo === 'acao' || ev.tipo === 'culto_tematico' || !ev.tipo;
+          if (ehEvPrincipal) {
+            const toMin = t => { const [h, m = 0] = String(t || '00:00').split(':').map(Number); return h * 60 + m; };
+            const iniNovo = toMin(horaIniCliente);
+            const fimNovo = toMin(horaFimCliente);
+            const iniEx = toMin(ev.horarioInicio || '19:00');
+            const fimEx = toMin(ev.horarioFim || ev.horarioTermino || '21:30');
+
+            if (iniNovo < fimEx + 120 && fimNovo > iniEx - 120) {
+              const hAntes = Math.floor(Math.max(0, iniEx - 120) / 60);
+              const mAntes = Math.max(0, iniEx - 120) % 60;
+              const livreAntes = (hAntes < 10 ? '0' : '') + hAntes + ':' + (mAntes < 10 ? '0' : '') + mAntes;
+
+              const hDepois = Math.floor(Math.min(1440, fimEx + 120) / 60);
+              const mDepois = Math.min(1440, fimEx + 120) % 60;
+              const livreDepois = (hDepois < 10 ? '0' : '') + hDepois + ':' + (mDepois < 10 ? '0' : '') + mDepois;
+
+              alert('❌ Horário indisponível: Já existe o evento "' + (ev.titulo || '') + '" agendado no dia ' + dataEvCliente + ' das ' + (ev.horarioInicio || '19:00') + ' às ' + (ev.horarioFim || '21:30') + '.\n\nPara eventos da igreja no salão, é obrigatório um intervalo mínimo de 2 horas entre eles.\nHorário livre antes das ' + livreAntes + ' ou a partir das ' + livreDepois + '.');
+              btn.disabled = false;
+              btn.innerText = 'Enviar Solicitação';
+              return;
+            }
+          }
+        }
       }
 
       const payload = {
@@ -5034,6 +5410,7 @@ function renderGestaoHtml({ user }) {
 }
 
 module.exports = {
+  verificarConflitoHorarioEvento,
   obterPerfilGestao,
   listarEventosLocais,
   listarEventosCalendario,

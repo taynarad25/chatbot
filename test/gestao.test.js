@@ -883,6 +883,127 @@ test("Portal de Gestão: /gestao/login, /gestao/register e /gestao/recuperar-sen
   assert.match(htmlRec, /\/gestao\/login/);
 });
 
+test("Bloqueio de 2 horas: verificarConflitoHorarioEvento bloqueia evento com menos de 2h de intervalo, mas permite reunião e ensaio", () => {
+  const eventosExistentes = [
+    {
+      id: "ev_1",
+      titulo: "Conferência de Homens",
+      data: "14/11/2026",
+      horarioInicio: "19:00",
+      horarioFim: "21:00",
+      tipo: "evento"
+    }
+  ];
+
+  // 1. Novo evento terminando às 18:00 (1h antes do existente) -> Conflito pelo buffer de 2h (17:00 a 23:00)
+  const conf1 = gestao.verificarConflitoHorarioEvento({
+    data: "14/11/2026",
+    horarioInicio: "16:00",
+    horarioTermino: "18:00",
+    tipo: "evento",
+    eventosExistentes
+  });
+  assert.equal(conf1.conflito, true);
+  assert.match(conf1.mensagem, /intervalo mínimo de 2 horas/);
+
+  // 2. Novo evento iniciando às 22:00 (1h após o existente) -> Conflito pelo buffer de 2h
+  const conf2 = gestao.verificarConflitoHorarioEvento({
+    data: "14/11/2026",
+    horarioInicio: "22:00",
+    horarioTermino: "23:30",
+    tipo: "evento",
+    eventosExistentes
+  });
+  assert.equal(conf2.conflito, true);
+  assert.match(conf2.mensagem, /intervalo mínimo de 2 horas/);
+
+  // 3. Novo evento iniciando às 23:00 (2h após o término das 21:00) -> Permitido!
+  const confLivreDepois = gestao.verificarConflitoHorarioEvento({
+    data: "14/11/2026",
+    horarioInicio: "23:00",
+    horarioTermino: "01:00",
+    tipo: "evento",
+    eventosExistentes
+  });
+  assert.equal(confLivreDepois.conflito, false);
+
+  // 4. Novo evento terminando às 17:00 (2h antes do início das 19:00) -> Permitido!
+  const confLivreAntes = gestao.verificarConflitoHorarioEvento({
+    data: "14/11/2026",
+    horarioInicio: "15:00",
+    horarioTermino: "17:00",
+    tipo: "evento",
+    eventosExistentes
+  });
+  assert.equal(confLivreAntes.conflito, false);
+
+  // 5. Reunião de liderança no horário das 17:30 às 18:30 (dentro do buffer de 2h do evento) -> Permitida!
+  const confReuniao = gestao.verificarConflitoHorarioEvento({
+    data: "14/11/2026",
+    horarioInicio: "17:30",
+    horarioTermino: "18:30",
+    tipo: "reuniao",
+    eventosExistentes
+  });
+  assert.equal(confReuniao.conflito, false);
+
+  // 6. Ensaio no horário das 17:00 às 18:30 -> Permitido sem a exigência do buffer de 2h!
+  const confEnsaio = gestao.verificarConflitoHorarioEvento({
+    data: "14/11/2026",
+    horarioInicio: "17:00",
+    horarioTermino: "18:30",
+    tipo: "ensaio",
+    eventosExistentes
+  });
+  assert.equal(confEnsaio.conflito, false);
+});
+
+test("Culto Temático: Pastores e Diretores podem solicitar sem necessidade de ficha longa", async () => {
+  const sessionPastor = {
+    username: "pastor.alberto",
+    role: "pastor",
+    nome: "Pastor Alberto",
+    telefone: "5511999990099"
+  };
+
+  const res = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "culto_tematico",
+    tema_culto: "Culto da Família Vitoriosa",
+    data: "15/11/2026",
+    horario_inicio: "18:00",
+    horario_termino: "20:30",
+    decoracao: "Sim, arranjos florais e iluminação especial",
+    louvor_diferente: "Sim, ministração do coral e hinos temáticos",
+    observacoes: "Entrada livre e Santa Comunhão"
+  }, sessionPastor);
+
+  assert.equal(res.ok, true);
+  assert.match(res.message, /Culto Temático solicitado com sucesso/);
+  assert.ok(res.codigo);
+
+  // Líder comum sem cargo pastor/diretor deve receber erro de permissão
+  const sessionLiderComum = {
+    username: "lider.comum",
+    role: "lider",
+    nome: "Líder Comum",
+    telefone: "5511988880011"
+  };
+
+  await assert.rejects(
+    async () => {
+      await gestao.criarSolicitacaoEventoWeb({
+        tipo: "culto_tematico",
+        tema_culto: "Culto dos Jovens",
+        data: "22/11/2026",
+        horario_inicio: "18:00",
+        horario_termino: "20:30"
+      }, sessionLiderComum);
+    },
+    /Apenas pastores e diretores têm permissão/
+  );
+});
+
+
 
 
 

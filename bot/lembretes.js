@@ -465,6 +465,7 @@ function registrarLembreteEnviado(eventoId, tipo, destinatario) {
     const agora = new Date().toISOString();
     db.prepare("INSERT INTO lembretes_enviados (eventoId, tipo, destinatario, enviadoEm) VALUES (?, ?, ?, ?)")
       .run(eventoId, tipo, destinatario, agora);
+    try { db.exec("PRAGMA wal_checkpoint(PASSIVE);"); } catch (_) {}
     return true;
   } catch (err) {
     console.error("[Lembretes] Erro ao registrar lembrete enviado:", err.message);
@@ -622,7 +623,7 @@ async function processarLembretesEventos({
   client,
   buscarEventos,
   agendasParaLer = [],
-  diasAntecedencia = 5,
+  diasAntecedencia = 7,
   dataBase = new Date(),
   notificarSecretariaFn = notificarSecretaria,
   etapas = null,
@@ -1045,7 +1046,7 @@ async function processarLembretesEventos({
  */
 async function processarLembretesDivulgacaoMultimidia({
   client,
-  diasAntecedencia = 5,
+  diasAntecedencia = 7,
   dataBase = new Date(),
   notificarFn = notificarMultimidia,
   fetchFn = globalThis.fetch,
@@ -1610,7 +1611,7 @@ function extrairItensADefinirFormulario(payload) {
 }
 
 
-function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens = [], diasAntecedencia = 5 } = {}) {
+function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens = [], diasAntecedencia = 7 } = {}) {
   const saudacao = nome ? `Olá, *${nome}*! Tudo bem?` : "Olá! Tudo bem?";
   const dataFormatada = formatarDataBrasil(data);
   const dataStr = dataFormatada ? ` em *${dataFormatada}*` : "";
@@ -1626,7 +1627,7 @@ function montarMensagemItensADefinir({ nome = "", evento = "", data = "", itens 
     `Faltam apenas *${diasAntecedencia} dias* para a realização do evento *${evento}*${dataStr}!\n\n` +
     `No formulário de agendamento, os seguintes itens haviam ficado marcados como *a definir*:\n` +
     `${listaItens}\n` +
-    `Elas já foram definidas? Você pode atualizar o formulário diretamente no portal (https://comunidadecristacurados.com.br/gestao) ou responder diretamente a esta mensagem com as definições para alinharmos tudo certinho!\n\n` +
+    `Eles já foram definidos? Você pode atualizar o formulário diretamente no portal (https://comunidadecristacurados.com.br/gestao) ou responder diretamente a esta mensagem com as definições para alinharmos tudo certinho!\n\n` +
     `_Seguimos à disposição e em oração pelo seu evento!_ 🙏✨`
   );
 }
@@ -1639,7 +1640,7 @@ async function processarLembretesItensADefinir({
   client,
   buscarEventos,
   agendasParaLer = [],
-  diasAntecedencia = 5,
+  diasAntecedencia = 7,
   dataBase = new Date(),
   notificarSecretariaFn = notificarSecretaria,
   etapas = null,
@@ -1661,7 +1662,7 @@ async function processarLembretesItensADefinir({
   const inicioDia = new Date(ano, targetDate.getMonth(), targetDate.getDate(), 0, 0, 0).toISOString();
   const fimDia = new Date(ano, targetDate.getMonth(), targetDate.getDate(), 23, 59, 59).toISOString();
 
-  console.log(`[Itens a Definir] Verificando eventos de ${dataAlvoStr} (5 dias)...`);
+  console.log(`[Itens a Definir] Verificando eventos de ${dataAlvoStr} (${diasAntecedencia} dias)...`);
 
   let eventos = [];
   try {
@@ -1753,15 +1754,23 @@ async function processarLembretesItensADefinir({
     const tipoRemoto = "lembrete_itens_a_definir";
     const telLimpo = String(telDest || "").replace(/\D/g, "");
     const destRemoto = `${nomeDest || "Líder"} (${telLimpo || telDest}) - ${eventoId}`;
-    const periodoRemoto = dataAlvoStr;
+    const periodoRemoto = `alinhamento_${eventoId}_${dataAlvoStr}`;
 
     if (!forcar) {
-      const remotoEnviado = await verificarEnvioRemoto({
+      let remotoEnviado = await verificarEnvioRemoto({
         tipo: tipoRemoto,
         destinatario: destRemoto,
         periodo: periodoRemoto,
         fetchFn,
       });
+      if (!remotoEnviado) {
+        remotoEnviado = await verificarEnvioRemoto({
+          tipo: tipoRemoto,
+          destinatario: destRemoto,
+          periodo: dataAlvoStr,
+          fetchFn,
+        });
+      }
 
       if (remotoEnviado === true) {
         console.log(`[Itens a Definir] ${tipoRemoto} para ${destRemoto} (${periodoRemoto}) já enviado anteriormente (planilha de logs). Ignorando.`);
@@ -1775,6 +1784,7 @@ async function processarLembretesItensADefinir({
       evento: titulo,
       data: dataEv,
       itens: itensADefinir,
+      diasAntecedencia,
     });
 
     const jid = formatarJidWhatsApp(telDest);

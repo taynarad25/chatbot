@@ -17,6 +17,22 @@ function obterPeriodoSemana(dataRef = new Date()) {
 }
 
 /**
+ * Normaliza o período antes de enviar para o Google Sheets via Web App.
+ * Se for uma data pura YYYY-MM-DD, adiciona o prefixo 'D_' para evitar que a planilha do Google
+ * converta o valor da célula em Date object nativo (o que quebra a comparação == no Apps Script).
+ * @param {string} periodo
+ * @returns {string}
+ */
+function normalizarPeriodo(periodo) {
+  if (!periodo) return "";
+  const s = String(periodo).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return `D_${s}`;
+  }
+  return s;
+}
+
+/**
  * Retorna o período em formato ISO diário (ex: "2026-10-01") para uma data de referência.
  * @param {Date|string} dataRef 
  * @returns {string}
@@ -165,6 +181,7 @@ module.exports = {
   obterUrlPlanilhaLogs,
   obterPeriodoSemana,
   obterPeriodoDia,
+  normalizarPeriodo,
   verificarEnvioRemoto,
   registrarEnvioRemoto,
 };

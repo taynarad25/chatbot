@@ -346,5 +346,14 @@ db.marcarLembrete24hEnviado = function (id) {
   }
 };
 
+function flushWalOnExit() {
+  try {
+    db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+  } catch (_) {}
+}
+process.on("exit", flushWalOnExit);
+process.on("SIGINT", () => { flushWalOnExit(); process.exit(0); });
+process.on("SIGTERM", () => { flushWalOnExit(); process.exit(0); });
+
 module.exports = db;
 

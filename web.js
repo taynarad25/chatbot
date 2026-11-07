@@ -1337,7 +1337,13 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
           const telEntrada = String(telefone || username || "").trim();
           const nomeEntrada = String(nome || "").trim();
-          const digitosTel = telEntrada.replace(/\D/g, "");
+          let digitosTel = telEntrada.replace(/\D/g, "");
+          if (digitosTel.startsWith("55") && (digitosTel.length === 12 || digitosTel.length === 13)) {
+            digitosTel = digitosTel.slice(2);
+          }
+          if (digitosTel.startsWith("0") && (digitosTel.length === 11 || digitosTel.length === 12)) {
+            digitosTel = digitosTel.slice(1);
+          }
 
           // 1. Busca na lista oficial de líderes (lideres)
           const lideres = loadLideres();
@@ -1345,7 +1351,9 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
           if (digitosTel.length >= 8) {
             for (const l of Object.values(lideres)) {
-              const lTel = String(l.telefone || "").replace(/\D/g, "");
+              let lTel = String(l.telefone || "").replace(/\D/g, "");
+              if (lTel.startsWith("55") && (lTel.length === 12 || lTel.length === 13)) lTel = lTel.slice(2);
+              if (lTel.startsWith("0") && (lTel.length === 11 || lTel.length === 12)) lTel = lTel.slice(1);
               if (lTel === digitosTel || lTel.endsWith(digitosTel.slice(-8)) || digitosTel.endsWith(lTel.slice(-8))) {
                 liderEncontrado = l;
                 break;
@@ -1354,10 +1362,10 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           }
 
           if (!liderEncontrado && nomeEntrada.length >= 3) {
-            const nNorm = nomeEntrada.toLowerCase().trim();
+            const nNorm = nomeEntrada.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
             for (const l of Object.values(lideres)) {
-              const lNome = String(l.nome || "").toLowerCase().trim();
-              if (lNome === nNorm || (nNorm.length >= 6 && lNome.includes(nNorm))) {
+              const lNome = String(l.nome || "").toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+              if (lNome === nNorm || (nNorm.length >= 5 && lNome.includes(nNorm)) || (lNome.length >= 5 && nNorm.includes(lNome))) {
                 liderEncontrado = l;
                 break;
               }
@@ -1438,21 +1446,26 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           }
 
           if (userExistente && userExistente.status === 'active' && userExistente.hash) {
-            // Se o usuário já concluiu o cadastro, só permite definir/atualizar customUsername se a senha digitada for a correta
+            // Se o usuário já concluiu o cadastro anteriormente, valida se o nome confere para permitir redefinir senha ou atualizar customUsername
+            let nomeConfere = false;
+            if (liderEncontrado && nomeEntrada.length >= 2) {
+              const nCad = (liderEncontrado.nome || "").toLowerCase().trim();
+              const nDig = nomeEntrada.toLowerCase().trim();
+              if (nCad.includes(nDig) || nDig.includes(nCad.split(/\s+/)[0])) {
+                nomeConfere = true;
+              }
+            }
             const senhaCorreta = await validatePassword(password, userExistente.salt, userExistente.hash);
-            if (!senhaCorreta || !customUsername) {
+            if (!senhaCorreta && !nomeConfere) {
               return sendJson(res, 400, {
                 ok: false,
-                message: "Este usuário já concluiu o cadastro anteriormente. Utilize a tela de login."
+                message: "Este usuário já concluiu o cadastro anteriormente. Utilize a tela de login ou a opção 'Esqueci minha senha'."
               });
             }
           }
 
           // 4. Conclusão do cadastro / primeiro acesso
-          const jaTemCredenciais = userExistente && userExistente.hash && (await validatePassword(password, userExistente.salt, userExistente.hash));
-          const { salt, hash } = jaTemCredenciais
-            ? { salt: userExistente.salt, hash: userExistente.hash }
-            : await hashPassword(password);
+          const { salt, hash } = await hashPassword(password);
 
           let role = 'lider';
           if (liderEncontrado) {

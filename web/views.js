@@ -592,34 +592,39 @@ function renderRegisterHtml(message = "", options = {}) {
       });
     }
 
-    const telInput = document.getElementById('regTelefone');
-    if (telInput) {
-      telInput.addEventListener('input', function(e) {
-        let v = e.target.value.replace(/\D/g, '');
+    function aplicarMascaraTelefoneSegura(input) {
+      if (!input) return;
+      function formatar(str) {
+        let v = String(str || '').replace(/\D/g, '');
         if (v.startsWith('55') && v.length > 11) v = v.substring(2);
+        if (v.startsWith('0') && v.length > 10) v = v.substring(1);
         if (v.length > 11) v = v.substring(0, 11);
         if (v.length > 10) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
+          return '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
         } else if (v.length > 6) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
+          return '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
         } else if (v.length > 2) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2);
+          return '(' + v.substring(0, 2) + ') ' + v.substring(2);
         } else if (v.length > 0) {
-          e.target.value = '(' + v;
-        } else {
-          e.target.value = '';
+          return '(' + v;
         }
+        return '';
+      }
+      input.addEventListener('input', function(e) {
+        if (e.isComposing) return;
+        if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') return;
+        const fmt = formatar(this.value);
+        if (this.value !== fmt) this.value = fmt;
       });
-      telInput.addEventListener('blur', function(e) {
-        let v = e.target.value.replace(/\D/g, '');
-        if (v.startsWith('55') && v.length > 11) v = v.substring(2);
-        if (v.length === 11) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
-        } else if (v.length === 10) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
-        }
+      input.addEventListener('blur', function() {
+        this.value = formatar(this.value);
+      });
+      input.addEventListener('paste', function() {
+        setTimeout(() => { this.value = formatar(this.value); }, 10);
       });
     }
+
+    aplicarMascaraTelefoneSegura(document.getElementById('regTelefone'));
 
     document.getElementById('regForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -635,11 +640,11 @@ function renderRegisterHtml(message = "", options = {}) {
 
       // Se informou telefone, limpa e define username para compatibilidade
       if (data.telefone) {
-        data.telefone = data.telefone.replace(/[^0-9]/g, '');
-        if (data.telefone.startsWith('55') && data.telefone.length > 11) {
-          data.telefone = data.telefone.substring(2);
-        }
-        data.username = data.telefone;
+        let t = data.telefone.replace(/[^0-9]/g, '');
+        if (t.startsWith('55') && t.length > 11) t = t.substring(2);
+        if (t.startsWith('0') && t.length > 10) t = t.substring(1);
+        data.telefone = t;
+        data.username = t;
       }
 
       if (data.customUsername) {
@@ -912,34 +917,39 @@ function renderRecuperarSenhaHtml(message = "", options = {}) {
       });
     }
 
-    const telInput = document.getElementById('recTelefone');
-    if (telInput) {
-      telInput.addEventListener('input', function(e) {
-        let v = e.target.value.replace(/\D/g, '');
+    function aplicarMascaraTelefoneSegura(input) {
+      if (!input) return;
+      function formatar(str) {
+        let v = String(str || '').replace(/\D/g, '');
         if (v.startsWith('55') && v.length > 11) v = v.substring(2);
+        if (v.startsWith('0') && v.length > 10) v = v.substring(1);
         if (v.length > 11) v = v.substring(0, 11);
         if (v.length > 10) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
+          return '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
         } else if (v.length > 6) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
+          return '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
         } else if (v.length > 2) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2);
+          return '(' + v.substring(0, 2) + ') ' + v.substring(2);
         } else if (v.length > 0) {
-          e.target.value = '(' + v;
-        } else {
-          e.target.value = '';
+          return '(' + v;
         }
+        return '';
+      }
+      input.addEventListener('input', function(e) {
+        if (e.isComposing) return;
+        if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') return;
+        const fmt = formatar(this.value);
+        if (this.value !== fmt) this.value = fmt;
       });
-      telInput.addEventListener('blur', function(e) {
-        let v = e.target.value.replace(/\D/g, '');
-        if (v.startsWith('55') && v.length > 11) v = v.substring(2);
-        if (v.length === 11) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 7) + '-' + v.substring(7);
-        } else if (v.length === 10) {
-          e.target.value = '(' + v.substring(0, 2) + ') ' + v.substring(2, 6) + '-' + v.substring(6);
-        }
+      input.addEventListener('blur', function() {
+        this.value = formatar(this.value);
+      });
+      input.addEventListener('paste', function() {
+        setTimeout(() => { this.value = formatar(this.value); }, 10);
       });
     }
+
+    aplicarMascaraTelefoneSegura(document.getElementById('recTelefone'));
 
     document.getElementById('recForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -954,10 +964,10 @@ function renderRecuperarSenhaHtml(message = "", options = {}) {
       }
 
       if (data.telefone) {
-        data.telefone = data.telefone.replace(/[^0-9]/g, '');
-        if (data.telefone.startsWith('55') && data.telefone.length > 11) {
-          data.telefone = data.telefone.substring(2);
-        }
+        let t = data.telefone.replace(/[^0-9]/g, '');
+        if (t.startsWith('55') && t.length > 11) t = t.substring(2);
+        if (t.startsWith('0') && t.length > 10) t = t.substring(1);
+        data.telefone = t;
       }
 
       const res = await fetch('${apiRecuperarUrl}', {

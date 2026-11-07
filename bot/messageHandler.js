@@ -965,9 +965,20 @@ async function processarFluxoConsultaFichasEventos({
   }
 }
 
+const BANNER_PORTAL_GESTAO =
+  "🌐 *PORTAL OFICIAL DE GESTÃO E AGENDAMENTOS*\n" +
+  "👉 https://comunidadecristacurados.com.br/gestao\n\n" +
+  "💡 *Primeiro acesso ao site?* É simples:\n" +
+  "• Acesse o link acima e clique em *Primeiro Acesso de Líder*\n" +
+  "• Informe seu WhatsApp e nome cadastrados para definir sua senha!\n" +
+  "• No portal você vê o calendário visual, salão livre e solicitações com poucos cliques.\n\n" +
+  "───────────────\n" +
+  "💬 _Você também pode continuar seu atendimento normalmente por aqui pelo WhatsApp:_";
+
 function montarMenuLider() {
   return (
     "👑 *Área do Líder*\n\n" +
+    BANNER_PORTAL_GESTAO + "\n\n" +
     "Escolha um subgrupo:\n\n" +
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
     "2️⃣ 📢 *Comunicação e Mídia*\n" +
@@ -978,9 +989,9 @@ function montarMenuLider() {
 
 function montarSubmenuLiderAgenda() {
   return (
-    "📅 *Agenda e Eventos*\n\n" +
+    "📅 *Agenda, Eventos e Reuniões*\n\n" +
     "Escolha o que deseja fazer:\n\n" +
-    "1️⃣ 🎪 *Gestão de Eventos* (Agendar, alterar datas/sessões, cancelar, formulário e montagem)\n" +
+    "1️⃣ 🎪 *Eventos da Igreja* (Agendar, alterar datas/sessões, cancelar, formulário e montagem)\n" +
     "2️⃣ 🤝 *Reuniões de Liderança* (Agendar, alterar ou desmarcar reunião)\n" +
     "3️⃣ 🔍 *Consultar Disponibilidade* (Ver dias e horários livres do salão)\n" +
     "4️⃣ 📋 *Inscrições & Fichas* (Ver inscritos, lista em PDF e formulários preenchidos)\n\n" +
@@ -1004,6 +1015,7 @@ function montarMenuPastoral() {
   return (
     "⛪ *Área Pastoral*\n" +
     "Graça e Paz, Pastor(a)!\n\n" +
+    BANNER_PORTAL_GESTAO + "\n\n" +
     "Escolha um subgrupo:\n\n" +
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
     "2️⃣ 🤝 *Atendimento Pastoral*\n" +
@@ -1054,6 +1066,7 @@ function montarSubmenuPastoralComunicacao() {
 function montarMenuDiretor() {
   return (
     "📋 *Área da Direção*\n\n" +
+    BANNER_PORTAL_GESTAO + "\n\n" +
     "Escolha um subgrupo:\n\n" +
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
     "2️⃣ 📢 *Comunicação e Mídia*\n" +

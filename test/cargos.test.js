@@ -7,6 +7,7 @@ const os = require("os");
 const path = require("path");
 const fs = require("fs");
 
+process.env.NODE_ENV = "test";
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-cargos-test-"));
 process.env.DB_PATH = path.join(tmpDir, "dados.db");
 process.env.COMBINED_LOG_PATH = path.join(tmpDir, "combined.log");
@@ -240,6 +241,7 @@ function criarBotHarness(usuariosCadastrados = [], { calendarEvents = [], agenda
     etapas,
     buscarEventos: async () => calendarEvents,
     listLideres: () => usuariosCadastrados,
+    tempoEsperaSaudacaoMs: 0,
   });
 
   async function enviarMsg(numero, texto) {
