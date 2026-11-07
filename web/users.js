@@ -88,7 +88,7 @@ function saveUser(user) {
     );
 
     try {
-      db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+      db.exec("PRAGMA wal_checkpoint(PASSIVE);");
     } catch (_) {}
   } catch (err) {
     console.error("[ALERTA:persistencia] Erro ao gravar usuário:", err);
@@ -111,7 +111,7 @@ function deleteUser(username) {
     db.prepare("DELETE FROM users WHERE username = ? OR telefone = ?").run(existing.telefone, existing.telefone);
   }
   try {
-    db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+    db.exec("PRAGMA wal_checkpoint(PASSIVE);");
   } catch (_) {}
   console.log(`[Users] Usuário '${existing.username}' (tel: ${existing.telefone || '-'}) removido.`);
   return { ok: true, message: "Usuário excluído com sucesso." };
