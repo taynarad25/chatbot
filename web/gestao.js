@@ -1,7 +1,7 @@
 const db = require("../db");
 const moment = require("moment-timezone");
 const path = require("path");
-const { salvarPendente, buscarPendente, removerPendente } = require("../bot/pendentesAprovacao");
+const { salvarPendente, buscarPendente, removerPendente, atualizarPendente } = require("../bot/pendentesAprovacao");
 const {
   salvarFormularioEvento,
   obterFormularioEvento,
@@ -1545,15 +1545,92 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     return true;
   }
 
-  // 4. ALTERAR EVENTO
+  // 4. ALTERAR EVENTO / SOLICITAÇÃO
   if (tipoAcao === 'alterar') {
-    const { nome_evento, campo_alterar, novo_valor, motivo } = corpo;
+    const { nome_evento, campo_alterar, novo_valor, motivo, codigo: codigoParam } = corpo;
     if (!nome_evento || !campo_alterar || !novo_valor) {
       throw new Error('Informe o evento, o campo que deseja alterar e a nova informação.');
     }
 
     verificarPermissaoGerenciarEvento(nome_evento);
 
+    // Verificar se é uma solicitação pendente existente
+    let pendenteExistente = null;
+    let codigoPendente = codigoParam ? String(codigoParam).trim().toUpperCase() : null;
+    if (codigoPendente) {
+      const p = buscarPendente(codigoPendente);
+      if (p) pendenteExistente = { codigo: codigoPendente, ...p };
+    }
+    if (!pendenteExistente && nome_evento) {
+      const nomeEvNorm = nome_evento.trim().toLowerCase();
+      const rows = db.prepare("SELECT codigo, dados, criadoEm FROM pendentes ORDER BY rowid DESC").all();
+      for (const r of rows) {
+        try {
+          const d = JSON.parse(r.dados);
+          const n = (d.nomeEvento || d.evento || d.nome || '').trim().toLowerCase();
+          if (n === nomeEvNorm && d.tipo !== 'cancelar' && d.tipo !== 'alterar') {
+            pendenteExistente = { codigo: r.codigo, ...d, criadoEm: r.criadoEm };
+            codigoPendente = r.codigo;
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (pendenteExistente) {
+      // Atualiza os dados da solicitação pendente diretamente na fila
+      const campoNorm = String(campo_alterar || '').toLowerCase().trim();
+      if (campoNorm.includes('data')) {
+        pendenteExistente.dataFormatada = novo_valor.trim();
+        const partes = novo_valor.trim().split('/');
+        if (partes.length === 3) {
+          pendenteExistente.dia = parseInt(partes[0], 10);
+          pendenteExistente.mes = parseInt(partes[1], 10);
+          pendenteExistente.ano = parseInt(partes[2], 10);
+        }
+      } else if (campoNorm.includes('horár') || campoNorm.includes('horar')) {
+        const partesHora = novo_valor.split(/às|-|a/i).map(s => s.trim());
+        if (partesHora.length >= 2) {
+          pendenteExistente.horarioInicio = partesHora[0];
+          pendenteExistente.horarioFim = partesHora[1];
+        } else {
+          pendenteExistente.horarioInicio = novo_valor.trim();
+        }
+      } else if (campoNorm.includes('local')) {
+        pendenteExistente.local = novo_valor.trim();
+      } else {
+        pendenteExistente.observacoes = (pendenteExistente.observacoes ? pendenteExistente.observacoes + '\n' : '') + `Alteração (${campo_alterar}): ${novo_valor}`;
+      }
+      pendenteExistente.motivoAlteracao = motivo?.trim() || '';
+      pendenteExistente.atualizadoEm = new Date().toISOString();
+
+      atualizarPendente(codigoPendente, pendenteExistente);
+
+      const avisoGrupo =
+        `🔄 *SOLICITAÇÃO ATUALIZADA PELO LÍDER*\n\n` +
+        `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
+        `📅 *Evento:* ${nome_evento.trim()}\n` +
+        `🔧 *Campo Alterado:* ${campo_alterar}\n` +
+        `✨ *Novo Valor:* ${novo_valor}\n` +
+        `📝 *Motivo:* ${motivo?.trim() || 'Ajuste de cronograma'}\n\n` +
+        `_A solicitação na fila (Código: ${codigoPendente}) foi atualizada diretamente pelo líder._`;
+
+      try {
+        const client = typeof getClient === 'function' ? getClient() : null;
+        if (client && client.info) {
+          await notificarSecretaria(client, avisoGrupo);
+        }
+      } catch (_) {}
+
+      return {
+        ok: true,
+        codigo: codigoPendente,
+        message: `Solicitação atualizada com sucesso (Código: ${codigoPendente})!`,
+        mensagem: `Solicitação atualizada com sucesso (Código: ${codigoPendente})!`
+      };
+    }
+
+    // Se o evento já está confirmado na agenda oficial, cria pedido formal de alteração
     const dadosAlteracao = {
       tipo: 'alterar',
       evento: nome_evento.trim(),
@@ -1593,15 +1670,70 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     };
   }
 
-  // 5. CANCELAR EVENTO
+  // 5. CANCELAR EVENTO / SOLICITAÇÃO
   if (tipoAcao === 'cancelar') {
-    const { nome_evento, motivo } = corpo;
+    const { nome_evento, motivo, codigo: codigoParam } = corpo;
     if (!nome_evento || !motivo) {
       throw new Error('Informe o nome do evento e o motivo do cancelamento.');
     }
 
     verificarPermissaoGerenciarEvento(nome_evento);
 
+    // Verificar se é uma solicitação pendente existente
+    let pendenteExistente = null;
+    let codigoPendente = codigoParam ? String(codigoParam).trim().toUpperCase() : null;
+    if (codigoPendente) {
+      const p = buscarPendente(codigoPendente);
+      if (p) pendenteExistente = { codigo: codigoPendente, ...p };
+    }
+    if (!pendenteExistente && nome_evento) {
+      const nomeEvNorm = nome_evento.trim().toLowerCase();
+      const rows = db.prepare("SELECT codigo, dados, criadoEm FROM pendentes ORDER BY rowid DESC").all();
+      for (const r of rows) {
+        try {
+          const d = JSON.parse(r.dados);
+          const n = (d.nomeEvento || d.evento || d.nome || '').trim().toLowerCase();
+          if (n === nomeEvNorm && d.tipo !== 'cancelar') {
+            pendenteExistente = { codigo: r.codigo, ...d, criadoEm: r.criadoEm };
+            codigoPendente = r.codigo;
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (pendenteExistente) {
+      // Remove da fila de pendentes
+      removerPendente(codigoPendente);
+
+      // Limpa formulário rascunho se existir
+      try {
+        db.prepare("DELETE FROM formularios_eventos WHERE LOWER(TRIM(evento)) = LOWER(TRIM(?))").run(nome_evento.trim());
+      } catch (_) {}
+
+      const avisoGrupo =
+        `🗑️ *SOLICITAÇÃO PENDENTE CANCELADA PELO LÍDER*\n\n` +
+        `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
+        `📅 *Evento:* ${nome_evento.trim()}\n` +
+        `⚠️ *Motivo:* ${motivo.trim()}\n\n` +
+        `_A solicitação pendente (Código: ${codigoPendente}) foi cancelada pelo líder e retirada da fila de aprovação._`;
+
+      try {
+        const client = typeof getClient === 'function' ? getClient() : null;
+        if (client && client.info) {
+          await notificarSecretaria(client, avisoGrupo);
+        }
+      } catch (_) {}
+
+      return {
+        ok: true,
+        codigo: codigoPendente,
+        message: 'Solicitação cancelada e removida com sucesso!',
+        mensagem: 'Solicitação cancelada e removida com sucesso!'
+      };
+    }
+
+    // Se o evento já está confirmado na agenda oficial, cria pedido formal de cancelamento
     const dadosCancelamento = {
       tipo: 'cancelar',
       evento: nome_evento.trim(),
@@ -3799,6 +3931,7 @@ function renderGestaoHtml({ user }) {
         <div class="evento-detalhes-box" id="boxDetalhesEventoGerenciar">
           <h4 id="det_titulo">Nome do Evento</h4>
           <p id="det_meta">Data • Horário • Local</p>
+          <div id="det_status_wrapper" style="margin-top: 6px;"></div>
         </div>
 
         <div class="alert-banner info" id="avisoOcupacaoExterna" style="display: none;">
@@ -3810,8 +3943,8 @@ function renderGestaoHtml({ user }) {
           <button class="btn-acao-evento" onclick="exibirSubtelaGerenciar('alterar')">
             <span>🔄</span>
             <div>
-              <strong>Alterar Evento</strong>
-              <div style="font-size: 0.72rem; color: var(--cor-subtexto);">Mudar data, horário, local ou informações</div>
+              <strong id="labelBtnAlterar">Alterar Evento</strong>
+              <div id="subBtnAlterar" style="font-size: 0.72rem; color: var(--cor-subtexto);">Mudar data, horário, local ou informações</div>
             </div>
           </button>
 
@@ -3826,8 +3959,8 @@ function renderGestaoHtml({ user }) {
           <button class="btn-acao-evento cancelar" onclick="exibirSubtelaGerenciar('cancelar')">
             <span>🗑️</span>
             <div>
-              <strong>Cancelar / Excluir Evento</strong>
-              <div style="font-size: 0.72rem; color: var(--cor-subtexto);">Enviar pedido formal de cancelamento para a Secretaria</div>
+              <strong id="labelBtnCancelar">Cancelar / Excluir Evento</strong>
+              <div id="subBtnCancelar" style="font-size: 0.72rem; color: var(--cor-subtexto);">Enviar pedido formal de cancelamento para a Secretaria</div>
             </div>
           </button>
         </div>
@@ -3837,7 +3970,7 @@ function renderGestaoHtml({ user }) {
           <button type="button" class="btn-voltar-tipo" onclick="voltarMenuGerenciar()">← Voltar às opções</button>
           
           <form onsubmit="submeterAlterarEventoSelecionado(event)">
-            <div class="alert-banner warning">
+            <div class="alert-banner warning" id="bannerAvisoAlterar">
               🔄 A alteração será enviada à Secretaria para aprovação no WhatsApp.
             </div>
 
@@ -3864,7 +3997,7 @@ function renderGestaoHtml({ user }) {
 
             <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
               <button type="button" class="btn-secundario" onclick="voltarMenuGerenciar()">Voltar</button>
-              <button type="submit" class="btn-principal">Enviar Alteração</button>
+              <button type="submit" class="btn-principal" id="btnSalvarAlteracao">Enviar Alteração</button>
             </div>
           </form>
         </div>
@@ -4103,7 +4236,7 @@ function renderGestaoHtml({ user }) {
           <button type="button" class="btn-voltar-tipo" onclick="voltarMenuGerenciar()">← Voltar às opções</button>
           
           <form onsubmit="submeterCancelarEventoSelecionado(event)">
-            <div class="alert-banner warning">
+            <div class="alert-banner warning" id="bannerAvisoCancelar">
               ⚠️ O cancelamento será comunicado à Secretaria e o evento retirado da agenda oficial.
             </div>
 
@@ -4114,7 +4247,7 @@ function renderGestaoHtml({ user }) {
 
             <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
               <button type="button" class="btn-secundario" onclick="voltarMenuGerenciar()">Voltar</button>
-              <button type="submit" class="btn-principal" style="background: var(--cor-vermelho);">
+              <button type="submit" class="btn-principal" id="btnConfirmarCancelar" style="background: var(--cor-vermelho);">
                 Confirmar Cancelamento
               </button>
             </div>
@@ -4444,7 +4577,7 @@ function renderGestaoHtml({ user }) {
               <span>📍 \${ev.local}</span>
               \${ev.status === 'pendente_secretaria' ? '<span style="color: var(--cor-amarelo); font-weight:800;">⏳ Aguardando Aprovação</span>' : '<span style="color: var(--cor-verde); font-weight:800;">✅ Confirmado</span>'}
             </div>
-            <span class="action-hint">Toque para alterar, ver formulário ou cancelar ›</span>
+            <span class="action-hint">\${ev.status === 'pendente_secretaria' ? 'Toque para alterar ou cancelar solicitação ›' : 'Toque para alterar, ver formulário ou cancelar ›'}</span>
           </div>
         \`).join('');
       }
@@ -4575,6 +4708,50 @@ function renderGestaoHtml({ user }) {
 
       voltarMenuGerenciar();
 
+      const ehPendente = ev.status === 'pendente_secretaria' || 
+                         ev.status === 'pendente' || 
+                         ev.origem === 'pendente' || 
+                         (ev.status && String(ev.status).toLowerCase().includes('aguardando'));
+
+      const tituloModal = document.getElementById('gerenciarEventoTitulo');
+      const labelAlterar = document.getElementById('labelBtnAlterar');
+      const subAlterar = document.getElementById('subBtnAlterar');
+      const btnFormulario = document.getElementById('btnAcaoFormulario');
+      const labelCancelar = document.getElementById('labelBtnCancelar');
+      const subCancelar = document.getElementById('subBtnCancelar');
+      const bannerAlt = document.getElementById('bannerAvisoAlterar');
+      const bannerCanc = document.getElementById('bannerAvisoCancelar');
+      const btnConfCanc = document.getElementById('btnConfirmarCancelar');
+      const statusWrapper = document.getElementById('det_status_wrapper');
+
+      if (ehPendente) {
+        if (tituloModal) tituloModal.innerText = '⚙️ Gerenciar Solicitação';
+        if (labelAlterar) labelAlterar.innerText = 'Alterar Solicitação';
+        if (subAlterar) subAlterar.innerText = 'Mudar data, horário, local ou informações da solicitação';
+        if (btnFormulario) btnFormulario.style.display = 'none';
+        if (labelCancelar) labelCancelar.innerText = 'Cancelar Solicitação';
+        if (subCancelar) subCancelar.innerText = 'Cancelar esta solicitação pendente';
+        if (bannerAlt) bannerAlt.innerHTML = '🔄 A alteração será enviada à Secretaria para atualizar a sua solicitação.';
+        if (bannerCanc) bannerCanc.innerHTML = '⚠️ A solicitação pendente será cancelada e retirada da fila da Secretaria.';
+        if (btnConfCanc) btnConfCanc.innerText = 'Confirmar Cancelamento da Solicitação';
+        if (statusWrapper) {
+          statusWrapper.innerHTML = '<span style="display:inline-block; font-size:0.75rem; font-weight:700; background:#fef3c7; color:#d97706; padding:3px 10px; border-radius:12px; border:1px solid #fde68a;">⏳ Aguardando Aprovação da Secretaria</span>';
+        }
+      } else {
+        if (tituloModal) tituloModal.innerText = '⚙️ Gerenciar Evento';
+        if (labelAlterar) labelAlterar.innerText = 'Alterar Evento';
+        if (subAlterar) subAlterar.innerText = 'Mudar data, horário, local ou informações';
+        if (btnFormulario) btnFormulario.style.display = 'flex';
+        if (labelCancelar) labelCancelar.innerText = 'Cancelar / Excluir Evento';
+        if (subCancelar) subCancelar.innerText = 'Enviar pedido formal de cancelamento para a Secretaria';
+        if (bannerAlt) bannerAlt.innerHTML = '🔄 A alteração será enviada à Secretaria para aprovação no WhatsApp.';
+        if (bannerCanc) bannerCanc.innerHTML = '⚠️ O cancelamento será comunicado à Secretaria e o evento retirado da agenda oficial.';
+        if (btnConfCanc) btnConfCanc.innerText = 'Confirmar Cancelamento do Evento';
+        if (statusWrapper) {
+          statusWrapper.innerHTML = '<span style="display:inline-block; font-size:0.75rem; font-weight:700; background:#dcfce7; color:#16a34a; padding:3px 10px; border-radius:12px; border:1px solid #bbf7d0;">✅ Evento Confirmado na Agenda</span>';
+        }
+      }
+
       if (ev.isOcupacaoExterna) {
         const aviso = document.getElementById('avisoOcupacaoExterna');
         if (aviso) aviso.style.display = 'flex';
@@ -4603,12 +4780,15 @@ function renderGestaoHtml({ user }) {
         const sol = todasSolicitacoes.find(s => s.id === idOuCodigo || s.codigo === idOuCodigo);
         if (sol) {
           ev = {
+            id: sol.id || sol.codigo,
+            codigo: sol.codigo,
             titulo: sol.titulo,
             data: sol.data,
             horarioInicio: sol.horarioInicio,
             horarioFim: sol.horarioFim,
             local: sol.local || ENDERECO_IGREJA,
             departamento: sol.departamento,
+            status: sol.statusClass === 'pendente' || String(sol.status).toLowerCase().includes('aguardando') ? 'pendente_secretaria' : 'confirmado',
             payload: sol.payload
           };
         }
@@ -4678,10 +4858,19 @@ function renderGestaoHtml({ user }) {
       }
     }
 
+    function ehEventoPendente(ev) {
+      if (!ev) return false;
+      return ev.status === 'pendente_secretaria' || 
+             ev.status === 'pendente' || 
+             ev.origem === 'pendente' || 
+             (ev.status && String(ev.status).toLowerCase().includes('aguardando'));
+    }
+
     function voltarMenuGerenciar() {
       const podeEditar = verificarPodeEditarEventoAtual(eventoSendoGerenciado);
       const aviso = document.getElementById('avisoOcupacaoExterna');
       const menu = document.getElementById('acoesEventoMenu');
+      const ehPendente = ehEventoPendente(eventoSendoGerenciado);
 
       if (!podeEditar) {
         if (aviso) {
@@ -4698,12 +4887,49 @@ function renderGestaoHtml({ user }) {
       document.getElementById('subtelaAlterar').style.display = 'none';
       document.getElementById('subtelaFormulario').style.display = 'none';
       document.getElementById('subtelaCancelar').style.display = 'none';
-      document.getElementById('gerenciarEventoTitulo').innerText = '⚙️ Gerenciar Evento';
-      if (eventoSendoGerenciado) {
-        const btnF = document.getElementById('btnAcaoFormulario');
-        if (btnF) {
-          const ehEv = (eventoSendoGerenciado.tipo === 'evento' || !eventoSendoGerenciado.tipo) && podeEditar;
-          btnF.style.display = ehEv ? 'flex' : 'none';
+
+      const tituloModal = document.getElementById('gerenciarEventoTitulo');
+      const labelAlterar = document.getElementById('labelBtnAlterar');
+      const subAlterar = document.getElementById('subBtnAlterar');
+      const btnFormulario = document.getElementById('btnAcaoFormulario');
+      const labelCancelar = document.getElementById('labelBtnCancelar');
+      const subCancelar = document.getElementById('subBtnCancelar');
+      const bannerAlt = document.getElementById('bannerAvisoAlterar');
+      const bannerCanc = document.getElementById('bannerAvisoCancelar');
+      const btnSalvarAlt = document.getElementById('btnSalvarAlteracao');
+      const btnConfCanc = document.getElementById('btnConfirmarCancelar');
+      const statusWrapper = document.getElementById('det_status_wrapper');
+
+      if (ehPendente) {
+        if (tituloModal) tituloModal.innerText = '⚙️ Gerenciar Solicitação';
+        if (labelAlterar) labelAlterar.innerText = 'Alterar Solicitação';
+        if (subAlterar) subAlterar.innerText = 'Mudar data, horário, local ou informações da solicitação';
+        if (btnFormulario) btnFormulario.style.display = 'none';
+        if (labelCancelar) labelCancelar.innerText = 'Cancelar Solicitação';
+        if (subCancelar) subCancelar.innerText = 'Cancelar esta solicitação pendente';
+        if (bannerAlt) bannerAlt.innerHTML = '🔄 A alteração atualizará os dados da solicitação na fila da Secretaria.';
+        if (bannerCanc) bannerCanc.innerHTML = '⚠️ A solicitação pendente será cancelada e retirada da fila da Secretaria.';
+        if (btnSalvarAlt) btnSalvarAlt.innerText = 'Salvar Alteração da Solicitação';
+        if (btnConfCanc) btnConfCanc.innerText = 'Confirmar Cancelamento da Solicitação';
+        if (statusWrapper) {
+          statusWrapper.innerHTML = '<span style="display:inline-block; font-size:0.75rem; font-weight:700; background:#fef3c7; color:#d97706; padding:3px 10px; border-radius:12px; border:1px solid #fde68a;">⏳ Aguardando Aprovação da Secretaria</span>';
+        }
+      } else {
+        if (tituloModal) tituloModal.innerText = '⚙️ Gerenciar Evento';
+        if (labelAlterar) labelAlterar.innerText = 'Alterar Evento';
+        if (subAlterar) subAlterar.innerText = 'Mudar data, horário, local ou informações';
+        if (btnFormulario) {
+          const ehEv = (eventoSendoGerenciado && (eventoSendoGerenciado.tipo === 'evento' || !eventoSendoGerenciado.tipo)) && podeEditar;
+          btnFormulario.style.display = ehEv ? 'flex' : 'none';
+        }
+        if (labelCancelar) labelCancelar.innerText = 'Cancelar / Excluir Evento';
+        if (subCancelar) subCancelar.innerText = 'Enviar pedido formal de cancelamento para a Secretaria';
+        if (bannerAlt) bannerAlt.innerHTML = '🔄 A alteração será enviada à Secretaria para aprovação no WhatsApp.';
+        if (bannerCanc) bannerCanc.innerHTML = '⚠️ O cancelamento será comunicado à Secretaria e o evento retirado da agenda oficial.';
+        if (btnSalvarAlt) btnSalvarAlt.innerText = 'Enviar Pedido de Alteração';
+        if (btnConfCanc) btnConfCanc.innerText = 'Confirmar Cancelamento do Evento';
+        if (statusWrapper) {
+          statusWrapper.innerHTML = '<span style="display:inline-block; font-size:0.75rem; font-weight:700; background:#dcfce7; color:#16a34a; padding:3px 10px; border-radius:12px; border:1px solid #bbf7d0;">✅ Evento Confirmado na Agenda</span>';
         }
       }
     }
@@ -4714,9 +4940,10 @@ function renderGestaoHtml({ user }) {
       document.getElementById('subtelaFormulario').style.display = tipo === 'formulario' ? 'block' : 'none';
       document.getElementById('subtelaCancelar').style.display = tipo === 'cancelar' ? 'block' : 'none';
 
-      if (tipo === 'alterar') document.getElementById('gerenciarEventoTitulo').innerText = '🔄 Alterar Informações do Evento';
+      const ehPendente = ehEventoPendente(eventoSendoGerenciado);
+      if (tipo === 'alterar') document.getElementById('gerenciarEventoTitulo').innerText = ehPendente ? '🔄 Alterar Solicitação' : '🔄 Alterar Informações do Evento';
       if (tipo === 'formulario') document.getElementById('gerenciarEventoTitulo').innerText = '📝 Ficha & Formulário do Evento';
-      if (tipo === 'cancelar') document.getElementById('gerenciarEventoTitulo').innerText = '🗑️ Cancelar Evento';
+      if (tipo === 'cancelar') document.getElementById('gerenciarEventoTitulo').innerText = ehPendente ? '🗑️ Cancelar Solicitação' : '🗑️ Cancelar Evento';
     }
 
     async function submeterAlterarEventoSelecionado(e) {
@@ -4730,6 +4957,8 @@ function renderGestaoHtml({ user }) {
       const payload = {
         tipo: 'alterar',
         nome_evento: eventoSendoGerenciado.titulo,
+        codigo: eventoSendoGerenciado.codigo || eventoSendoGerenciado.id,
+        origem_status: eventoSendoGerenciado.status,
         campo_alterar: document.getElementById('ger_alt_campo').value,
         novo_valor: document.getElementById('ger_alt_novo_valor').value,
         motivo: document.getElementById('ger_alt_motivo').value
@@ -4743,9 +4972,10 @@ function renderGestaoHtml({ user }) {
         });
         const ret = await res.json();
         if (ret.ok) {
-          alert('✅ ' + (ret.mensagem || 'Solicitação de alteração enviada!'));
+          alert('✅ ' + (ret.mensagem || ret.message || 'Solicitação atualizada!'));
           fecharModalGerenciarEvento();
           carregarSolicitacoesServidor();
+          carregarEventosDoMes();
         } else {
           alert('❌ Erro: ' + ret.message);
         }
@@ -4822,6 +5052,8 @@ function renderGestaoHtml({ user }) {
       const payload = {
         tipo: 'cancelar',
         nome_evento: eventoSendoGerenciado.titulo,
+        codigo: eventoSendoGerenciado.codigo || eventoSendoGerenciado.id,
+        origem_status: eventoSendoGerenciado.status,
         motivo: document.getElementById('ger_canc_motivo').value
       };
 
@@ -4833,9 +5065,10 @@ function renderGestaoHtml({ user }) {
         });
         const ret = await res.json();
         if (ret.ok) {
-          alert('✅ Solicitação de cancelamento enviada à Secretaria!');
+          alert('✅ ' + (ret.mensagem || ret.message || 'Solicitação cancelada!'));
           fecharModalGerenciarEvento();
           carregarSolicitacoesServidor();
+          carregarEventosDoMes();
         } else {
           alert('❌ Erro: ' + ret.message);
         }

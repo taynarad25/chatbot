@@ -1129,6 +1129,85 @@ test("Integridade de Sintaxe Client-Side: renderGestaoHtml produz script inline 
   }, "O script JavaScript inline do painel de gestão não pode conter SyntaxError");
 });
 
+test("Gestão de Solicitações Pendentes na UI: apenas opções de alterar e cancelar solicitação, sem formulário para pendentes", () => {
+  const sessionAdmin = {
+    username: "gabriela",
+    role: "admin",
+    nome: "Gabriela Diniz",
+    telefone: "5511942685501"
+  };
+
+  const html = gestao.renderGestaoHtml({ user: sessionAdmin });
+  assert.ok(html.includes("id=\"btnAcaoFormulario\""), "Deve existir o botão de ação do formulário");
+  assert.ok(html.includes("id=\"labelBtnAlterar\""), "Deve existir label para alterar");
+  assert.ok(html.includes("id=\"labelBtnCancelar\""), "Deve existir label para cancelar");
+  assert.ok(html.includes("Alterar Solicitação"), "Script deve conter texto Alterar Solicitação");
+  assert.ok(html.includes("Cancelar Solicitação"), "Script deve conter texto Cancelar Solicitação");
+  assert.ok(html.includes("btnFormulario.style.display = 'none'"), "Formulário deve ser escondido para solicitações pendentes");
+  assert.ok(html.includes("Toque para alterar ou cancelar solicitação"), "Card do calendário deve indicar opções corretas para pendente");
+});
+
+test("Ciclo de Vida de Solicitação Pendente: líder consegue alterar e cancelar solicitação antes da aprovação", async () => {
+  const sessionLider = {
+    username: "lider_teste_pend",
+    role: "lider",
+    nome: "Líder Teste Pendente",
+    telefone: "5511988881234",
+    departamentos: ["Geral"]
+  };
+
+  // 1. Cria solicitação pendente
+  const resCriar = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "evento",
+    nome_evento: "Vigília Teste Pendente",
+    departamento: "Geral",
+    data: "27/11/2026",
+    horario_inicio: "22:00",
+    horario_termino: "02:00",
+    local: "Templo Principal",
+    publico_alvo: "Todos",
+    estimativa_pessoas: "50"
+  }, sessionLider);
+
+  assert.ok(resCriar.ok, "Solicitação inicial deve ser criada");
+  const codigo = resCriar.codigo;
+  assert.ok(codigo, "Deve ter gerado um código");
+
+  // 2. Altera a solicitação pendente
+  const resAlterar = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "alterar",
+    codigo,
+    nome_evento: "Vigília Teste Pendente",
+    campo_alterar: "Data",
+    novo_valor: "28/11/2026",
+    motivo: "Mudança de dia necessária"
+  }, sessionLider);
+
+  assert.ok(resAlterar.ok, "Deve permitir alterar solicitação pendente");
+  assert.match(resAlterar.message, /atualizada com sucesso/i);
+
+  // Confere se os dados no banco foram atualizados
+  const pendenteAtualizado = db.prepare("SELECT dados FROM pendentes WHERE codigo = ?").get(codigo);
+  assert.ok(pendenteAtualizado, "Registro pendente deve continuar existindo");
+  const dados = JSON.parse(pendenteAtualizado.dados);
+  assert.equal(dados.dataFormatada, "28/11/2026", "A data deve ter sido atualizada para 28/11/2026");
+
+  // 3. Cancela a solicitação pendente
+  const resCancelar = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "cancelar",
+    codigo,
+    nome_evento: "Vigília Teste Pendente",
+    motivo: "Cancelado pelo líder antes da aprovação"
+  }, sessionLider);
+
+  assert.ok(resCancelar.ok, "Deve permitir cancelar solicitação pendente");
+  assert.match(resCancelar.message, /cancelada e removida/i);
+
+  // Confere se foi removido da tabela pendentes
+  const pendenteRemovido = db.prepare("SELECT 1 FROM pendentes WHERE codigo = ?").get(codigo);
+  assert.ok(!pendenteRemovido, "Registro pendente deve ter sido removido do banco");
+});
+
 
 
 
