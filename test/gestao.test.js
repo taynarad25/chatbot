@@ -1011,6 +1011,105 @@ test("Culto Temático: Pastores e Diretores podem solicitar sem necessidade de f
   );
 });
 
+test("Bloqueio de Horário Noturno/Vigília: evento que cruza meia-noite (ex: 22h às 01h) bloqueia novo evento às 22h com buffer de 1h30", () => {
+  const eventosExistentes = [
+    {
+      titulo: "Sala de Oração",
+      data: "28/11/2026",
+      horarioInicio: "22:00",
+      horarioFim: "01:00",
+      status: "confirmado"
+    }
+  ];
+
+  // 1. Tentar marcar evento às 22:00 no mesmo dia deve ser BLOQUEADO!
+  const conf1 = gestao.verificarConflitoHorarioEvento({
+    data: "28/11/2026",
+    horarioInicio: "22:00",
+    horarioTermino: "23:30",
+    tipo: "evento",
+    eventosExistentes
+  });
+  assert.equal(conf1.bloquear, true);
+  assert.equal(conf1.conflito, true);
+  assert.match(conf1.mensagem, /Já existe o evento "Sala de Oração"/);
+  assert.match(conf1.mensagem, /intervalo mínimo de 1h30/);
+  assert.equal(conf1.horaLivreAntes, "20:30");
+
+  // 2. Tentar marcar evento às 21:00 (menos de 1h30 antes de 22:00) deve ser BLOQUEADO!
+  const conf2 = gestao.verificarConflitoHorarioEvento({
+    data: "28/11/2026",
+    horarioInicio: "19:30",
+    horarioTermino: "21:00",
+    tipo: "evento",
+    eventosExistentes
+  });
+  assert.equal(conf2.bloquear, true);
+
+  // 3. Evento que termina às 20:30 (exatamente 1h30 antes) é PERMITIDO!
+  const conf3 = gestao.verificarConflitoHorarioEvento({
+    data: "28/11/2026",
+    horarioInicio: "18:30",
+    horarioTermino: "20:30",
+    tipo: "evento",
+    eventosExistentes
+  });
+  assert.equal(conf3.bloquear, false);
+});
+
+test("Deduplicação: evento pendente não aparece duplicado no calendário e solicitações com nome 'Teste' aparecem corretamente", async () => {
+  const sessionAdmin = {
+    username: "gabriela",
+    role: "admin",
+    nome: "Gabriela Diniz",
+    telefone: "5511942685501"
+  };
+
+  // 1. Cria uma solicitação com nome "Teste"
+  const res1 = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "evento",
+    nome_evento: "Teste Automatizado Deduplicação",
+    departamento: "Geral",
+    tipo_duracao: "unico",
+    data: "25/11/2026",
+    horario_inicio: "14:00",
+    horario_termino: "16:00",
+    local: "Salão Principal"
+  }, sessionAdmin);
+
+  assert.equal(res1.ok, true);
+  const cod1 = res1.codigo;
+
+  // 2. Testa idempotência (re-envio rápido de requisição idêntica não cria outro registro)
+  const resDuplicado = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "evento",
+    nome_evento: "Teste Automatizado Deduplicação",
+    departamento: "Geral",
+    tipo_duracao: "unico",
+    data: "25/11/2026",
+    horario_inicio: "14:00",
+    horario_termino: "16:00",
+    local: "Salão Principal"
+  }, sessionAdmin);
+
+  assert.equal(resDuplicado.ok, true);
+  assert.equal(resDuplicado.codigo, cod1, "Deve retornar o mesmo código existente sem duplicar");
+
+  // 3. Confere se aparece em listarSolicitacoes com seu código real e status pendente
+  const solicitacoes = gestao.listarSolicitacoes({ user: sessionAdmin });
+  const solEncontrada = solicitacoes.filter(s => s.titulo === "Teste Automatizado Deduplicação");
+  assert.equal(solEncontrada.length, 1, "Deve haver apenas uma solicitação e ela deve aparecer mesmo com a palavra Teste");
+  assert.equal(solEncontrada[0].codigo, cod1);
+  assert.match(solEncontrada[0].status, /Aguardando Secretaria/);
+
+  // 4. Confere se no calendário local (listarEventosLocais) o evento não está duplicado
+  const eventosLocais = gestao.listarEventosLocais(sessionAdmin);
+  const eventosFiltrados = eventosLocais.filter(e => e.titulo === "Teste Automatizado Deduplicação" && e.data === "25/11/2026");
+  assert.equal(eventosFiltrados.length, 1, "Não deve haver duplicação do mesmo evento no calendário");
+  assert.equal(eventosFiltrados[0].status, "pendente_secretaria");
+});
+
+
 
 
 

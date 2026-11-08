@@ -492,6 +492,11 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
           });
         } catch (_) {}
 
+        // Se ainda está pendente de aprovação, pula aqui para não duplicar com o Step 4 (pendentes)
+        if (estaPendente) {
+          continue;
+        }
+
         eventos.push({
           id: `form_${r.id}`,
           origem: 'formulario',
@@ -503,7 +508,7 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
           local: payload.local || ENDERECO_IGREJA,
           responsavel: payload.nome_lider || payload.solicitanteNome || '',
           docUrl: r.docUrl || '',
-          status: estaPendente ? 'pendente_secretaria' : 'confirmado',
+          status: 'confirmado',
           tipo: r.evento.toLowerCase().includes('ensaio') ? 'ensaio' : (r.evento.toLowerCase().includes('reunião') ? 'reuniao' : 'evento'),
           payload
         });
@@ -575,6 +580,12 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
             }
             if (!bData) return;
             const tituloBloco = b.titulo ? `${nome} - ${b.titulo}` : (d.blocos.length > 1 ? `${nome} (Sessão ${bIdx + 1})` : nome);
+            const jaExisteBloco = eventos.some(e => 
+              e.data === bData && 
+              e.titulo.toLowerCase().trim() === tituloBloco.toLowerCase().trim()
+            );
+            if (jaExisteBloco) return;
+
             eventos.push({
               id: `pend_${pend.codigo}_${bIdx}`,
               origem: 'pendente',
@@ -596,6 +607,12 @@ function listarEventosLocais(user = null, ano = null, mes = null) {
             dataFormatada = `${dataFormatada.trim()}/${anoAtual}`;
           }
           if (dataFormatada) {
+            const jaExisteEvento = eventos.some(e => 
+              e.data === dataFormatada && 
+              e.titulo.toLowerCase().trim() === nome.toLowerCase().trim()
+            );
+            if (jaExisteEvento) continue;
+
             eventos.push({
               id: `pend_${pend.codigo}`,
               origem: 'pendente',
@@ -713,7 +730,7 @@ function listarSolicitacoes({ user = null } = {}) {
       try {
         const d = JSON.parse(p.dados);
         const nome = (d.nomeEvento || d.evento || d.nome || d.finalidade || '').trim();
-        if (!nome || /^(teste|test|gabi|gabriela)$/i.test(nome)) continue;
+        if (!nome) continue;
 
         const dataFormatada = d.dataFormatada || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
         if (!dataFormatada && !d.blocos && !d.dataInicio && d.tipo !== 'midia') continue;
@@ -770,6 +787,27 @@ function listarSolicitacoes({ user = null } = {}) {
     for (const f of rowsForm) {
       let p = {};
       try { p = JSON.parse(f.payload); } catch (_) {}
+
+      // Se este evento já estiver na lista de solicitações (ex: veio de pendentes), pula para não duplicar
+      const jaConsta = solicitacoes.some(s => 
+        (s.titulo && s.titulo.toLowerCase().trim() === f.evento.toLowerCase().trim() && s.data === f.data) ||
+        (s.payload && (s.payload.formId === f.id || s.payload.formularioId === f.id))
+      );
+      if (jaConsta) continue;
+
+      // Se ainda consta na tabela de pendentes aguardando aprovação da Secretaria, não mostra como "Aprovado" prematuramente
+      let aindaPendente = false;
+      try {
+        const rowPend = db.prepare("SELECT dados FROM pendentes").all();
+        aindaPendente = rowPend.some(pend => {
+          try {
+            const dp = JSON.parse(pend.dados);
+            const nomeP = (dp.nomeEvento || dp.evento || dp.nome || '').trim().toLowerCase();
+            return nomeP === f.evento.toLowerCase().trim();
+          } catch (_) { return false; }
+        });
+      } catch (_) {}
+      if (aindaPendente) continue;
       
       if (!perfil?.isPastor && !perfil?.isDiretor && !perfil?.isAdmin) {
         const deptos = (perfil?.departamentos || []).map(d => String(d).toLowerCase());
@@ -943,8 +981,11 @@ function verificarConflitoHorarioEvento({
 
       // 2. Checa conflito com eventos já agendados na data
       if (Array.isArray(eventosExistentes) && eventosExistentes.length > 0) {
-        const minNovoIni = horaParaMinutos(sessao.inicio);
-        const minNovoFim = horaParaMinutos(sessao.fim);
+        let minNovoIni = horaParaMinutos(sessao.inicio);
+        let minNovoFim = horaParaMinutos(sessao.fim);
+        if (minNovoFim <= minNovoIni) {
+          minNovoFim += 24 * 60; // Cruza meia-noite (ex: 22h às 01h)
+        }
 
         for (const ev of eventosExistentes) {
           if (!ev || ev.status === 'recusado' || ev.status === 'cancelado') continue;
@@ -952,8 +993,11 @@ function verificarConflitoHorarioEvento({
 
           const tipoEvExistente = String(ev.tipo || 'evento').toLowerCase();
           const tituloEv = ev.titulo || ev.evento || ev.nomeEvento || 'Evento existente';
-          const minExistIni = horaParaMinutos(ev.horarioInicio || '19:00');
-          const minExistFim = horaParaMinutos(ev.horarioFim || ev.horarioTermino || '21:30');
+          let minExistIni = horaParaMinutos(ev.horarioInicio || '19:00');
+          let minExistFim = horaParaMinutos(ev.horarioFim || ev.horarioTermino || '21:30');
+          if (minExistFim <= minExistIni) {
+            minExistFim += 24 * 60; // Cruza meia-noite (ex: Sala de Oração 22:00 às 01:00)
+          }
 
           if (ehReuniaoOuAtend) {
             // Reunião ou atendimento: não exige 1h30 e NÃO bloqueia, apenas alerta caso ocorra sobreposição de horário
@@ -971,12 +1015,12 @@ function verificarConflitoHorarioEvento({
             // Evento, ação, venda, culto temático: BLOQUEIO OBRIGATÓRIO com intervalo mínimo de 1h30 (90 min)
             const BUFFER_MINUTOS = 90;
             const minJanelaBloqueadaIni = Math.max(0, minExistIni - BUFFER_MINUTOS);
-            const minJanelaBloqueadaFim = Math.min(24 * 60, minExistFim + BUFFER_MINUTOS);
+            const minJanelaBloqueadaFim = minExistFim + BUFFER_MINUTOS;
 
             // Verifica se invade a janela bloqueada
             if (minNovoIni < minJanelaBloqueadaFim && minNovoFim > minJanelaBloqueadaIni) {
               const horaLivreAntes = minutosParaHora(minJanelaBloqueadaIni);
-              const horaLivreDepois = minutosParaHora(minJanelaBloqueadaFim);
+              const horaLivreDepois = minutosParaHora(minJanelaBloqueadaFim % (24 * 60));
 
               return {
                 conflito: true,
@@ -1000,6 +1044,34 @@ function verificarConflitoHorarioEvento({
 async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () => null) {
   const perfil = obterPerfilGestao(usuarioLogado);
   const tipoAcao = String(corpo.tipo || 'evento').toLowerCase().trim();
+
+  // Prevenção contra duplicação de envio (idempotência):
+  // Se já foi cadastrada uma solicitação idêntica recentemente, retorna a existente sem criar duplicata
+  try {
+    const nomeEvChecagem = (corpo.nome_evento || corpo.tema_culto || corpo.evento || corpo.nome || '').trim().toLowerCase();
+    const dataChecagem = (corpo.data || '').trim();
+    const horaChecagem = (corpo.horario_inicio || '19:00').trim();
+
+    if (nomeEvChecagem && dataChecagem) {
+      const pendentesRecentes = db.prepare("SELECT codigo, dados, criadoEm FROM pendentes ORDER BY rowid DESC LIMIT 15").all();
+      for (const pr of pendentesRecentes) {
+        try {
+          const dp = JSON.parse(pr.dados);
+          const nomeP = (dp.nomeEvento || dp.evento || dp.nome || '').trim().toLowerCase();
+          const dataP = (dp.dataFormatada || '').trim();
+          const horaP = (dp.horarioInicio || '').trim();
+          if (nomeP === nomeEvChecagem && dataP === dataChecagem && (horaP === horaChecagem || !horaChecagem)) {
+            return {
+              ok: true,
+              codigo: pr.codigo,
+              message: `Solicitação já registrada com sucesso (Código: ${pr.codigo})!`,
+              mensagem: `Solicitação já registrada com sucesso (Código: ${pr.codigo})!`
+            };
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
 
   // 0. SOLICITAÇÃO DE ARTES / MÍDIA
   if (tipoAcao === 'midia') {
@@ -2782,7 +2854,7 @@ function renderGestaoHtml({ user }) {
         <div class="name">${perfil?.nome || 'Líder'}</div>
         <span class="role-pill ${perfil?.perfilTitulo?.toLowerCase()}">${perfil?.perfilTitulo || 'Líder'}</span>
       </div>
-      <a href="/gestao/logout" class="btn-sair" onclick="event.preventDefault(); window.location.href='/gestao/logout';">Sair</a>
+      <a href="/gestao/logout" class="btn-sair" onclick="event.preventDefault(); fazerLogoutGestao();">Sair</a>
     </div>
   </header>
 
@@ -4812,10 +4884,10 @@ function renderGestaoHtml({ user }) {
         return (h || 0) * 60 + (m || 0);
       };
 
-      const minNovoIni = toMin(horaIni);
-      const minNovoFim = toMin(horaFim);
+      let minNovoIni = toMin(horaIni);
+      let minNovoFim = toMin(horaFim);
       if (minNovoFim <= minNovoIni) {
-        return { conflito: false, bloquear: false, aviso: false };
+        minNovoFim += 24 * 60;
       }
 
       const normData = d => {
@@ -4840,8 +4912,11 @@ function renderGestaoHtml({ user }) {
       });
 
       for (const ev of evsNoDia) {
-        const iniEx = toMin(ev.horarioInicio || '19:00');
-        const fimEx = toMin(ev.horarioFim || ev.horarioTermino || '21:30');
+        let iniEx = toMin(ev.horarioInicio || '19:00');
+        let fimEx = toMin(ev.horarioFim || ev.horarioTermino || '21:30');
+        if (fimEx <= iniEx) {
+          fimEx += 24 * 60;
+        }
         const tituloEv = ev.titulo || ev.evento || ev.nomeEvento || 'Evento existente';
 
         if (ehReuniaoOuAtend) {
@@ -4860,11 +4935,11 @@ function renderGestaoHtml({ user }) {
           // Eventos gerais, cultos temáticos, ações e vendas: BLOQUEIO OBRIGATÓRIO DE 1H30 (90 min)
           const BUFFER_90 = 90;
           const minJanelaIni = Math.max(0, iniEx - BUFFER_90);
-          const minJanelaFim = Math.min(24 * 60, fimEx + BUFFER_90);
+          const minJanelaFim = fimEx + BUFFER_90;
 
           if (minNovoIni < minJanelaFim && minNovoFim > minJanelaIni) {
             const formatarHora = min => {
-              const h = Math.floor(min / 60);
+              const h = Math.floor(min / 60) % 24;
               const m = min % 60;
               return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
             };
@@ -4947,8 +5022,19 @@ function renderGestaoHtml({ user }) {
       }
     }
 
+    async function fazerLogoutGestao() {
+      try {
+        await fetch('/gestao/logout', { method: 'POST' });
+      } catch (_) {}
+      window.location.href = '/gestao/login';
+    }
+
+    let enviandoSolicitacaoGlobal = false;
+
     async function submeterNovoCultoTematico(e) {
       e.preventDefault();
+      if (enviandoSolicitacaoGlobal) return;
+      enviandoSolicitacaoGlobal = true;
       const btn = document.getElementById('btnSalvarCultoTematico');
       btn.disabled = true;
       btn.innerText = 'Enviando...';
@@ -4961,6 +5047,7 @@ function renderGestaoHtml({ user }) {
         alert(checkCulto.mensagem.replace(/<[^>]+>/g, ' '));
         btn.disabled = false;
         btn.innerText = 'Solicitar Culto Temático';
+        enviandoSolicitacaoGlobal = false;
         return;
       }
 
@@ -4993,6 +5080,7 @@ function renderGestaoHtml({ user }) {
       } catch (_) {
         alert('❌ Erro de conexão.');
       } finally {
+        enviandoSolicitacaoGlobal = false;
         btn.disabled = false;
         btn.innerText = 'Solicitar Culto Temático';
       }
@@ -5000,6 +5088,8 @@ function renderGestaoHtml({ user }) {
 
     async function submeterNovoEvento(e) {
       e.preventDefault();
+      if (enviandoSolicitacaoGlobal) return;
+      enviandoSolicitacaoGlobal = true;
       const btn = document.getElementById('btnSalvarEvento');
       btn.disabled = true;
       btn.innerText = 'Enviando...';
@@ -5027,6 +5117,7 @@ function renderGestaoHtml({ user }) {
           alert(checkEv.mensagem.replace(/<[^>]+>/g, ' '));
           btn.disabled = false;
           btn.innerText = 'Enviar Solicitação';
+          enviandoSolicitacaoGlobal = false;
           return;
         }
       }
@@ -5071,6 +5162,7 @@ function renderGestaoHtml({ user }) {
       } catch (_) {
         alert('❌ Erro ao enviar.');
       } finally {
+        enviandoSolicitacaoGlobal = false;
         btn.disabled = false;
         btn.innerText = 'Enviar Solicitação';
       }
@@ -5078,6 +5170,8 @@ function renderGestaoHtml({ user }) {
 
     async function submeterNovaReuniao(e) {
       e.preventDefault();
+      if (enviandoSolicitacaoGlobal) return;
+      enviandoSolicitacaoGlobal = true;
       const btn = document.getElementById('btnSalvarReuniao');
       btn.disabled = true;
 
@@ -5088,6 +5182,7 @@ function renderGestaoHtml({ user }) {
       if (checkReu.aviso) {
         if (!confirm(checkReu.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento da reunião mesmo assim?')) {
           btn.disabled = false;
+          enviandoSolicitacaoGlobal = false;
           return;
         }
       }
@@ -5120,12 +5215,15 @@ function renderGestaoHtml({ user }) {
       } catch (_) {
         alert('❌ Erro ao enviar.');
       } finally {
+        enviandoSolicitacaoGlobal = false;
         btn.disabled = false;
       }
     }
 
     async function submeterNovoEnsaio(e) {
       e.preventDefault();
+      if (enviandoSolicitacaoGlobal) return;
+      enviandoSolicitacaoGlobal = true;
       const btn = document.getElementById('btnSalvarEnsaio');
       btn.disabled = true;
 
@@ -5136,6 +5234,7 @@ function renderGestaoHtml({ user }) {
       if (checkEns.aviso) {
         if (!confirm(checkEns.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento do ensaio mesmo assim?')) {
           btn.disabled = false;
+          enviandoSolicitacaoGlobal = false;
           return;
         }
       }
@@ -5168,12 +5267,15 @@ function renderGestaoHtml({ user }) {
       } catch (_) {
         alert('❌ Erro ao enviar.');
       } finally {
+        enviandoSolicitacaoGlobal = false;
         btn.disabled = false;
       }
     }
 
     async function submeterNovaAcao(e) {
       e.preventDefault();
+      if (enviandoSolicitacaoGlobal) return;
+      enviandoSolicitacaoGlobal = true;
       const btn = document.getElementById('btnSalvarAcao');
       if (btn) btn.disabled = true;
 
@@ -5186,6 +5288,7 @@ function renderGestaoHtml({ user }) {
         if (checkAcao.bloquear) {
           alert(checkAcao.mensagem.replace(/<[^>]+>/g, ' '));
           if (btn) btn.disabled = false;
+          enviandoSolicitacaoGlobal = false;
           return;
         }
       }
@@ -5220,12 +5323,15 @@ function renderGestaoHtml({ user }) {
       } catch (_) {
         alert('❌ Erro ao enviar.');
       } finally {
+        enviandoSolicitacaoGlobal = false;
         if (btn) btn.disabled = false;
       }
     }
 
     async function submeterAtendimentoPastoral(e) {
       e.preventDefault();
+      if (enviandoSolicitacaoGlobal) return;
+      enviandoSolicitacaoGlobal = true;
       const btn = document.getElementById('btnSalvarAtendimento');
       if (btn) btn.disabled = true;
 
@@ -5236,6 +5342,7 @@ function renderGestaoHtml({ user }) {
       if (checkAtend.aviso) {
         if (!confirm(checkAtend.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento pastoral mesmo assim?')) {
           if (btn) btn.disabled = false;
+          enviandoSolicitacaoGlobal = false;
           return;
         }
       }
@@ -5269,6 +5376,7 @@ function renderGestaoHtml({ user }) {
       } catch (_) {
         alert('❌ Erro ao salvar.');
       } finally {
+        enviandoSolicitacaoGlobal = false;
         if (btn) btn.disabled = false;
       }
     }
