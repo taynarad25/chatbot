@@ -4796,7 +4796,13 @@ function renderGestaoHtml({ user }) {
               const mDepois = Math.min(1440, fimEx + 120) % 60;
               const livreDepois = (hDepois < 10 ? '0' : '') + hDepois + ':' + (mDepois < 10 ? '0' : '') + mDepois;
 
-              alert('❌ Horário indisponível: Já existe o evento "' + (ev.titulo || '') + '" agendado no dia ' + dataEvCliente + ' das ' + (ev.horarioInicio || '19:00') + ' às ' + (ev.horarioFim || '21:30') + '.\n\nPara eventos da igreja no salão, é obrigatório um intervalo mínimo de 2 horas entre eles.\nHorário livre antes das ' + livreAntes + ' ou a partir das ' + livreDepois + '.');
+              const msgConflito2h = [
+                '❌ Horário indisponível: Já existe o evento "' + (ev.titulo || '') + '" agendado no dia ' + dataEvCliente + ' das ' + (ev.horarioInicio || '19:00') + ' às ' + (ev.horarioFim || '21:30') + '.',
+                '',
+                'Para eventos da igreja no salão, é obrigatório um intervalo mínimo de 2 horas entre eles.',
+                'Horário livre antes das ' + livreAntes + ' ou a partir das ' + livreDepois + '.'
+              ].join('\\n');
+              alert(msgConflito2h);
               btn.disabled = false;
               btn.innerText = 'Enviar Solicitação';
               return;
