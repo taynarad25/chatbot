@@ -67,7 +67,7 @@ function renderLoginHtml(message = "", options = {}) {
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 4px;
-      background: linear-gradient(90deg, var(--cor-ciano), var(--cor-roxo), var(--cor-magenta));
+      background: ${isGestao ? 'linear-gradient(90deg, #7c3aed, #a855f7, #ec4899)' : 'linear-gradient(90deg, var(--cor-ciano), var(--cor-roxo), var(--cor-magenta))'};
     }
     .brand-header {
       text-align: center;
@@ -78,7 +78,7 @@ function renderLoginHtml(message = "", options = {}) {
       height: 68px;
       object-fit: contain;
       margin-bottom: 12px;
-      filter: drop-shadow(0 6px 14px rgba(0, 188, 212, 0.35));
+      filter: drop-shadow(0 6px 14px ${isGestao ? 'rgba(124, 58, 237, 0.4)' : 'rgba(0, 188, 212, 0.35)'});
     }
     .brand-title {
       font-size: 1.35rem;
@@ -87,7 +87,7 @@ function renderLoginHtml(message = "", options = {}) {
       color: #ffffff;
     }
     .brand-title span {
-      color: var(--cor-ciano);
+      color: ${isGestao ? '#a855f7' : 'var(--cor-ciano)'};
     }
     .brand-subtitle {
       font-size: 0.82rem;
@@ -213,8 +213,15 @@ function renderLoginHtml(message = "", options = {}) {
   <div class="container">
     <div class="brand-header">
       <img src="/images/logo.png" alt="Logotipo Curados" class="brand-logo" />
-      <h1 class="brand-title"><span>CURADOS</span></h1>
-      <p class="brand-subtitle">${subtitle}</p>
+      ${isGestao ? `
+        <div><span style="display:inline-block; margin-bottom:10px; padding: 4px 14px; background: rgba(124, 58, 237, 0.22); border: 1px solid rgba(168, 85, 247, 0.45); border-radius: 20px; font-size: 0.74rem; font-weight: 700; color: #c084fc; letter-spacing: 1.2px; text-transform: uppercase;">Área de Líderes &amp; Ministérios</span></div>
+        <h1 class="brand-title" style="letter-spacing: 2px;">GESTÃO DE <span style="color:#a855f7;">EVENTOS</span></h1>
+        <p class="brand-subtitle" style="color:#d8b4fe; font-size: 0.8rem; margin-top: 4px;">Gestão de Eventos & Ministérios</p>
+      ` : `
+        <div><span style="display:inline-block; margin-bottom:10px; padding: 4px 14px; background: rgba(0, 188, 212, 0.22); border: 1px solid rgba(0, 188, 212, 0.45); border-radius: 20px; font-size: 0.74rem; font-weight: 700; color: #67e8f9; letter-spacing: 1.2px; text-transform: uppercase;">Painel Administrativo</span></div>
+        <h1 class="brand-title">SECRETARIA &amp; <span style="color:var(--cor-ciano);">BOT</span></h1>
+        <p class="brand-subtitle" style="color:#9ca3af; font-size: 0.8rem; margin-top: 4px;">Comunidade Cristã Curados</p>
+      `}
     </div>
 
 
@@ -238,12 +245,12 @@ function renderLoginHtml(message = "", options = {}) {
         <label for="rememberMe" style="cursor: pointer; user-select: none;">Permanecer conectado neste navegador</label>
       </div>
       
-      <button type="submit">Acessar Painel</button>
+      <button type="submit" ${isGestao ? 'style="background: linear-gradient(135deg, #7c3aed, #9333ea); box-shadow: 0 8px 22px rgba(124, 58, 237, 0.45);"' : ''}>${isGestao ? 'Entrar na Gestão de Eventos' : 'Acessar Secretaria'}</button>
       <div class="links" style="margin-top: 16px; text-align: center;">
-        <span style="color: #a1a1aa; font-size: 0.88rem;">Primeiro acesso ou deseja cadastrar seu usuário?</span>
+        <span style="color: #a1a1aa; font-size: 0.88rem;">${isGestao ? 'Primeiro acesso na gestão ou deseja cadastrar seu usuário?' : 'Primeiro acesso ou deseja cadastrar seu usuário?'}</span>
         <div style="margin-top: 8px;">
-          <a href="${registerUrl}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; color: #ff7e5f; text-decoration: none; font-weight: 600; font-size: 0.88rem; transition: background 0.2s;">
-            👤 Cadastrar Nome de Usuário e Senha
+          <a href="${registerUrl}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; color: ${isGestao ? '#c084fc' : '#ff7e5f'}; text-decoration: none; font-weight: 600; font-size: 0.88rem; transition: background 0.2s;">
+            👤 ${isGestao ? 'Cadastrar Acesso de Líder / Pastor' : 'Cadastrar Nome de Usuário e Senha'}
           </a>
         </div>
       </div>

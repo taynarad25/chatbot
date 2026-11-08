@@ -851,10 +851,26 @@ function minutosParaHora(minutos) {
 }
 
 /**
+ * Normaliza datas no formato DD/MM ou DD/MM/AAAA para DD/MM/AAAA
+ */
+function normalizarDataComparacao(d) {
+  if (!d) return '';
+  const partes = String(d).trim().split('/');
+  if (partes.length === 2) {
+    const anoPadrao = moment().tz("America/Sao_Paulo").year();
+    return `${partes[0].padStart(2, '0')}/${partes[1].padStart(2, '0')}/${anoPadrao}`;
+  }
+  if (partes.length === 3) {
+    return `${partes[0].padStart(2, '0')}/${partes[1].padStart(2, '0')}/${partes[2]}`;
+  }
+  return String(d).trim();
+}
+
+/**
  * Valida se um agendamento conflita com cultos de domingo e eventos existentes.
- * Para eventos gerais da igreja (tipo: 'evento' ou 'acao'), aplica o bloqueio obrigatório de 2 horas (120 min)
+ * Para eventos gerais da igreja, ações e cultos temáticos, aplica o bloqueio obrigatório de 1h30 (90 min)
  * antes e depois de eventos existentes no mesmo dia.
- * Para reuniões, ensaios, atendimentos e cultos temáticos, não exige o bloqueio de 2 horas.
+ * Para reuniões e atendimentos pastorais, não bloqueia e apenas retorna um aviso de atenção caso haja sobreposição.
  */
 function verificarConflitoHorarioEvento({
   data,
@@ -865,9 +881,7 @@ function verificarConflitoHorarioEvento({
   eventosExistentes = []
 } = {}) {
   const tipoNorm = String(tipo || 'evento').toLowerCase().trim();
-
-  // Reuniões, ensaios, atendimentos pastorais e cultos temáticos NÃO exigem o intervalo de 2 horas
-  const exigeIntervalo2Horas = (tipoNorm === 'evento' || tipoNorm === 'acao' || tipoNorm === 'venda');
+  const ehReuniaoOuAtend = (tipoNorm === 'reuniao' || tipoNorm === 'atendimento');
 
   // Monta lista de sessões/datas a validar
   const sessoes = [];
@@ -893,25 +907,38 @@ function verificarConflitoHorarioEvento({
 
   for (const sessao of sessoes) {
     const dataStr = sessao.data.trim();
-    const partes = dataStr.split('/');
+    const dataNorm = normalizarDataComparacao(dataStr);
+    const partes = dataNorm.split('/');
     if (partes.length >= 2) {
       const diaNum = parseInt(partes[0], 10);
       const mesNum = parseInt(partes[1], 10);
       const anoNum = partes[2] ? parseInt(partes[2], 10) : moment().tz("America/Sao_Paulo").year();
 
       // 1. Checa conflito com cultos de domingo (Ceia 1º domingo e Culto de Celebração)
-      const confDomingo = verificarConflitoCultoDomingo({
-        dia: diaNum,
-        mes: mesNum,
-        ano: anoNum,
-        horarioInicio: sessao.inicio,
-        horarioFim: sessao.fim
-      });
-      if (confDomingo && confDomingo.conflito) {
-        return {
-          conflito: true,
-          mensagem: confDomingo.mensagem
-        };
+      // Culto temático substitui/ocupa o horário de culto oficial no domingo, portanto é permitido
+      if (tipoNorm !== 'culto_tematico') {
+        const confDomingo = verificarConflitoCultoDomingo({
+          dia: diaNum,
+          mes: mesNum,
+          ano: anoNum,
+          horarioInicio: sessao.inicio,
+          horarioFim: sessao.fim
+        });
+        if (confDomingo && confDomingo.conflito) {
+          if (ehReuniaoOuAtend) {
+            return {
+              conflito: false,
+              bloquear: false,
+              aviso: true,
+              mensagem: `⚠️ Atenção: Há culto oficial agendado neste domingo (${confDomingo.mensagem}). Reuniões e atendimentos são permitidos, mas certifique-se de não atrapalhar o culto.`
+            };
+          }
+          return {
+            conflito: true,
+            bloquear: true,
+            mensagem: confDomingo.mensagem
+          };
+        }
       }
 
       // 2. Checa conflito com eventos já agendados na data
@@ -921,44 +948,44 @@ function verificarConflitoHorarioEvento({
 
         for (const ev of eventosExistentes) {
           if (!ev || ev.status === 'recusado' || ev.status === 'cancelado') continue;
-          if (ev.data !== dataStr) continue;
+          if (normalizarDataComparacao(ev.data) !== dataNorm) continue;
 
-          // Se o evento existente for um evento de salão / culto / ação
           const tipoEvExistente = String(ev.tipo || 'evento').toLowerCase();
-          const ehEventoPrincipal = tipoEvExistente === 'evento' || tipoEvExistente === 'acao' || tipoEvExistente === 'culto_tematico' || !ev.tipo;
+          const tituloEv = ev.titulo || ev.evento || ev.nomeEvento || 'Evento existente';
+          const minExistIni = horaParaMinutos(ev.horarioInicio || '19:00');
+          const minExistFim = horaParaMinutos(ev.horarioFim || ev.horarioTermino || '21:30');
 
-          if (exigeIntervalo2Horas && ehEventoPrincipal) {
-            const minExistIni = horaParaMinutos(ev.horarioInicio || '19:00');
-            const minExistFim = horaParaMinutos(ev.horarioFim || ev.horarioTermino || '21:30');
+          if (ehReuniaoOuAtend) {
+            // Reunião ou atendimento: não exige 1h30 e NÃO bloqueia, apenas alerta caso ocorra sobreposição de horário
+            if (minNovoIni < minExistFim && minNovoFim > minExistIni) {
+              return {
+                conflito: false,
+                bloquear: false,
+                aviso: true,
+                eventoConflitante: tituloEv,
+                horarioExistente: `${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}`,
+                mensagem: `⚠️ Atenção: Já existe "${tituloEv}" agendado no dia ${dataStr} das ${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}. Reuniões e atendimentos são permitidos, mas certifique-se de que não haverá interferência no espaço.`
+              };
+            }
+          } else {
+            // Evento, ação, venda, culto temático: BLOQUEIO OBRIGATÓRIO com intervalo mínimo de 1h30 (90 min)
+            const BUFFER_MINUTOS = 90;
+            const minJanelaBloqueadaIni = Math.max(0, minExistIni - BUFFER_MINUTOS);
+            const minJanelaBloqueadaFim = Math.min(24 * 60, minExistFim + BUFFER_MINUTOS);
 
-            // Regra do Bloqueio de 2 Horas (120 minutos de buffer antes e depois):
-            const minJanelaBloqueadaIni = Math.max(0, minExistIni - 120);
-            const minJanelaBloqueadaFim = Math.min(24 * 60, minExistFim + 120);
-
-            // Verifica se o novo evento invade a janela bloqueada
+            // Verifica se invade a janela bloqueada
             if (minNovoIni < minJanelaBloqueadaFim && minNovoFim > minJanelaBloqueadaIni) {
-              const tituloEv = ev.titulo || ev.evento || ev.nomeEvento || 'Evento existente';
               const horaLivreAntes = minutosParaHora(minJanelaBloqueadaIni);
               const horaLivreDepois = minutosParaHora(minJanelaBloqueadaFim);
 
               return {
                 conflito: true,
+                bloquear: true,
                 eventoConflitante: tituloEv,
                 horarioExistente: `${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}`,
-                mensagem: `❌ Horário indisponível: Já existe o evento "${tituloEv}" agendado no dia ${dataStr} das ${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}. É obrigatório um intervalo mínimo de 2 horas entre eventos no salão (horário livre antes das ${horaLivreAntes} ou a partir das ${horaLivreDepois}).`
-              };
-            }
-          } else {
-            // Se o novo evento for reunião/ensaio OU o evento existente for reunião/ensaio,
-            // valida apenas sobreposição direta de horário (sem o buffer de 2 horas)
-            const minExistIni = horaParaMinutos(ev.horarioInicio || '19:00');
-            const minExistFim = horaParaMinutos(ev.horarioFim || ev.horarioTermino || '21:30');
-            if (minNovoIni < minExistFim && minNovoFim > minExistIni) {
-              const tituloEv = ev.titulo || ev.evento || 'Atividade existente';
-              return {
-                conflito: true,
-                eventoConflitante: tituloEv,
-                mensagem: `❌ Horário indisponível: Já existe "${tituloEv}" agendado no dia ${dataStr} das ${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}.`
+                horaLivreAntes,
+                horaLivreDepois,
+                mensagem: `❌ Horário indisponível: Já existe o evento "${tituloEv}" agendado no dia ${dataStr} das ${ev.horarioInicio || '19:00'} às ${ev.horarioFim || '21:30'}. É obrigatório um intervalo mínimo de 1h30 entre eventos no salão (você pode marcar um evento que termine até às ${horaLivreAntes} ou comece a partir das ${horaLivreDepois}).`
               };
             }
           }
@@ -967,7 +994,7 @@ function verificarConflitoHorarioEvento({
     }
   }
 
-  return { conflito: false };
+  return { conflito: false, bloquear: false, aviso: false };
 }
 
 async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () => null) {
@@ -1091,6 +1118,24 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     }
 
     const [diaStr, mesStr, anoStr] = data.split('/');
+    const anoNumAcao = anoStr ? parseInt(anoStr, 10) : moment().tz("America/Sao_Paulo").year();
+    const mesNumAcao = mesStr ? parseInt(mesStr, 10) : moment().tz("America/Sao_Paulo").month() + 1;
+
+    // Se ocupar o salão ou for na igreja, checa conflito e buffer de 1h30
+    if (ocupa_salao === 'sim' || !local || local.includes(ENDERECO_IGREJA)) {
+      const evsExistentesAcao = await listarEventosCalendario({ user: perfil, mes: mesNumAcao, ano: anoNumAcao });
+      const confAcao = verificarConflitoHorarioEvento({
+        data,
+        horarioInicio: horario_inicio,
+        horarioTermino: horario_termino,
+        tipo: 'acao',
+        eventosExistentes: evsExistentesAcao
+      });
+      if (confAcao && confAcao.bloquear) {
+        throw new Error(confAcao.mensagem);
+      }
+    }
+
     const dadosAcao = {
       tipo: 'acao',
       evento: nome_evento.trim(),
@@ -1155,6 +1200,22 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     }
 
     const [diaStr, mesStr, anoStr] = data.split('/');
+    const anoNumCulto = anoStr ? parseInt(anoStr, 10) : moment().tz("America/Sao_Paulo").year();
+    const mesNumCulto = mesStr ? parseInt(mesStr, 10) : moment().tz("America/Sao_Paulo").month() + 1;
+
+    // Checa conflitos e buffer de 1h30 para Culto Temático
+    const evsExistentesCulto = await listarEventosCalendario({ user: perfil, mes: mesNumCulto, ano: anoNumCulto });
+    const confCulto = verificarConflitoHorarioEvento({
+      data,
+      horarioInicio: horario_inicio,
+      horarioTermino: horario_termino,
+      tipo: 'culto_tematico',
+      eventosExistentes: evsExistentesCulto
+    });
+    if (confCulto && confCulto.bloquear) {
+      throw new Error(confCulto.mensagem);
+    }
+
     const dadosCultoTematico = {
       tipo: 'culto_tematico',
       evento: tema_culto.trim(),
@@ -1601,7 +1662,7 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     if (corpo.blocos_json) {
       try { blocosCheck = JSON.parse(corpo.blocos_json); } catch (_) {}
     }
-    const evsExistentes = listarEventosLocais(perfil, anoNumChecagem, mesNumChecagem);
+    const evsExistentes = await listarEventosCalendario({ user: perfil, mes: mesNumChecagem, ano: anoNumChecagem });
     const resultadoConflito = verificarConflitoHorarioEvento({
       data: dataChecagem,
       horarioInicio: corpo.horario_inicio || '19:00',
@@ -1610,7 +1671,7 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
       blocos: blocosCheck,
       eventosExistentes: evsExistentes
     });
-    if (resultadoConflito && resultadoConflito.conflito) {
+    if (resultadoConflito && resultadoConflito.bloquear) {
       throw new Error(resultadoConflito.mensagem);
     }
   }
@@ -2634,6 +2695,27 @@ function renderGestaoHtml({ user }) {
     .alert-banner.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
     .alert-banner.info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
 
+    .alert-conflito {
+      padding: 11px 14px;
+      border-radius: 10px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      line-height: 1.45;
+      margin: 10px 0 14px 0;
+      animation: fadeInConflito 0.2s ease-in;
+    }
+    .alert-conflito.bloqueio {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+    .alert-conflito.aviso {
+      background: #fffbeb;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+    @keyframes fadeInConflito { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
     /* MODAL DE GERENCIAMENTO DO EVENTO (ALTERAR / CANCELAR / FORMULÁRIO) */
     .evento-detalhes-box {
       background: var(--cor-cinza-suave);
@@ -2700,7 +2782,7 @@ function renderGestaoHtml({ user }) {
         <div class="name">${perfil?.nome || 'Líder'}</div>
         <span class="role-pill ${perfil?.perfilTitulo?.toLowerCase()}">${perfil?.perfilTitulo || 'Líder'}</span>
       </div>
-      <a href="/gestao/logout" class="btn-sair">Sair</a>
+      <a href="/gestao/logout" class="btn-sair" onclick="event.preventDefault(); window.location.href='/gestao/logout';">Sair</a>
     </div>
   </header>
 
@@ -3027,17 +3109,18 @@ function renderGestaoHtml({ user }) {
               <div class="form-row three-cols">
                 <div class="form-group">
                   <label>Data *</label>
-                  <input type="text" class="form-control" id="ev_data" placeholder="DD/MM/AAAA" />
+                  <input type="text" class="form-control" id="ev_data" placeholder="DD/MM/AAAA" oninput="verificarConflitoTempoReal('evento')" onchange="verificarConflitoTempoReal('evento')" />
                 </div>
                 <div class="form-group">
                   <label>Horário Início *</label>
-                  <input type="time" class="form-control" id="ev_hora_ini" value="19:00" />
+                  <input type="time" class="form-control" id="ev_hora_ini" value="19:00" oninput="verificarConflitoTempoReal('evento')" onchange="verificarConflitoTempoReal('evento')" />
                 </div>
                 <div class="form-group">
                   <label>Horário Término *</label>
-                  <input type="time" class="form-control" id="ev_hora_fim" value="21:30" />
+                  <input type="time" class="form-control" id="ev_hora_fim" value="21:30" oninput="verificarConflitoTempoReal('evento')" onchange="verificarConflitoTempoReal('evento')" />
                 </div>
               </div>
+              <div id="avisoConflito_evento" class="alert-conflito" style="display:none;"></div>
             </div>
 
             <!-- Campos Múltiplos Dias -->
@@ -3152,20 +3235,21 @@ function renderGestaoHtml({ user }) {
               </div>
               <div class="form-group">
                 <label>Data *</label>
-                <input type="text" class="form-control" id="reu_data" placeholder="DD/MM/AAAA" required />
+                <input type="text" class="form-control" id="reu_data" placeholder="DD/MM/AAAA" oninput="verificarConflitoTempoReal('reuniao')" onchange="verificarConflitoTempoReal('reuniao')" required />
               </div>
             </div>
 
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>Horário Início *</label>
-                <input type="time" class="form-control" id="reu_hora_ini" value="19:30" required />
+                <input type="time" class="form-control" id="reu_hora_ini" value="19:30" oninput="verificarConflitoTempoReal('reuniao')" onchange="verificarConflitoTempoReal('reuniao')" required />
               </div>
               <div class="form-group">
                 <label>Horário Término *</label>
-                <input type="time" class="form-control" id="reu_hora_fim" value="21:00" required />
+                <input type="time" class="form-control" id="reu_hora_fim" value="21:00" oninput="verificarConflitoTempoReal('reuniao')" onchange="verificarConflitoTempoReal('reuniao')" required />
               </div>
             </div>
+            <div id="avisoConflito_reuniao" class="alert-conflito" style="display:none;"></div>
 
             <div class="form-group">
               <label>Local</label>
@@ -3254,7 +3338,7 @@ function renderGestaoHtml({ user }) {
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>Data * (Ideal no domingo)</label>
-                <input type="text" class="form-control" id="culto_data" placeholder="DD/MM/AAAA" required />
+                <input type="text" class="form-control" id="culto_data" placeholder="DD/MM/AAAA" oninput="verificarConflitoTempoReal('culto_tematico')" onchange="verificarConflitoTempoReal('culto_tematico')" required />
               </div>
               <div class="form-group">
                 <label>Local</label>
@@ -3265,13 +3349,14 @@ function renderGestaoHtml({ user }) {
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>Horário Início *</label>
-                <input type="time" class="form-control" id="culto_hora_ini" value="18:00" required />
+                <input type="time" class="form-control" id="culto_hora_ini" value="18:00" oninput="verificarConflitoTempoReal('culto_tematico')" onchange="verificarConflitoTempoReal('culto_tematico')" required />
               </div>
               <div class="form-group">
                 <label>Horário Término *</label>
-                <input type="time" class="form-control" id="culto_hora_fim" value="20:30" required />
+                <input type="time" class="form-control" id="culto_hora_fim" value="20:30" oninput="verificarConflitoTempoReal('culto_tematico')" onchange="verificarConflitoTempoReal('culto_tematico')" required />
               </div>
             </div>
+            <div id="avisoConflito_culto" class="alert-conflito" style="display:none;"></div>
 
             <div class="form-row two-cols">
               <div class="form-group">
@@ -3320,20 +3405,21 @@ function renderGestaoHtml({ user }) {
               </div>
               <div class="form-group">
                 <label>Data *</label>
-                <input type="text" class="form-control" id="acao_data" placeholder="DD/MM/AAAA" required />
+                <input type="text" class="form-control" id="acao_data" placeholder="DD/MM/AAAA" oninput="verificarConflitoTempoReal('acao')" onchange="verificarConflitoTempoReal('acao')" required />
               </div>
             </div>
 
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>Horário Início *</label>
-                <input type="time" class="form-control" id="acao_hora_ini" value="11:30" required />
+                <input type="time" class="form-control" id="acao_hora_ini" value="11:30" oninput="verificarConflitoTempoReal('acao')" onchange="verificarConflitoTempoReal('acao')" required />
               </div>
               <div class="form-group">
                 <label>Horário Término *</label>
-                <input type="time" class="form-control" id="acao_hora_fim" value="15:00" required />
+                <input type="time" class="form-control" id="acao_hora_fim" value="15:00" oninput="verificarConflitoTempoReal('acao')" onchange="verificarConflitoTempoReal('acao')" required />
               </div>
             </div>
+            <div id="avisoConflito_acao" class="alert-conflito" style="display:none;"></div>
 
             <div class="form-row two-cols">
               <div class="form-group">
@@ -3385,17 +3471,18 @@ function renderGestaoHtml({ user }) {
             <div class="form-row three-cols">
               <div class="form-group">
                 <label>Data *</label>
-                <input type="text" class="form-control" id="at_data" placeholder="DD/MM/AAAA" required />
+                <input type="text" class="form-control" id="at_data" placeholder="DD/MM/AAAA" oninput="verificarConflitoTempoReal('atendimento')" onchange="verificarConflitoTempoReal('atendimento')" required />
               </div>
               <div class="form-group">
                 <label>Início *</label>
-                <input type="time" class="form-control" id="at_hora_ini" value="14:00" required />
+                <input type="time" class="form-control" id="at_hora_ini" value="14:00" oninput="verificarConflitoTempoReal('atendimento')" onchange="verificarConflitoTempoReal('atendimento')" required />
               </div>
               <div class="form-group">
                 <label>Término *</label>
-                <input type="time" class="form-control" id="at_hora_fim" value="15:00" required />
+                <input type="time" class="form-control" id="at_hora_fim" value="15:00" oninput="verificarConflitoTempoReal('atendimento')" onchange="verificarConflitoTempoReal('atendimento')" required />
               </div>
             </div>
+            <div id="avisoConflito_atendimento" class="alert-conflito" style="display:none;"></div>
 
             <div class="form-row two-cols">
               <div class="form-group">
@@ -4348,6 +4435,9 @@ function renderGestaoHtml({ user }) {
       }
 
       document.getElementById('modalAgendamento').classList.add('active');
+      if (typeof verificarConflitoTempoReal === 'function') {
+        verificarConflitoTempoReal(tipo);
+      }
     }
 
     function fecharModalAgendamento() {
@@ -4712,11 +4802,167 @@ function renderGestaoHtml({ user }) {
     }
 
     
+    function calcularConflitoNoCliente(tipo, dataStr, horaIni, horaFim) {
+      if (!dataStr || !horaIni || !horaFim || !Array.isArray(todosEventos) || todosEventos.length === 0) {
+        return { conflito: false, bloquear: false, aviso: false };
+      }
+
+      const toMin = t => {
+        const [h, m = 0] = String(t || '00:00').split(':').map(Number);
+        return (h || 0) * 60 + (m || 0);
+      };
+
+      const minNovoIni = toMin(horaIni);
+      const minNovoFim = toMin(horaFim);
+      if (minNovoFim <= minNovoIni) {
+        return { conflito: false, bloquear: false, aviso: false };
+      }
+
+      const normData = d => {
+        if (!d) return '';
+        const p = String(d).trim().split('/');
+        if (p.length === 2) {
+          return p[0].padStart(2, '0') + '/' + p[1].padStart(2, '0') + '/' + anoAtual;
+        }
+        if (p.length === 3) {
+          return p[0].padStart(2, '0') + '/' + p[1].padStart(2, '0') + '/' + p[2];
+        }
+        return String(d).trim();
+      };
+
+      const dataAlvo = normData(dataStr);
+      const tipoNorm = String(tipo || 'evento').toLowerCase().trim();
+      const ehReuniaoOuAtend = (tipoNorm === 'reuniao' || tipoNorm === 'atendimento' || tipoNorm === 'ensaio');
+
+      const evsNoDia = todosEventos.filter(ev => {
+        if (!ev || ev.status === 'recusado' || ev.status === 'cancelado') return false;
+        return normData(ev.data) === dataAlvo;
+      });
+
+      for (const ev of evsNoDia) {
+        const iniEx = toMin(ev.horarioInicio || '19:00');
+        const fimEx = toMin(ev.horarioFim || ev.horarioTermino || '21:30');
+        const tituloEv = ev.titulo || ev.evento || ev.nomeEvento || 'Evento existente';
+
+        if (ehReuniaoOuAtend) {
+          // Reunião ou atendimento: NÃO bloqueia e não exige 1h30. Apenas alerta sobreposição direta
+          if (minNovoIni < fimEx && minNovoFim > iniEx) {
+            return {
+              conflito: false,
+              bloquear: false,
+              aviso: true,
+              eventoConflitante: tituloEv,
+              horarioExistente: (ev.horarioInicio || '19:00') + ' às ' + (ev.horarioFim || '21:30'),
+              mensagem: '⚠️ <strong>Aviso de agenda:</strong> Já existe "' + tituloEv + '" agendado no dia ' + dataStr + ' das ' + (ev.horarioInicio || '19:00') + ' às ' + (ev.horarioFim || '21:30') + '. Reuniões e atendimentos são permitidos, mas certifique-se de que não haverá conflito no espaço.'
+            };
+          }
+        } else {
+          // Eventos gerais, cultos temáticos, ações e vendas: BLOQUEIO OBRIGATÓRIO DE 1H30 (90 min)
+          const BUFFER_90 = 90;
+          const minJanelaIni = Math.max(0, iniEx - BUFFER_90);
+          const minJanelaFim = Math.min(24 * 60, fimEx + BUFFER_90);
+
+          if (minNovoIni < minJanelaFim && minNovoFim > minJanelaIni) {
+            const formatarHora = min => {
+              const h = Math.floor(min / 60);
+              const m = min % 60;
+              return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+            };
+            const livreAntes = formatarHora(minJanelaIni);
+            const livreDepois = formatarHora(minJanelaFim);
+
+            return {
+              conflito: true,
+              bloquear: true,
+              aviso: false,
+              eventoConflitante: tituloEv,
+              horarioExistente: (ev.horarioInicio || '19:00') + ' às ' + (ev.horarioFim || '21:30'),
+              livreAntes,
+              livreDepois,
+              mensagem: '❌ <strong>Horário indisponível:</strong> Já existe o evento "' + tituloEv + '" agendado no dia ' + dataStr + ' das ' + (ev.horarioInicio || '19:00') + ' às ' + (ev.horarioFim || '21:30') + '.<br>É obrigatório um intervalo mínimo de 1h30 entre eventos no salão.<br>Você pode marcar um evento que termine até às <strong>' + livreAntes + '</strong> ou comece a partir das <strong>' + livreDepois + '</strong>.'
+            };
+          }
+        }
+      }
+
+      return { conflito: false, bloquear: false, aviso: false };
+    }
+
+    function verificarConflitoTempoReal(tipo) {
+      let campoData, campoHoraIni, campoHoraFim, boxAviso, btnSubmit;
+      if (tipo === 'evento') {
+        campoData = document.getElementById('ev_data');
+        campoHoraIni = document.getElementById('ev_hora_ini');
+        campoHoraFim = document.getElementById('ev_hora_fim');
+        boxAviso = document.getElementById('avisoConflito_evento');
+        btnSubmit = document.getElementById('btnSalvarEvento');
+      } else if (tipo === 'culto_tematico') {
+        campoData = document.getElementById('culto_data');
+        campoHoraIni = document.getElementById('culto_hora_ini');
+        campoHoraFim = document.getElementById('culto_hora_fim');
+        boxAviso = document.getElementById('avisoConflito_culto');
+        btnSubmit = document.getElementById('btnSalvarCultoTematico');
+      } else if (tipo === 'acao') {
+        campoData = document.getElementById('acao_data');
+        campoHoraIni = document.getElementById('acao_hora_ini');
+        campoHoraFim = document.getElementById('acao_hora_fim');
+        boxAviso = document.getElementById('avisoConflito_acao');
+        btnSubmit = document.getElementById('btnSalvarAcao');
+      } else if (tipo === 'reuniao') {
+        campoData = document.getElementById('reu_data');
+        campoHoraIni = document.getElementById('reu_hora_ini');
+        campoHoraFim = document.getElementById('reu_hora_fim');
+        boxAviso = document.getElementById('avisoConflito_reuniao');
+        btnSubmit = document.getElementById('btnSalvarReuniao');
+      } else if (tipo === 'atendimento') {
+        campoData = document.getElementById('at_data');
+        campoHoraIni = document.getElementById('at_hora_ini');
+        campoHoraFim = document.getElementById('at_hora_fim');
+        boxAviso = document.getElementById('avisoConflito_atendimento');
+        btnSubmit = document.getElementById('btnSalvarAtendimento');
+      }
+
+      if (!campoData || !boxAviso) return;
+
+      const dataVal = (campoData.value || '').trim();
+      const horaIniVal = campoHoraIni?.value || '19:00';
+      const horaFimVal = campoHoraFim?.value || '21:30';
+
+      const res = calcularConflitoNoCliente(tipo, dataVal, horaIniVal, horaFimVal);
+
+      if (res.bloquear) {
+        boxAviso.style.display = 'block';
+        boxAviso.className = 'alert-conflito bloqueio';
+        boxAviso.innerHTML = res.mensagem;
+        if (btnSubmit) btnSubmit.disabled = true;
+      } else if (res.aviso) {
+        boxAviso.style.display = 'block';
+        boxAviso.className = 'alert-conflito aviso';
+        boxAviso.innerHTML = res.mensagem;
+        if (btnSubmit) btnSubmit.disabled = false;
+      } else {
+        boxAviso.style.display = 'none';
+        boxAviso.innerHTML = '';
+        if (btnSubmit) btnSubmit.disabled = false;
+      }
+    }
+
     async function submeterNovoCultoTematico(e) {
       e.preventDefault();
       const btn = document.getElementById('btnSalvarCultoTematico');
       btn.disabled = true;
       btn.innerText = 'Enviando...';
+
+      const dataVal = document.getElementById('culto_data')?.value;
+      const horaIniVal = document.getElementById('culto_hora_ini')?.value || '18:00';
+      const horaFimVal = document.getElementById('culto_hora_fim')?.value || '20:30';
+      const checkCulto = calcularConflitoNoCliente('culto_tematico', dataVal, horaIniVal, horaFimVal);
+      if (checkCulto.bloquear) {
+        alert(checkCulto.mensagem.replace(/<[^>]+>/g, ' '));
+        btn.disabled = false;
+        btn.innerText = 'Solicitar Culto Temático';
+        return;
+      }
 
       const payload = {
         tipo: 'culto_tematico',
@@ -4770,44 +5016,18 @@ function renderGestaoHtml({ user }) {
         });
       }
 
-      
-      // Validação rápida no cliente de intervalo mínimo de 2 horas para eventos
+      // Validação no cliente de intervalo mínimo de 1h30 (90 min) para eventos
       const dataEvCliente = document.getElementById('ev_data')?.value;
       const horaIniCliente = document.getElementById('ev_hora_ini')?.value || '19:00';
       const horaFimCliente = document.getElementById('ev_hora_fim')?.value || '21:30';
 
-      if (tipo === 'unico' && dataEvCliente && Array.isArray(todosEventos)) {
-        const evsNoDia = todosEventos.filter(ev => ev.data === dataEvCliente && ev.status !== 'recusado' && ev.status !== 'cancelado');
-        for (const ev of evsNoDia) {
-          const ehEvPrincipal = ev.tipo === 'evento' || ev.tipo === 'acao' || ev.tipo === 'culto_tematico' || !ev.tipo;
-          if (ehEvPrincipal) {
-            const toMin = t => { const [h, m = 0] = String(t || '00:00').split(':').map(Number); return h * 60 + m; };
-            const iniNovo = toMin(horaIniCliente);
-            const fimNovo = toMin(horaFimCliente);
-            const iniEx = toMin(ev.horarioInicio || '19:00');
-            const fimEx = toMin(ev.horarioFim || ev.horarioTermino || '21:30');
-
-            if (iniNovo < fimEx + 120 && fimNovo > iniEx - 120) {
-              const hAntes = Math.floor(Math.max(0, iniEx - 120) / 60);
-              const mAntes = Math.max(0, iniEx - 120) % 60;
-              const livreAntes = (hAntes < 10 ? '0' : '') + hAntes + ':' + (mAntes < 10 ? '0' : '') + mAntes;
-
-              const hDepois = Math.floor(Math.min(1440, fimEx + 120) / 60);
-              const mDepois = Math.min(1440, fimEx + 120) % 60;
-              const livreDepois = (hDepois < 10 ? '0' : '') + hDepois + ':' + (mDepois < 10 ? '0' : '') + mDepois;
-
-              const msgConflito2h = [
-                '❌ Horário indisponível: Já existe o evento "' + (ev.titulo || '') + '" agendado no dia ' + dataEvCliente + ' das ' + (ev.horarioInicio || '19:00') + ' às ' + (ev.horarioFim || '21:30') + '.',
-                '',
-                'Para eventos da igreja no salão, é obrigatório um intervalo mínimo de 2 horas entre eles.',
-                'Horário livre antes das ' + livreAntes + ' ou a partir das ' + livreDepois + '.'
-              ].join('\\n');
-              alert(msgConflito2h);
-              btn.disabled = false;
-              btn.innerText = 'Enviar Solicitação';
-              return;
-            }
-          }
+      if (tipo === 'unico' && dataEvCliente) {
+        const checkEv = calcularConflitoNoCliente('evento', dataEvCliente, horaIniCliente, horaFimCliente);
+        if (checkEv.bloquear) {
+          alert(checkEv.mensagem.replace(/<[^>]+>/g, ' '));
+          btn.disabled = false;
+          btn.innerText = 'Enviar Solicitação';
+          return;
         }
       }
 
@@ -4861,6 +5081,17 @@ function renderGestaoHtml({ user }) {
       const btn = document.getElementById('btnSalvarReuniao');
       btn.disabled = true;
 
+      const dataVal = document.getElementById('reu_data')?.value;
+      const horaIniVal = document.getElementById('reu_hora_ini')?.value || '19:30';
+      const horaFimVal = document.getElementById('reu_hora_fim')?.value || '21:00';
+      const checkReu = calcularConflitoNoCliente('reuniao', dataVal, horaIniVal, horaFimVal);
+      if (checkReu.aviso) {
+        if (!confirm(checkReu.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento da reunião mesmo assim?')) {
+          btn.disabled = false;
+          return;
+        }
+      }
+
       const payload = {
         tipo: 'reuniao',
         departamento: document.getElementById('reu_departamento').value,
@@ -4898,6 +5129,17 @@ function renderGestaoHtml({ user }) {
       const btn = document.getElementById('btnSalvarEnsaio');
       btn.disabled = true;
 
+      const dataVal = document.getElementById('ens_data')?.value;
+      const horaIniVal = document.getElementById('ens_hora_ini')?.value || '19:00';
+      const horaFimVal = document.getElementById('ens_hora_fim')?.value || '21:30';
+      const checkEns = calcularConflitoNoCliente('ensaio', dataVal, horaIniVal, horaFimVal);
+      if (checkEns.aviso) {
+        if (!confirm(checkEns.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento do ensaio mesmo assim?')) {
+          btn.disabled = false;
+          return;
+        }
+      }
+
       const payload = {
         tipo: 'ensaio',
         departamento: document.getElementById('ens_departamento').value,
@@ -4934,6 +5176,19 @@ function renderGestaoHtml({ user }) {
       e.preventDefault();
       const btn = document.getElementById('btnSalvarAcao');
       if (btn) btn.disabled = true;
+
+      const dataVal = document.getElementById('acao_data')?.value;
+      const horaIniVal = document.getElementById('acao_hora_ini')?.value || '11:30';
+      const horaFimVal = document.getElementById('acao_hora_fim')?.value || '15:00';
+      const ocupaSal = document.getElementById('acao_ocupa_salao')?.value;
+      if (ocupaSal === 'sim') {
+        const checkAcao = calcularConflitoNoCliente('acao', dataVal, horaIniVal, horaFimVal);
+        if (checkAcao.bloquear) {
+          alert(checkAcao.mensagem.replace(/<[^>]+>/g, ' '));
+          if (btn) btn.disabled = false;
+          return;
+        }
+      }
 
       const payload = {
         tipo: 'acao',
@@ -4973,6 +5228,17 @@ function renderGestaoHtml({ user }) {
       e.preventDefault();
       const btn = document.getElementById('btnSalvarAtendimento');
       if (btn) btn.disabled = true;
+
+      const dataVal = document.getElementById('at_data')?.value;
+      const horaIniVal = document.getElementById('at_hora_ini')?.value || '14:00';
+      const horaFimVal = document.getElementById('at_hora_fim')?.value || '15:00';
+      const checkAtend = calcularConflitoNoCliente('atendimento', dataVal, horaIniVal, horaFimVal);
+      if (checkAtend.aviso) {
+        if (!confirm(checkAtend.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento pastoral mesmo assim?')) {
+          if (btn) btn.disabled = false;
+          return;
+        }
+      }
 
       const payload = {
         tipo: 'atendimento',

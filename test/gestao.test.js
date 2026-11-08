@@ -23,6 +23,7 @@ let server;
 let baseUrl;
 
 before(async () => {
+  gestao.setDependencies({ buscarEventos: async () => [] });
   server = startWebServer({ getStatus, startClient: noop, cancelQr: noop, disconnectClient: noop, port: 0 });
   await new Promise((resolve) => server.once("listening", resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -883,7 +884,7 @@ test("Portal de Gestão: /gestao/login, /gestao/register e /gestao/recuperar-sen
   assert.match(htmlRec, /\/gestao\/login/);
 });
 
-test("Bloqueio de 2 horas: verificarConflitoHorarioEvento bloqueia evento com menos de 2h de intervalo, mas permite reunião e ensaio", () => {
+test("Bloqueio de 1h30: verificarConflitoHorarioEvento bloqueia evento com menos de 1h30 de intervalo, mas não bloqueia reunião e atendimento", () => {
   const eventosExistentes = [
     {
       id: "ev_1",
@@ -895,7 +896,7 @@ test("Bloqueio de 2 horas: verificarConflitoHorarioEvento bloqueia evento com me
     }
   ];
 
-  // 1. Novo evento terminando às 18:00 (1h antes do existente) -> Conflito pelo buffer de 2h (17:00 a 23:00)
+  // 1. Novo evento terminando às 18:00 (1h antes do existente) -> Conflito pelo buffer de 1h30 (90 min: livre antes das 17:30 ou após 22:30)
   const conf1 = gestao.verificarConflitoHorarioEvento({
     data: "14/11/2026",
     horarioInicio: "16:00",
@@ -904,9 +905,12 @@ test("Bloqueio de 2 horas: verificarConflitoHorarioEvento bloqueia evento com me
     eventosExistentes
   });
   assert.equal(conf1.conflito, true);
-  assert.match(conf1.mensagem, /intervalo mínimo de 2 horas/);
+  assert.equal(conf1.bloquear, true);
+  assert.match(conf1.mensagem, /intervalo mínimo de 1h30/);
+  assert.equal(conf1.horaLivreAntes, "17:30");
+  assert.equal(conf1.horaLivreDepois, "22:30");
 
-  // 2. Novo evento iniciando às 22:00 (1h após o existente) -> Conflito pelo buffer de 2h
+  // 2. Novo evento iniciando às 22:00 (1h após o existente) -> Conflito pelo buffer de 1h30
   const conf2 = gestao.verificarConflitoHorarioEvento({
     data: "14/11/2026",
     horarioInicio: "22:00",
@@ -915,47 +919,51 @@ test("Bloqueio de 2 horas: verificarConflitoHorarioEvento bloqueia evento com me
     eventosExistentes
   });
   assert.equal(conf2.conflito, true);
-  assert.match(conf2.mensagem, /intervalo mínimo de 2 horas/);
+  assert.equal(conf2.bloquear, true);
+  assert.match(conf2.mensagem, /intervalo mínimo de 1h30/);
 
-  // 3. Novo evento iniciando às 23:00 (2h após o término das 21:00) -> Permitido!
+  // 3. Novo evento iniciando às 22:30 (1h30 após o término das 21:00) -> Permitido!
   const confLivreDepois = gestao.verificarConflitoHorarioEvento({
     data: "14/11/2026",
-    horarioInicio: "23:00",
-    horarioTermino: "01:00",
+    horarioInicio: "22:30",
+    horarioTermino: "00:00",
     tipo: "evento",
     eventosExistentes
   });
   assert.equal(confLivreDepois.conflito, false);
 
-  // 4. Novo evento terminando às 17:00 (2h antes do início das 19:00) -> Permitido!
+  // 4. Novo evento terminando às 17:30 (1h30 antes do início das 19:00) -> Permitido!
   const confLivreAntes = gestao.verificarConflitoHorarioEvento({
     data: "14/11/2026",
     horarioInicio: "15:00",
-    horarioTermino: "17:00",
+    horarioTermino: "17:30",
     tipo: "evento",
     eventosExistentes
   });
   assert.equal(confLivreAntes.conflito, false);
 
-  // 5. Reunião de liderança no horário das 17:30 às 18:30 (dentro do buffer de 2h do evento) -> Permitida!
+  // 5. Reunião de liderança no mesmo horário das 19:30 às 20:30 (sobreposição) -> Não bloqueia, apenas emite aviso!
   const confReuniao = gestao.verificarConflitoHorarioEvento({
     data: "14/11/2026",
-    horarioInicio: "17:30",
-    horarioTermino: "18:30",
+    horarioInicio: "19:30",
+    horarioTermino: "20:30",
     tipo: "reuniao",
     eventosExistentes
   });
-  assert.equal(confReuniao.conflito, false);
+  assert.equal(confReuniao.bloquear, false);
+  assert.equal(confReuniao.aviso, true);
+  assert.match(confReuniao.mensagem, /Reuniões e atendimentos são permitidos/);
 
-  // 6. Ensaio no horário das 17:00 às 18:30 -> Permitido sem a exigência do buffer de 2h!
-  const confEnsaio = gestao.verificarConflitoHorarioEvento({
+  // 6. Atendimento pastoral no horário das 19:00 às 20:00 -> Não bloqueia, apenas emite aviso!
+  const confAtend = gestao.verificarConflitoHorarioEvento({
     data: "14/11/2026",
-    horarioInicio: "17:00",
-    horarioTermino: "18:30",
-    tipo: "ensaio",
+    horarioInicio: "19:00",
+    horarioTermino: "20:00",
+    tipo: "atendimento",
     eventosExistentes
   });
-  assert.equal(confEnsaio.conflito, false);
+  assert.equal(confAtend.bloquear, false);
+  assert.equal(confAtend.aviso, true);
 });
 
 test("Culto Temático: Pastores e Diretores podem solicitar sem necessidade de ficha longa", async () => {
