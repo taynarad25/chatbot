@@ -5180,7 +5180,7 @@ function renderGestaoHtml({ user }) {
       const horaFimVal = document.getElementById('reu_hora_fim')?.value || '21:00';
       const checkReu = calcularConflitoNoCliente('reuniao', dataVal, horaIniVal, horaFimVal);
       if (checkReu.aviso) {
-        if (!confirm(checkReu.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento da reunião mesmo assim?')) {
+        if (!confirm(checkReu.mensagem.replace(/<[^>]+>/g, ' ') + '\\n\\nDeseja prosseguir com o agendamento da reunião mesmo assim?')) {
           btn.disabled = false;
           enviandoSolicitacaoGlobal = false;
           return;
@@ -5232,7 +5232,7 @@ function renderGestaoHtml({ user }) {
       const horaFimVal = document.getElementById('ens_hora_fim')?.value || '21:30';
       const checkEns = calcularConflitoNoCliente('ensaio', dataVal, horaIniVal, horaFimVal);
       if (checkEns.aviso) {
-        if (!confirm(checkEns.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento do ensaio mesmo assim?')) {
+        if (!confirm(checkEns.mensagem.replace(/<[^>]+>/g, ' ') + '\\n\\nDeseja prosseguir com o agendamento do ensaio mesmo assim?')) {
           btn.disabled = false;
           enviandoSolicitacaoGlobal = false;
           return;
@@ -5340,7 +5340,7 @@ function renderGestaoHtml({ user }) {
       const horaFimVal = document.getElementById('at_hora_fim')?.value || '15:00';
       const checkAtend = calcularConflitoNoCliente('atendimento', dataVal, horaIniVal, horaFimVal);
       if (checkAtend.aviso) {
-        if (!confirm(checkAtend.mensagem.replace(/<[^>]+>/g, ' ') + '\n\nDeseja prosseguir com o agendamento pastoral mesmo assim?')) {
+        if (!confirm(checkAtend.mensagem.replace(/<[^>]+>/g, ' ') + '\\n\\nDeseja prosseguir com o agendamento pastoral mesmo assim?')) {
           if (btn) btn.disabled = false;
           enviandoSolicitacaoGlobal = false;
           return;

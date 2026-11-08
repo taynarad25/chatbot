@@ -1109,6 +1109,27 @@ test("Deduplicação: evento pendente não aparece duplicado no calendário e so
   assert.equal(eventosFiltrados[0].status, "pendente_secretaria");
 });
 
+test("Integridade de Sintaxe Client-Side: renderGestaoHtml produz script inline 100% válido sem SyntaxError", () => {
+  const sessionAdmin = {
+    username: "gabriela",
+    role: "admin",
+    nome: "Gabriela Diniz",
+    telefone: "5511942685501"
+  };
+
+  const html = gestao.renderGestaoHtml({ user: sessionAdmin });
+  assert.ok(html.includes("<script>"), "HTML deve conter tag script");
+  const match = html.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(match && match[1], "Conteúdo do script deve ser extraível");
+
+  const vm = require("vm");
+  // Compilar o script com o compilador V8 do Node para garantir que não haja erros de token ou sintaxe
+  assert.doesNotThrow(() => {
+    new vm.Script(match[1], { filename: "gestao_inline_test.js" });
+  }, "O script JavaScript inline do painel de gestão não pode conter SyntaxError");
+});
+
+
 
 
 
