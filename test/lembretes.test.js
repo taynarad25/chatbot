@@ -6,8 +6,46 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chatbot-lembretes-test-"))
 process.env.DB_PATH = path.join(tmpDir, "lembretes.db");
 process.env.NODE_ENV = "test";
 
+const originalFetch = globalThis.fetch;
+const inMemorySheetLogs = new Set();
+globalThis.fetch = async (url, opts = {}) => {
+  const urlStr = String(url || "");
+  if (urlStr.includes("script.google.com") && opts?.body) {
+    try {
+      const body = JSON.parse(opts.body);
+      if (body.action === "verificar_envio") {
+        const chave = `${body.tipo}|${body.destinatario}|${body.periodo}`;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ enviado: inMemorySheetLogs.has(chave) }),
+          text: async () => JSON.stringify({ enviado: inMemorySheetLogs.has(chave) })
+        };
+      }
+      if (body.action === "registrar_envio") {
+        const chave = `${body.tipo}|${body.destinatario}|${body.periodo}`;
+        inMemorySheetLogs.add(chave);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, status: "success" }),
+          text: async () => JSON.stringify({ ok: true, status: "success" })
+        };
+      }
+    } catch (_) {}
+  }
+  if (typeof originalFetch === "function") {
+    return originalFetch(url, opts);
+  }
+  return { ok: true, status: 200, json: async () => ({ ok: true }), text: async () => "{}" };
+};
+
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
+
+after(() => {
+  globalThis.fetch = originalFetch;
+});
 
 const db = require("../db");
 const {
@@ -1406,6 +1444,97 @@ test("obterUltimaExecucaoRotina e registrarExecucaoRotina: persiste data de roti
   // Tenta chamar checarExecutar sem forçar (deve pular)
   await agendador.checarExecutar(false);
   assert.equal(rotinasChamadas, 0, "Não deve reexecutar rotina se já rodou hoje");
+});
+
+test("Treinamento / Curso: lembrete de 5 dias só é enviado para a 1ª sessão e isento de itens a definir", async () => {
+  const TEL_LIDER_TR = "5511999994321";
+  try { removeLider(TEL_LIDER_TR); } catch {}
+  addLider({
+    nome: "Líder de Intercessão",
+    telefone: TEL_LIDER_TR,
+    cargos: ["lider"],
+    departamento: "Intercessão",
+  });
+
+  const idTr = "google-ev-treina-intercessao-01";
+  try {
+    db.prepare("DELETE FROM lembretes_enviados WHERE eventoId = ?").run(idTr);
+  } catch {}
+
+  const evTreinamento = {
+    id: idTr,
+    summary: "Treinamento de Intercessão - Módulos 1 e 2",
+    description: "Curso de intercessão e prática profética.\nSolicitante: Líder de Intercessão\nTelefone: 5511999994321\nSessão 1: 2026-11-20\nSessão 2: 2026-11-27",
+    start: { dateTime: "2026-11-20T19:30:00-03:00" },
+    end: { dateTime: "2026-11-20T21:30:00-03:00" },
+    location: "Templo",
+    calendarId: "cal-intercessao"
+  };
+
+  // 1. 5 dias antes da 1ª SESSÃO (Data base: 2026-11-15 -> alvo: 2026-11-20)
+  const msgs1 = [];
+  const fakeClient1 = {
+    sendMessage: async (to, txt) => {
+      msgs1.push({ to, txt });
+    },
+  };
+
+  const res1 = await processarLembretesEventos({
+    client: fakeClient1,
+    buscarEventos: async () => [evTreinamento],
+    agendasParaLer: ["cal-intercessao"],
+    diasAntecedencia: 5,
+    dataBase: new Date("2026-11-15T10:00:00.000Z"),
+  });
+
+  assert.equal(res1.enviados, 1);
+  assert.equal(msgs1.length, 1);
+  assert.match(msgs1[0].txt, /Treinamento de Intercessão/);
+  assert.match(msgs1[0].txt, /Líder de Intercessão/);
+
+  // 2. 5 dias antes da 2ª SESSÃO (Data base: 2026-11-22 -> alvo: 2026-11-27)
+  const evTreinaSessao2 = {
+    ...evTreinamento,
+    start: { dateTime: "2026-11-27T19:30:00-03:00" },
+    end: { dateTime: "2026-11-27T21:30:00-03:00" },
+  };
+
+  const msgs2 = [];
+  const fakeClient2 = {
+    sendMessage: async (to, txt) => {
+      msgs2.push({ to, txt });
+    },
+  };
+
+  const res2 = await processarLembretesEventos({
+    client: fakeClient2,
+    buscarEventos: async () => [evTreinaSessao2],
+    agendasParaLer: ["cal-intercessao"],
+    diasAntecedencia: 5,
+    dataBase: new Date("2026-11-22T10:00:00.000Z"),
+  });
+
+  assert.equal(res2.enviados, 0, "Não deve enviar lembrete de 5 dias para sessões subsequentes de treinamento");
+  assert.equal(msgs2.length, 0);
+
+  // 3. Treinamento é isento do lembrete de ficha/itens a definir (processarLembretesItensADefinir)
+  const msgsItens = [];
+  const fakeClientItens = {
+    sendMessage: async (to, txt) => {
+      msgsItens.push({ to, txt });
+    },
+  };
+
+  const resItens = await processarLembretesItensADefinir({
+    client: fakeClientItens,
+    buscarEventos: async () => [evTreinamento],
+    diasAntecedencia: 7,
+    dataBase: new Date("2026-11-13T10:00:00.000Z"),
+  });
+
+  assert.equal(resItens.enviados, 0, "Treinamento não deve receber cobrança de itens a definir");
+
+  try { removeLider(TEL_LIDER_TR); } catch {}
 });
 
 

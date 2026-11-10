@@ -463,10 +463,12 @@ function buscarLembreteEnviado(eventoId, tipo) {
 function registrarLembreteEnviado(eventoId, tipo, destinatario) {
   try {
     const agora = new Date().toISOString();
-    db.prepare("INSERT INTO lembretes_enviados (eventoId, tipo, destinatario, enviadoEm) VALUES (?, ?, ?, ?)")
-      .run(eventoId, tipo, destinatario, agora);
+    const info = db.prepare(`
+      INSERT OR IGNORE INTO lembretes_enviados (eventoId, tipo, destinatario, enviadoEm)
+      VALUES (?, ?, ?, ?)
+    `).run(eventoId, tipo, destinatario, agora);
     try { db.exec("PRAGMA wal_checkpoint(PASSIVE);"); } catch (_) {}
-    return true;
+    return info.changes > 0;
   } catch (err) {
     console.error("[Lembretes] Erro ao registrar lembrete enviado:", err.message);
     return false;
@@ -698,6 +700,24 @@ async function processarLembretesEventos({
     const datasInfo = extrairDatasEvento(ev);
     const primeiroDia = datasInfo.primeiroDia;
     const ehMultiplosDias = datasInfo.ehMultiplosDias;
+
+    const ehTreinamento = /treinamento|curso|capacita[çc][ãa]o|escola\s+b[íi]blica/i.test(ev.summary || "") ||
+                          /treinamento|curso/i.test(ev.description || "") ||
+                          ev.tipo === 'treinamento';
+
+    // Regra específica para Treinamento / Curso:
+    // O líder NÃO precisa do lembrete de 5 dias em todas as sessões, APENAS na primeira sessão!
+    if (ehTreinamento && diasAntecedencia > 1) {
+      const matchSessao = (ev.summary || "").match(/(?:Sess[ãa]o|M[óo]dulo|Etapa)\s*(\d+)/i);
+      if (matchSessao && parseInt(matchSessao[1], 10) > 1) {
+        console.log(`[Lembretes] Treinamento "${ev.summary}" (Sessão ${matchSessao[1]}) ignorado para lembrete de ${diasAntecedencia} dias (lembrete de antecedência enviado apenas na 1ª sessão).`);
+        continue;
+      }
+      if (ehMultiplosDias && primeiroDia && primeiroDia !== dataAlvoStr) {
+        console.log(`[Lembretes] Treinamento "${ev.summary}" ignorado para ${dataAlvoStr} (lembrete de ${diasAntecedencia} dias conta apenas pelo 1º dia: ${primeiroDia}).`);
+        continue;
+      }
+    }
 
     // Para eventos com mais de 1 dia o dia do lembrete conta como o primeiro e somente esse:
     // Se a data que dispararia o lembrete (dataAlvoStr) não for o primeiro dia do evento, ignora!
@@ -1680,7 +1700,7 @@ async function processarLembretesItensADefinir({
   const tipoLembrete = `${diasAntecedencia}_dias_itens_a_definir`;
 
   for (const ev of eventos) {
-    if (ehEnsaio(ev) || ehReuniao(ev) || ehAtendimentoPastoral(ev)) {
+    if (ehEnsaio(ev) || ehReuniao(ev) || ehAtendimentoPastoral(ev) || /treinamento|curso|capacita[çc][ãa]o/i.test(ev.summary || "") || /treinamento|curso/i.test(ev.description || "")) {
       continue;
     }
 

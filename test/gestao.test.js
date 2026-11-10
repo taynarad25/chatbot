@@ -1208,6 +1208,135 @@ test("Ciclo de Vida de Solicitação Pendente: líder consegue alterar e cancela
   assert.ok(!pendenteRemovido, "Registro pendente deve ter sido removido do banco");
 });
 
+test("Treinamento / Curso: suporta múltiplas sessões, valida conflito e salva sem ficha", async () => {
+  const sessionLider = {
+    username: "lider_intercessao",
+    role: "lider",
+    nome: "Líder Intercessão",
+    telefone: "5511999998888",
+    departamentos: ["Intercessão"]
+  };
+
+  const blocos = [
+    { data: "15/11/2026", inicio: "09:00", fim: "11:30" },
+    { data: "22/11/2026", inicio: "09:00", fim: "11:30" },
+    { data: "29/11/2026", inicio: "09:00", fim: "11:30" }
+  ];
+
+  const res = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "treinamento",
+    nome_treinamento: "Treinamento de Intercessão - Módulos 1 a 3",
+    departamento: "Intercessão",
+    tipo_duracao: "multiplo",
+    blocos_json: JSON.stringify(blocos),
+    local: "Salão Principal",
+    publico: "Equipe de Intercessão"
+  }, sessionLider);
+
+  assert.ok(res.ok, "Treinamento deve ser criado com sucesso");
+  assert.ok(res.codigo, "Deve gerar código de pendente");
+
+  const pendente = db.prepare("SELECT dados FROM pendentes WHERE codigo = ?").get(res.codigo);
+  assert.ok(pendente);
+  const dados = JSON.parse(pendente.dados);
+  assert.equal(dados.tipo, "treinamento");
+  assert.equal(dados.evento, "Treinamento de Intercessão - Módulos 1 a 3");
+  assert.equal(dados.blocos.length, 3);
+
+  // Aparece em Minhas Solicitações
+  const solicitacoes = gestao.listarSolicitacoes({ user: sessionLider });
+  const achou = solicitacoes.find(s => s.codigo === res.codigo);
+  assert.ok(achou, "Solicitação de treinamento deve constar em Minhas Solicitações");
+  assert.equal(achou.titulo, "Treinamento de Intercessão - Módulos 1 a 3");
+  assert.equal(achou.tipo, "treinamento");
+
+  // Bloqueio de horário para outros eventos na data/horário de uma das sessões (15/11/2026 às 09:00)
+  const eventosSimulados = [
+    {
+      data: "15/11/2026",
+      horarioInicio: "09:00",
+      horarioFim: "11:30",
+      titulo: "Treinamento de Intercessão",
+      tipo: "treinamento"
+    }
+  ];
+
+  const conflito = gestao.verificarConflitoHorarioEvento({
+    data: "15/11/2026",
+    horarioInicio: "10:00",
+    horarioTermino: "12:00",
+    tipo: "evento",
+    eventosExistentes: eventosSimulados
+  });
+  assert.equal(conflito.bloquear, true, "Deve bloquear evento em sobreposição direta");
+});
+
+test("Culto Temático no domingo: substitui o culto oficial e não sofre conflito com Culto de Celebração", () => {
+  const eventosDomingo = [
+    {
+      data: "20/12/2026",
+      horarioInicio: "18:00",
+      horarioFim: "20:30",
+      titulo: "Culto de Celebração",
+      tipo: "evento"
+    }
+  ];
+
+  const conflito = gestao.verificarConflitoHorarioEvento({
+    data: "20/12/2026",
+    horarioInicio: "18:00",
+    horarioTermino: "21:00",
+    tipo: "culto_tematico",
+    eventosExistentes: eventosDomingo
+  });
+
+  assert.equal(conflito.bloquear, false, "Culto temático no domingo não deve ser bloqueado pelo Culto de Celebração");
+});
+
+test("Minhas Solicitações: exibe pedidos de alteração e cancelamento pendentes de análise", async () => {
+  const sessionLider = {
+    username: "lider_minhas_sol",
+    role: "lider",
+    nome: "Líder Minhas Sol",
+    telefone: "5511999990000",
+    departamentos: ["Geral"]
+  };
+
+  // Pedido de alteração de evento existente
+  const resAlt = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "alterar",
+    nome_evento: "Culto Especial de Louvor",
+    departamento: "Geral",
+    data: "10/12/2026",
+    campo_alterar: "Horário",
+    novo_valor: "20:00",
+    motivo: "Ajuste na programação"
+  }, sessionLider);
+  assert.ok(resAlt.ok);
+
+  // Pedido de cancelamento de evento existente
+  const resCanc = await gestao.criarSolicitacaoEventoWeb({
+    tipo: "cancelar",
+    nome_evento: "Vigília de Final de Ano",
+    departamento: "Geral",
+    data: "31/12/2026",
+    motivo: "Reagendada para janeiro"
+  }, sessionLider);
+  assert.ok(resCanc.ok);
+
+  const sols = gestao.listarSolicitacoes({ user: sessionLider });
+  const solAlt = sols.find(s => s.codigo === resAlt.codigo);
+  const solCanc = sols.find(s => s.codigo === resCanc.codigo);
+
+  assert.ok(solAlt, "Pedido de alteração deve aparecer na lista de solicitações");
+  assert.equal(solAlt.status, "⏳ Alteração em Análise");
+  assert.match(solAlt.titulo, /Culto Especial de Louvor \(Alterar Horário\)/);
+
+  assert.ok(solCanc, "Pedido de cancelamento deve aparecer na lista de solicitações");
+  assert.equal(solCanc.status, "⏳ Cancelamento em Análise");
+  assert.match(solCanc.titulo, /Vigília de Final de Ano \(Pedido de Cancelamento\)/);
+});
+
 
 
 

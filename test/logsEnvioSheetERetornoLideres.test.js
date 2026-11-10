@@ -430,12 +430,12 @@ test("processarLembretesEventos: deduplicação via planilha e mensagem enxuta �
   assert.ok(verifica, "deve fazer POST verificar_envio");
   assert.equal(verifica.tipo, "lembrete_evento_5_dias");
   assert.match(verifica.destinatario, /Gustavo Louvor/);
-  assert.equal(verifica.periodo, dEvIsoGustavo);
+  assert.equal(verifica.periodo, `D_${dEvIsoGustavo}`);
 
   assert.ok(registra, "deve fazer POST registrar_envio");
   assert.equal(registra.tipo, "lembrete_evento_5_dias");
   assert.match(registra.destinatario, /Gustavo Louvor/);
-  assert.equal(registra.periodo, dEvIsoGustavo);
+  assert.equal(registra.periodo, `D_${dEvIsoGustavo}`);
 
   // 2. Se a planilha retornar enviado: true, ignora o envio (mesmo se o banco reiniciar)
   try {

@@ -63,50 +63,65 @@ async function verificarEnvioRemoto({
     return null;
   }
 
-  const payload = {
-    action: "verificar_envio",
-    tipo: String(tipo),
-    destinatario: String(destinatario || "Geral"),
-    periodo: String(periodo),
-  };
+  const periodoNorm = normalizarPeriodo(periodo);
 
-  try {
-    const res = await fetchFn(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  async function consultar(p) {
+    const payload = {
+      action: "verificar_envio",
+      tipo: String(tipo),
+      destinatario: String(destinatario || "Geral"),
+      periodo: String(p),
+    };
 
-    if (!res.ok) {
-      console.warn(`[LogsEnvioSheet] Web App retornou status HTTP ${res.status} ao verificar envio para '${tipo}' (${destinatario}, ${periodo}).`);
-      return null;
-    }
+    try {
+      const res = await fetchFn(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    let data;
-    if (typeof res.text === "function") {
-      const texto = await res.text();
-      try {
-        data = JSON.parse(texto);
-      } catch {
-        console.warn(`[LogsEnvioSheet] Resposta não-JSON recebida ao verificar envio para '${tipo}': ${texto.slice(0, 100)}`);
+      if (!res.ok) {
+        console.warn(`[LogsEnvioSheet] Web App retornou status HTTP ${res.status} ao verificar envio para '${tipo}' (${destinatario}, ${p}).`);
         return null;
       }
-    } else if (typeof res.json === "function") {
-      data = await res.json();
-    } else {
+
+      let data;
+      if (typeof res.text === "function") {
+        const texto = await res.text();
+        try {
+          data = JSON.parse(texto);
+        } catch {
+          console.warn(`[LogsEnvioSheet] Resposta não-JSON recebida ao verificar envio para '${tipo}': ${texto.slice(0, 100)}`);
+          return null;
+        }
+      } else if (typeof res.json === "function") {
+        data = await res.json();
+      } else {
+        return null;
+      }
+
+      if (data && typeof data.enviado !== "undefined") {
+        return data.enviado === true || data.enviado === "true";
+      }
+
+      return null;
+    } catch (err) {
+      console.warn(`[LogsEnvioSheet] Erro ao comunicar com Web App de logs (${tipo}, ${destinatario}, ${p}): ${err.message}`);
       return null;
     }
-
-    // A planilha responderá com { "enviado": true } ou { "enviado": false }
-    if (data && typeof data.enviado !== "undefined") {
-      return data.enviado === true || data.enviado === "true";
-    }
-
-    return null;
-  } catch (err) {
-    console.warn(`[LogsEnvioSheet] Erro ao comunicar com Web App de logs (${tipo}, ${destinatario}, ${periodo}): ${err.message}`);
-    return null;
   }
+
+  // Consulta prioritariamente com período normalizado (D_YYYY-MM-DD evita conversão automática para Date no Google Sheets)
+  const resNorm = await consultar(periodoNorm);
+  if (resNorm === true) return true;
+
+  // Se retornou false ou null e havia diferença com o período original, tenta consultar com o período bruto
+  if (periodoNorm !== String(periodo)) {
+    const resBruto = await consultar(periodo);
+    if (resBruto === true) return true;
+  }
+
+  return resNorm;
 }
 
 /**
@@ -133,11 +148,13 @@ async function registrarEnvioRemoto({
     return false;
   }
 
+  const periodoNorm = normalizarPeriodo(periodo);
+
   const payload = {
     action: "registrar_envio",
     tipo: String(tipo),
     destinatario: String(destinatario || "Geral"),
-    periodo: String(periodo),
+    periodo: String(periodoNorm),
     timestamp: new Date().toISOString(),
     ...detalhes,
   };
@@ -150,7 +167,7 @@ async function registrarEnvioRemoto({
     });
 
     if (!res.ok) {
-      console.warn(`[LogsEnvioSheet] Web App retornou status HTTP ${res.status} ao registrar envio para '${tipo}' (${destinatario}, ${periodo}).`);
+      console.warn(`[LogsEnvioSheet] Web App retornou status HTTP ${res.status} ao registrar envio para '${tipo}' (${destinatario}, ${periodoNorm}).`);
       return false;
     }
 
@@ -160,7 +177,6 @@ async function registrarEnvioRemoto({
       try {
         data = JSON.parse(texto);
       } catch {
-        // Se respondeu 200 com texto ok
         return true;
       }
     } else if (typeof res.json === "function") {
@@ -169,9 +185,13 @@ async function registrarEnvioRemoto({
       return true;
     }
 
-    return data && (data.sucesso === true || data.status === "success" || data.ok === true || typeof data.enviado !== "undefined");
+    const sucesso = data && (data.sucesso === true || data.status === "success" || data.ok === true || typeof data.enviado !== "undefined" || data.registrado === true);
+    if (sucesso) {
+      console.log(`[LogsEnvioSheet] Envio registrado com sucesso na planilha: '${tipo}' (${destinatario}, ${periodoNorm}).`);
+    }
+    return Boolean(sucesso);
   } catch (err) {
-    console.warn(`[LogsEnvioSheet] Erro ao registrar envio no Web App de logs (${tipo}, ${destinatario}, ${periodo}): ${err.message}`);
+    console.warn(`[LogsEnvioSheet] Erro ao registrar envio no Web App de logs (${tipo}, ${destinatario}, ${periodoNorm}): ${err.message}`);
     return false;
   }
 }

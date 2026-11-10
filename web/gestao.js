@@ -162,8 +162,8 @@ function obterPerfilGestao(session) {
   );
 
   const isAdmin = role === 'admin' || username === 'admin';
-  const isPastor = isAdmin || role === 'pastor' || Boolean(dadosPastoral && dadosPastoral.cargo.toLowerCase().includes('pastor')) || cargos.includes('pastor');
-  const isDiretor = isPastor || role === 'diretor' || cargos.includes('diretor') || username.includes('diretor');
+  const isPastor = isAdmin || role === 'pastor' || role === 'pastora' || Boolean(dadosPastoral && dadosPastoral.cargo.toLowerCase().includes('pastor')) || cargos.includes('pastor') || cargos.includes('pastora');
+  const isDiretor = isPastor || role === 'diretor' || role === 'diretoria' || cargos.includes('diretor') || cargos.includes('diretoria') || username.includes('diretor') || username.includes('diretoria');
   const isLider = isAdmin || isPastor || isDiretor || role === 'lider' || temPermissaoLideranca || username.startsWith('lider.');
 
   // Se o usuário estiver na lista apenas como membro sem nenhum cargo de liderança:
@@ -729,11 +729,11 @@ function listarSolicitacoes({ user = null } = {}) {
     for (const p of rowsPend) {
       try {
         const d = JSON.parse(p.dados);
-        const nome = (d.nomeEvento || d.evento || d.nome || d.finalidade || '').trim();
+        let nome = (d.nomeEvento || d.evento || d.nome || d.finalidade || '').trim();
         if (!nome) continue;
 
-        const dataFormatada = d.dataFormatada || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
-        if (!dataFormatada && !d.blocos && !d.dataInicio && d.tipo !== 'midia') continue;
+        const dataFormatada = d.dataFormatada || d.data || (d.dia && d.mes && d.ano ? `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}` : '');
+        if (!dataFormatada && !d.blocos && !d.dataInicio && d.tipo !== 'midia' && d.tipo !== 'alterar' && d.tipo !== 'cancelar') continue;
 
         if (!perfil?.isPastor && !perfil?.isDiretor && !perfil?.isAdmin) {
           const deptos = (perfil?.departamentos || []).map(d => String(d).toLowerCase());
@@ -747,7 +747,17 @@ function listarSolicitacoes({ user = null } = {}) {
 
         let statusTexto = 'Aguardando Secretaria';
         let statusClass = 'pendente';
-        if (d.status === 'recusado') {
+        let tituloExibicao = nome;
+
+        if (d.tipo === 'alterar') {
+          statusTexto = '⏳ Alteração em Análise';
+          statusClass = 'pendente';
+          tituloExibicao = `${nome} (Alterar ${d.campo || 'Dados'})`;
+        } else if (d.tipo === 'cancelar') {
+          statusTexto = '⏳ Cancelamento em Análise';
+          statusClass = 'pendente';
+          tituloExibicao = `${nome} (Pedido de Cancelamento)`;
+        } else if (d.status === 'recusado') {
           statusTexto = '❌ Recusado pela Secretaria';
           statusClass = 'recusado';
         } else if (d.status === 'aprovado') {
@@ -762,10 +772,10 @@ function listarSolicitacoes({ user = null } = {}) {
           codigo: p.codigo,
           id: p.codigo,
           tipo: d.tipo || 'evento',
-          titulo: nome,
+          titulo: tituloExibicao,
           departamento: d.rede || d.departamento || 'Geral',
           data: dataFormatada || (d.blocos && d.blocos[0]?.data) || d.prazoEntrega || '',
-          horarioInicio: d.horarioInicio || (d.blocos && d.blocos[0]?.inicio) || (d.tipo === 'midia' ? 'Prazo de Entrega' : '19:00'),
+          horarioInicio: d.horarioInicio || (d.blocos && d.blocos[0]?.inicio) || (d.tipo === 'midia' ? 'Prazo de Entrega' : (d.tipo === 'alterar' || d.tipo === 'cancelar' ? '-' : '19:00')),
           horarioFim: d.horarioFim || (d.blocos && d.blocos[0]?.fim) || '',
           responsavel: d.solicitanteNome || '',
           status: statusTexto,
@@ -993,6 +1003,12 @@ function verificarConflitoHorarioEvento({
 
           const tipoEvExistente = String(ev.tipo || 'evento').toLowerCase();
           const tituloEv = ev.titulo || ev.evento || ev.nomeEvento || 'Evento existente';
+
+          const ehCultoOficialDomingo = /culto\s+de\s+celebra[çc][ãa]o|culto\s+oficial|culto\s+de\s+domingo|culto\s+da\s+fam[íi]lia|^culto$/i.test(String(tituloEv).trim());
+          if ((tipoNorm === 'culto_tematico' || tipoNorm === 'culto') && ehCultoOficialDomingo) {
+            // O Culto Temático substitui/ocupa o horário do culto oficial de domingo, portanto não é conflito
+            continue;
+          }
           let minExistIni = horaParaMinutos(ev.horarioInicio || '19:00');
           let minExistFim = horaParaMinutos(ev.horarioFim || ev.horarioTermino || '21:30');
           if (minExistFim <= minExistIni) {
@@ -1261,24 +1277,31 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 
 
   // 1C. CULTO TEMÁTICO (Exclusivo Pastores e Diretores - Sem necessidade de ficha longa)
-  if (tipoAcao === 'culto_tematico') {
+  if (tipoAcao === 'culto_tematico' || tipoAcao === 'culto' || tipoAcao === 'culto_especial') {
     if (!perfil?.isPastor && !perfil?.isDiretor && !perfil?.isAdmin) {
       throw new Error('Apenas pastores e diretores têm permissão para agendar Cultos Temáticos.');
     }
 
-    const { tema_culto, data, horario_inicio, horario_termino, decoracao, louvor_diferente, observacoes } = corpo;
-    if (!tema_culto || !data || !horario_inicio || !horario_termino) {
+    const temaFinal = (corpo.tema_culto || corpo.nome_evento || corpo.evento || corpo.nome || '').trim();
+    const { data, horario_inicio, horario_termino, decoracao, louvor_diferente, observacoes } = corpo;
+    if (!temaFinal || !data || !horario_inicio || !horario_termino) {
       throw new Error('Preencha o tema/nome do culto temático, a data e os horários de início e término.');
     }
 
-    const [diaStr, mesStr, anoStr] = data.split('/');
+    let dataFormatada = String(data).trim();
+    if (dataFormatada.includes('-')) {
+      const [anoP, mesP, diaP] = dataFormatada.split('-');
+      dataFormatada = `${diaP.padStart(2, '0')}/${mesP.padStart(2, '0')}/${anoP}`;
+    }
+
+    const [diaStr, mesStr, anoStr] = dataFormatada.split('/');
     const anoNumCulto = anoStr ? parseInt(anoStr, 10) : moment().tz("America/Sao_Paulo").year();
     const mesNumCulto = mesStr ? parseInt(mesStr, 10) : moment().tz("America/Sao_Paulo").month() + 1;
 
     // Checa conflitos e buffer de 1h30 para Culto Temático
     const evsExistentesCulto = await listarEventosCalendario({ user: perfil, mes: mesNumCulto, ano: anoNumCulto });
     const confCulto = verificarConflitoHorarioEvento({
-      data,
+      data: dataFormatada,
       horarioInicio: horario_inicio,
       horarioTermino: horario_termino,
       tipo: 'culto_tematico',
@@ -1290,14 +1313,14 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 
     const dadosCultoTematico = {
       tipo: 'culto_tematico',
-      evento: tema_culto.trim(),
-      nomeEvento: tema_culto.trim(),
+      evento: temaFinal,
+      nomeEvento: temaFinal,
       departamento: 'Geral',
       rede: 'Geral',
-      dia: parseInt(diaStr, 10),
-      mes: parseInt(mesStr, 10),
-      ano: parseInt(anoStr, 10),
-      dataFormatada: data,
+      dia: parseInt(diaStr, 10) || 1,
+      mes: parseInt(mesStr, 10) || 1,
+      ano: parseInt(anoStr, 10) || anoNumCulto,
+      dataFormatada,
       horarioInicio: horario_inicio,
       horarioFim: horario_termino,
       local: ENDERECO_IGREJA,
@@ -1315,8 +1338,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     const avisoGrupo =
       `✨ *SOLICITAÇÃO DE CULTO TEMÁTICO*\n\n` +
       `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
-      `📖 *Tema / Culto:* ${tema_culto.trim()}\n` +
-      `📆 *Data:* ${data}\n` +
+      `📖 *Tema / Culto:* ${temaFinal}\n` +
+      `📆 *Data:* ${dataFormatada}\n` +
       `⏰ *Horário:* ${horario_inicio} às ${horario_termino}\n` +
       `🎨 *Decoração Especial:* ${dadosCultoTematico.decoracao}\n` +
       `🎵 *Louvor Diferente:* ${dadosCultoTematico.louvorDiferente}\n` +
@@ -1337,6 +1360,126 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
       codigo,
       message: `Culto Temático solicitado com sucesso (Código: ${codigo}) e enviado para aprovação da Secretaria!`,
       mensagem: `Culto Temático solicitado com sucesso (Código: ${codigo}) e enviado para aprovação da Secretaria!`
+    };
+  }
+
+  // 1D. TREINAMENTO / CURSO (Não precisa de ficha de pós-evento, suporta múltiplas sessões/módulos)
+  if (tipoAcao === 'treinamento' || tipoAcao === 'curso') {
+    const {
+      nome_treinamento,
+      nome_evento,
+      departamento,
+      data,
+      horario_inicio,
+      horario_termino,
+      tipo_duracao = 'multiplo',
+      blocos_json,
+      local,
+      publico,
+      estimativa_pessoas,
+      observacoes
+    } = corpo;
+
+    const nomeFinal = (nome_treinamento || nome_evento || corpo.evento || corpo.nome || '').trim();
+    if (!nomeFinal) {
+      throw new Error('O nome do treinamento ou curso é obrigatório.');
+    }
+
+    let blocos = null;
+    let dataFormatada = data ? String(data).trim() : '';
+    if (dataFormatada.includes('-')) {
+      const [anoP, mesP, diaP] = dataFormatada.split('-');
+      dataFormatada = `${diaP.padStart(2, '0')}/${mesP.padStart(2, '0')}/${anoP}`;
+    }
+
+    if (tipo_duracao === 'multiplo' && blocos_json) {
+      try {
+        blocos = typeof blocos_json === 'string' ? JSON.parse(blocos_json) : blocos_json;
+        if (Array.isArray(blocos) && blocos.length > 0) {
+          dataFormatada = blocos[0].data;
+        }
+      } catch (_) {}
+    }
+
+    if (!dataFormatada && (!blocos || blocos.length === 0)) {
+      throw new Error('Informe a data ou adicione as sessões do treinamento.');
+    }
+
+    const partes = dataFormatada.split('/');
+    const diaNum = parseInt(partes[0], 10) || 1;
+    const mesNum = parseInt(partes[1], 10) || (moment().tz("America/Sao_Paulo").month() + 1);
+    const anoNum = parseInt(partes[2], 10) || moment().tz("America/Sao_Paulo").year();
+
+    const evsExistentes = await listarEventosCalendario({ user: perfil, mes: mesNum, ano: anoNum });
+    const conf = verificarConflitoHorarioEvento({
+      data: dataFormatada,
+      horarioInicio: horario_inicio || '19:30',
+      horarioTermino: horario_termino || '21:30',
+      tipo: 'treinamento',
+      blocos,
+      eventosExistentes: evsExistentes
+    });
+    if (conf && conf.bloquear) {
+      throw new Error(conf.mensagem);
+    }
+
+    const dadosTreinamento = {
+      tipo: 'treinamento',
+      evento: nomeFinal,
+      nomeEvento: nomeFinal,
+      departamento: departamento?.trim() || perfil?.departamentoPrincipal || 'Geral',
+      rede: departamento?.trim() || perfil?.departamentoPrincipal || 'Geral',
+      dia: diaNum,
+      mes: mesNum,
+      ano: anoNum,
+      dataFormatada,
+      horarioInicio: horario_inicio || '19:30',
+      horarioFim: horario_termino || '21:30',
+      tipoDuracao: tipo_duracao,
+      blocos: blocos || null,
+      local: local?.trim() || ENDERECO_IGREJA,
+      publico: publico?.trim() || 'Toda a Igreja',
+      estimativaPessoas: estimativa_pessoas || '',
+      observacoes: observacoes?.trim() || '',
+      solicitanteNome: perfil?.nome || 'Líder',
+      solicitanteId: perfil?.telefone || perfil?.username || '',
+      criadoVia: 'painel_web',
+      criadoEm: new Date().toISOString()
+    };
+
+    const codigo = salvarPendente(dadosTreinamento);
+
+    let detalheDatas = `📆 *Data:* ${dataFormatada}\n⏰ *Horário:* ${dadosTreinamento.horarioInicio} às ${dadosTreinamento.horarioFim}`;
+    if (Array.isArray(blocos) && blocos.length > 0) {
+      detalheDatas = `📚 *Sessões / Módulos Agendados (${blocos.length}):*\n` +
+        blocos.map((b, i) => `  • Sessão ${i + 1}: ${b.data} das ${b.inicio || '19:30'} às ${b.fim || '21:30'}`).join('\n');
+    }
+
+    const avisoGrupo =
+      `🎓 *SOLICITAÇÃO DE TREINAMENTO / CURSO*\n\n` +
+      `👤 *Solicitante:* ${perfil?.nome} (${perfil?.telefone || perfil?.username})\n` +
+      `🏢 *Ministério:* ${dadosTreinamento.departamento}\n` +
+      `📖 *Treinamento:* ${nomeFinal}\n` +
+      `${detalheDatas}\n` +
+      `📍 *Local:* ${dadosTreinamento.local}\n` +
+      (dadosTreinamento.publico ? `👥 *Público:* ${dadosTreinamento.publico}\n` : '') +
+      (dadosTreinamento.observacoes ? `📝 *Observações:* ${dadosTreinamento.observacoes}\n` : '') +
+      `\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `_Responda a este resumo com "marcar evento" para confirmar ou "não marcar" para negar._\n\n` +
+      `_Código: ${codigo}_`;
+
+    try {
+      const client = typeof getClient === 'function' ? getClient() : null;
+      if (client && client.info) {
+        await notificarSecretaria(client, avisoGrupo);
+      }
+    } catch (_) {}
+
+    return {
+      ok: true,
+      codigo,
+      message: `Treinamento/Curso registrado com sucesso (Código: ${codigo}) e enviado para aprovação da Secretaria!`,
+      mensagem: `Treinamento/Curso registrado com sucesso (Código: ${codigo}) e enviado para aprovação da Secretaria!`
     };
   }
 
@@ -1634,6 +1777,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     const dadosAlteracao = {
       tipo: 'alterar',
       evento: nome_evento.trim(),
+      departamento: corpo.departamento?.trim() || '',
+      dataFormatada: corpo.data || corpo.dataFormatada || '',
       campo: campo_alterar,
       novoValor: novo_valor,
       motivo: motivo?.trim() || 'Ajuste de cronograma',
@@ -1737,6 +1882,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     const dadosCancelamento = {
       tipo: 'cancelar',
       evento: nome_evento.trim(),
+      departamento: corpo.departamento?.trim() || '',
+      dataFormatada: corpo.data || corpo.dataFormatada || '',
       motivo: motivo.trim(),
       solicitanteNome: perfil?.nome || 'Líder',
       solicitanteId: perfil?.telefone || perfil?.username || '',
@@ -3249,6 +3396,12 @@ function renderGestaoHtml({ user }) {
               <span class="desc">Cultos especiais aos domingos. Rápido, sem ficha e com perguntas direto à Secretaria.</span>
             </button>
             ` : ''}
+
+            <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('treinamento')">
+              <span class="icone">🎓</span>
+              <span class="titulo">Treinamento / Curso</span>
+              <span class="desc">Cursos, módulos e treinamentos com várias sessões. Sem ficha longa de pós-evento.</span>
+            </button>
             <button class="tipo-card-btn" onclick="iniciarAgendamentoTipo('reuniao')">
               <span class="icone">🤝</span>
               <span class="titulo">Reunião de Liderança</span>
@@ -3581,6 +3734,94 @@ function renderGestaoHtml({ user }) {
             <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
               <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
               <button type="submit" class="btn-principal" id="btnSalvarCultoTematico">Solicitar Culto Temático</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- PASSO 2F: FORMULÁRIO DE TREINAMENTO / CURSO -->
+        <div id="stepFormTreinamento" class="form-step">
+          <button type="button" class="btn-voltar-tipo" onclick="voltarParaEscolhaTipo()">← Escolher outro tipo</button>
+          
+          <form id="formNovoTreinamento" onsubmit="submeterNovoTreinamento(event)">
+            <div class="alert-banner info">
+              🎓 Formulário para treinamentos, escolas e cursos ministeriais. Suporta múltiplas sessões/módulos e não exige ficha detalhada de pós-evento.
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Nome do Treinamento / Curso *</label>
+                <input type="text" class="form-control" id="treina_nome" placeholder="Ex: Treinamento de Intercessão" required />
+              </div>
+              <div class="form-group">
+                <label>Ministério Responsável *</label>
+                <select class="form-control" id="treina_departamento" required>
+                  ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Formato de Duração *</label>
+              <select class="form-control" id="treina_tipo_duracao" onchange="mudarTipoDuracaoTreinamento()">
+                <option value="multiplo" selected>Múltiplas Sessões / Vários Dias (Ex: 3 ou 4 domingos/sábados)</option>
+                <option value="unico">Dia Único / Intensivo</option>
+              </select>
+            </div>
+
+            <!-- DIA ÚNICO -->
+            <div id="secaoTreinaDiaUnico" style="display:none;">
+              <div class="form-row three-cols">
+                <div class="form-group">
+                  <label>Data *</label>
+                  <input type="text" class="form-control" id="treina_data" placeholder="DD/MM/AAAA" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
+                </div>
+                <div class="form-group">
+                  <label>Horário Início *</label>
+                  <input type="time" class="form-control" id="treina_hora_ini" value="19:30" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
+                </div>
+                <div class="form-group">
+                  <label>Horário Término *</label>
+                  <input type="time" class="form-control" id="treina_hora_fim" value="21:30" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
+                </div>
+              </div>
+            </div>
+
+            <!-- MÚLTIPLAS SESSÕES -->
+            <div id="secaoTreinaMultiplasSessoes">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label style="font-weight: 700; font-size: 0.85rem; color: var(--cor-roxo);">Datas das Sessões / Módulos *</label>
+                <button type="button" class="btn-secundario" style="padding: 4px 10px; font-size: 0.75rem;" onclick="adicionarBlocoSessaoTreinamento()">+ Adicionar Sessão</button>
+              </div>
+              <div id="containerBlocosTreinamento" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;"></div>
+            </div>
+
+            <div id="avisoConflito_treinamento" class="alert-conflito" style="display:none;"></div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Local</label>
+                <input type="text" class="form-control" id="treina_local" value="Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi" />
+              </div>
+              <div class="form-group">
+                <label>Público-Alvo</label>
+                <input type="text" class="form-control" id="treina_publico" placeholder="Ex: Equipe de Intercessão / Novos Líderes / Toda a Igreja" />
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Estimativa de Participantes</label>
+                <input type="text" class="form-control" id="treina_estimativa" placeholder="Ex: 20 pessoas" />
+              </div>
+              <div class="form-group">
+                <label>Observações / Requisitos</label>
+                <input type="text" class="form-control" id="treina_obs" placeholder="Ex: Trazer caderno e Bíblia" />
+              </div>
+            </div>
+
+            <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" class="btn-secundario" onclick="fecharModalAgendamento()">Cancelar</button>
+              <button type="submit" class="btn-principal" id="btnSalvarTreinamento">Solicitar Treinamento</button>
             </div>
           </form>
         </div>
@@ -4630,6 +4871,17 @@ function renderGestaoHtml({ user }) {
         document.getElementById('stepFormEnsaio').classList.add('active');
         document.getElementById('modalAgendamentoTitulo').innerText = '🎵 Agendar Ensaio';
         if (document.getElementById('ens_data')) document.getElementById('ens_data').value = dataStr;
+      } else if (tipo === 'treinamento') {
+        const stepTr = document.getElementById('stepFormTreinamento');
+        if (stepTr) {
+          stepTr.classList.add('active');
+          document.getElementById('modalAgendamentoTitulo').innerText = '🎓 Agendar Treinamento / Curso';
+          if (document.getElementById('treina_data')) document.getElementById('treina_data').value = dataStr;
+          const containerTr = document.getElementById('containerBlocosTreinamento');
+          if (containerTr && containerTr.children.length === 0) {
+            adicionarBlocoSessaoTreinamento(dataStr, '19:30', '21:30');
+          }
+        }
       } else if (tipo === 'atendimento') {
         const stepAt = document.getElementById('stepFormAtendimento');
         if (stepAt) {
@@ -4957,6 +5209,8 @@ function renderGestaoHtml({ user }) {
       const payload = {
         tipo: 'alterar',
         nome_evento: eventoSendoGerenciado.titulo,
+        data: eventoSendoGerenciado.data || '',
+        departamento: eventoSendoGerenciado.departamento || '',
         codigo: eventoSendoGerenciado.codigo || eventoSendoGerenciado.id,
         origem_status: eventoSendoGerenciado.status,
         campo_alterar: document.getElementById('ger_alt_campo').value,
@@ -5052,6 +5306,8 @@ function renderGestaoHtml({ user }) {
       const payload = {
         tipo: 'cancelar',
         nome_evento: eventoSendoGerenciado.titulo,
+        data: eventoSendoGerenciado.data || '',
+        departamento: eventoSendoGerenciado.departamento || '',
         codigo: eventoSendoGerenciado.codigo || eventoSendoGerenciado.id,
         origem_status: eventoSendoGerenciado.status,
         motivo: document.getElementById('ger_canc_motivo').value
@@ -5106,6 +5362,55 @@ function renderGestaoHtml({ user }) {
       container.appendChild(div);
     }
 
+    function mudarTipoDuracaoTreinamento() {
+      const tipo = document.getElementById('treina_tipo_duracao').value;
+      const secUnico = document.getElementById('secaoTreinaDiaUnico');
+      const secMultiplo = document.getElementById('secaoTreinaMultiplasSessoes');
+      if (secUnico) secUnico.style.display = tipo === 'unico' ? 'block' : 'none';
+      if (secMultiplo) secMultiplo.style.display = tipo === 'multiplo' ? 'block' : 'none';
+    }
+
+    let contadorBlocosTreinamento = 0;
+    function adicionarBlocoSessaoTreinamento(dataPreenchida = '', horaIni = '19:30', horaFim = '21:30') {
+      contadorBlocosTreinamento++;
+      const container = document.getElementById('containerBlocosTreinamento');
+      if (!container) return;
+      const numSessao = container.children.length + 1;
+      const div = document.createElement('div');
+      div.className = 'form-row three-cols';
+      div.style.background = '#f8fafc';
+      div.style.padding = '8px';
+      div.style.borderRadius = '8px';
+      div.style.alignItems = 'center';
+      div.id = 'bloco_treina_' + contadorBlocosTreinamento;
+
+      div.innerHTML = \`
+        <div>
+          <label style="font-size:0.7rem; color:var(--cor-subtexto);">Sessão \${numSessao} (Data)</label>
+          <input type="text" class="form-control" placeholder="DD/MM/AAAA" value="\${dataPreenchida}" id="treina_bloco_data_\${contadorBlocosTreinamento}" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
+        </div>
+        <div>
+          <label style="font-size:0.7rem; color:var(--cor-subtexto);">Início</label>
+          <input type="time" class="form-control" value="\${horaIni}" id="treina_bloco_ini_\${contadorBlocosTreinamento}" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
+        </div>
+        <div style="display: flex; gap: 4px; align-items: flex-end;">
+          <div style="flex: 1;">
+            <label style="font-size:0.7rem; color:var(--cor-subtexto);">Término</label>
+            <input type="time" class="form-control" value="\${horaFim}" id="treina_bloco_fim_\${contadorBlocosTreinamento}" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
+          </div>
+          <button type="button" class="btn-secundario" style="min-height: 38px; color: #ef4444; border-color: #fca5a5;" onclick="removerBlocoSessaoTreinamento('\${div.id}')">✕</button>
+        </div>
+      \`;
+      container.appendChild(div);
+      verificarConflitoTempoReal('treinamento');
+    }
+
+    function removerBlocoSessaoTreinamento(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+      verificarConflitoTempoReal('treinamento');
+    }
+
     
     function calcularConflitoNoCliente(tipo, dataStr, horaIni, horaFim) {
       if (!dataStr || !horaIni || !horaFim || !Array.isArray(todosEventos) || todosEventos.length === 0) {
@@ -5151,6 +5456,11 @@ function renderGestaoHtml({ user }) {
           fimEx += 24 * 60;
         }
         const tituloEv = ev.titulo || ev.evento || ev.nomeEvento || 'Evento existente';
+
+        const ehCultoOficialDomingo = /culto\s+de\s+celebra[çc][ãa]o|culto\s+oficial|culto\s+de\s+domingo|culto\s+da\s+fam[íi]lia|^culto$/i.test(String(tituloEv).trim());
+        if ((tipoNorm === 'culto_tematico' || tipoNorm === 'culto') && ehCultoOficialDomingo) {
+          continue;
+        }
 
         if (ehReuniaoOuAtend) {
           // Reunião ou atendimento: NÃO bloqueia e não exige 1h30. Apenas alerta sobreposição direta
@@ -5228,6 +5538,47 @@ function renderGestaoHtml({ user }) {
         campoHoraFim = document.getElementById('at_hora_fim');
         boxAviso = document.getElementById('avisoConflito_atendimento');
         btnSubmit = document.getElementById('btnSalvarAtendimento');
+      } else if (tipo === 'treinamento') {
+        const tipoDur = document.getElementById('treina_tipo_duracao')?.value || 'multiplo';
+        boxAviso = document.getElementById('avisoConflito_treinamento');
+        btnSubmit = document.getElementById('btnSalvarTreinamento');
+
+        if (tipoDur === 'multiplo') {
+          const container = document.getElementById('containerBlocosTreinamento');
+          const rows = container ? container.querySelectorAll('.form-row') : [];
+          if (boxAviso && rows.length > 0) {
+            let conflitoEncontrado = null;
+            for (let i = 0; i < rows.length; i++) {
+              const inputs = rows[i].querySelectorAll('input');
+              const dVal = (inputs[0]?.value || '').trim();
+              const hIniVal = inputs[1]?.value || '19:30';
+              const hFimVal = inputs[2]?.value || '21:30';
+              if (dVal) {
+                const resBloco = calcularConflitoNoCliente('treinamento', dVal, hIniVal, hFimVal);
+                if (resBloco.bloquear) {
+                  conflitoEncontrado = { sessao: i + 1, data: dVal, res: resBloco };
+                  break;
+                }
+              }
+            }
+            if (conflitoEncontrado) {
+              boxAviso.style.display = 'block';
+              boxAviso.className = 'alert-conflito bloqueio';
+              boxAviso.innerHTML = '<strong>Sessão ' + conflitoEncontrado.sessao + ' (' + conflitoEncontrado.data + '):</strong> ' + conflitoEncontrado.res.mensagem;
+              if (btnSubmit) btnSubmit.disabled = true;
+              return;
+            } else {
+              boxAviso.style.display = 'none';
+              boxAviso.innerHTML = '';
+              if (btnSubmit) btnSubmit.disabled = false;
+              return;
+            }
+          }
+        } else {
+          campoData = document.getElementById('treina_data');
+          campoHoraIni = document.getElementById('treina_hora_ini');
+          campoHoraFim = document.getElementById('treina_hora_fim');
+        }
       }
 
       if (!campoData || !boxAviso) return;
@@ -5558,6 +5909,110 @@ function renderGestaoHtml({ user }) {
       } finally {
         enviandoSolicitacaoGlobal = false;
         if (btn) btn.disabled = false;
+      }
+    }
+
+    async function submeterNovoTreinamento(e) {
+      e.preventDefault();
+      if (enviandoSolicitacaoGlobal) return;
+      enviandoSolicitacaoGlobal = true;
+      const btn = document.getElementById('btnSalvarTreinamento');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Enviando...';
+      }
+
+      const tipoDuracao = document.getElementById('treina_tipo_duracao').value;
+      const blocos = [];
+      let dataFinal = '';
+      let horaIniFinal = '19:30';
+      let horaFimFinal = '21:30';
+
+      if (tipoDuracao === 'multiplo') {
+        const container = document.getElementById('containerBlocosTreinamento');
+        if (container) {
+          container.querySelectorAll('.form-row').forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            const dt = (inputs[0]?.value || '').trim();
+            const ini = (inputs[1]?.value || '19:30').trim();
+            const fim = (inputs[2]?.value || '21:30').trim();
+            if (dt) {
+              blocos.push({ data: dt, inicio: ini, fim: fim });
+            }
+          });
+        }
+        if (blocos.length === 0) {
+          alert('Por favor, adicione pelo menos uma sessão com data para o treinamento.');
+          if (btn) { btn.disabled = false; btn.innerText = 'Solicitar Treinamento'; }
+          enviandoSolicitacaoGlobal = false;
+          return;
+        }
+        dataFinal = blocos[0].data;
+        horaIniFinal = blocos[0].inicio;
+        horaFimFinal = blocos[0].fim;
+
+        for (let i = 0; i < blocos.length; i++) {
+          const b = blocos[i];
+          const checkB = calcularConflitoNoCliente('treinamento', b.data, b.inicio, b.fim);
+          if (checkB.bloquear) {
+            alert('Sessão ' + (i + 1) + ' (' + b.data + '): ' + checkB.mensagem.replace(/<[^>]+>/g, ' '));
+            if (btn) { btn.disabled = false; btn.innerText = 'Solicitar Treinamento'; }
+            enviandoSolicitacaoGlobal = false;
+            return;
+          }
+        }
+      } else {
+        dataFinal = document.getElementById('treina_data')?.value || '';
+        horaIniFinal = document.getElementById('treina_hora_ini')?.value || '19:30';
+        horaFimFinal = document.getElementById('treina_hora_fim')?.value || '21:30';
+
+        const checkUni = calcularConflitoNoCliente('treinamento', dataFinal, horaIniFinal, horaFimFinal);
+        if (checkUni.bloquear) {
+          alert(checkUni.mensagem.replace(/<[^>]+>/g, ' '));
+          if (btn) { btn.disabled = false; btn.innerText = 'Solicitar Treinamento'; }
+          enviandoSolicitacaoGlobal = false;
+          return;
+        }
+      }
+
+      const payload = {
+        tipo: 'treinamento',
+        nome_treinamento: document.getElementById('treina_nome').value,
+        departamento: document.getElementById('treina_departamento').value,
+        tipo_duracao: tipoDuracao,
+        data: dataFinal,
+        horario_inicio: horaIniFinal,
+        horario_termino: horaFimFinal,
+        blocos_json: blocos.length > 0 ? JSON.stringify(blocos) : null,
+        local: document.getElementById('treina_local')?.value || '',
+        publico: document.getElementById('treina_publico')?.value || '',
+        estimativa_pessoas: document.getElementById('treina_estimativa')?.value || '',
+        observacoes: document.getElementById('treina_obs')?.value || ''
+      };
+
+      try {
+        const res = await fetch('/gestao/api/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ret = await res.json();
+        if (ret.ok) {
+          alert('✅ ' + (ret.mensagem || ret.message || 'Treinamento/Curso solicitado com sucesso!'));
+          fecharModalAgendamento();
+          carregarEventosServidor();
+          carregarSolicitacoesServidor();
+        } else {
+          alert('❌ Erro: ' + (ret.message || 'Falha ao solicitar treinamento.'));
+        }
+      } catch (_) {
+        alert('❌ Erro ao enviar.');
+      } finally {
+        enviandoSolicitacaoGlobal = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Solicitar Treinamento';
+        }
       }
     }
 
