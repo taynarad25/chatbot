@@ -3234,6 +3234,9 @@ function renderGestaoHtml({ user }) {
         📖 Área Pastoral
       </button>
       ` : ''}
+      <a href="/controlefinanceiro" class="tab-btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">
+        💎 Controle Financeiro
+      </a>
     </nav>
 
     <!-- ABA 1: CALENDÁRIO -->
@@ -3526,11 +3529,11 @@ function renderGestaoHtml({ user }) {
                 </div>
                 <div class="form-group">
                   <label>Horário Início *</label>
-                  <input type="time" class="form-control" id="ev_hora_ini" value="19:00" oninput="verificarConflitoTempoReal('evento')" onchange="verificarConflitoTempoReal('evento')" />
+                  <input type="time" class="form-control" id="ev_hora_ini" value="" oninput="verificarConflitoTempoReal('evento')" onchange="verificarConflitoTempoReal('evento')" />
                 </div>
                 <div class="form-group">
                   <label>Horário Término *</label>
-                  <input type="time" class="form-control" id="ev_hora_fim" value="21:30" oninput="verificarConflitoTempoReal('evento')" onchange="verificarConflitoTempoReal('evento')" />
+                  <input type="time" class="form-control" id="ev_hora_fim" value="" oninput="verificarConflitoTempoReal('evento')" onchange="verificarConflitoTempoReal('evento')" />
                 </div>
               </div>
               <div id="avisoConflito_evento" class="alert-conflito" style="display:none;"></div>
@@ -3557,7 +3560,7 @@ function renderGestaoHtml({ user }) {
                 </div>
                 <div class="form-group">
                   <label>Hora de Início *</label>
-                  <input type="time" class="form-control" id="ev_consec_hora_ini" value="18:00" />
+                  <input type="time" class="form-control" id="ev_consec_hora_ini" value="" />
                 </div>
               </div>
               <div class="form-row two-cols">
@@ -3567,7 +3570,7 @@ function renderGestaoHtml({ user }) {
                 </div>
                 <div class="form-group">
                   <label>Hora de Término *</label>
-                  <input type="time" class="form-control" id="ev_consec_hora_fim" value="16:00" />
+                  <input type="time" class="form-control" id="ev_consec_hora_fim" value="" />
                 </div>
               </div>
             </div>
@@ -3656,11 +3659,11 @@ function renderGestaoHtml({ user }) {
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>Horário Início *</label>
-                <input type="time" class="form-control" id="reu_hora_ini" value="19:30" oninput="verificarConflitoTempoReal('reuniao')" onchange="verificarConflitoTempoReal('reuniao')" required />
+                <input type="time" class="form-control" id="reu_hora_ini" value="" oninput="verificarConflitoTempoReal('reuniao')" onchange="verificarConflitoTempoReal('reuniao')" required />
               </div>
               <div class="form-group">
                 <label>Horário Término *</label>
-                <input type="time" class="form-control" id="reu_hora_fim" value="21:00" oninput="verificarConflitoTempoReal('reuniao')" onchange="verificarConflitoTempoReal('reuniao')" required />
+                <input type="time" class="form-control" id="reu_hora_fim" value="" oninput="verificarConflitoTempoReal('reuniao')" onchange="verificarConflitoTempoReal('reuniao')" required />
               </div>
             </div>
             <div id="avisoConflito_reuniao" class="alert-conflito" style="display:none;"></div>
@@ -3709,11 +3712,11 @@ function renderGestaoHtml({ user }) {
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>Horário Início *</label>
-                <input type="time" class="form-control" id="ens_hora_ini" value="19:30" required />
+                <input type="time" class="form-control" id="ens_hora_ini" value="" required />
               </div>
               <div class="form-group">
                 <label>Horário Término *</label>
-                <input type="time" class="form-control" id="ens_hora_fim" value="21:30" required />
+                <input type="time" class="form-control" id="ens_hora_fim" value="" required />
               </div>
             </div>
 
@@ -3763,11 +3766,11 @@ function renderGestaoHtml({ user }) {
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>Horário Início *</label>
-                <input type="time" class="form-control" id="culto_hora_ini" value="18:00" oninput="verificarConflitoTempoReal('culto_tematico')" onchange="verificarConflitoTempoReal('culto_tematico')" required />
+                <input type="time" class="form-control" id="culto_hora_ini" value="" oninput="verificarConflitoTempoReal('culto_tematico')" onchange="verificarConflitoTempoReal('culto_tematico')" required />
               </div>
               <div class="form-group">
                 <label>Horário Término *</label>
-                <input type="time" class="form-control" id="culto_hora_fim" value="20:30" oninput="verificarConflitoTempoReal('culto_tematico')" onchange="verificarConflitoTempoReal('culto_tematico')" required />
+                <input type="time" class="form-control" id="culto_hora_fim" value="" oninput="verificarConflitoTempoReal('culto_tematico')" onchange="verificarConflitoTempoReal('culto_tematico')" required />
               </div>
             </div>
             <div id="avisoConflito_culto" class="alert-conflito" style="display:none;"></div>
@@ -3915,11 +3918,11 @@ function renderGestaoHtml({ user }) {
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>Horário Início *</label>
-                <input type="time" class="form-control" id="acao_hora_ini" value="11:30" oninput="verificarConflitoTempoReal('acao')" onchange="verificarConflitoTempoReal('acao')" required />
+                <input type="time" class="form-control" id="acao_hora_ini" value="" oninput="verificarConflitoTempoReal('acao')" onchange="verificarConflitoTempoReal('acao')" required />
               </div>
               <div class="form-group">
                 <label>Horário Término *</label>
-                <input type="time" class="form-control" id="acao_hora_fim" value="15:00" oninput="verificarConflitoTempoReal('acao')" onchange="verificarConflitoTempoReal('acao')" required />
+                <input type="time" class="form-control" id="acao_hora_fim" value="" oninput="verificarConflitoTempoReal('acao')" onchange="verificarConflitoTempoReal('acao')" required />
               </div>
             </div>
             <div id="avisoConflito_acao" class="alert-conflito" style="display:none;"></div>
@@ -3978,11 +3981,11 @@ function renderGestaoHtml({ user }) {
               </div>
               <div class="form-group">
                 <label>Início *</label>
-                <input type="time" class="form-control" id="at_hora_ini" value="14:00" oninput="verificarConflitoTempoReal('atendimento')" onchange="verificarConflitoTempoReal('atendimento')" required />
+                <input type="time" class="form-control" id="at_hora_ini" value="" oninput="verificarConflitoTempoReal('atendimento')" onchange="verificarConflitoTempoReal('atendimento')" required />
               </div>
               <div class="form-group">
                 <label>Término *</label>
-                <input type="time" class="form-control" id="at_hora_fim" value="15:00" oninput="verificarConflitoTempoReal('atendimento')" onchange="verificarConflitoTempoReal('atendimento')" required />
+                <input type="time" class="form-control" id="at_hora_fim" value="" oninput="verificarConflitoTempoReal('atendimento')" onchange="verificarConflitoTempoReal('atendimento')" required />
               </div>
             </div>
             <div id="avisoConflito_atendimento" class="alert-conflito" style="display:none;"></div>
@@ -5719,9 +5722,9 @@ function renderGestaoHtml({ user }) {
             for (let i = 0; i < rows.length; i++) {
               const inputs = rows[i].querySelectorAll('input');
               const dVal = (inputs[0]?.value || '').trim();
-              const hIniVal = inputs[1]?.value || '19:30';
-              const hFimVal = inputs[2]?.value || '21:30';
-              if (dVal) {
+              const hIniVal = (inputs[1]?.value || '').trim();
+              const hFimVal = (inputs[2]?.value || '').trim();
+              if (dVal && hIniVal && hFimVal) {
                 const resBloco = calcularConflitoNoCliente('treinamento', dVal, hIniVal, hFimVal);
                 if (resBloco.bloquear) {
                   conflitoEncontrado = { sessao: i + 1, data: dVal, res: resBloco };
@@ -5752,8 +5755,8 @@ function renderGestaoHtml({ user }) {
       if (!campoData || !boxAviso) return;
 
       const dataVal = (campoData.value || '').trim();
-      const horaIniVal = campoHoraIni?.value || '19:00';
-      const horaFimVal = campoHoraFim?.value || '21:30';
+      const horaIniVal = campoHoraIni?.value || '';
+      const horaFimVal = campoHoraFim?.value || '';
 
       const res = calcularConflitoNoCliente(tipo, dataVal, horaIniVal, horaFimVal);
 
