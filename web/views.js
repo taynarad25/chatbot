@@ -2589,6 +2589,10 @@ function renderIndexHtml() {
         <h3 class="section-title-tab" style="margin:0;">Logs do Sistema</h3>
         <button class="danger" id="clearLogsBtn" style="padding: 6px 14px; font-size: 0.82rem; width: auto;">Limpar Logs</button>
       </div>
+      <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+        <button type="button" id="btnPausarLogs" onclick="window.__logsPausados=!window.__logsPausados; this.textContent = window.__logsPausados ? '▶️ Retomar atualização' : '⏸️ Pausar atualização';">⏸️ Pausar atualização</button>
+        <button type="button" onclick="(function(b){var t=document.getElementById('logsContainer').textContent; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){b.textContent='✅ Copiado!'; setTimeout(function(){b.textContent='📋 Copiar logs';},2000);}).catch(function(){alert('Não foi possível copiar automaticamente. Pause e selecione o texto manualmente.');});})(this)">📋 Copiar logs</button>
+      </div>
       <pre id="logsContainer">Carregando logs...</pre>
     </div>
   </div>
@@ -4258,8 +4262,16 @@ function renderIndexHtml() {
             .then(logJson => {
               const cont = document.getElementById('logsContainer');
               if (cont && logJson.ok) {
+                // Não atualiza se o usuário está selecionando/copiando texto ou se pausou os logs
+                const sel = window.getSelection ? window.getSelection() : null;
+                const selecionando = sel && sel.toString().length > 0 && cont.contains(sel.anchorNode);
+                if (selecionando || window.__logsPausados) return;
+                if (cont.textContent === logJson.logs) return;
+                // Só rola para o fim se o usuário já estava no final
+                const estavaNoFim = (cont.scrollHeight - cont.scrollTop - cont.clientHeight) < 40;
+                const posAnterior = cont.scrollTop;
                 cont.textContent = logJson.logs;
-                cont.scrollTop = cont.scrollHeight;
+                cont.scrollTop = estavaNoFim ? cont.scrollHeight : posAnterior;
               }
             })
             .catch(err => console.warn('Erro ao buscar logs'));

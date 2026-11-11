@@ -2205,6 +2205,62 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
 }
 
 /**
+ * Bloco de repetição (estilo Google Agenda) para eventos/treinamentos de vários dias.
+ * Gera automaticamente as sessões no container correspondente.
+ */
+function renderBlocoRecorrencia(prefixo) {
+  return `
+              <div style="background:#f5f3ff; border:1.5px dashed #c4b5fd; border-radius:12px; padding:12px; margin-bottom:12px;">
+                <div style="font-weight:800; font-size:0.85rem; color:var(--cor-roxo); margin-bottom:8px;">🔁 Repetição (opcional) — gera as sessões automaticamente</div>
+                <div class="form-row three-cols">
+                  <div class="form-group">
+                    <label>1ª data</label>
+                    <input type="date" class="form-control" id="${prefixo}_rec_data" />
+                  </div>
+                  <div class="form-group">
+                    <label>Início</label>
+                    <input type="time" class="form-control" id="${prefixo}_rec_ini" />
+                  </div>
+                  <div class="form-group">
+                    <label>Término</label>
+                    <input type="time" class="form-control" id="${prefixo}_rec_fim" />
+                  </div>
+                </div>
+                <div class="form-row three-cols">
+                  <div class="form-group">
+                    <label>Repetir</label>
+                    <select class="form-control" id="${prefixo}_rec_freq" onchange="document.getElementById('${prefixo}_rec_custom').style.display = this.value === 'custom' ? 'flex' : 'none'">
+                      <option value="semanal">Toda semana (mesmo dia)</option>
+                      <option value="quinzenal">A cada 2 semanas</option>
+                      <option value="mensal">Todo mês (mesmo dia do mês)</option>
+                      <option value="mensal_semana">Todo mês (ex: 1º domingo)</option>
+                      <option value="diario">Todos os dias</option>
+                      <option value="custom">Personalizar...</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Quantas vezes?</label>
+                    <input type="number" min="1" max="52" class="form-control" id="${prefixo}_rec_qtd" placeholder="Ex: 4" />
+                  </div>
+                  <div class="form-group">
+                    <label>ou até a data</label>
+                    <input type="date" class="form-control" id="${prefixo}_rec_ate" />
+                  </div>
+                </div>
+                <div id="${prefixo}_rec_custom" style="display:none; gap:8px; align-items:center; margin-bottom:8px;">
+                  <span style="font-size:0.8rem;">A cada</span>
+                  <input type="number" min="1" max="30" class="form-control" style="max-width:80px;" id="${prefixo}_rec_intervalo" value="1" />
+                  <select class="form-control" style="max-width:140px;" id="${prefixo}_rec_unidade">
+                    <option value="dias">dia(s)</option>
+                    <option value="semanas" selected>semana(s)</option>
+                    <option value="meses">mês(es)</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-secundario" onclick="gerarSessoesRecorrentes('${prefixo}')">⚡ Gerar sessões</button>
+              </div>`;
+}
+
+/**
  * Renderiza o HTML da tela de Gestão de Eventos (/gestao)
  */
 function renderGestaoHtml({ user }) {
@@ -3482,6 +3538,7 @@ function renderGestaoHtml({ user }) {
 
             <!-- Campos Múltiplos Dias -->
             <div id="secaoMultiplosDias" style="display: none;">
+              ${renderBlocoRecorrencia('ev')}
               <div class="form-group">
                 <label>Sessões / Blocos Programados</label>
                 <div id="containerBlocos" style="display: flex; flex-direction: column; gap: 8px;"></div>
@@ -3777,17 +3834,18 @@ function renderGestaoHtml({ user }) {
                 </div>
                 <div class="form-group">
                   <label>Horário Início *</label>
-                  <input type="time" class="form-control" id="treina_hora_ini" value="19:30" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
+                  <input type="time" class="form-control" id="treina_hora_ini" value="" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
                 </div>
                 <div class="form-group">
                   <label>Horário Término *</label>
-                  <input type="time" class="form-control" id="treina_hora_fim" value="21:30" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
+                  <input type="time" class="form-control" id="treina_hora_fim" value="" oninput="verificarConflitoTempoReal('treinamento')" onchange="verificarConflitoTempoReal('treinamento')" />
                 </div>
               </div>
             </div>
 
             <!-- MÚLTIPLAS SESSÕES -->
             <div id="secaoTreinaMultiplasSessoes">
+              ${renderBlocoRecorrencia('treina')}
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <label style="font-weight: 700; font-size: 0.85rem; color: var(--cor-roxo);">Datas das Sessões / Módulos *</label>
                 <button type="button" class="btn-secundario" style="padding: 4px 10px; font-size: 0.75rem;" onclick="adicionarBlocoSessaoTreinamento()">+ Adicionar Sessão</button>
@@ -4218,7 +4276,7 @@ function renderGestaoHtml({ user }) {
             <div class="form-row two-cols">
               <div class="form-group">
                 <label>O que deseja alterar? *</label>
-                <select class="form-control" id="ger_alt_campo" required>
+                <select class="form-control" id="ger_alt_campo" required onchange="atualizarCamposAlteracao()">
                   <option value="Data">Data</option>
                   <option value="Horário">Horário</option>
                   <option value="Local">Local</option>
@@ -4227,8 +4285,22 @@ function renderGestaoHtml({ user }) {
               </div>
               <div class="form-group">
                 <label>Nova Informação *</label>
-                <input type="text" class="form-control" id="ger_alt_novo_valor" placeholder="Ex: Nova data 25/11 ou 19h às 21h" required />
+                <input type="hidden" id="ger_alt_novo_valor" />
+                <div id="alt_box_data">
+                  <input type="date" class="form-control" id="ger_alt_nova_data" />
+                </div>
+                <div id="alt_box_horario" style="display:none; gap:6px;">
+                  <input type="time" class="form-control" id="ger_alt_hora_ini" title="Início" />
+                  <input type="time" class="form-control" id="ger_alt_hora_fim" title="Término" />
+                </div>
+                <div id="alt_box_local" style="display:none;">
+                  <input type="text" class="form-control" id="ger_alt_novo_local" placeholder="Novo endereço completo" />
+                </div>
               </div>
+            </div>
+            <div class="form-group" id="alt_box_outro" style="display:none;">
+              <label>Descreva o que deseja alterar *</label>
+              <textarea class="form-control" id="ger_alt_outro" rows="3" placeholder="Fale à vontade o que precisa mudar..."></textarea>
             </div>
 
             <div class="form-group">
@@ -4879,7 +4951,7 @@ function renderGestaoHtml({ user }) {
           if (document.getElementById('treina_data')) document.getElementById('treina_data').value = dataStr;
           const containerTr = document.getElementById('containerBlocosTreinamento');
           if (containerTr && containerTr.children.length === 0) {
-            adicionarBlocoSessaoTreinamento(dataStr, '19:30', '21:30');
+            adicionarBlocoSessaoTreinamento(dataStr, '', '');
           }
         }
       } else if (tipo === 'atendimento') {
@@ -4910,6 +4982,8 @@ function renderGestaoHtml({ user }) {
 
       // Pré-preenche campos
       if (document.getElementById('ger_alt_novo_valor')) document.getElementById('ger_alt_novo_valor').value = '';
+      ['ger_alt_nova_data','ger_alt_hora_ini','ger_alt_hora_fim','ger_alt_novo_local','ger_alt_outro'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      if (document.getElementById('ger_alt_campo')) { document.getElementById('ger_alt_campo').value = 'Data'; atualizarCamposAlteracao(); }
       if (document.getElementById('ger_alt_motivo')) document.getElementById('ger_alt_motivo').value = '';
       if (document.getElementById('ger_canc_motivo')) document.getElementById('ger_canc_motivo').value = '';
 
@@ -5198,6 +5272,33 @@ function renderGestaoHtml({ user }) {
       if (tipo === 'cancelar') document.getElementById('gerenciarEventoTitulo').innerText = ehPendente ? '🗑️ Cancelar Solicitação' : '🗑️ Cancelar Evento';
     }
 
+    function atualizarCamposAlteracao() {
+      const campo = document.getElementById('ger_alt_campo')?.value;
+      const mostrar = (id, on, disp) => { const el = document.getElementById(id); if (el) el.style.display = on ? (disp || 'block') : 'none'; };
+      mostrar('alt_box_data', campo === 'Data');
+      mostrar('alt_box_horario', campo === 'Horário', 'flex');
+      mostrar('alt_box_local', campo === 'Local');
+      mostrar('alt_box_outro', campo === 'Outro Detalhe');
+    }
+
+    function montarNovoValorAlteracao() {
+      const campo = document.getElementById('ger_alt_campo').value;
+      if (campo === 'Data') {
+        const v = document.getElementById('ger_alt_nova_data').value;
+        if (!v) return '';
+        const [a, m, d] = v.split('-');
+        return d + '/' + m + '/' + a;
+      }
+      if (campo === 'Horário') {
+        const i = document.getElementById('ger_alt_hora_ini').value;
+        const f = document.getElementById('ger_alt_hora_fim').value;
+        if (!i || !f) return '';
+        return i + ' às ' + f;
+      }
+      if (campo === 'Local') return document.getElementById('ger_alt_novo_local').value.trim();
+      return document.getElementById('ger_alt_outro').value.trim();
+    }
+
     async function submeterAlterarEventoSelecionado(e) {
       e.preventDefault();
       if (!eventoSendoGerenciado) return;
@@ -5205,6 +5306,13 @@ function renderGestaoHtml({ user }) {
         alert('❌ Permissão negada: Líderes só podem alterar eventos do seu próprio ministério. Somente Diretores e Pastores podem alterar todos os eventos.');
         return;
       }
+
+      const novoValor = montarNovoValorAlteracao();
+      if (!novoValor) {
+        alert('Preencha a nova informação (data, horários de início e término, endereço ou descrição).');
+        return;
+      }
+      document.getElementById('ger_alt_novo_valor').value = novoValor;
 
       const payload = {
         tipo: 'alterar',
@@ -5341,7 +5449,7 @@ function renderGestaoHtml({ user }) {
     }
 
     let contadorBlocos = 0;
-    function adicionarBlocoSessao() {
+    function adicionarBlocoSessao(dataPre = '', iniPre = '', fimPre = '') {
       contadorBlocos++;
       const container = document.getElementById('containerBlocos');
       const div = document.createElement('div');
@@ -5352,14 +5460,74 @@ function renderGestaoHtml({ user }) {
       div.id = 'bloco_' + contadorBlocos;
 
       div.innerHTML = \`
-        <div><input type="text" class="form-control" placeholder="Data DD/MM" id="bloco_data_\${contadorBlocos}" /></div>
-        <div><input type="time" class="form-control" value="19:00" id="bloco_ini_\${contadorBlocos}" /></div>
+        <div><input type="text" class="form-control" placeholder="DD/MM/AAAA" value="\${dataPre}" id="bloco_data_\${contadorBlocos}" /></div>
+        <div><input type="time" class="form-control" value="\${iniPre}" id="bloco_ini_\${contadorBlocos}" /></div>
         <div style="display: flex; gap: 4px;">
-          <input type="time" class="form-control" value="21:30" id="bloco_fim_\${contadorBlocos}" />
+          <input type="time" class="form-control" value="\${fimPre}" id="bloco_fim_\${contadorBlocos}" />
           <button type="button" class="btn-secundario" onclick="document.getElementById('bloco_\${contadorBlocos}').remove()" style="padding: 0 8px;">✕</button>
         </div>
       \`;
       container.appendChild(div);
+    }
+
+    // Gera sessões recorrentes (estilo Google Agenda) para eventos e treinamentos de vários dias
+    function gerarSessoesRecorrentes(prefixo) {
+      const g = id => document.getElementById(prefixo + '_rec_' + id);
+      const dataIni = g('data').value;
+      const hIni = g('ini').value;
+      const hFim = g('fim').value;
+      const freq = g('freq').value;
+      let qtd = parseInt(g('qtd').value, 10) || 0;
+      const ate = g('ate').value;
+      if (!dataIni || !hIni || !hFim) { alert('Informe a 1ª data e os horários de início e término.'); return; }
+      if (!qtd && !ate) { alert('Informe quantas vezes ou até qual data deve repetir.'); return; }
+      if (!qtd) qtd = 52;
+      qtd = Math.min(qtd, 52);
+
+      const [a, m, d] = dataIni.split('-').map(Number);
+      const base = new Date(a, m - 1, d, 12, 0, 0);
+      const limite = ate ? (() => { const [y, mo, da] = ate.split('-').map(Number); return new Date(y, mo - 1, da, 23, 59, 0); })() : null;
+      const diaSemana = base.getDay();
+      const nSemanaMes = Math.ceil(base.getDate() / 7);
+
+      const proxima = (i) => {
+        const dt = new Date(base);
+        if (freq === 'semanal') dt.setDate(base.getDate() + 7 * i);
+        else if (freq === 'quinzenal') dt.setDate(base.getDate() + 14 * i);
+        else if (freq === 'diario') dt.setDate(base.getDate() + i);
+        else if (freq === 'mensal') { dt.setDate(1); dt.setMonth(base.getMonth() + i); const ult = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); dt.setDate(Math.min(base.getDate(), ult)); }
+        else if (freq === 'mensal_semana') {
+          dt.setDate(1); dt.setMonth(base.getMonth() + i);
+          const desloc = (diaSemana - dt.getDay() + 7) % 7;
+          dt.setDate(1 + desloc + 7 * (nSemanaMes - 1));
+          if (dt.getMonth() !== (base.getMonth() + i) % 12) dt.setDate(dt.getDate() - 7);
+        } else {
+          const n = parseInt(g('intervalo').value, 10) || 1;
+          const un = g('unidade').value;
+          if (un === 'dias') dt.setDate(base.getDate() + n * i);
+          else if (un === 'semanas') dt.setDate(base.getDate() + 7 * n * i);
+          else { dt.setDate(1); dt.setMonth(base.getMonth() + n * i); const ult = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); dt.setDate(Math.min(base.getDate(), ult)); }
+        }
+        return dt;
+      };
+
+      const datas = [];
+      for (let i = 0; i < qtd; i++) {
+        const dt = proxima(i);
+        if (limite && dt > limite) break;
+        datas.push(String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0') + '/' + dt.getFullYear());
+      }
+      if (datas.length === 0) { alert('Nenhuma data gerada. Verifique a configuração.'); return; }
+
+      const containerId = prefixo === 'treina' ? 'containerBlocosTreinamento' : 'containerBlocos';
+      const container = document.getElementById(containerId);
+      if (container.children.length > 0 && !confirm('Substituir as sessões já adicionadas pelas ' + datas.length + ' geradas?')) return;
+      container.innerHTML = '';
+      datas.forEach(dt => {
+        if (prefixo === 'treina') adicionarBlocoSessaoTreinamento(dt, hIni, hFim);
+        else adicionarBlocoSessao(dt, hIni, hFim);
+      });
+      if (prefixo === 'treina') verificarConflitoTempoReal('treinamento');
     }
 
     function mudarTipoDuracaoTreinamento() {
@@ -5371,7 +5539,7 @@ function renderGestaoHtml({ user }) {
     }
 
     let contadorBlocosTreinamento = 0;
-    function adicionarBlocoSessaoTreinamento(dataPreenchida = '', horaIni = '19:30', horaFim = '21:30') {
+    function adicionarBlocoSessaoTreinamento(dataPreenchida = '', horaIni = '', horaFim = '') {
       contadorBlocosTreinamento++;
       const container = document.getElementById('containerBlocosTreinamento');
       if (!container) return;
@@ -5934,12 +6102,18 @@ function renderGestaoHtml({ user }) {
           container.querySelectorAll('.form-row').forEach(row => {
             const inputs = row.querySelectorAll('input');
             const dt = (inputs[0]?.value || '').trim();
-            const ini = (inputs[1]?.value || '19:30').trim();
-            const fim = (inputs[2]?.value || '21:30').trim();
+            const ini = (inputs[1]?.value || '').trim();
+            const fim = (inputs[2]?.value || '').trim();
             if (dt) {
               blocos.push({ data: dt, inicio: ini, fim: fim });
             }
           });
+        }
+        if (blocos.some(b => !b.inicio || !b.fim)) {
+          alert('Preencha o horário de início e término de todas as sessões.');
+          if (btn) { btn.disabled = false; btn.innerText = 'Solicitar Treinamento'; }
+          enviandoSolicitacaoGlobal = false;
+          return;
         }
         if (blocos.length === 0) {
           alert('Por favor, adicione pelo menos uma sessão com data para o treinamento.');
@@ -5963,8 +6137,14 @@ function renderGestaoHtml({ user }) {
         }
       } else {
         dataFinal = document.getElementById('treina_data')?.value || '';
-        horaIniFinal = document.getElementById('treina_hora_ini')?.value || '19:30';
-        horaFimFinal = document.getElementById('treina_hora_fim')?.value || '21:30';
+        horaIniFinal = document.getElementById('treina_hora_ini')?.value || '';
+        horaFimFinal = document.getElementById('treina_hora_fim')?.value || '';
+        if (!dataFinal || !horaIniFinal || !horaFimFinal) {
+          alert('Preencha a data e os horários de início e término.');
+          if (btn) { btn.disabled = false; btn.innerText = 'Solicitar Treinamento'; }
+          enviandoSolicitacaoGlobal = false;
+          return;
+        }
 
         const checkUni = calcularConflitoNoCliente('treinamento', dataFinal, horaIniFinal, horaFimFinal);
         if (checkUni.bloquear) {
