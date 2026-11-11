@@ -86,6 +86,7 @@ const {
   iniciarFluxoConsultaInscricoes,
   processarFluxoConsultaInscricoes,
 } = require("./consultaInscricoes");
+const financeiro = require("../web/financeiro");
 
 // Cada "átomo" é uma saudação isolada reconhecida. A mensagem inteira precisa ser só
 // uma sequência desses átomos (separados por vírgula/ponto/"e"/espaço) pra contar como
@@ -1020,7 +1021,8 @@ function montarMenuPastoral() {
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
     "2️⃣ 🤝 *Atendimento Pastoral*\n" +
     "3️⃣ 📢 *Comunicação e Mídia*\n" +
-    "4️⃣ 📋 *Inscrições & Fichas de Eventos*\n\n" +
+    "4️⃣ 📋 *Inscrições & Fichas de Eventos*\n" +
+    "5️⃣ 💎 *Prestação de Contas (Finanças da Igreja)*\n\n" +
     "Digite *menu* para voltar ao menu principal."
   );
 }
@@ -1070,7 +1072,8 @@ function montarMenuDiretor() {
     "Escolha um subgrupo:\n\n" +
     "1️⃣ 📅 *Agenda, Eventos e Reuniões*\n" +
     "2️⃣ 📢 *Comunicação e Mídia*\n" +
-    "3️⃣ 📋 *Inscrições & Fichas de Eventos*\n\n" +
+    "3️⃣ 📋 *Inscrições & Fichas de Eventos*\n" +
+    "4️⃣ 💎 *Prestação de Contas (Finanças da Igreja)*\n\n" +
     "Digite *menu* para voltar ao menu principal."
   );
 }
@@ -1123,6 +1126,29 @@ function montarMenuInscricoesOuFichas() {
     "2️⃣ 📄 *Fichas dos Eventos* (Ver formulários preenchidos e links de documentos)\n\n" +
     "Digite *1* ou *2* (ou digite *voltar* para o menu anterior):"
   );
+}
+
+async function responderPrestacaoContas({ msg, usuario, contato, numero, isPastor, isDiretor }) {
+  if (!isPastor && !isDiretor) {
+    return msg.reply(
+      `🔒 *Acesso Restrito*\n\n` +
+      `A prestação de contas completa da igreja é reservada exclusivamente aos Pastores e Membros da Diretoria.\n\n` +
+      `Para dúvidas ou solicitações financeiras de ministérios, entre em contato com a Tesouraria pelo WhatsApp: *+55 11 99111-7612*.\n\n` +
+      `Digite *menu* para voltar ao menu principal.`
+    );
+  }
+  const nomeSolicitante = (usuario && usuario.nome) || (contato && (contato.name || contato.pushname)) || "Pastor(a) / Diretor(a)";
+  try {
+    const resumo = financeiro.obterResumoPrestacaoContas({
+      solicitanteNome: nomeSolicitante,
+      solicitanteTel: numero,
+      canal: "whatsapp",
+    });
+    return msg.reply(resumo.textoWhatsApp);
+  } catch (errFin) {
+    console.error("[Prestação de Contas] Erro ao gerar resumo:", errFin);
+    return msg.reply("❌ Não foi possível gerar a prestação de contas no momento. Por favor tente novamente em alguns instantes ou acesse o site.");
+  }
 }
 
 function montarTextoMenuPrincipal({
@@ -5168,13 +5194,18 @@ function createMessageHandler({
               });
             }
 
+            if (escolha === "5" || /presta[cç][aã]o|financ|contas/i.test(escolha)) {
+              delete etapas[numero];
+              return await responderPrestacaoContas({ msg, usuario, contato, numero, isPastor, isDiretor });
+            }
+
             // Atalhos diretos preservados
-            if (escolha === "5" || /aviso|comunicado/i.test(escolha)) {
+            if (/aviso|comunicado/i.test(escolha)) {
               info.fluxo = "comunicados";
               info.etapa = "texto_comunicado";
               return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
             }
-            if (escolha === "5" || /artes|flyers/i.test(escolha)) {
+            if (/artes|flyers/i.test(escolha)) {
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
@@ -5800,13 +5831,18 @@ function createMessageHandler({
               });
             }
 
+            if (escolha === "4" || /presta[cç][aã]o|financ|contas/i.test(escolha)) {
+              delete etapas[numero];
+              return await responderPrestacaoContas({ msg, usuario, contato, numero, isPastor, isDiretor });
+            }
+
             // Atalhos diretos preservados
-            if (escolha === "4" || /aviso|comunicado/i.test(escolha)) {
+            if (/aviso|comunicado/i.test(escolha)) {
               info.fluxo = "comunicados";
               info.etapa = "texto_comunicado";
               return msg.reply("📢 *Solicitar aviso / comunicado no culto*\n\nPor favor, digite abaixo o texto do comunicado que você deseja que seja lido ou exibido nos cultos:");
             }
-            if (escolha === "4" || /artes|flyers/i.test(escolha)) {
+            if (/artes|flyers/i.test(escolha)) {
               info.fluxo = "artes_flyers";
               info.etapa = "artes_departamento";
               const redesUsuario = obterRedesParaUsuario(usuario);
@@ -6803,6 +6839,11 @@ Digite *menu* para voltar ao menu principal.`;
           "• *Data e horários* necessários (ex: dia anterior das 18:00 às 21:00 ou 2 horas antes do início)\n\n" +
           "_Essas informações serão registradas no departamento e encaminhadas à secretaria e equipe._"
         );
+      }
+
+      if (/^(?:consultar\s+|ver\s+|pedir\s+|solicitar\s+)?(?:presta[cç][aã]o\s+de\s+contas?|relat[oó]rio\s+financeiro|resumo\s+financeiro|finan[cç]as\s+(?:da\s+)?igreja|contas\s+da\s+igreja)$/i.test(texto.trim())) {
+        console.log(`[Prestação de Contas] Solicitada por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+        return await responderPrestacaoContas({ msg, usuario, contato, numero, isPastor, isDiretor });
       }
 
       // Consulta de informações sobre evento com descrição gerada por IA

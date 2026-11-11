@@ -3234,9 +3234,6 @@ function renderGestaoHtml({ user }) {
         📖 Área Pastoral
       </button>
       ` : ''}
-      <a href="/controlefinanceiro" class="tab-btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">
-        💎 Controle Financeiro
-      </a>
     </nav>
 
     <!-- ABA 1: CALENDÁRIO -->

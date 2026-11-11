@@ -386,29 +386,10 @@
     if (!state.dashboard) return `<div class="fin-card">Carregando indicadores...</div>`;
     const ind = state.dashboard.indicadores;
     const graf = state.dashboard.graficos;
-
-    const kpis = [
-      { label: "1. Saldo Financeiro Total", val: fmtMoney(ind.saldo_total), sub: "Soma real de todas as contas", cls: "kpi-info" },
-      { label: "2. Caixa Físico (Espécie)", val: fmtMoney(ind.dinheiro_caixa_fisico), sub: "Dinheiro em mãos na igreja", cls: "kpi-success" },
-      { label: "3. Saldos Bancários", val: fmtMoney(ind.saldo_contas_bancarias.reduce((s, c) => s + c.saldo_atual, 0)), sub: `${ind.saldo_contas_bancarias.length} conta(s) bancária(s)`, cls: "kpi-info" },
-      { label: "4. Total Disponível Livre", val: fmtMoney(ind.total_disponivel), sub: "Descontando reservas", cls: "kpi-success" },
-      { label: "5. Valores Reservados", val: fmtMoney(ind.total_reservado), sub: "Fundos e projetos carimbados", cls: "kpi-warning" },
-      { label: "6. Entradas do Período", val: fmtMoney(ind.entradas_mes), sub: `${fmtDate(state.dashboard.periodo.inicio)} a ${fmtDate(state.dashboard.periodo.fim)}`, cls: "kpi-success" },
-      { label: "7. Saídas do Período", val: fmtMoney(ind.saidas_mes), sub: "Despesas efetivadas", cls: "kpi-danger" },
-      { label: "8. Resultado do Período", val: fmtMoney(ind.resultado_mes), sub: ind.resultado_mes >= 0 ? "Superávit no período" : "Déficit no período", cls: ind.resultado_mes >= 0 ? "kpi-success" : "kpi-danger" },
-      { label: "9. Contas a Pagar (Abertas)", val: fmtMoney(ind.contas_a_pagar), sub: "Total pendente de quitação", cls: "kpi-warning" },
-      { label: "10. Contas Vencidas", val: fmtMoney(ind.contas_vencidas), sub: "Atenção imediata", cls: "kpi-danger" },
-      { label: "11. Vencendo em 7 dias", val: fmtMoney(ind.contas_vencer_7d), sub: "Próximos 7 dias", cls: "kpi-warning" },
-      { label: "12. Vencendo em 30 dias", val: fmtMoney(ind.contas_vencer_30d), sub: "Próximos 30 dias", cls: "kpi-info" },
-      { label: "13. Valores a Receber", val: fmtMoney(ind.valores_a_receber), sub: "Entradas pendentes", cls: "kpi-info" },
-      { label: "14. Dízimos Recebidos", val: fmtMoney(ind.dizimos_mes), sub: "No período filtrado", cls: "kpi-success" },
-      { label: "15. Ofertas Recebidas", val: fmtMoney(ind.ofertas_mes), sub: "Gerais, especiais e missões", cls: "kpi-success" },
-      { label: "16. Outras Contribuições", val: fmtMoney(ind.outras_contribuicoes), sub: "Eventos, cantina, doações", cls: "kpi-info" },
-      { label: "17. Despesas Fixas", val: fmtMoney(ind.despesas_fixas_mensais), sub: "Estrutura e recorrentes", cls: "kpi-warning" },
-      { label: "18. Despesas Variáveis", val: fmtMoney(ind.despesas_variaveis), sub: "Ministérios e ações", cls: "kpi-info" },
-      { label: "19. Previsão de Saldo Futuro", val: fmtMoney(ind.previsao_saldo_futuro), sub: "Saldo atual + a receber - a pagar", cls: ind.previsao_saldo_futuro >= 0 ? "kpi-success" : "kpi-danger" },
-      { label: "20. Movimentações Recentes", val: String(state.dashboard.movimentacoes_recentes.length), sub: "Últimos lançamentos registrados", cls: "kpi-info" },
-    ];
+    const totalBancos = (ind.saldo_contas_bancarias || []).reduce((s, c) => s + c.saldo_atual, 0);
+    const qtdBancos = (ind.saldo_contas_bancarias || []).length;
+    const isSuperavit = ind.resultado_mes >= 0;
+    const temVencidas = ind.contas_vencidas > 0;
 
     const renderBarGroup = (obj, color) => {
       const entries = Object.entries(obj || {}).sort((a, b) => b[1] - a[1]);
@@ -434,18 +415,194 @@
     );
 
     return `
-      <div class="fin-kpi-grid">
-        ${kpis
-          .map(
-            (k) => `
-          <div class="fin-kpi-card ${k.cls}">
-            <div class="fin-kpi-label">${esc(k.label)}</div>
-            <div class="fin-kpi-value">${esc(k.val)}</div>
-            <div class="fin-kpi-sub">${esc(k.sub)}</div>
-          </div>`
-          )
-          .join("")}
+      <!-- BANNER DE PRESTAÇÃO DE CONTAS & CONTATO TESOURARIA -->
+      <div class="fin-prestacao-banner no-print">
+        <div class="fin-prestacao-info">
+          <div class="fin-prestacao-icon">📑</div>
+          <div class="fin-prestacao-text">
+            <h3>Prestação de Contas Consolidada (Pastores & Diretoria)</h3>
+            <p>Resumo oficial de entradas, saídas, saldos bancários e previsão futura com auditoria e rastreabilidade.</p>
+          </div>
+        </div>
+        <div class="fin-prestacao-actions">
+          <span style="font-size:0.82rem;background:rgba(255,255,255,0.18);padding:0.4rem 0.75rem;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:6px">
+            📞 Tesouraria: +55 11 99111-7612
+          </span>
+          <button type="button" class="fin-btn" style="background:#ffffff;color:#6d28d9;font-weight:800;border:none;box-shadow:0 2px 8px rgba(0,0,0,0.15)" data-action="open-prestacao">
+            📋 Gerar Prestação de Contas
+          </button>
+        </div>
       </div>
+
+      <!-- DESTAQUES PRINCIPAIS (HERO KPIS) -->
+      <div class="fin-hero-grid">
+        <div class="fin-hero-card hero-saldo">
+          <div class="fin-hero-header">
+            <span class="fin-hero-title">Saldo Financeiro Total</span>
+            <span class="fin-hero-icon">🏦</span>
+          </div>
+          <div class="fin-hero-value">${fmtMoney(ind.saldo_total)}</div>
+          <div class="fin-hero-sub">Soma real de todas as contas ativas da igreja</div>
+        </div>
+
+        <div class="fin-hero-card hero-disponivel">
+          <div class="fin-hero-header">
+            <span class="fin-hero-title">Total Disponível Livre</span>
+            <span class="fin-hero-icon">💎</span>
+          </div>
+          <div class="fin-hero-value" style="color:#059669">${fmtMoney(ind.total_disponivel)}</div>
+          <div class="fin-hero-sub">Valor livre para utilização (descontando reservas)</div>
+        </div>
+
+        <div class="fin-hero-card ${isSuperavit ? "hero-resultado-pos" : "hero-resultado-neg"}">
+          <div class="fin-hero-header">
+            <span class="fin-hero-title">Resultado do Período</span>
+            <span class="fin-hero-icon">${isSuperavit ? "📈" : "📉"}</span>
+          </div>
+          <div class="fin-hero-value" style="color:${isSuperavit ? "#16a34a" : "#dc2626"}">${fmtMoney(ind.resultado_mes)}</div>
+          <div class="fin-hero-sub">
+            <strong style="color:${isSuperavit ? "#16a34a" : "#dc2626"}">${isSuperavit ? "Superávit ✅" : "Déficit ⚠️"}</strong>
+            <span>• Entradas menos Saídas do período</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BLOCO 1: LOCALIZAÇÃO DOS SALDOS & LIQUIDEZ -->
+      <section class="fin-dash-section">
+        <div class="fin-dash-section-header">
+          <div class="fin-dash-section-title">
+            <span class="badge-icon">🏦</span>
+            <span>Contas & Saldos por Local</span>
+          </div>
+          <span class="fin-dash-section-sub">Onde o recurso da igreja está armazenado no momento</span>
+        </div>
+        <div class="fin-dash-grid">
+          <div class="fin-stat-card stat-success">
+            <div class="fin-stat-label">💵 Caixa Físico (Espécie)</div>
+            <div class="fin-stat-value">${fmtMoney(ind.dinheiro_caixa_fisico)}</div>
+            <div class="fin-stat-sub">Dinheiro em mãos na igreja</div>
+          </div>
+          <div class="fin-stat-card stat-primary">
+            <div class="fin-stat-label">🏦 Saldos Bancários</div>
+            <div class="fin-stat-value">${fmtMoney(totalBancos)}</div>
+            <div class="fin-stat-sub">${qtdBancos} conta(s) bancária(s) ativa(s)</div>
+          </div>
+          <div class="fin-stat-card stat-warning">
+            <div class="fin-stat-label">🛡️ Valores Reservados</div>
+            <div class="fin-stat-value">${fmtMoney(ind.total_reservado)}</div>
+            <div class="fin-stat-sub">Fundos e projetos com carimbo</div>
+          </div>
+          <div class="fin-stat-card">
+            <div class="fin-stat-label">🔮 Previsão de Saldo Futuro</div>
+            <div class="fin-stat-value">${fmtMoney(ind.previsao_saldo_futuro)}</div>
+            <div class="fin-stat-sub">Saldo atual + a receber - a pagar</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BLOCO 2: ENTRADAS VS SAÍDAS DO PERÍODO -->
+      <section class="fin-dash-section">
+        <div class="fin-dash-section-header">
+          <div class="fin-dash-section-title">
+            <span class="badge-icon">⚖️</span>
+            <span>Movimentação do Período (${fmtDate(state.dashboard.periodo.inicio)} a ${fmtDate(state.dashboard.periodo.fim)})</span>
+          </div>
+          <span class="fin-dash-section-sub">Entradas arrecadadas vs despesas efetivadas</span>
+        </div>
+        <div class="fin-dash-grid">
+          <div class="fin-stat-card stat-success">
+            <div class="fin-stat-label">📥 Entradas Efetivadas</div>
+            <div class="fin-stat-value">${fmtMoney(ind.entradas_mes)}</div>
+            <div class="fin-stat-sub">Receitas confirmadas no período</div>
+          </div>
+          <div class="fin-stat-card stat-danger">
+            <div class="fin-stat-label">📤 Saídas Efetivadas</div>
+            <div class="fin-stat-value">${fmtMoney(ind.saidas_mes)}</div>
+            <div class="fin-stat-sub">Despesas pagas no período</div>
+          </div>
+          <div class="fin-stat-card stat-warning">
+            <div class="fin-stat-label">🏢 Despesas Fixas / Estruturais</div>
+            <div class="fin-stat-value">${fmtMoney(ind.despesas_fixas_mensais)}</div>
+            <div class="fin-stat-sub">Aluguel, água, energia, internet e sustento</div>
+          </div>
+          <div class="fin-stat-card">
+            <div class="fin-stat-label">🎪 Despesas Variáveis</div>
+            <div class="fin-stat-value">${fmtMoney(ind.despesas_variaveis)}</div>
+            <div class="fin-stat-sub">Ministérios, eventos e pontuais</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BLOCO 3: ARRECADAÇÃO (DÍZIMOS & OFERTAS) -->
+      <section class="fin-dash-section">
+        <div class="fin-dash-section-header">
+          <div class="fin-dash-section-title">
+            <span class="badge-icon">🙌</span>
+            <span>Arrecadação & Contribuições</span>
+          </div>
+          <span class="fin-dash-section-sub">Dízimos, ofertas dos cultos e outras receitas</span>
+        </div>
+        <div class="fin-dash-grid">
+          <div class="fin-stat-card stat-success">
+            <div class="fin-stat-label">🙏 Dízimos Recebidos</div>
+            <div class="fin-stat-value">${fmtMoney(ind.dizimos_mes)}</div>
+            <div class="fin-stat-sub">No período selecionado</div>
+          </div>
+          <div class="fin-stat-card stat-success">
+            <div class="fin-stat-label">🎁 Ofertas Recebidas</div>
+            <div class="fin-stat-value">${fmtMoney(ind.ofertas_mes)}</div>
+            <div class="fin-stat-sub">Gerais, missões e Santa Ceia</div>
+          </div>
+          <div class="fin-stat-card">
+            <div class="fin-stat-label">📦 Outras Contribuições</div>
+            <div class="fin-stat-value">${fmtMoney(ind.outras_contribuicoes)}</div>
+            <div class="fin-stat-sub">Cantina, eventos, doações e inscrições</div>
+          </div>
+          <div class="fin-stat-card stat-primary">
+            <div class="fin-stat-label">🧾 Lançamentos Recentes</div>
+            <div class="fin-stat-value">${state.dashboard.movimentacoes_recentes.length}</div>
+            <div class="fin-stat-sub">Últimos registros computados</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BLOCO 4: CONTAS A PAGAR & COMPROMISSOS FUTUROS -->
+      <section class="fin-dash-section">
+        <div class="fin-dash-section-header">
+          <div class="fin-dash-section-title">
+            <span class="badge-icon">⚠️</span>
+            <span>Compromissos Financeiros & Contas a Pagar</span>
+          </div>
+          <span class="fin-dash-section-sub">Controle de vencimentos e obrigações da igreja</span>
+        </div>
+        <div class="fin-dash-grid">
+          <div class="fin-stat-card stat-warning">
+            <div class="fin-stat-label">📋 Contas a Pagar (Abertas)</div>
+            <div class="fin-stat-value">${fmtMoney(ind.contas_a_pagar)}</div>
+            <div class="fin-stat-sub">Total pendente de quitação</div>
+          </div>
+          <div class="fin-stat-card ${temVencidas ? "stat-alert-urgent" : "stat-success"}">
+            <div class="fin-stat-label">${temVencidas ? "🚨 Contas Vencidas" : "✅ Contas Vencidas"}</div>
+            <div class="fin-stat-value">${fmtMoney(ind.contas_vencidas)}</div>
+            <div class="fin-stat-sub">${temVencidas ? ind.qtd_vencidas + " conta(s) - Atenção urgente!" : "Nenhuma conta vencida!"}</div>
+          </div>
+          <div class="fin-stat-card stat-warning">
+            <div class="fin-stat-label">⏳ Vencendo em até 7 dias</div>
+            <div class="fin-stat-value">${fmtMoney(ind.contas_vencer_7d)}</div>
+            <div class="fin-stat-sub">Atenção no curto prazo</div>
+          </div>
+          <div class="fin-stat-card">
+            <div class="fin-stat-label">📅 Vencendo em até 30 dias</div>
+            <div class="fin-stat-value">${fmtMoney(ind.contas_vencer_30d)}</div>
+            <div class="fin-stat-sub">Planejamento do mês</div>
+          </div>
+          <div class="fin-stat-card stat-primary">
+            <div class="fin-stat-label">💰 Valores a Receber</div>
+            <div class="fin-stat-value">${fmtMoney(ind.valores_a_receber)}</div>
+            <div class="fin-stat-sub">Entradas pendentes cadastradas</div>
+          </div>
+        </div>
+      </section>
 
       <div class="fin-charts-grid">
         <div class="fin-card">
@@ -929,9 +1086,10 @@
             <span class="fin-card-title">📑 Prestação de Contas Oficial — Comunidade Cristã Curados</span>
             <p style="font-size:0.8rem;color:var(--fin-muted)">Período de referência: ${fmtDate(state.dashboard.periodo.inicio)} a ${fmtDate(state.dashboard.periodo.fim)}</p>
           </div>
-          <div class="no-print" style="display:flex;gap:0.5rem">
+          <div class="no-print" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button type="button" class="fin-btn fin-btn-primary fin-btn-sm" data-action="open-prestacao">📑 Resumo Executivo Oficial</button>
             <a href="/controlefinanceiro/api/relatorio.csv?${q}" class="fin-btn fin-btn-success fin-btn-sm">📥 Exportar Planilha (CSV)</a>
-            <button type="button" class="fin-btn fin-btn-primary fin-btn-sm" data-action="print-report">🖨️ Imprimir / Salvar PDF</button>
+            <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="print-report">🖨️ Imprimir / Salvar PDF</button>
           </div>
         </div>
 
@@ -1495,6 +1653,112 @@
     `;
   }
 
+  async function openPrestacaoModal() {
+    const m = document.getElementById("fin-modal-root");
+    m.innerHTML = `
+      <div class="fin-modal-backdrop">
+        <div class="fin-modal" style="max-width:840px">
+          <div class="fin-modal-header">
+            <span class="fin-modal-title">📑 Prestação de Contas (Pastoral & Diretoria)</span>
+            <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="close-modal">✕</button>
+          </div>
+          <div style="padding:2.5rem 1rem;text-align:center;font-size:1.05rem;color:var(--fin-muted)">
+            Consultando informações consolidadas e registrando auditoria... ⏳
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      const [resumo, hist] = await Promise.all([
+        api("/prestacao-contas"),
+        api("/prestacao-contas/historico").catch(() => ({ logs: [] })),
+      ]);
+
+      const logsHtml = (hist.logs || []).slice(0, 10).map((l) => {
+        let det = {};
+        try { det = JSON.parse(l.detalhes || "{}"); } catch (_) {}
+        const dataFmt = new Date(l.criado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+        const canalBadge = det.canal === "whatsapp"
+          ? `<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:700">📱 WhatsApp</span>`
+          : `<span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:700">💻 Web / Site</span>`;
+        return `
+          <tr>
+            <td style="white-space:nowrap;font-size:0.8rem">${dataFmt}</td>
+            <td style="font-weight:600;font-size:0.84rem">${esc(l.usuario || "Desconhecido")}</td>
+            <td>${canalBadge}</td>
+            <td style="font-size:0.78rem;color:var(--fin-muted)">${esc(l.ip || "-")}</td>
+          </tr>
+        `;
+      }).join("");
+
+      m.innerHTML = `
+        <div class="fin-modal-backdrop">
+          <div class="fin-modal" style="max-width:860px">
+            <div class="fin-modal-header">
+              <div>
+                <span class="fin-modal-title">📑 Prestação de Contas Consolidada</span>
+                <div style="font-size:0.78rem;color:var(--fin-muted);margin-top:2px">
+                  Comunidade Cristã Curados • Acesso Exclusivo para Pastores e Diretoria
+                </div>
+              </div>
+              <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="close-modal">✕</button>
+            </div>
+
+            <div class="fin-alert fin-alert-info" style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+              <div>
+                <strong>Auditoria Ativa:</strong> Esta consulta foi registrada com sucesso nos logs com seu usuário, data/hora e canal.
+              </div>
+              <span style="font-weight:700;font-size:0.82rem">📞 Tesouraria: +55 11 99111-7612</span>
+            </div>
+
+            <div style="margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+              <span style="font-weight:700;font-size:0.88rem;color:var(--fin-text)">Resumo Estruturado Oficial:</span>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="fin-btn fin-btn-sm fin-btn-outline" data-action="copy-prestacao-text" id="btn-copy-prestacao">
+                  📋 Copiar Texto Completo
+                </button>
+                <button type="button" class="fin-btn fin-btn-sm fin-btn-outline" data-action="print-report">
+                  🖨️ Imprimir
+                </button>
+              </div>
+            </div>
+
+            <div class="fin-prestacao-box" id="prestacao-texto-box">${esc(resumo.textoWhatsApp)}</div>
+
+            <div style="margin-top:1.25rem">
+              <span style="font-weight:800;font-size:0.88rem;color:var(--fin-text);display:block;margin-bottom:0.5rem">
+                🛡️ Histórico de Quem Solicitou Prestação de Contas (Últimos acessos)
+              </span>
+              <div class="fin-table-wrapper" style="max-height:180px;overflow-y:auto">
+                <table class="fin-table" style="font-size:0.82rem">
+                  <thead>
+                    <tr>
+                      <th>Data / Horário</th>
+                      <th>Quem Solicitou</th>
+                      <th>Canal</th>
+                      <th>IP / Origem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${logsHtml || `<tr><td colspan="4" style="text-align:center;color:var(--fin-muted)">Nenhum registro anterior localizado.</td></tr>`}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="fin-modal-footer" style="margin-top:1rem">
+              <button type="button" class="fin-btn fin-btn-primary" data-action="close-modal">Concluído</button>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      alert("Erro ao carregar prestação de contas: " + err.message);
+      closeModal();
+    }
+  }
+
   function openContaModal(contaId) {
     const c = contaId ? state.contas.find((x) => String(x.id) === String(contaId)) : null;
     const m = document.getElementById("fin-modal-root");
@@ -1753,6 +2017,23 @@
         renderApp();
       } else if (action === "close-modal") {
         closeModal();
+      } else if (action === "open-prestacao") {
+        openPrestacaoModal();
+      } else if (action === "copy-prestacao-text") {
+        const box = document.getElementById("prestacao-texto-box");
+        if (box) {
+          const txt = box.textContent || box.innerText;
+          navigator.clipboard.writeText(txt).then(() => {
+            const b = document.getElementById("btn-copy-prestacao");
+            if (b) {
+              const old = b.innerHTML;
+              b.innerHTML = "✅ Copiado!";
+              setTimeout(() => { b.innerHTML = old; }, 2500);
+            }
+          }).catch(() => {
+            alert("Texto selecionado: use Ctrl+C para copiar.");
+          });
+        }
       } else if (action === "open-lancamento") {
         openLancamentoModal({
           tipo: btn.getAttribute("data-tipo"),

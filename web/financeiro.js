@@ -79,6 +79,8 @@ const CATEGORIAS_INICIAIS = {
 };
 
 const FORMAS = ["Dinheiro", "Pix", "Transferência bancária", "Cartão de débito", "Cartão de crédito", "Boleto", "Outros"];
+const CONTATO_TESOURARIA = "+55 11 99111-7612";
+const TEL_TESOURARIA_NUM = "5511991117612";
 
 // ───────────────────────── BANCO ─────────────────────────
 db.exec(`
@@ -470,6 +472,151 @@ function dashboard(q, user) {
     mensal,
     recentes,
     movimentacoes_recentes: recentes,
+  };
+}
+
+function formatarCentavos(c) {
+  return "R$ " + (Number(c || 0) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function obterResumoPrestacaoContas({ solicitanteNome, solicitanteTel, canal = "web", ip = null }) {
+  const agora = agoraIso();
+  const hoje = hojeSP();
+  const [ano, mes] = hoje.split("-").map(Number);
+  const nomesMeses = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ];
+  const mesAtualNome = nomesMeses[mes - 1] || "Mês Atual";
+
+  // Auditoria obrigatória de acesso/solicitação
+  try {
+    db.prepare(`
+      INSERT INTO fin_auditoria (usuario, acao, entidade, entidade_id, detalhes, ip, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      `${solicitanteNome || "Pastor/Diretor"} (${solicitanteTel || "sem telefone"})`,
+      "solicitacao_prestacao_contas",
+      "prestacao_contas",
+      null,
+      JSON.stringify({
+        canal,
+        solicitante: solicitanteNome,
+        telefone: solicitanteTel,
+        horario: agora,
+        data_solicitacao: hoje,
+      }),
+      ip || (canal === "whatsapp" ? "whatsapp_bot" : "web"),
+      agora
+    );
+  } catch (errAud) {
+    console.error("[Financeiro] Erro ao registrar auditoria de prestação de contas:", errAud);
+  }
+
+  // Obter panorama consolidado do mês atual
+  const dashMes = dashboard({ periodo: "mes" }, { papel: "admin_financeiro" });
+  const ind = dashMes.indicadores;
+
+  // Análise dos próximos meses (M+1 e M+2)
+  const proximoMesData = addMeses(`${ano}-${String(mes).padStart(2, "0")}-01`, 1);
+  const [proxAno, proxMes] = proximoMesData.split("-").map(Number);
+  const proxMesNome = nomesMeses[proxMes - 1];
+  const proxFim = new Date(Date.UTC(proxAno, proxMes, 0)).toISOString().slice(0, 10);
+
+  const contasAPagarProxMes = db.prepare(`
+    SELECT COALESCE(SUM(valor), 0) total, COUNT(*) qtd
+    FROM fin_lancamentos
+    WHERE status = 'pendente' AND tipo = 'saida' AND vencimento BETWEEN ? AND ?
+  `).get(proximoMesData, proxFim);
+
+  const contasAReceberProxMes = db.prepare(`
+    SELECT COALESCE(SUM(valor), 0) total, COUNT(*) qtd
+    FROM fin_lancamentos
+    WHERE status = 'pendente' AND tipo = 'entrada' AND vencimento BETWEEN ? AND ?
+  `).get(proximoMesData, proxFim);
+
+  const dataHoraBr = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date());
+
+  const resultadoPositivo = ind.resultado_mes >= 0;
+
+  // Montagem do texto detalhado para WhatsApp e Leitura Pastoral
+  let txt = `📑 *PRESTAÇÃO DE CONTAS DA IGREJA*\n`;
+  txt += `🏛️ *Comunidade Cristã Curados*\n`;
+  txt += `👤 *Solicitado por:* ${solicitanteNome || "Liderança"}\n`;
+  txt += `🕒 *Gerado em:* ${dataHoraBr} (${canal === "whatsapp" ? "WhatsApp" : "Site"})\n`;
+  txt += `─────────────────────────\n\n`;
+
+  txt += `💰 *1. SALDOS & DISPONIBILIDADE*\n`;
+  txt += `• *Saldo Total Geral:* ${formatarCentavos(ind.saldo_total)}\n`;
+  txt += `• *Caixa Físico (em mãos na igreja):* ${formatarCentavos(ind.dinheiro_caixa_fisico)}\n`;
+  if (ind.saldo_contas_bancarias && ind.saldo_contas_bancarias.length) {
+    txt += `• *Bancos:* ${formatarCentavos(ind.saldo_contas_bancarias.reduce((s, c) => s + c.saldo_atual, 0))}\n`;
+    for (const c of ind.saldo_contas_bancarias) {
+      txt += `   └ ${c.nome}: ${formatarCentavos(c.saldo_atual)}\n`;
+    }
+  }
+  txt += `• *Disponível Livre (Descontando reservas):* ${formatarCentavos(ind.total_disponivel)}\n`;
+  if (ind.total_reservado > 0) {
+    txt += `• *Valores Reservados (Projetos / Fundos):* ${formatarCentavos(ind.total_reservado)}\n`;
+  }
+  txt += `\n`;
+
+  txt += `📊 *2. MOVIMENTAÇÃO DO MÊS (${mesAtualNome}/${ano})*\n`;
+  txt += `📥 *Total de Entradas:* ${formatarCentavos(ind.entradas_mes)}\n`;
+  txt += `   • Dízimos: ${formatarCentavos(ind.dizimos_mes)}\n`;
+  txt += `   • Ofertas: ${formatarCentavos(ind.ofertas_mes)}\n`;
+  txt += `   • Outras Contribuições / Eventos: ${formatarCentavos(ind.outras_contribuicoes)}\n\n`;
+
+  txt += `📤 *Total de Saídas:* ${formatarCentavos(ind.saidas_mes)}\n`;
+  txt += `   • Despesas Fixas (Estrutura/Aluguel/Luz): ${formatarCentavos(ind.despesas_fixas_mensais)}\n`;
+  txt += `   • Despesas Variáveis / Ministérios: ${formatarCentavos(ind.despesas_variaveis)}\n\n`;
+
+  txt += `📈 *Resultado Líquido do Mês:* ${formatarCentavos(ind.resultado_mes)} (${resultadoPositivo ? "Superávit ✅" : "Déficit ⚠️"})\n\n`;
+
+  txt += `⚠️ *3. CONTAS A PAGAR & COMPROMISSOS*\n`;
+  if (ind.contas_vencidas > 0) {
+    txt += `🚨 *Contas Vencidas:* ${formatarCentavos(ind.contas_vencidas)} (${ind.qtd_vencidas} conta(s) - Atenção imediata!)\n`;
+  } else {
+    txt += `✅ *Contas Vencidas:* R$ 0,00 (Nenhuma conta vencida!)\n`;
+  }
+  txt += `• Vencendo nos próximos 7 dias: ${formatarCentavos(ind.contas_vencer_7d)}\n`;
+  txt += `• Vencendo nos próximos 30 dias: ${formatarCentavos(ind.contas_vencer_30d)}\n`;
+  txt += `• Total aberto a pagar: ${formatarCentavos(ind.contas_a_pagar)}\n`;
+  txt += `• Valores a receber pendentes: ${formatarCentavos(ind.valores_a_receber)}\n\n`;
+
+  txt += `🔮 *4. SITUAÇÃO FINANCEIRA DOS PRÓXIMOS MESES*\n`;
+  txt += `• *Previsão de Saldo Futuro:* ${formatarCentavos(ind.previsao_saldo_futuro)}\n`;
+  txt += `• *${proxMesNome}/${proxAno} - Contas a Pagar Agendadas:* ${formatarCentavos(contasAPagarProxMes.total)} (${contasAPagarProxMes.qtd} lançamento(s))\n`;
+  if (contasAReceberProxMes.total > 0) {
+    txt += `• *${proxMesNome}/${proxAno} - A Receber Previsto:* ${formatarCentavos(contasAReceberProxMes.total)}\n`;
+  }
+  txt += `• *Estimativa Recorrente Mensal:* ${formatarCentavos(ind.despesas_fixas_mensais)} em despesas fixas\n\n`;
+
+  txt += `─────────────────────────\n`;
+  txt += `🔒 _Relatório oficial emitido com registro e rastreabilidade nos logs da igreja._\n`;
+  txt += `🏛️ _Tesouraria CCC • Contato: +55 11 99111-7612_`;
+
+  return {
+    ok: true,
+    dataHora: dataHoraBr,
+    mesAtualNome,
+    ano,
+    solicitanteNome,
+    solicitanteTel,
+    canal,
+    indicadores: ind,
+    proximoMes: {
+      mesNome: proxMesNome,
+      ano: proxAno,
+      contasAPagar: contasAPagarProxMes.total,
+      qtdContasAPagar: contasAPagarProxMes.qtd,
+      contasAReceber: contasAReceberProxMes.total,
+    },
+    textoWhatsApp: txt,
   };
 }
 
@@ -1164,6 +1311,29 @@ async function handle(req, res, { pathname, searchParams, ip }) {
       json(res, 200, { ok: true, message: "2FA desativado." }); return true;
     }
 
+    // Prestação de Contas (Pastores e Diretores)
+    if (metodo === "GET" && pathname === "/controlefinanceiro/api/prestacao-contas") {
+      exigir("ver");
+      const resumo = obterResumoPrestacaoContas({
+        solicitanteNome: user.nome,
+        solicitanteTel: user.telefone,
+        canal: "web",
+        ip,
+      });
+      json(res, 200, resumo); return true;
+    }
+
+    if (metodo === "GET" && pathname === "/controlefinanceiro/api/prestacao-contas/historico") {
+      exigir("ver");
+      const logs = db.prepare(`
+        SELECT id, usuario, acao, entidade, detalhes, ip, criado_em
+        FROM fin_auditoria
+        WHERE acao = 'solicitacao_prestacao_contas'
+        ORDER BY id DESC LIMIT 50
+      `).all();
+      json(res, 200, { ok: true, logs }); return true;
+    }
+
     // Auditoria
     if (metodo === "GET" && pathname === "/controlefinanceiro/api/auditoria") {
       exigir("auditoria");
@@ -1197,5 +1367,23 @@ async function handle(req, res, { pathname, searchParams, ip }) {
   }
 }
 
-module.exports = { handle, centavos, saldosContas, criarLancamento, quitarLancamento, cancelarLancamento, salvarConferencia, fecharCulto, dashboard, listarLancamentos, pode, totp, conferirTotp, PERMS };
+module.exports = {
+  handle,
+  centavos,
+  saldosContas,
+  criarLancamento,
+  quitarLancamento,
+  cancelarLancamento,
+  salvarConferencia,
+  fecharCulto,
+  dashboard,
+  listarLancamentos,
+  pode,
+  totp,
+  conferirTotp,
+  PERMS,
+  obterResumoPrestacaoContas,
+  CONTATO_TESOURARIA,
+  TEL_TESOURARIA_NUM,
+};
 

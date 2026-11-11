@@ -208,10 +208,48 @@ test("Controle Financeiro — Usuários iniciais, Primeiro Acesso, Contas, Lanç
     assert.equal(conf.valor_contado, 65000);
   }
 
+  // 9. Prestação de Contas via API Web
+  {
+    const { req, res, pathname, searchParams } = createMockReqRes("GET", "/controlefinanceiro/api/prestacao-contas", null, sessionCookie);
+    await financeiro.handle(req, res, { pathname, searchParams, ip: "127.0.0.1" });
+    assert.equal(res.statusCode, 200);
+    const pData = JSON.parse(res.body);
+    assert.equal(pData.ok, true);
+    assert.ok(pData.textoWhatsApp.includes("PRESTAÇÃO DE CONTAS DA IGREJA"));
+    assert.ok(pData.textoWhatsApp.includes("SALDOS & DISPONIBILIDADE"));
+    assert.ok(pData.textoWhatsApp.includes("SITUAÇÃO FINANCEIRA DOS PRÓXIMOS MESES"));
+
+    // Verifica que auditoria foi gravada
+    const log = db.prepare("SELECT * FROM fin_auditoria WHERE acao = 'solicitacao_prestacao_contas' ORDER BY id DESC LIMIT 1").get();
+    assert.ok(log);
+    assert.ok(log.usuario.includes("Larissa Luana dos Santos"));
+    const det = JSON.parse(log.detalhes);
+    assert.equal(det.canal, "web");
+  }
+
+  // 10. Prestação de Contas direta (como chamada pelo bot do WhatsApp)
+  {
+    const resWpp = financeiro.obterResumoPrestacaoContas({
+      solicitanteNome: "Pastor Anderson",
+      solicitanteTel: "5511999998888",
+      canal: "whatsapp",
+    });
+    assert.equal(resWpp.ok, true);
+    assert.ok(resWpp.textoWhatsApp.includes("Pastor Anderson"));
+    assert.ok(resWpp.textoWhatsApp.includes("WhatsApp"));
+
+    const logWpp = db.prepare("SELECT * FROM fin_auditoria WHERE acao = 'solicitacao_prestacao_contas' ORDER BY id DESC LIMIT 1").get();
+    assert.ok(logWpp);
+    assert.ok(logWpp.usuario.includes("Pastor Anderson"));
+    const detWpp = JSON.parse(logWpp.detalhes);
+    assert.equal(detWpp.canal, "whatsapp");
+  }
+
   // Limpa dados criados pelo teste para deixar o banco limpo para o primeiro acesso real
   db.prepare("DELETE FROM fin_lancamentos WHERE conta_id = ?").run(contaBancoId);
   db.prepare("DELETE FROM fin_contas WHERE id = ?").run(contaBancoId);
   db.prepare("DELETE FROM fin_conferencias WHERE observacoes = 'Teste conferência 650 reais'").run();
+  db.prepare("DELETE FROM fin_auditoria WHERE acao = 'solicitacao_prestacao_contas'").run();
   db.prepare("UPDATE fin_usuarios SET salt=NULL, hash=NULL WHERE telefone='5511951617993'").run();
 });
 
@@ -221,5 +259,13 @@ test("Gestão — Todos os inputs type='time' começam em branco (value='')", ()
   });
   const timeInputsWithDefault = html.match(/type="time"[^>]*value="[0-9]{2}:[0-9]{2}"/g);
   assert.equal(timeInputsWithDefault, null, "Nenhum input type='time' deve vir com horário pré-preenchido");
+});
+
+test("Gestão — Área de gestão não exibe controle financeiro", () => {
+  const html = gestao.renderGestaoHtml({
+    user: { username: "gabriela", nome: "Gabriela Diniz", role: "admin", telefone: "5511942685501" },
+  });
+  assert.equal(html.includes("/controlefinanceiro"), false, "A área de gestão não deve conter link para /controlefinanceiro");
+  assert.equal(html.includes("Controle Financeiro"), false, "A área de gestão não deve exibir texto de Controle Financeiro");
 });
 
