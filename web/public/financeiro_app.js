@@ -434,8 +434,32 @@
         </div>
       </div>
 
-      <!-- DESTAQUES PRINCIPAIS (HERO KPIS) -->
-      <div class="fin-hero-grid">
+      <!-- CARD EXECUTIVO MOBILE 3-EM-1 (EXCLUSIVO CELULAR) -->
+      <div class="fin-mobile-hero mobile-only">
+        <div class="fin-mhero-top">
+          <div class="fin-mhero-label">
+            <span>🏦 Saldo Geral da Igreja</span>
+            <span style="font-size:0.68rem;background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:999px">Consolidado</span>
+          </div>
+          <div class="fin-mhero-main-val">${fmtMoney(ind.saldo_total)}</div>
+        </div>
+        <div class="fin-mhero-bottom">
+          <div class="fin-mhero-col">
+            <span class="fin-mhero-sublabel">💎 Disponível Livre</span>
+            <span class="fin-mhero-subval" style="color:#6ee7b7">${fmtMoney(ind.total_disponivel)}</span>
+          </div>
+          <div class="fin-mhero-divider"></div>
+          <div class="fin-mhero-col">
+            <span class="fin-mhero-sublabel">📈 Resultado do Mês</span>
+            <span class="fin-mhero-subval" style="color:${isSuperavit ? "#86efac" : "#fca5a5"}">
+              ${fmtMoney(ind.resultado_mes)} <small style="font-size:0.75rem">${isSuperavit ? "✅" : "⚠️"}</small>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESTAQUES PRINCIPAIS (HERO KPIS - DESKTOP / NOTEBOOK) -->
+      <div class="fin-hero-grid desktop-only">
         <div class="fin-hero-card hero-saldo">
           <div class="fin-hero-header">
             <span class="fin-hero-title">Saldo Financeiro Total</span>
@@ -467,8 +491,17 @@
         </div>
       </div>
 
+      <!-- SELETOR RÁPIDO DE BLOCOS (EXCLUSIVO CELULAR) -->
+      <div class="fin-dash-pills mobile-only no-print">
+        <button type="button" class="fin-pill-btn active" data-action="filter-dash-block" data-target="all">Todos</button>
+        <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="saldos">🏦 Saldos</button>
+        <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="movimento">⚖️ Movimentação</button>
+        <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="dizimos">🙌 Dízimos/Ofertas</button>
+        <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="contas">⚠️ Contas a Pagar</button>
+      </div>
+
       <!-- BLOCO 1: LOCALIZAÇÃO DOS SALDOS & LIQUIDEZ -->
-      <section class="fin-dash-section">
+      <section class="fin-dash-section fin-sec-saldos">
         <div class="fin-dash-section-header">
           <div class="fin-dash-section-title">
             <span class="badge-icon">🏦</span>
@@ -501,7 +534,7 @@
       </section>
 
       <!-- BLOCO 2: ENTRADAS VS SAÍDAS DO PERÍODO -->
-      <section class="fin-dash-section">
+      <section class="fin-dash-section fin-sec-movimento">
         <div class="fin-dash-section-header">
           <div class="fin-dash-section-title">
             <span class="badge-icon">⚖️</span>
@@ -534,7 +567,7 @@
       </section>
 
       <!-- BLOCO 3: ARRECADAÇÃO (DÍZIMOS & OFERTAS) -->
-      <section class="fin-dash-section">
+      <section class="fin-dash-section fin-sec-dizimos">
         <div class="fin-dash-section-header">
           <div class="fin-dash-section-title">
             <span class="badge-icon">🙌</span>
@@ -567,7 +600,7 @@
       </section>
 
       <!-- BLOCO 4: CONTAS A PAGAR & COMPROMISSOS FUTUROS -->
-      <section class="fin-dash-section">
+      <section class="fin-dash-section fin-sec-contas">
         <div class="fin-dash-section-header">
           <div class="fin-dash-section-title">
             <span class="badge-icon">⚠️</span>
@@ -2017,6 +2050,22 @@
         renderApp();
       } else if (action === "close-modal") {
         closeModal();
+      } else if (action === "filter-dash-block") {
+        const target = btn.getAttribute("data-target");
+        document.querySelectorAll(".fin-pill-btn").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        const secs = document.querySelectorAll(".fin-dash-section");
+        if (target === "all") {
+          secs.forEach((s) => (s.style.display = ""));
+        } else {
+          secs.forEach((s) => {
+            if (s.classList.contains(`fin-sec-${target}`)) {
+              s.style.display = "";
+            } else {
+              s.style.display = "none";
+            }
+          });
+        }
       } else if (action === "open-prestacao") {
         openPrestacaoModal();
       } else if (action === "copy-prestacao-text") {

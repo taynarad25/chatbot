@@ -216,8 +216,8 @@ test("Controle Financeiro — Usuários iniciais, Primeiro Acesso, Contas, Lanç
     const pData = JSON.parse(res.body);
     assert.equal(pData.ok, true);
     assert.ok(pData.textoWhatsApp.includes("PRESTAÇÃO DE CONTAS DA IGREJA"));
-    assert.ok(pData.textoWhatsApp.includes("SALDOS & DISPONIBILIDADE"));
-    assert.ok(pData.textoWhatsApp.includes("SITUAÇÃO FINANCEIRA DOS PRÓXIMOS MESES"));
+    assert.ok(pData.textoWhatsApp.includes("SALDOS ATUAIS"));
+    assert.ok(pData.textoWhatsApp.includes("MOVIMENTO DO MÊS"));
 
     // Verifica que auditoria foi gravada
     const log = db.prepare("SELECT * FROM fin_auditoria WHERE acao = 'solicitacao_prestacao_contas' ORDER BY id DESC LIMIT 1").get();
@@ -236,7 +236,7 @@ test("Controle Financeiro — Usuários iniciais, Primeiro Acesso, Contas, Lanç
     });
     assert.equal(resWpp.ok, true);
     assert.ok(resWpp.textoWhatsApp.includes("Pastor Anderson"));
-    assert.ok(resWpp.textoWhatsApp.includes("WhatsApp"));
+    assert.ok(resWpp.textoWhatsApp.includes("Saldo Geral"));
 
     const logWpp = db.prepare("SELECT * FROM fin_auditoria WHERE acao = 'solicitacao_prestacao_contas' ORDER BY id DESC LIMIT 1").get();
     assert.ok(logWpp);

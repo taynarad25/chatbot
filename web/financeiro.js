@@ -543,62 +543,47 @@ function obterResumoPrestacaoContas({ solicitanteNome, solicitanteTel, canal = "
 
   const resultadoPositivo = ind.resultado_mes >= 0;
 
-  // Montagem do texto detalhado para WhatsApp e Leitura Pastoral
-  let txt = `📑 *PRESTAÇÃO DE CONTAS DA IGREJA*\n`;
-  txt += `🏛️ *Comunidade Cristã Curados*\n`;
-  txt += `👤 *Solicitado por:* ${solicitanteNome || "Liderança"}\n`;
-  txt += `🕒 *Gerado em:* ${dataHoraBr} (${canal === "whatsapp" ? "WhatsApp" : "Site"})\n`;
-  txt += `─────────────────────────\n\n`;
+  // Montagem do texto executivo para WhatsApp e Leitura Rápida
+  let txt = `📊 *PRESTAÇÃO DE CONTAS DA IGREJA*\n`;
+  txt += `🏛️ *Comunidade Cristã Curados • ${mesAtualNome}/${ano}*\n`;
+  txt += `👤 _Solicitante: ${solicitanteNome || "Liderança"}_\n\n`;
 
-  txt += `💰 *1. SALDOS & DISPONIBILIDADE*\n`;
-  txt += `• *Saldo Total Geral:* ${formatarCentavos(ind.saldo_total)}\n`;
-  txt += `• *Caixa Físico (em mãos na igreja):* ${formatarCentavos(ind.dinheiro_caixa_fisico)}\n`;
-  if (ind.saldo_contas_bancarias && ind.saldo_contas_bancarias.length) {
-    txt += `• *Bancos:* ${formatarCentavos(ind.saldo_contas_bancarias.reduce((s, c) => s + c.saldo_atual, 0))}\n`;
-    for (const c of ind.saldo_contas_bancarias) {
-      txt += `   └ ${c.nome}: ${formatarCentavos(c.saldo_atual)}\n`;
-    }
-  }
-  txt += `• *Disponível Livre (Descontando reservas):* ${formatarCentavos(ind.total_disponivel)}\n`;
-  if (ind.total_reservado > 0) {
-    txt += `• *Valores Reservados (Projetos / Fundos):* ${formatarCentavos(ind.total_reservado)}\n`;
+  txt += `━━━━━━━━━━━━━━━━━━━━\n`;
+  txt += `💰 *SALDOS ATUAIS*\n`;
+  txt += `• *Saldo Geral:* ${formatarCentavos(ind.saldo_total)}\n`;
+  txt += `• *Disponível Livre:* ${formatarCentavos(ind.total_disponivel)}\n`;
+  const infoExtraSaldos = [];
+  if (ind.dinheiro_caixa_fisico > 0) infoExtraSaldos.push(`Caixa: ${formatarCentavos(ind.dinheiro_caixa_fisico)}`);
+  const totBancos = (ind.saldo_contas_bancarias || []).reduce((s, c) => s + c.saldo_atual, 0);
+  if (totBancos > 0) infoExtraSaldos.push(`Bancos: ${formatarCentavos(totBancos)}`);
+  if (ind.total_reservado > 0) infoExtraSaldos.push(`Reservado: ${formatarCentavos(ind.total_reservado)}`);
+  if (infoExtraSaldos.length) {
+    txt += `  _(${infoExtraSaldos.join(" | ")})_\n`;
   }
   txt += `\n`;
 
-  txt += `📊 *2. MOVIMENTAÇÃO DO MÊS (${mesAtualNome}/${ano})*\n`;
-  txt += `📥 *Total de Entradas:* ${formatarCentavos(ind.entradas_mes)}\n`;
-  txt += `   • Dízimos: ${formatarCentavos(ind.dizimos_mes)}\n`;
-  txt += `   • Ofertas: ${formatarCentavos(ind.ofertas_mes)}\n`;
-  txt += `   • Outras Contribuições / Eventos: ${formatarCentavos(ind.outras_contribuicoes)}\n\n`;
+  txt += `━━━━━━━━━━━━━━━━━━━━\n`;
+  txt += `📈 *MOVIMENTO DO MÊS*\n`;
+  txt += `• 📥 Entradas: *${formatarCentavos(ind.entradas_mes)}*\n`;
+  txt += `  _(Dízimos: ${formatarCentavos(ind.dizimos_mes)} | Ofertas: ${formatarCentavos(ind.ofertas_mes)})_\n`;
+  txt += `• 📤 Saídas: *${formatarCentavos(ind.saidas_mes)}*\n`;
+  txt += `  _(Fixas: ${formatarCentavos(ind.despesas_fixas_mensais)} | Deptos: ${formatarCentavos(ind.despesas_variaveis)})_\n`;
+  txt += `• ⚖️ Resultado: *${formatarCentavos(ind.resultado_mes)}* (${resultadoPositivo ? "Superávit ✅" : "Déficit ⚠️"})\n\n`;
 
-  txt += `📤 *Total de Saídas:* ${formatarCentavos(ind.saidas_mes)}\n`;
-  txt += `   • Despesas Fixas (Estrutura/Aluguel/Luz): ${formatarCentavos(ind.despesas_fixas_mensais)}\n`;
-  txt += `   • Despesas Variáveis / Ministérios: ${formatarCentavos(ind.despesas_variaveis)}\n\n`;
-
-  txt += `📈 *Resultado Líquido do Mês:* ${formatarCentavos(ind.resultado_mes)} (${resultadoPositivo ? "Superávit ✅" : "Déficit ⚠️"})\n\n`;
-
-  txt += `⚠️ *3. CONTAS A PAGAR & COMPROMISSOS*\n`;
+  txt += `━━━━━━━━━━━━━━━━━━━━\n`;
+  txt += `⚠️ *COMPROMISSOS & CONTAS*\n`;
   if (ind.contas_vencidas > 0) {
-    txt += `🚨 *Contas Vencidas:* ${formatarCentavos(ind.contas_vencidas)} (${ind.qtd_vencidas} conta(s) - Atenção imediata!)\n`;
+    txt += `• Contas Vencidas: *🚨 ${formatarCentavos(ind.contas_vencidas)}* (${ind.qtd_vencidas} conta(s) pendente(s))\n`;
   } else {
-    txt += `✅ *Contas Vencidas:* R$ 0,00 (Nenhuma conta vencida!)\n`;
+    txt += `• Contas Vencidas: *R$ 0,00* ✅ (Em dia)\n`;
   }
-  txt += `• Vencendo nos próximos 7 dias: ${formatarCentavos(ind.contas_vencer_7d)}\n`;
-  txt += `• Vencendo nos próximos 30 dias: ${formatarCentavos(ind.contas_vencer_30d)}\n`;
-  txt += `• Total aberto a pagar: ${formatarCentavos(ind.contas_a_pagar)}\n`;
-  txt += `• Valores a receber pendentes: ${formatarCentavos(ind.valores_a_receber)}\n\n`;
+  txt += `• A vencer (próx. 30 dias): *${formatarCentavos(ind.contas_vencer_30d)}*\n`;
+  txt += `• 🔮 Saldo Projetado: *${formatarCentavos(ind.previsao_saldo_futuro)}*\n\n`;
 
-  txt += `🔮 *4. SITUAÇÃO FINANCEIRA DOS PRÓXIMOS MESES*\n`;
-  txt += `• *Previsão de Saldo Futuro:* ${formatarCentavos(ind.previsao_saldo_futuro)}\n`;
-  txt += `• *${proxMesNome}/${proxAno} - Contas a Pagar Agendadas:* ${formatarCentavos(contasAPagarProxMes.total)} (${contasAPagarProxMes.qtd} lançamento(s))\n`;
-  if (contasAReceberProxMes.total > 0) {
-    txt += `• *${proxMesNome}/${proxAno} - A Receber Previsto:* ${formatarCentavos(contasAReceberProxMes.total)}\n`;
-  }
-  txt += `• *Estimativa Recorrente Mensal:* ${formatarCentavos(ind.despesas_fixas_mensais)} em despesas fixas\n\n`;
-
-  txt += `─────────────────────────\n`;
-  txt += `🔒 _Relatório oficial emitido com registro e rastreabilidade nos logs da igreja._\n`;
-  txt += `🏛️ _Tesouraria CCC • Contato: +55 11 99111-7612_`;
+  txt += `━━━━━━━━━━━━━━━━━━━━\n`;
+  txt += `🔗 _Comprovantes e extrato completo no site:_\n`;
+  txt += `comunidadecristacurados.com.br/controlefinanceiro\n`;
+  txt += `📞 _Tesouraria: +55 11 99111-7612_`;
 
   return {
     ok: true,
