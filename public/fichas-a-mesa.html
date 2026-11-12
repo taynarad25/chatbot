@@ -432,7 +432,10 @@
                     <span>✨ <em>Rede de Mulheres</em></span>
                 </p>
             </div>
-            <div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button onclick="sincronizarGoogleSheets()" class="btn-action btn-secondary" id="btnSyncSheets" style="border-color: rgba(34, 197, 94, 0.4); color: #86efac;" title="Sincronizar e puxar novas inscrições registradas no Google Sheets">
+                    📊 Puxar do Google Sheets
+                </button>
                 <button onclick="carregarInscricoes()" class="btn-action btn-secondary" id="btnRecarregar">
                     🔄 Atualizar Lista
                 </button>
@@ -491,6 +494,25 @@
 
     <script>
         let todasInscritas = [];
+
+        async function sincronizarGoogleSheets() {
+            const btn = document.getElementById('btnSyncSheets');
+            if (btn) btn.innerHTML = '⏳ Sincronizando...';
+            try {
+                const res = await fetch('/a-mesa/api/sincronizar', { method: 'POST' });
+                const data = await res.json();
+                if (data.ok) {
+                    alert(`✅ Sincronizado com a planilha Google!\nTotal na planilha: ${data.totalPlanilha}.\nNovas inscrições importadas: ${data.importadas}.`);
+                    await carregarInscricoes();
+                } else {
+                    alert('Aviso: ' + (data.message || 'Não foi possível sincronizar com a planilha Google.'));
+                }
+            } catch (err) {
+                alert('Erro ao sincronizar: ' + err.message);
+            } finally {
+                if (btn) btn.innerHTML = '📊 Puxar do Google Sheets';
+            }
+        }
 
         async function carregarInscricoes() {
             const btn = document.getElementById('btnRecarregar');

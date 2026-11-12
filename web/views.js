@@ -2495,6 +2495,34 @@ function renderIndexHtml() {
         </div>
       </div>
       ` : ''}
+
+      ${!isEventoExpiradoData('2026-12-12') ? `
+      <!-- Card do Evento À Mesa — Rede de Mulheres -->
+      <div class="evento-card-item" data-event-date="2026-12-12" style="margin-top: 2rem; border-color: rgba(197, 155, 39, 0.45); background: linear-gradient(135deg, rgba(197, 155, 39, 0.12), rgba(214, 51, 132, 0.08));">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: inline-block; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; background: rgba(197, 155, 39, 0.2); color: #fae8a4; border: 1px solid rgba(197, 155, 39, 0.45); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;">
+              ✨ Rede de Mulheres
+            </div>
+            <h4 style="font-size: 1.35rem; color: #fff; margin: 0 0 6px;">À Mesa — Com Gratidão e Propósito</h4>
+            <p style="color: var(--cor-texto-mutado); font-size: 0.88rem; margin: 0;">
+              🗓️ <strong>12/12/2026 às 16:00</strong> &nbsp;•&nbsp; 📍 <strong>Comunidade Cristã Curados (Templo Principal)</strong> &nbsp;•&nbsp; <em>Inscrição Gratuita & Individual • Comes e Bebes com Gisa ou Gláucia</em>
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button onclick="window.open('/a-mesa/fichas', '_blank')" style="background: linear-gradient(135deg, #dfb743, #c59b27); color: #0f1015; padding: 10px 16px; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(197, 155, 39, 0.35);" title="Ver fichas individuais e painel das líderes">
+              📑 Fichas das Líderes
+            </button>
+            <button onclick="window.open('/a-mesa', '_blank')" style="background: rgba(255, 255, 255, 0.08); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Ver formulário público de inscrição">
+              🔗 Abrir Formulário
+            </button>
+            <button onclick="window.open('/a-mesa/api/exportar-csv', '_blank')" style="background: rgba(34, 197, 94, 0.18); color: #86efac; padding: 10px 16px; border-radius: 10px; font-weight: 700; border: 1px solid rgba(34, 197, 94, 0.35); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Baixar planilha Excel com as inscritas">
+              📥 Baixar Planilha (Excel)
+            </button>
+          </div>
+        </div>
+      </div>
+      ` : ''}
       </div>
     </div>
 

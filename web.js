@@ -1167,6 +1167,27 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
 
           const inscricao = eventoAMesa.salvarInscricaoAMesa({ nome, telefone });
 
+          // Sincroniza em background com o Google Sheets (se configurado)
+          try {
+            eventoAMesa.enviarInscricaoPlanilhaAMesa({ nome: inscricao.nome, telefone })
+              .catch(errSheet => console.warn('[Evento À Mesa] Aviso ao enviar para Google Sheets:', errSheet.message));
+          } catch (_) {}
+
+          // Disparo de confirmação automática no WhatsApp da participante
+          try {
+            const botClient = typeof getClient === 'function' ? getClient() : null;
+            if (botClient && botClient.info) {
+              const msgZap = eventoAMesa.montarMensagemConfirmacaoAMesa({ nome: inscricao.nome, telefone });
+              const numLimpo = String(telefone).replace(/\D/g, '');
+              const chatId = numLimpo.includes('@') ? numLimpo : `${numLimpo.startsWith('55') ? numLimpo : '55' + numLimpo}@c.us`;
+              botClient.sendMessage(chatId, msgZap)
+                .then(() => eventoAMesa.marcarConfirmacaoWhatsAppEnviada(inscricao.id))
+                .catch(errZap => console.warn('[Evento À Mesa] Aviso no envio WhatsApp:', errZap.message));
+            }
+          } catch (errDisparo) {
+            console.warn('[Evento À Mesa] Bot WhatsApp não disponível para confirmação imediata');
+          }
+
           return sendJson(res, 200, {
             ok: true,
             message: inscricao.mensagem,
@@ -1261,6 +1282,17 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         } catch (errCsv) {
           console.error('[Evento À Mesa] Erro ao exportar CSV:', errCsv);
           return sendJson(res, 500, { ok: false, message: 'Erro ao gerar planilha CSV.' });
+        }
+      }
+
+      // API: Sincronizar com Planilha Google (/a-mesa/api/sincronizar)
+      if (req.method === 'POST' && (pathname === '/a-mesa/api/sincronizar' || pathname === '/a-mesa/sincronizar')) {
+        try {
+          const resSync = await eventoAMesa.sincronizarInscricoesComNuvemAMesa();
+          return sendJson(res, resSync.ok ? 200 : 500, resSync);
+        } catch (errSync) {
+          console.error('[Evento À Mesa] Erro ao sincronizar com Google Sheets:', errSync);
+          return sendJson(res, 500, { ok: false, message: errSync.message });
         }
       }
 
