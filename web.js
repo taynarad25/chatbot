@@ -1807,10 +1807,14 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
           const mes = urlObj.searchParams.get('mes');
           const ano = urlObj.searchParams.get('ano');
+          const forcar = urlObj.searchParams.get('forcar') === 'true';
+          if (forcar) {
+            gestao.limparCacheCalendario();
+          }
           const session = getSession(req);
           const perfil = gestao.obterPerfilGestao(session);
           const eventos = await gestao.listarEventosCalendario({ user: perfil, mes, ano });
-          res.setHeader('Cache-Control', 'private, max-age=60');
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
           return sendJson(res, 200, { ok: true, eventos });
         }
 
@@ -1819,6 +1823,7 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           const session = getSession(req);
           const perfil = gestao.obterPerfilGestao(session);
           const solicitacoes = gestao.listarSolicitacoes({ user: perfil });
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
           return sendJson(res, 200, { ok: true, solicitacoes });
         }
 

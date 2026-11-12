@@ -40,9 +40,9 @@ const LINK_ATA_REUNIAO = "https://docs.google.com/document/d/1ZtFfD3f3jB1QkL2Y4X
 let injectedBuscarEventos = null;
 let injectedCalendar = null;
 
-// Cache em memória para Google Calendar (TTL 15 minutos por mês)
+// Cache em memória para Google Calendar (TTL 30 segundos por mês)
 const cacheGcalPorChave = new Map();
-const TTL_CACHE_GCAL = 15 * 60 * 1000;
+const TTL_CACHE_GCAL = 30 * 1000;
 
 function limparCacheCalendario() {
   cacheGcalPorChave.clear();
@@ -714,6 +714,58 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
       const gcalFiltrados = filtrarEventosPorPapel(novosEventosGcal, perfil);
       eventos.push(...gcalFiltrados);
     }
+
+    // Auto-reconciliação inteligente com Google Calendar:
+    // Se o evento já foi alterado na agenda oficial (ex: data/hora no GCal já reflete o novo valor ou já foi atualizado),
+    // remove a pendência obsoleta da fila para não continuar exibindo "Alteração em Análise".
+    try {
+      const rowsPend = db.prepare("SELECT codigo, dados, criadoEm FROM pendentes").all();
+      for (const pend of rowsPend) {
+        try {
+          const d = JSON.parse(pend.dados);
+          if (d.tipo === 'alterar' || d.tipo === 'reuniao_alterar') {
+            const nomeEv = (d.nomeEvento || d.evento || d.nome || '').trim().toLowerCase();
+            if (!nomeEv) continue;
+            const gMatch = gcalEvents.find(g => (g.summary || '').trim().toLowerCase() === nomeEv);
+            if (gMatch) {
+              const startIso = gMatch.start?.dateTime || gMatch.start?.date;
+              const mStart = startIso ? moment.tz(startIso, "America/Sao_Paulo") : null;
+              const gData = mStart ? mStart.format('DD/MM/YYYY') : '';
+              const gHora = mStart ? mStart.format('HH:mm') : '';
+
+              let jaRefletido = false;
+              const campoNorm = String(d.campo || '').toLowerCase();
+              const novoValNorm = String(d.novoValor || '').trim();
+
+              if (campoNorm.includes('data') && novoValNorm) {
+                const diaMes = novoValNorm.substring(0, 5);
+                if (gData === novoValNorm || gData.startsWith(diaMes)) jaRefletido = true;
+              } else if (campoNorm.includes('horár') && novoValNorm) {
+                if (gHora.startsWith(novoValNorm.split(' ')[0])) jaRefletido = true;
+              } else if (gMatch.updated && pend.criadoEm && new Date(gMatch.updated).getTime() >= new Date(pend.criadoEm).getTime()) {
+                jaRefletido = true;
+              }
+
+              if (jaRefletido) {
+                removerPendente(pend.codigo);
+                const idx = eventos.findIndex(e => e.codigo === pend.codigo);
+                if (idx !== -1) eventos.splice(idx, 1);
+              }
+            }
+          } else if (d.tipo === 'cancelar' || d.tipo === 'cancelar_reuniao') {
+            const nomeEv = (d.nomeEvento || d.evento || d.nome || '').trim().toLowerCase();
+            if (!nomeEv) continue;
+            const gMatch = gcalEvents.find(g => (g.summary || '').trim().toLowerCase() === nomeEv);
+            const idadePend = Date.now() - new Date(pend.criadoEm || 0).getTime();
+            if (!gMatch && idadePend > 15000) {
+              removerPendente(pend.codigo);
+              const idx = eventos.findIndex(e => e.codigo === pend.codigo);
+              if (idx !== -1) eventos.splice(idx, 1);
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   } catch (_) {}
 
   return eventos;
@@ -4706,8 +4758,9 @@ function renderGestaoHtml({ user }) {
       const chave = \`\${anoAtual}-\${mesAtual}\`;
       const loader = document.getElementById('calLoadingIndicator');
 
-      // Se já temos os eventos deste mês no cache local e não é recarga forçada: renderiza NA HORA (0ms)
-      if (!forcar && cacheEventosCliente.has(chave)) {
+      if (forcar) {
+        cacheEventosCliente.delete(chave);
+      } else if (cacheEventosCliente.has(chave)) {
         todosEventos = cacheEventosCliente.get(chave);
         renderizarCalendario();
         selecionarDia(diaSelecionado);
@@ -4721,7 +4774,7 @@ function renderGestaoHtml({ user }) {
 
       if (loader && todosEventos.length === 0) loader.style.display = 'flex';
       try {
-        const res = await fetch(\`/gestao/api/eventos?mes=\${mesAtual + 1}&ano=\${anoAtual}\`);
+        const res = await fetch(\`/gestao/api/eventos?mes=\${mesAtual + 1}&ano=\${anoAtual}\${forcar ? '&forcar=true' : ''}\`);
         if (!res.ok) throw new Error('Falha HTTP ' + res.status);
         const data = await res.json();
         if (data && data.ok && Array.isArray(data.eventos)) {
@@ -5183,26 +5236,32 @@ function renderGestaoHtml({ user }) {
     }
 
     function abrirGerenciadorPorId(idOuCodigo) {
-      let ev = todosEventos.find(e => e.id === idOuCodigo || e.codigo === idOuCodigo);
-      if (!ev) {
-        const sol = todasSolicitacoes.find(s => s.id === idOuCodigo || s.codigo === idOuCodigo);
-        if (sol) {
-          ev = {
-            id: sol.id || sol.codigo,
-            codigo: sol.codigo,
-            titulo: sol.titulo,
-            data: sol.data,
-            horarioInicio: sol.horarioInicio,
-            horarioFim: sol.horarioFim,
-            local: sol.local || ENDERECO_IGREJA,
-            departamento: sol.departamento,
-            status: sol.statusClass === 'pendente' || String(sol.status).toLowerCase().includes('aguardando') ? 'pendente_secretaria' : 'confirmado',
-            payload: sol.payload
-          };
-        }
+      if (!idOuCodigo) return;
+      const idStr = String(idOuCodigo).trim();
+      let sol = todasSolicitacoes.find(s => String(s.id).trim() === idStr || String(s.codigo).trim() === idStr);
+      let ev = todosEventos.find(e => String(e.id).trim() === idStr || String(e.codigo).trim() === idStr);
+
+      let item = ev || null;
+      if (sol) {
+        item = {
+          id: sol.id || sol.codigo,
+          codigo: sol.codigo,
+          tipo: sol.tipo || ev?.tipo || 'evento',
+          titulo: sol.titulo || ev?.titulo || '',
+          data: sol.data || ev?.data || '',
+          horarioInicio: sol.horarioInicio || ev?.horarioInicio || '19:00',
+          horarioFim: sol.horarioFim || ev?.horarioFim || '21:30',
+          local: sol.local || ev?.local || ENDERECO_IGREJA,
+          departamento: sol.departamento || ev?.departamento || 'Geral',
+          status: sol.statusClass === 'pendente' || String(sol.status).toLowerCase().includes('aguardando') || String(sol.status).toLowerCase().includes('análise') ? 'pendente_secretaria' : (ev?.status || 'confirmado'),
+          payload: sol.payload || ev?.payload,
+          solicitanteId: sol.payload?.solicitanteId || ev?.payload?.solicitanteId || sol.responsavel || '',
+          solicitanteNome: sol.payload?.solicitanteNome || ev?.payload?.solicitanteNome || sol.responsavel || '',
+          criadoPor: sol.payload?.criadoPor || ev?.payload?.criadoPor || ''
+        };
       }
-      if (!ev) return;
-      abrirGerenciadorPorObjeto(ev);
+      if (!item) return;
+      abrirGerenciadorPorObjeto(item);
     }
 
     function verificarPodeEditarEventoAtual(ev) {
@@ -5215,11 +5274,35 @@ function renderGestaoHtml({ user }) {
       if (ehPrivilegiado) return true;
       if (ev.isOcupacaoExterna) return false;
 
+      // Se o usuário logado é o solicitante ou criador deste pedido / evento, ele SEMPRE pode gerenciar
+      const meuTel = String(usuarioLogado?.telefone || '').replace(/\D/g, '');
+      const evTel = String(ev.solicitanteId || ev.payload?.solicitanteId || '').replace(/\D/g, '');
+      const meuUser = String(usuarioLogado?.username || '').toLowerCase().trim();
+      const evUser = String(ev.criadoPor || ev.payload?.criadoPor || ev.solicitanteId || '').toLowerCase().trim();
+      const meuNome = String(usuarioLogado?.nome || '').toLowerCase().trim();
+      const evNome = String(ev.responsavel || ev.solicitanteNome || ev.payload?.solicitanteNome || '').toLowerCase().trim();
+
+      if (meuTel && evTel && (meuTel.includes(evTel) || evTel.includes(meuTel))) return true;
+      if (meuUser && evUser && (meuUser === evUser)) return true;
+      if (meuNome && evNome && (meuNome.includes(evNome) || evNome.includes(meuNome))) return true;
+
+      // Se a solicitação está na lista de solicitações do usuário ou foi aberta por ele
+      const constaMinhasSol = todasSolicitacoes.some(s => (s.codigo && s.codigo === ev.codigo) || (s.id && s.id === ev.id));
+      if (constaMinhasSol) return true;
+
       const deptosLider = (usuarioLogado?.departamentos || [])
         .map(d => String(d).toLowerCase().trim())
         .filter(d => d && d !== 'geral');
 
       const deptoEv = String(ev.departamento || '').toLowerCase().trim();
+      if (!deptoEv || deptoEv === 'geral') {
+        return true;
+      }
+
+      const matchLouvor = (deptosLider.some(d => d.includes('epifania') || d.includes('louvor'))) &&
+                          (deptoEv.includes('epifania') || deptoEv.includes('louvor') || deptoEv.includes('música'));
+      if (matchLouvor) return true;
+
       return deptosLider.length > 0 && deptoEv && deptosLider.some(d => deptoEv.includes(d) || d.includes(deptoEv));
     }
 
@@ -5268,10 +5351,17 @@ function renderGestaoHtml({ user }) {
 
     function ehEventoPendente(ev) {
       if (!ev) return false;
+      const st = String(ev.status || '').toLowerCase();
       return ev.status === 'pendente_secretaria' || 
              ev.status === 'pendente' || 
              ev.origem === 'pendente' || 
-             (ev.status && String(ev.status).toLowerCase().includes('aguardando'));
+             st.includes('aguardando') ||
+             st.includes('análise') ||
+             st.includes('analise') ||
+             ev.tipo === 'alterar' ||
+             ev.tipo === 'cancelar' ||
+             ev.tipo === 'alteracao' ||
+             ev.tipo === 'cancelamento';
     }
 
     function voltarMenuGerenciar() {
@@ -5396,9 +5486,13 @@ function renderGestaoHtml({ user }) {
       }
       document.getElementById('ger_alt_novo_valor').value = novoValor;
 
+      const nomeBase = String(eventoSendoGerenciado.titulo || '')
+        .replace(/\s*\((?:Alterar|Pedido de Cancelamento)[^)]*\)/gi, '')
+        .trim();
+
       const payload = {
         tipo: 'alterar',
-        nome_evento: eventoSendoGerenciado.titulo,
+        nome_evento: nomeBase || eventoSendoGerenciado.titulo,
         data: eventoSendoGerenciado.data || '',
         departamento: eventoSendoGerenciado.departamento || '',
         codigo: eventoSendoGerenciado.codigo || eventoSendoGerenciado.id,
@@ -5424,13 +5518,18 @@ function renderGestaoHtml({ user }) {
           alert('✅ ' + (ret.mensagem || ret.message || 'Solicitação atualizada!'));
           fecharModalGerenciarEvento();
           carregarSolicitacoesServidor();
-          carregarEventosDoMes();
+          carregarEventosServidor(true);
         } else {
-          alert('❌ Erro: ' + ret.message);
+          alert('❌ Erro: ' + (ret.message || ret.mensagem || 'Falha ao atualizar.'));
         }
-      } catch (_) {
+      } catch (err) {
+        console.error('[Gestão] Erro ao alterar solicitação:', err);
         alert('❌ Erro de conexão.');
       }
+    }
+
+    function carregarEventosDoMes() {
+      return carregarEventosServidor(true);
     }
 
     async function submeterAtualizarFormularioSelecionado(e) {
@@ -5498,9 +5597,13 @@ function renderGestaoHtml({ user }) {
         return;
       }
 
+      const nomeBase = String(eventoSendoGerenciado.titulo || '')
+        .replace(/\s*\((?:Alterar|Pedido de Cancelamento)[^)]*\)/gi, '')
+        .trim();
+
       const payload = {
         tipo: 'cancelar',
-        nome_evento: eventoSendoGerenciado.titulo,
+        nome_evento: nomeBase || eventoSendoGerenciado.titulo,
         data: eventoSendoGerenciado.data || '',
         departamento: eventoSendoGerenciado.departamento || '',
         codigo: eventoSendoGerenciado.codigo || eventoSendoGerenciado.id,
@@ -5519,11 +5622,12 @@ function renderGestaoHtml({ user }) {
           alert('✅ ' + (ret.mensagem || ret.message || 'Solicitação cancelada!'));
           fecharModalGerenciarEvento();
           carregarSolicitacoesServidor();
-          carregarEventosDoMes();
+          carregarEventosServidor(true);
         } else {
-          alert('❌ Erro: ' + ret.message);
+          alert('❌ Erro: ' + (ret.message || ret.mensagem || 'Falha ao cancelar.'));
         }
-      } catch (_) {
+      } catch (err) {
+        console.error('[Gestão] Erro ao cancelar solicitação:', err);
         alert('❌ Erro de conexão.');
       }
     }

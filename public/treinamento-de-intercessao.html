@@ -538,7 +538,7 @@
                 <div class="info-icon">⏳</div>
                 <div class="info-content">
                     <h4>Prazo de Inscrição</h4>
-                    <p style="color: var(--cor-laranja-suave); font-weight: 700;">Até 05 de Novembro</p>
+                    <p style="color: var(--cor-laranja-suave); font-weight: 700;">Até 14 de Novembro</p>
                 </div>
             </div>
             <div class="info-card">
@@ -581,7 +581,7 @@
         <section class="form-section">
             <div class="form-header">
                 <h2><span>✍️</span> Ficha de Inscrição</h2>
-                <p>Preencha os dados abaixo para garantir a sua vaga. ⏳ <strong>Inscrições abertas até o dia 05 de Novembro de 2026.</strong></p>
+                <p>Preencha os dados abaixo para garantir a sua vaga. ⏳ <strong>Inscrições abertas até o dia 14 de Novembro de 2026.</strong></p>
             </div>
 
             <form id="formIntercessao" onsubmit="realizarInscricao(event)" novalidate>
@@ -678,7 +678,7 @@
 
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQk1-oLONEbLfqfdDgW3xJETF7kKZTW1lP2NpaR_vFwwK2koBaudYuODD04IT0wg65Iw/exec";
-        const PRAZO_INSCRICAO = new Date("2026-11-05T23:59:59.999-03:00");
+        const PRAZO_INSCRICAO = new Date("2026-11-14T23:59:59.999-03:00");
 
         function verificarPrazoInscricao() {
             if (new Date() > PRAZO_INSCRICAO) {
@@ -687,11 +687,11 @@
                     btn.disabled = true;
                     btn.style.opacity = '0.6';
                     btn.style.cursor = 'not-allowed';
-                    btn.innerHTML = '<span>🔒 Inscrições Encerradas (Prazo: 05/11/2026)</span>';
+                    btn.innerHTML = '<span>🔒 Inscrições Encerradas (Prazo: 14/11/2026)</span>';
                 }
                 const headerP = document.querySelector('.form-header p');
                 if (headerP) {
-                    headerP.innerHTML = '⚠️ <strong style="color: #f87171;">As inscrições para o Treinamento de Intercessão foram encerradas no dia 05 de Novembro de 2026.</strong>';
+                    headerP.innerHTML = '⚠️ <strong style="color: #f87171;">As inscrições para o Treinamento de Intercessão foram encerradas no dia 14 de Novembro de 2026.</strong>';
                 }
             }
         }
@@ -735,7 +735,7 @@
             e.preventDefault();
 
             if (new Date() > PRAZO_INSCRICAO) {
-                alert('As inscrições para o Treinamento de Intercessão foram encerradas no dia 05 de Novembro de 2026.');
+                alert('As inscrições para o Treinamento de Intercessão foram encerradas no dia 14 de Novembro de 2026.');
                 return;
             }
 
