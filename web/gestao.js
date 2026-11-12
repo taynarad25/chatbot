@@ -691,6 +691,11 @@ async function listarEventosCalendario({ user = null, mes = null, ano = null } =
         novosEventosGcal.push({
           id: `gcal_${g.id}`,
           origem: 'google',
+          calendarId: g.calendarId || null,
+          eventId: g.id || null,
+          inicioOriginal: g.start?.dateTime || g.start?.date || null,
+          fimOriginal: g.end?.dateTime || g.end?.date || null,
+          isDiaInteiroOriginal: !g.start?.dateTime,
           titulo: summary,
           departamento: depto,
           data: dataFormatada,
@@ -752,7 +757,7 @@ function listarSolicitacoes({ user = null } = {}) {
         if (d.tipo === 'alterar') {
           statusTexto = '⏳ Alteração em Análise';
           statusClass = 'pendente';
-          tituloExibicao = `${nome} (Alterar ${d.campo || 'Dados'})`;
+          tituloExibicao = `${nome} (Alterar ${d.campoOriginal || d.campo || 'Dados'})`;
         } else if (d.tipo === 'cancelar') {
           statusTexto = '⏳ Cancelamento em Análise';
           statusClass = 'pendente';
@@ -1774,16 +1779,93 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
     }
 
     // Se o evento já está confirmado na agenda oficial, cria pedido formal de alteração
+    const campoNorm = String(campo_alterar || '').toLowerCase().trim();
+    let campoChave = 'outro';
+    if (campoNorm.includes('data')) campoChave = 'data';
+    else if (campoNorm.includes('horár') || campoNorm.includes('horar')) campoChave = 'horario';
+    else if (campoNorm.includes('local')) campoChave = 'local';
+    else if (campoNorm.includes('nome') || campoNorm.includes('título') || campoNorm.includes('titulo')) campoChave = 'nome';
+
+    let novoDia = null, novoMes = null, novoAno = null;
+    let novoHorarioInicio = null, novoHorarioFim = null;
+    let novoLocal = null, novoNome = null;
+
+    if (campoChave === 'data') {
+      const match = String(novo_valor).trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+      if (match) {
+        novoDia = parseInt(match[1], 10);
+        novoMes = parseInt(match[2], 10);
+        novoAno = match[3] ? parseInt(match[3], 10) : null;
+      }
+    } else if (campoChave === 'horario') {
+      const partes = String(novo_valor).split(/às|-|a/i).map(s => s.trim());
+      if (partes.length >= 2) {
+        novoHorarioInicio = partes[0];
+        novoHorarioFim = partes[1];
+      } else if (partes.length === 1 && partes[0]) {
+        novoHorarioInicio = partes[0];
+      }
+    } else if (campoChave === 'local') {
+      novoLocal = String(novo_valor).trim();
+    } else if (campoChave === 'nome') {
+      novoNome = String(novo_valor).trim();
+    }
+
+    const telSolicitante = String(perfil?.telefone || '').replace(/\D/g, '');
+    const jidSolicitante = telSolicitante 
+      ? (telSolicitante.length <= 11 && !telSolicitante.startsWith('55') ? `55${telSolicitante}@c.us` : `${telSolicitante}@c.us`)
+      : (perfil?.username && perfil.username.includes('@') ? perfil.username : (telSolicitante ? `${telSolicitante}@c.us` : ''));
+
+    let targetCalendarId = corpo.calendarId || null;
+    let targetEventId = corpo.eventId || (corpo.codigo && String(corpo.codigo).startsWith('gcal_') ? String(corpo.codigo).replace('gcal_', '') : null);
+    let targetInicio = corpo.inicioOriginal || null;
+    let targetFim = corpo.fimOriginal || null;
+    let targetDiaInteiro = Boolean(corpo.isDiaInteiroOriginal);
+
+    if ((!targetCalendarId || !targetEventId) && typeof injectedBuscarEventos === 'function') {
+      try {
+        const agora = moment.tz("America/Sao_Paulo");
+        const evs = await injectedBuscarEventos(
+          agora.clone().startOf('year').toISOString(),
+          agora.clone().endOf('year').add(1, 'year').toISOString()
+        );
+        const evMatch = (evs || []).find(e => 
+          e.summary && e.summary.toLowerCase().trim() === nome_evento.trim().toLowerCase()
+        );
+        if (evMatch) {
+          targetCalendarId = targetCalendarId || evMatch.calendarId;
+          targetEventId = targetEventId || evMatch.id;
+          targetInicio = targetInicio || evMatch.start?.dateTime || evMatch.start?.date;
+          targetFim = targetFim || evMatch.end?.dateTime || evMatch.end?.date;
+          targetDiaInteiro = !evMatch.start?.dateTime;
+        }
+      } catch (_) {}
+    }
+
     const dadosAlteracao = {
       tipo: 'alterar',
       evento: nome_evento.trim(),
       departamento: corpo.departamento?.trim() || '',
       dataFormatada: corpo.data || corpo.dataFormatada || '',
-      campo: campo_alterar,
+      campo: campoChave,
+      campoOriginal: campo_alterar,
       novoValor: novo_valor,
+      novoDia,
+      novoMes,
+      novoAno,
+      novoHorarioInicio,
+      novoHorarioFim,
+      novoLocal,
+      novoNome,
+      calendarId: targetCalendarId,
+      eventId: targetEventId,
+      inicioOriginal: targetInicio,
+      fimOriginal: targetFim,
+      isDiaInteiroOriginal: targetDiaInteiro,
       motivo: motivo?.trim() || 'Ajuste de cronograma',
       solicitanteNome: perfil?.nome || 'Líder',
-      solicitanteId: perfil?.telefone || perfil?.username || '',
+      solicitanteId: jidSolicitante,
+      solicitanteTelefone: telSolicitante,
       criadoVia: 'painel_web',
       criadoEm: new Date().toISOString()
     };
@@ -1797,7 +1879,7 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
       `🔧 *Campo a Alterar:* ${campo_alterar}\n` +
       `✨ *Nova Informação:* ${novo_valor}\n` +
       `📝 *Motivo:* ${dadosAlteracao.motivo}\n\n` +
-      `_Responda a este resumo com "alterar evento" para confirmar ou "não alterar" para negar._\n\n` +
+      `_Responda a este resumo com "alterar evento" para aplicar automaticamente na agenda oficial, ou "não alterar" para negar._\n\n` +
       `_Código: ${codigo}_`;
 
     try {
@@ -5321,6 +5403,11 @@ function renderGestaoHtml({ user }) {
         departamento: eventoSendoGerenciado.departamento || '',
         codigo: eventoSendoGerenciado.codigo || eventoSendoGerenciado.id,
         origem_status: eventoSendoGerenciado.status,
+        calendarId: eventoSendoGerenciado.calendarId || '',
+        eventId: eventoSendoGerenciado.eventId || (eventoSendoGerenciado.id && String(eventoSendoGerenciado.id).startsWith('gcal_') ? String(eventoSendoGerenciado.id).replace('gcal_', '') : ''),
+        inicioOriginal: eventoSendoGerenciado.inicioOriginal || '',
+        fimOriginal: eventoSendoGerenciado.fimOriginal || '',
+        isDiaInteiroOriginal: Boolean(eventoSendoGerenciado.isDiaInteiroOriginal),
         campo_alterar: document.getElementById('ger_alt_campo').value,
         novo_valor: document.getElementById('ger_alt_novo_valor').value,
         motivo: document.getElementById('ger_alt_motivo').value

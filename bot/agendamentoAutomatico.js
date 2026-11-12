@@ -76,26 +76,58 @@ function montarResourcesMultiplosBlocos(dados, ano) {
 
 // Monta o "resource" de patch para aplicar automaticamente uma alteração
 // estruturada (horário, data, nome ou local) aprovada pela secretaria.
-// `campo` indica qual dado foi alterado; os demais campos do evento não são
-// tocados. Alterações em texto livre ("outro") não têm como ser aplicadas
-// automaticamente, então retorna null nesse caso (o fluxo antigo, manual,
-// continua valendo).
+// Suporta requisições feitas via WhatsApp ou Painel de Gestão Web.
 function montarResourcePatchAlteracao(dados) {
-  const { campo } = dados;
+  if (!dados) return null;
+  const campoRaw = String(dados.campo || "").toLowerCase().trim();
+  let campo = campoRaw;
+  if (campoRaw.includes("data")) campo = "data";
+  else if (campoRaw.includes("horar") || campoRaw.includes("horár")) campo = "horario";
+  else if (campoRaw.includes("local")) campo = "local";
+  else if (campoRaw.includes("nome") || campoRaw.includes("titul") || campoRaw.includes("título")) campo = "nome";
 
-  if (campo === "nome") return { summary: dados.novoNome };
-  if (campo === "local") return { location: dados.novoLocal };
+  const novoNome = dados.novoNome || (campo === "nome" ? dados.novoValor : null);
+  const novoLocal = dados.novoLocal || (campo === "local" ? dados.novoValor : null);
+
+  if (campo === "nome" && novoNome) return { summary: String(novoNome).trim() };
+  if (campo === "local" && novoLocal) return { location: String(novoLocal).trim() };
   if (campo !== "data" && campo !== "horario") return null;
+
+  let novoDia = dados.novoDia;
+  let novoMes = dados.novoMes;
+  let novoAno = dados.novoAno;
+
+  if (campo === "data" && (!novoDia || !novoMes) && dados.novoValor) {
+    const match = String(dados.novoValor).trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+    if (match) {
+      novoDia = parseInt(match[1], 10);
+      novoMes = parseInt(match[2], 10);
+      if (match[3]) novoAno = parseInt(match[3], 10);
+    }
+  }
+
+  let novoHorarioInicio = dados.novoHorarioInicio;
+  let novoHorarioFim = dados.novoHorarioFim;
+
+  if (campo === "horario" && (!novoHorarioInicio || !novoHorarioFim) && dados.novoValor) {
+    const partes = String(dados.novoValor).split(/às|-|a/i).map((s) => s.trim());
+    if (partes.length >= 2) {
+      novoHorarioInicio = partes[0];
+      novoHorarioFim = partes[1];
+    } else if (partes.length === 1 && partes[0]) {
+      novoHorarioInicio = partes[0];
+    }
+  }
 
   const { isDiaInteiroOriginal, inicioOriginal, fimOriginal } = dados;
 
   if (isDiaInteiroOriginal) {
     // Evento de dia inteiro não tem horário pra mudar — só faz sentido mudar a data.
-    if (campo !== "data") return null;
+    if (campo !== "data" || !novoDia || !novoMes) return null;
 
-    const ano = moment.tz(inicioOriginal, "America/Sao_Paulo").year();
-    const duracaoDias = moment(fimOriginal).diff(moment(inicioOriginal), "days");
-    const novoInicio = moment.tz(`${dados.novoDia}/${dados.novoMes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
+    const ano = novoAno || (inicioOriginal ? moment.tz(inicioOriginal, "America/Sao_Paulo").year() : moment.tz("America/Sao_Paulo").year());
+    const duracaoDias = inicioOriginal && fimOriginal ? Math.max(moment(fimOriginal).diff(moment(inicioOriginal), "days"), 1) : 1;
+    const novoInicio = moment.tz(`${novoDia}/${novoMes}/${ano}`, "D/M/YYYY", "America/Sao_Paulo");
 
     return {
       start: { date: novoInicio.format("YYYY-MM-DD") },
@@ -103,20 +135,27 @@ function montarResourcePatchAlteracao(dados) {
     };
   }
 
-  const duracaoMinutos = moment(fimOriginal).diff(moment(inicioOriginal), "minutes");
-  let novoInicio = moment.tz(inicioOriginal, "America/Sao_Paulo");
+  const duracaoMinutos = inicioOriginal && fimOriginal ? Math.max(moment(fimOriginal).diff(moment(inicioOriginal), "minutes"), 30) : 150;
+  let novoInicio = inicioOriginal ? moment.tz(inicioOriginal, "America/Sao_Paulo") : moment.tz("America/Sao_Paulo");
   let novoFim;
 
   if (campo === "data") {
-    novoInicio = novoInicio.clone().set({ date: dados.novoDia, month: dados.novoMes - 1 });
+    if (!novoDia || !novoMes) return null;
+    const ano = novoAno || novoInicio.year();
+    novoInicio = novoInicio.clone().set({ date: novoDia, month: novoMes - 1, year: ano });
     novoFim = novoInicio.clone().add(duracaoMinutos, "minutes");
   } else {
-    const [hInicio, mInicio] = dados.novoHorarioInicio.split(":").map(Number);
-    const [hFim, mFim] = dados.novoHorarioFim.split(":").map(Number);
+    if (!novoHorarioInicio) return null;
+    const [hInicio, mInicio] = novoHorarioInicio.split(":").map(Number);
     novoInicio = novoInicio.clone().set({ hour: hInicio, minute: mInicio, second: 0, millisecond: 0 });
-    novoFim = novoInicio.clone().set({ hour: hFim, minute: mFim, second: 0, millisecond: 0 });
-    if (novoFim.isSameOrBefore(novoInicio)) {
-      novoFim = novoFim.add(1, "day");
+    if (novoHorarioFim) {
+      const [hFim, mFim] = novoHorarioFim.split(":").map(Number);
+      novoFim = novoInicio.clone().set({ hour: hFim, minute: mFim, second: 0, millisecond: 0 });
+      if (novoFim.isSameOrBefore(novoInicio)) {
+        novoFim = novoFim.add(1, "day");
+      }
+    } else {
+      novoFim = novoInicio.clone().add(duracaoMinutos, "minutes");
     }
   }
 

@@ -258,6 +258,21 @@ async function enviarComRetry(client, fnEnvio, { jid = "", maxTentativas = 3, es
 }
 
 /**
+ * Garante que o identificador de destino seja um JID válido do WhatsApp (ex: 5511999999999@c.us ou grupo@g.us)
+ * @param {string} jid 
+ * @returns {string}
+ */
+function normalizarJid(jid) {
+  if (!jid) return jid;
+  const s = String(jid).trim();
+  if (s.includes("@")) return s;
+  const digitos = s.replace(/\D/g, "");
+  if (!digitos) return s;
+  const comDdi = (digitos.length <= 11 && !digitos.startsWith("55")) ? `55${digitos}` : digitos;
+  return `${comDdi}@c.us`;
+}
+
+/**
  * Envia uma mensagem via cliente WhatsApp com proteção de retry automático
  * @param {object} client 
  * @param {string} jid 
@@ -271,15 +286,17 @@ async function enviarMensagemResiliente(client, jid, content, options = {}, conf
     throw new Error("Cliente WhatsApp inválido ou sem método sendMessage");
   }
 
+  const destino = normalizarJid(jid);
+
   // Se o client já possui resiliência ativa no sendMessage, chama diretamente para não duplicar retries
   if (client._sendMessageResiliente) {
-    return client.sendMessage(jid, content, options);
+    return client.sendMessage(destino, content, options);
   }
 
   return enviarComRetry(
     client,
-    () => client.sendMessage(jid, content, options),
-    { jid, ...config }
+    () => client.sendMessage(destino, content, options),
+    { jid: destino, ...config }
   );
 }
 
@@ -296,10 +313,11 @@ function aplicarResilienciaClient(client) {
   const originalSendMessage = client.sendMessage.bind(client);
 
   client.sendMessage = async function (chatId, content, options) {
+    const destino = normalizarJid(chatId);
     return enviarComRetry(
       client,
-      () => originalSendMessage(chatId, content, options),
-      { jid: chatId }
+      () => originalSendMessage(destino, content, options),
+      { jid: destino }
     );
   };
 
@@ -308,6 +326,7 @@ function aplicarResilienciaClient(client) {
 }
 
 module.exports = {
+  normalizarJid,
   isTransientPuppeteerError,
   injetarPatchesCompatibilidade,
   garantirAmbientePronto,

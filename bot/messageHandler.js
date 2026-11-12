@@ -52,6 +52,7 @@ const {
 const { notificarSecretaria: notificarSecretariaDefault, notificarPastoral, notificarMultimidia, NOME_GRUPO_SECRETARIA, NOME_GRUPO_PASTORAL, NOME_GRUPO_MULTIMIDIA, atualizarCacheGrupo, obterJidCached } = require("./secretaria");
 const { executarBroadcast, BROADCAST_CONFIG } = require("./broadcast");
 const { baixarMidiaComRetry } = require("./mediaStorage");
+const { normalizarJid } = require("./senderResiliente");
 const { montarResourceEvento, montarResourcesMultiplosBlocos, montarResourcePatchAlteracao } = require("./agendamentoAutomatico");
 const { gerarDescricaoEvento, salvarDescricaoEvento, buscarDescricaoEvento } = require("./descricaoEvento");
 const { salvarPendente, buscarPendente, buscarPendentePorPastor, atualizarPendente, removerPendente, extrairCodigo } = require("./pendentesAprovacao");
@@ -2381,18 +2382,48 @@ function createMessageHandler({
 
               if (dados.tipo === "reuniao_alterar") {
                 const { solicitanteId, evento } = dados;
+                const jidSolicitante = normalizarJid(solicitanteId);
 
                 if (isAlterar) {
+                  let targetCalendarId = dados.calendarId;
+                  let targetEventId = dados.eventId;
+
+                  if ((!targetCalendarId || !targetEventId) && typeof buscarEventos === "function") {
+                    try {
+                      const agora = moment.tz("America/Sao_Paulo");
+                      const encontrados = await buscarEventos(
+                        agora.clone().startOf("year").toISOString(),
+                        agora.clone().endOf("year").add(1, "year").toISOString()
+                      );
+                      const evMatch = (encontrados || []).find((e) =>
+                        e.summary && evento && e.summary.toLowerCase().trim() === evento.toLowerCase().trim()
+                      );
+                      if (evMatch) {
+                        targetCalendarId = targetCalendarId || evMatch.calendarId;
+                        targetEventId = targetEventId || evMatch.id;
+                        if (!dados.inicioOriginal) dados.inicioOriginal = evMatch.start?.dateTime || evMatch.start?.date;
+                        if (!dados.fimOriginal) dados.fimOriginal = evMatch.end?.dateTime || evMatch.end?.date;
+                        if (dados.isDiaInteiroOriginal === undefined) dados.isDiaInteiroOriginal = !evMatch.start?.dateTime;
+                      }
+                    } catch (_) {}
+                  }
+
                   const resourcePatch = dados.campo ? montarResourcePatchAlteracao(dados) : null;
 
-                  if (resourcePatch) {
+                  if (resourcePatch && targetCalendarId && targetEventId) {
                     try {
-                      await calendar.events.patch({ calendarId: dados.calendarId, eventId: dados.eventId, resource: resourcePatch });
+                      await calendar.events.patch({ calendarId: targetCalendarId, eventId: targetEventId, resource: resourcePatch });
                       removerPendente(codigo);
 
                       const feedback = `✅ *Alteração de Reunião Aprovada!*\n\nSua solicitação de alteração para a reunião "*${evento}*" foi aprovada e já foi atualizada na agenda oficial. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
-                      await client.sendMessage(solicitanteId, feedback);
-                      console.log(`[Secretaria] Alteração de reunião aplicada para ${mascararTelefone(solicitanteId)}`);
+                      if (jidSolicitante) {
+                        try {
+                          await client.sendMessage(jidSolicitante, feedback);
+                          console.log(`[Secretaria] Alteração de reunião aplicada para ${mascararTelefone(jidSolicitante)}`);
+                        } catch (eSend) {
+                          console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração de reunião para ${mascararTelefone(jidSolicitante)}:`, eSend.message);
+                        }
+                      }
                       return msg.reply(`✅ Alteração aplicada na agenda de Reuniões e líder notificado.`);
                     } catch (err) {
                       console.error("[ALERTA:google-calendar] Erro ao aplicar alteração de reunião:", err);
@@ -2403,9 +2434,11 @@ function createMessageHandler({
                   removerPendente(codigo);
                   const feedback = `✅ *Alteração de Reunião Aprovada!*\n\nSua solicitação de alteração para a reunião "*${evento}*" foi aprovada pela secretaria. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
                   try {
-                    await client.sendMessage(solicitanteId, feedback);
+                    if (jidSolicitante) {
+                      await client.sendMessage(jidSolicitante, feedback);
+                    }
                   } catch (sendErr) {
-                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(jidSolicitante)}:`, sendErr.message);
                   }
                   return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração de reunião.`);
                 } else {
@@ -2414,31 +2447,64 @@ function createMessageHandler({
                   atualizarPendente(codigo, dados);
                   const feedback = `❌ *Alteração de Reunião Não Aprovada*\n\nInfelizmente sua solicitação de alteração para a reunião "*${evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria.\n\nDigite *menu* para voltar ao menu principal.`;
                   try {
-                    await client.sendMessage(solicitanteId, feedback);
+                    if (jidSolicitante) {
+                      await client.sendMessage(jidSolicitante, feedback);
+                    }
                   } catch (sendErr) {
-                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de recusa para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                    console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de recusa para ${mascararTelefone(jidSolicitante)}:`, sendErr.message);
                   }
                   return msg.reply(`✅ Solicitante notificado sobre a recusa da alteração de reunião.`);
                 }
               }
 
               const { solicitanteId, evento } = dados;
+              const jidSolicitante = normalizarJid(solicitanteId);
 
               if (isAlterar) {
+                let targetCalendarId = dados.calendarId;
+                let targetEventId = dados.eventId;
+
+                if ((!targetCalendarId || !targetEventId) && typeof buscarEventos === "function") {
+                  try {
+                    const agora = moment.tz("America/Sao_Paulo");
+                    const encontrados = await buscarEventos(
+                      agora.clone().startOf("year").toISOString(),
+                      agora.clone().endOf("year").add(1, "year").toISOString()
+                    );
+                    const evMatch = (encontrados || []).find((e) =>
+                      e.summary && evento && e.summary.toLowerCase().trim() === evento.toLowerCase().trim()
+                    );
+                    if (evMatch) {
+                      targetCalendarId = targetCalendarId || evMatch.calendarId;
+                      targetEventId = targetEventId || evMatch.id;
+                      if (!dados.inicioOriginal) dados.inicioOriginal = evMatch.start?.dateTime || evMatch.start?.date;
+                      if (!dados.fimOriginal) dados.fimOriginal = evMatch.end?.dateTime || evMatch.end?.date;
+                      if (dados.isDiaInteiroOriginal === undefined) dados.isDiaInteiroOriginal = !evMatch.start?.dateTime;
+                    }
+                  } catch (eBusca) {
+                    console.warn("[Secretaria] Aviso ao buscar evento no Google Calendar para alteração:", eBusca.message);
+                  }
+                }
+
                 // Alterações estruturadas (horário/data/nome/local) carregam "campo" e
-                // conseguem ser aplicadas automaticamente. O texto livre ("outro") não
-                // tem como ser interpretado com segurança, então continua manual.
+                // conseguem ser aplicadas automaticamente na agenda do Google.
                 const resourcePatch = dados.campo ? montarResourcePatchAlteracao(dados) : null;
 
-                if (resourcePatch) {
+                if (resourcePatch && targetCalendarId && targetEventId) {
                   try {
-                    await calendar.events.patch({ calendarId: dados.calendarId, eventId: dados.eventId, resource: resourcePatch });
+                    await calendar.events.patch({ calendarId: targetCalendarId, eventId: targetEventId, resource: resourcePatch });
                     removerPendente(codigo);
 
                     const feedback = `✅ *Alteração Aprovada e Aplicada!*\n\nSua solicitação de alteração para o evento "*${evento}*" foi aprovada e já foi atualizada na agenda oficial. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
-                    await client.sendMessage(solicitanteId, feedback);
-                    console.log(`[Secretaria] Alteração automática aplicada para ${mascararTelefone(solicitanteId)}`);
-                    return msg.reply(`✅ Alteração aplicada na agenda e líder notificado.`);
+                    if (jidSolicitante) {
+                      try {
+                        await client.sendMessage(jidSolicitante, feedback);
+                        console.log(`[Secretaria] Alteração automática aplicada para ${mascararTelefone(jidSolicitante)}`);
+                      } catch (eSend) {
+                        console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(jidSolicitante)}:`, eSend.message);
+                      }
+                    }
+                    return msg.reply(`✅ Alteração aplicada na agenda oficial e solicitante notificado.`);
                   } catch (err) {
                     console.error("[ALERTA:google-calendar] Erro ao aplicar alteração automática:", err);
                     return msg.reply("❌ Erro ao aplicar a alteração na agenda do Google. A permissão ou conflito impediu a gravação automática. Responda de novo a esta mesma mensagem depois de resolvido.");
@@ -2448,20 +2514,24 @@ function createMessageHandler({
                 removerPendente(codigo);
                 const feedback = `✅ *Alteração Aprovada!*\n\nSua solicitação de alteração para o evento "*${evento}*" foi aprovada pela secretaria. 🙏\n\nDigite *menu* para voltar ao menu principal.`;
                 try {
-                  await client.sendMessage(solicitanteId, feedback);
-                  console.log(`[Secretaria] Feedback de alteração aprovada enviado para ${mascararTelefone(solicitanteId)}`);
+                  if (jidSolicitante) {
+                    await client.sendMessage(jidSolicitante, feedback);
+                    console.log(`[Secretaria] Feedback de alteração aprovada enviado para ${mascararTelefone(jidSolicitante)}`);
+                  }
                 } catch (sendErr) {
-                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(jidSolicitante)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a aprovação da alteração.`);
               } else {
                 removerPendente(codigo);
                 const feedback = `❌ *Alteração Não Aprovada*\n\nInfelizmente sua solicitação de alteração para o evento "*${evento}*" não pôde ser aprovada. Por favor, entre em contato com a secretaria para mais detalhes.\n\nDigite *menu* para voltar ao menu principal.`;
                 try {
-                  await client.sendMessage(solicitanteId, feedback);
-                  console.log(`[Secretaria] Feedback de alteração recusada enviado para ${mascararTelefone(solicitanteId)}`);
+                  if (jidSolicitante) {
+                    await client.sendMessage(jidSolicitante, feedback);
+                    console.log(`[Secretaria] Feedback de alteração recusada enviado para ${mascararTelefone(jidSolicitante)}`);
+                  }
                 } catch (sendErr) {
-                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(solicitanteId)}:`, sendErr.message);
+                  console.error(`[ALERTA:whatsapp] Erro ao enviar feedback de alteração para ${mascararTelefone(jidSolicitante)}:`, sendErr.message);
                 }
                 return msg.reply(`✅ Solicitante notificado sobre a recusa da alteração.`);
               }
