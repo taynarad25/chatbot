@@ -222,20 +222,51 @@ function iniciarRotinaLimpezaAutomatica({ db = null, intervaloMs = 15 * 60 * 100
 
 /**
  * Filtra no HTML renderizado do servidor quaisquer elementos que possuam data-event-date passada.
- * Isso garante que nenhum card ou link de evento expirado seja entregue no HTML,
- * mesmo antes do JavaScript do navegador rodar.
+ * Remove completamente o elemento correspondente respeitando aninhamento de tags (ex: divs dentro de divs),
+ * garantindo que nenhum card ou link de evento expirado seja entregue no HTML.
  */
 function filtrarHtmlEventosExpirados(html, dataReferencia = new Date()) {
   if (!html || typeof html !== 'string') return html;
 
-  // Regex para encontrar tags com data-event-date="YYYY-MM-DD"
-  // Ex: <li data-event-date="2026-10-24">...</li> ou <div class="evento-home-card..." data-event-date="2026-10-24">...</div>
-  return html.replace(/<([a-z0-9]+)[^>]*\bdata-event-date=["']([^"']+)["'][^>]*>[\s\S]*?<\/\1>/gi, (match, tag, dateStr) => {
+  const tagOpenRegex = /<([a-z0-9]+)\b([^>]*\bdata-event-date=["']([^"']+)["'][^>]*)>/gi;
+  let match;
+  let resultado = html;
+
+  while ((match = tagOpenRegex.exec(resultado)) !== null) {
+    const fullOpenTag = match[0];
+    const tagName = match[1].toLowerCase();
+    const dateStr = match[3];
+    const startIndex = match.index;
+
     if (isEventoExpiradoData(dateStr, dataReferencia)) {
-      return ''; // Remove completamente o elemento do HTML
+      let depth = 1;
+      let currentIndex = startIndex + fullOpenTag.length;
+      const tagSearchRegex = new RegExp(`(<${tagName}\\b[^>]*>)|(<\\/${tagName}>)`, 'gi');
+      tagSearchRegex.lastIndex = currentIndex;
+
+      let innerMatch;
+      let endIndex = -1;
+      while ((innerMatch = tagSearchRegex.exec(resultado)) !== null) {
+        if (innerMatch[1]) {
+          depth++;
+        } else if (innerMatch[2]) {
+          depth--;
+          if (depth === 0) {
+            endIndex = innerMatch.index + innerMatch[0].length;
+            break;
+          }
+        }
+      }
+
+      if (endIndex !== -1) {
+        resultado = resultado.slice(0, startIndex) + resultado.slice(endIndex);
+        tagOpenRegex.lastIndex = startIndex;
+        continue;
+      }
     }
-    return match;
-  });
+  }
+
+  return resultado;
 }
 
 module.exports = {
