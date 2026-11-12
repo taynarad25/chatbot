@@ -425,10 +425,10 @@
           </div>
         </div>
         <div class="fin-prestacao-actions">
-          <span style="font-size:0.82rem;background:rgba(255,255,255,0.18);padding:0.4rem 0.75rem;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:6px">
+          <span style="font-size:0.82rem;background:#f8fafc;color:#4c1d95;border:1px solid #e2e8f0;padding:0.4rem 0.75rem;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:6px">
             📞 Tesouraria: +55 11 99111-7612
           </span>
-          <button type="button" class="fin-btn" style="background:#ffffff;color:#6d28d9;font-weight:800;border:none;box-shadow:0 2px 8px rgba(0,0,0,0.15)" data-action="open-prestacao">
+          <button type="button" class="fin-btn fin-btn-primary" data-action="open-prestacao">
             📋 Gerar Prestação de Contas
           </button>
         </div>
@@ -439,19 +439,19 @@
         <div class="fin-mhero-top">
           <div class="fin-mhero-label">
             <span>🏦 Saldo Geral da Igreja</span>
-            <span style="font-size:0.68rem;background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:999px">Consolidado</span>
+            <span style="font-size:0.68rem;background:#f3e8ff;color:#6d28d9;padding:1px 6px;border-radius:999px;font-weight:700">Consolidado</span>
           </div>
           <div class="fin-mhero-main-val">${fmtMoney(ind.saldo_total)}</div>
         </div>
         <div class="fin-mhero-bottom">
           <div class="fin-mhero-col">
             <span class="fin-mhero-sublabel">💎 Disponível Livre</span>
-            <span class="fin-mhero-subval" style="color:#6ee7b7">${fmtMoney(ind.total_disponivel)}</span>
+            <span class="fin-mhero-subval" style="color:#059669">${fmtMoney(ind.total_disponivel)}</span>
           </div>
           <div class="fin-mhero-divider"></div>
           <div class="fin-mhero-col">
             <span class="fin-mhero-sublabel">📈 Resultado do Mês</span>
-            <span class="fin-mhero-subval" style="color:${isSuperavit ? "#86efac" : "#fca5a5"}">
+            <span class="fin-mhero-subval" style="color:${isSuperavit ? "#16a34a" : "#dc2626"}">
               ${fmtMoney(ind.resultado_mes)} <small style="font-size:0.75rem">${isSuperavit ? "✅" : "⚠️"}</small>
             </span>
           </div>

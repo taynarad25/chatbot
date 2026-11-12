@@ -1,12 +1,12 @@
 :root {
-  --fin-bg: #f8fafc;
+  --fin-bg: #ffffff;
   --fin-surface: #ffffff;
   --fin-border: #e2e8f0;
-  --fin-text: #0f172a;
+  --fin-text: #1e293b;
   --fin-muted: #64748b;
-  --fin-primary: #6d28d9;
-  --fin-primary-hover: #5b21b6;
-  --fin-primary-light: #f3e8ff;
+  --fin-primary: #7c3aed;
+  --fin-primary-hover: #6d28d9;
+  --fin-primary-light: #f5f3ff;
   --fin-success: #16a34a;
   --fin-success-light: #dcfce7;
   --fin-danger: #dc2626;
@@ -15,9 +15,9 @@
   --fin-warning-light: #fef3c7;
   --fin-info: #2563eb;
   --fin-info-light: #dbeafe;
-  --fin-dark: #1e1b4b;
+  --fin-dark: #121214;
   --fin-radius: 12px;
-  --fin-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --fin-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
 * {
@@ -34,9 +34,9 @@ body.fin-body {
   min-height: 100vh;
 }
 
-/* Header & Topbar */
+/* Header & Topbar (Harmonizado com a Área de Gestão) */
 .fin-topbar {
-  background: linear-gradient(135deg, #1e1b4b 0%, #311042 100%);
+  background: #121214;
   color: #fff;
   padding: 0.85rem 1.5rem;
   display: flex;
@@ -45,7 +45,8 @@ body.fin-body {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  border-bottom: 2px solid var(--fin-primary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
 .fin-brand {
@@ -166,17 +167,18 @@ body.fin-body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top right, #2e1065, #0f172a 70%);
+  background: #f8fafc;
   padding: 1.5rem;
 }
 
 .fin-auth-card {
   width: 100%;
   max-width: 440px;
-  background: var(--fin-surface);
-  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--fin-border);
+  border-radius: 18px;
   padding: 2.25rem;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 .fin-auth-header {
@@ -386,7 +388,7 @@ body.fin-body {
 }
 
 .fin-stat-card {
-  background: #f8fafc;
+  background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 0.9rem 1rem;
@@ -395,12 +397,13 @@ body.fin-body {
   justify-content: space-between;
   position: relative;
   transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
 }
 
 .fin-stat-card:hover {
   background: #ffffff;
   border-color: #cbd5e1;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .fin-stat-label {
@@ -444,19 +447,21 @@ body.fin-body {
 .desktop-only { display: block; }
 .mobile-only { display: none; }
 
-/* Card Executivo Mobile 3-em-1 */
+/* Card Executivo Mobile 3-em-1 (Clean White) */
 .fin-mobile-hero {
-  background: linear-gradient(135deg, #2e1065 0%, #4c1d95 100%);
-  color: #ffffff;
+  background: #ffffff;
+  color: var(--fin-text);
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid var(--fin-primary);
   border-radius: 14px;
   padding: 1rem 1.15rem;
   margin-bottom: 0.85rem;
-  box-shadow: 0 4px 14px rgba(76, 29, 149, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 
 .fin-mhero-top {
   padding-bottom: 0.65rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid #f1f5f9;
   margin-bottom: 0.65rem;
 }
 
@@ -468,7 +473,7 @@ body.fin-body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #ddd6fe;
+  color: var(--fin-muted);
   margin-bottom: 0.2rem;
 }
 
@@ -476,7 +481,7 @@ body.fin-body {
   font-size: 1.7rem;
   font-weight: 900;
   line-height: 1.1;
-  color: #ffffff;
+  color: var(--fin-text);
   letter-spacing: -0.02em;
 }
 
@@ -494,7 +499,7 @@ body.fin-body {
 
 .fin-mhero-sublabel {
   font-size: 0.66rem;
-  color: #c4b5fd;
+  color: var(--fin-muted);
   text-transform: uppercase;
   font-weight: 700;
   margin-bottom: 0.15rem;
@@ -503,13 +508,13 @@ body.fin-body {
 .fin-mhero-subval {
   font-size: 1.1rem;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--fin-text);
 }
 
 .fin-mhero-divider {
   width: 1px;
   height: 32px;
-  background: rgba(255, 255, 255, 0.15);
+  background: #e2e8f0;
 }
 
 /* Pílulas de Navegação de Blocos Mobile */
@@ -545,10 +550,12 @@ body.fin-body {
   box-shadow: 0 2px 6px rgba(109, 40, 217, 0.25);
 }
 
-/* Banner de Prestação de Contas */
+/* Banner de Prestação de Contas (Clean White) */
 .fin-prestacao-banner {
-  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
-  color: #ffffff;
+  background: #ffffff;
+  color: var(--fin-text);
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid var(--fin-primary);
   border-radius: 14px;
   padding: 1.1rem 1.4rem;
   margin-bottom: 1.35rem;
@@ -557,7 +564,7 @@ body.fin-body {
   justify-content: space-between;
   gap: 1.25rem;
   flex-wrap: wrap;
-  box-shadow: 0 4px 16px rgba(109, 40, 217, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
 .fin-prestacao-info {
@@ -570,7 +577,8 @@ body.fin-body {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.15);
+  background: #f5f3ff;
+  color: var(--fin-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -582,12 +590,12 @@ body.fin-body {
   font-size: 1.05rem;
   font-weight: 800;
   margin: 0 0 0.15rem;
-  color: #ffffff;
+  color: var(--fin-text);
 }
 
 .fin-prestacao-text p {
   font-size: 0.8rem;
-  color: #ddd6fe;
+  color: var(--fin-muted);
   margin: 0;
 }
 
