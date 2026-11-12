@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscrição: À Mesa — Com Gratidão e Propósito | Rede de Mulheres</title>
+    <meta name="description" content="Inscrição oficial para o encontro À Mesa: Com Gratidão e Propósito da Rede de Mulheres da Comunidade Cristã Curados. Dia 12/12 às 16h.">
+    
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3">
+    <link rel="icon" type="image/png" href="/images/logo.png?v=3">
+    <link rel="shortcut icon" type="image/png" href="/images/logo.png?v=3">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --cor-dourado-primario: #c59b27;
+            --cor-dourado-brilho: #dfb743;
+            --cor-dourado-claro: #fae8a4;
+            --cor-champagne: #fdfbf7;
+            --cor-fundo-escuro: #0f1015;
+            --cor-card: #181922;
+            --cor-card-topo: #202230;
+            --cor-borda: rgba(197, 155, 39, 0.28);
+            --cor-borda-hover: rgba(223, 183, 67, 0.6);
+            --cor-texto: #f9fafb;
+            --cor-texto-suave: #9ca3af;
+            --cor-sucesso: #22c55e;
+            --cor-alerta: #eab308;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--cor-fundo-escuro);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(197, 155, 39, 0.15), transparent 45%),
+                radial-gradient(circle at 100% 100%, rgba(214, 51, 132, 0.08), transparent 40%);
+            color: var(--cor-texto);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.6;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: rgba(15, 16, 21, 0.92);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--cor-borda);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .top-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #ffffff;
+        }
+
+        .top-brand img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        .top-brand-text {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 800;
+            letter-spacing: 1.2px;
+            color: var(--cor-dourado-claro);
+        }
+
+        .top-tag {
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(197, 155, 39, 0.16);
+            color: #fae8a4;
+            border: 1px solid rgba(197, 155, 39, 0.45);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+            flex: 1;
+        }
+
+        /* Hero do Evento */
+        .banner-wrapper {
+            position: relative;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--cor-borda);
+            margin-bottom: 28px;
+            background: #111;
+        }
+
+        .banner-img-desktop {
+            width: 100%;
+            height: auto;
+            max-height: 400px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .banner-img-mobile {
+            display: none;
+            width: 100%;
+            height: auto;
+            max-height: 480px;
+            object-fit: cover;
+        }
+
+        @media (max-width: 768px) {
+            .banner-img-desktop { display: none; }
+            .banner-img-mobile { display: block; }
+        }
+
+        /* Cartões de Destaque */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-bottom: 26px;
+        }
+
+        .info-card {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 16px;
+            padding: 16px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .info-card:hover {
+            border-color: var(--cor-borda-hover);
+            transform: translateY(-2px);
+        }
+
+        .info-icon {
+            font-size: 1.8rem;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(197, 155, 39, 0.12);
+            border-radius: 12px;
+            border: 1px solid rgba(197, 155, 39, 0.25);
+            flex-shrink: 0;
+        }
+
+        .info-content h4 {
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--cor-texto-suave);
+            margin-bottom: 2px;
+        }
+
+        .info-content p {
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: var(--cor-texto);
+        }
+
+        /* Card do Adendo Especial de Comes e Bebes */
+        .card-adendo-oferta {
+            background: linear-gradient(135deg, rgba(197, 155, 39, 0.14) 0%, rgba(214, 51, 132, 0.08) 100%);
+            border: 1.5px solid rgba(223, 183, 67, 0.55);
+            border-radius: 18px;
+            padding: 20px 22px;
+            margin-bottom: 28px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .adendo-icon {
+            font-size: 2.2rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .adendo-texto h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            color: #fae8a4;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .adendo-texto p {
+            font-size: 0.94rem;
+            color: #f3f4f6;
+            line-height: 1.55;
+        }
+
+        .lideres-destaque {
+            color: #fae8a4;
+            font-weight: 800;
+            background: rgba(197, 155, 39, 0.2);
+            padding: 2px 7px;
+            border-radius: 6px;
+            border: 1px solid rgba(197, 155, 39, 0.4);
+            display: inline-block;
+        }
+
+        /* Formulário de Inscrição */
+        .form-section {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 22px;
+            padding: 34px 30px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        @media (max-width: 600px) {
+            .form-section {
+                padding: 24px 18px;
+            }
+        }
+
+        .form-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .form-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            color: #ffffff;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .form-header h2 span {
+            color: #dfb743;
+            font-style: italic;
+        }
+
+        .form-header p {
+            color: var(--cor-texto-suave);
+            font-size: 0.96rem;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+
+        .badge-individual {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            background: rgba(223, 183, 67, 0.15);
+            border: 1px solid rgba(223, 183, 67, 0.4);
+            color: #fae8a4;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #e5e7eb;
+            margin-bottom: 8px;
+        }
+
+        .form-group label .required {
+            color: #ef4444;
+            margin-left: 3px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2rem;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 14px 16px 14px 48px;
+            background: #11131a;
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.22s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--cor-dourado-brilho);
+            background: #151824;
+            box-shadow: 0 0 0 3px rgba(223, 183, 67, 0.2);
+        }
+
+        .form-control::placeholder {
+            color: #6b7280;
+        }
+
+        .input-help {
+            font-size: 0.8rem;
+            color: var(--cor-texto-suave);
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, #dfb743 0%, #c59b27 100%);
+            border: none;
+            border-radius: 12px;
+            color: #0f1015;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(197, 155, 39, 0.35);
+            transition: all 0.22s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(197, 155, 39, 0.5);
+            filter: brightness(1.05);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Modal de Sucesso */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 1000;
+        }
+
+        .modal-card {
+            background: #171822;
+            border: 1.5px solid var(--cor-dourado-brilho);
+            border-radius: 22px;
+            padding: 36px 30px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(197, 155, 39, 0.2);
+            animation: zoomIn 0.3s ease;
+        }
+
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.92); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-icon {
+            font-size: 3.5rem;
+            margin-bottom: 12px;
+        }
+
+        .modal-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            color: #fae8a4;
+            margin-bottom: 12px;
+        }
+
+        .modal-msg {
+            color: #e5e7eb;
+            font-size: 0.98rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .modal-lembrete-box {
+            background: rgba(197, 155, 39, 0.12);
+            border: 1px solid rgba(197, 155, 39, 0.35);
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 0.88rem;
+            color: #f3f4f6;
+            margin-bottom: 22px;
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        .modal-btn {
+            background: linear-gradient(135deg, #dfb743 0%, #c59b27 100%);
+            color: #0f1015;
+            border: none;
+            border-radius: 10px;
+            padding: 13px 24px;
+            font-weight: 800;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .modal-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 24px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--cor-texto-suave);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+        <a href="/" class="top-brand">
+            <img src="/images/logo.png" alt="Logo Comunidade Cristã Curados" onerror="this.src='/favicon.png'">
+            <span class="top-brand-text">COMUNIDADE CRISTÃ CURADOS</span>
+        </a>
+        <div class="top-tag">
+            <span>✨</span>
+            <span>Rede de Mulheres</span>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="container">
+
+        <!-- BANNER DO EVENTO -->
+        <section class="banner-wrapper">
+            <img src="/images/a-mesa-desktop.jpg" alt="Banner À Mesa: Com Gratidão e Propósito" class="banner-img-desktop" onerror="this.src='/images/a-mesa-mobile.jpg'">
+            <img src="/images/a-mesa-mobile.jpg" alt="Banner À Mesa: Com Gratidão e Propósito" class="banner-img-mobile" onerror="this.src='/images/a-mesa-desktop.jpg'">
+        </section>
+
+        <!-- CARDS INFORMATIVOS -->
+        <section class="info-grid">
+            <div class="info-card">
+                <div class="info-icon">🗓️</div>
+                <div class="info-content">
+                    <h4>Data do Encontro</h4>
+                    <p>Sábado, 12/12/2026</p>
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-icon">⏰</div>
+                <div class="info-content">
+                    <h4>Horário</h4>
+                    <p>16:00 (Início)</p>
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-icon">📍</div>
+                <div class="info-content">
+                    <h4>Local</h4>
+                    <p>Templo Principal</p>
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-icon">🎟️</div>
+                <div class="info-content">
+                    <h4>Inscrição</h4>
+                    <p style="color: #fae8a4;">Gratuita • Individual</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- CARD DESTACADO: ADENDO DE COMES E BEBES -->
+        <section class="card-adendo-oferta">
+            <div class="adendo-icon">☕</div>
+            <div class="adendo-texto">
+                <h3>Momento de Comunhão & Comes e Bebes</h3>
+                <p>
+                    Para tornar a nossa tarde ainda mais especial e acolhedora, teremos um delicioso momento de comunhão.
+                    <strong>Se você puder e desejar ofertar algum valor para os comes e bebes</strong>, por favor procure uma de nossas queridas líderes da Rede de Mulheres: 
+                    <span class="lideres-destaque">Gisa</span> ou <span class="lideres-destaque">Gláucia</span>.
+                </p>
+            </div>
+        </section>
+
+        <!-- FORMULÁRIO DE INSCRIÇÃO SIMPLES -->
+        <section class="form-section">
+            <div class="form-header">
+                <h2>Garanta sua vaga <span>À Mesa</span></h2>
+                <p>Preencha os dados abaixo para confirmar sua presença neste encontro especial de gratidão e propósito.</p>
+                <div>
+                    <span class="badge-individual">👤 Inscrição Individual por Mulher</span>
+                </div>
+            </div>
+
+            <form id="formAMesa" onsubmit="realizarInscricao(event)">
+                <!-- Nome Completo -->
+                <div class="form-group">
+                    <label for="campoNome">Nome Completo <span class="required">*</span></label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input 
+                            type="text" 
+                            id="campoNome" 
+                            name="nome" 
+                            class="form-control" 
+                            placeholder="Ex: Maria Aparecida da Silva" 
+                            required 
+                            autocomplete="name"
+                            maxlength="100"
+                        >
+                    </div>
+                </div>
+
+                <!-- Telefone / WhatsApp -->
+                <div class="form-group">
+                    <label for="campoTelefone">Telefone / WhatsApp <span class="required">*</span></label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">📱</span>
+                        <input 
+                            type="tel" 
+                            id="campoTelefone" 
+                            name="telefone" 
+                            class="form-control" 
+                            placeholder="(11) 99999-9999" 
+                            required 
+                            autocomplete="tel"
+                            maxlength="15"
+                            oninput="mascaraTelefone(this)"
+                        >
+                    </div>
+                    <div class="input-help">
+                        <span>🔒</span>
+                        <span>Seu número será utilizado para confirmações e avisos do encontro.</span>
+                    </div>
+                </div>
+
+                <!-- Botão de Envio -->
+                <button type="submit" id="btnSubmit" class="submit-btn">
+                    <span>✨ Confirmar Minha Inscrição Gratuita</span>
+                </button>
+            </form>
+        </section>
+
+    </main>
+
+    <!-- MODAL DE SUCESSO -->
+    <div class="modal-overlay" id="modalSucesso">
+        <div class="modal-card">
+            <div class="modal-icon">💐</div>
+            <h3 class="modal-title">Inscrição Confirmada!</h3>
+            <p class="modal-msg" id="msgSucesso">
+                Sua vaga no encontro <strong>À Mesa: Com Gratidão e Propósito</strong> foi confirmada com muito carinho.
+            </p>
+            <div class="modal-lembrete-box">
+                <strong>💛 Lembrete de Comunhão:</strong><br>
+                Caso deseje contribuir com uma oferta voluntária para os comes e bebes da nossa mesa, procure carinhosamente as líderes <strong>Gisa</strong> ou <strong>Gláucia</strong>.
+            </div>
+            <button class="modal-btn" onclick="fecharModalSucesso()">Concluir</button>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+        Comunidade Cristã Curados &copy; 2026 • Rede de Mulheres<br>
+        <small style="opacity: 0.75;">À Mesa: Com Gratidão e Propósito • 12 de Dezembro às 16h</small>
+    </footer>
+
+    <script>
+        function mascaraTelefone(input) {
+            let v = input.value.replace(/\D/g, '');
+            if (v.length > 11) v = v.substring(0, 11);
+            if (v.length > 10) {
+                input.value = `(${v.substring(0, 2)}) ${v.substring(2, 7)}-${v.substring(7)}`;
+            } else if (v.length > 6) {
+                input.value = `(${v.substring(0, 2)}) ${v.substring(2, 6)}-${v.substring(6)}`;
+            } else if (v.length > 2) {
+                input.value = `(${v.substring(0, 2)}) ${v.substring(2)}`;
+            } else if (v.length > 0) {
+                input.value = `(${v}`;
+            } else {
+                input.value = '';
+            }
+        }
+
+        async function realizarInscricao(e) {
+            e.preventDefault();
+
+            const nome = document.getElementById('campoNome').value.trim();
+            const telefone = document.getElementById('campoTelefone').value.trim();
+
+            if (!nome) {
+                alert('Por favor, informe seu nome completo.');
+                document.getElementById('campoNome').focus();
+                return;
+            }
+
+            const telLimpo = telefone.replace(/\D/g, '');
+            if (telLimpo.length < 10) {
+                alert('Por favor, informe um número de telefone/WhatsApp válido com DDD.');
+                document.getElementById('campoTelefone').focus();
+                return;
+            }
+
+            const btn = document.getElementById('btnSubmit');
+            const textoOriginal = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳ Confirmando inscrição...</span>';
+
+            try {
+                const response = await fetch('/a-mesa/api/inscrever', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, telefone })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.ok) {
+                    throw new Error(data.message || 'Erro ao processar inscrição. Tente novamente.');
+                }
+
+                const msgElement = document.getElementById('msgSucesso');
+                if (data.data && data.data.jaInscrita) {
+                    msgElement.innerHTML = `Olá, <strong>${data.data.nome}</strong>! Você já estava inscrita no encontro <strong>À Mesa</strong> com o telefone ${data.data.telefone}. Sua vaga está garantida!`;
+                } else {
+                    msgElement.innerHTML = `Parabéns, <strong>${nome}</strong>! Sua vaga no encontro <strong>À Mesa: Com Gratidão e Propósito</strong> foi garantida com sucesso.<br><br>🗓️ <strong>Sábado, 12/12 às 16:00</strong><br>📍 Templo Principal`;
+                }
+
+                document.getElementById('modalSucesso').style.display = 'flex';
+                document.getElementById('formAMesa').reset();
+            } catch (err) {
+                alert(err.message || 'Ocorreu um erro ao realizar a inscrição. Por favor, tente novamente ou fale com a secretaria.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = textoOriginal;
+            }
+        }
+
+        function fecharModalSucesso() {
+            document.getElementById('modalSucesso').style.display = 'none';
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

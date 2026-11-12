@@ -19,6 +19,7 @@ const { notificarSecretaria } = require("./bot/secretaria");
 const limpezaEventos = require("./web/limpeza_eventos");
 const gestao = require("./web/gestao");
 const financeiro = require("./web/financeiro");
+const eventoAMesa = require("./web/evento_a_mesa");
 const db = require("./db");
 
 function isSecretariaAutorizada(u) {
@@ -84,6 +85,9 @@ const FICHAS_MULHERES_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "
 const FICHAS_CRIANCAS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "fichas-criancas.html"))
   ? path.join(__dirname, "public", "fichas-criancas.html")
   : path.join(__dirname, "web", "public", "fichas-criancas.html");
+const A_MESA_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "a-mesa.html"))
+  ? path.join(__dirname, "public", "a-mesa.html")
+  : path.join(__dirname, "web", "public", "a-mesa.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -1118,6 +1122,100 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
           }
         } catch (err) {
           console.error('[Treinamento Intercessão] Erro ao excluir inscrição:', err);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
+        }
+      }
+
+      // Rota pública: À Mesa - Rede de Mulheres (/a-mesa, /mulheres-a-mesa)
+      if (req.method === 'GET' && (
+        pathname === '/a-mesa' || pathname === '/a-mesa/' || pathname === '/a-mesa.html' ||
+        pathname === '/mulheres-a-mesa' || pathname === '/mulheres-a-mesa/'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "a-mesa.html"))
+          ? path.join(__dirname, "public", "a-mesa.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "a-mesa.html")) ? path.join(__dirname, "web", "public", "a-mesa.html") : A_MESA_HTML_FILE);
+        if (fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // API: Inscrição À Mesa (/a-mesa/api/inscrever)
+      if (req.method === 'POST' && (pathname === '/a-mesa/api/inscrever' || pathname === '/a-mesa/inscrever')) {
+        try {
+          if (eventoAMesa.isEventoExpirado()) {
+            return sendJson(res, 400, {
+              ok: false,
+              message: 'As inscrições para o evento À Mesa foram encerradas.'
+            });
+          }
+
+          const body = await parseRequestBody(req);
+          const { nome, telefone } = body || {};
+          if (!nome || !telefone) {
+            return sendJson(res, 400, { ok: false, message: 'Nome completo e telefone são obrigatórios.' });
+          }
+
+          const inscricao = eventoAMesa.salvarInscricaoAMesa({ nome, telefone });
+
+          return sendJson(res, 200, {
+            ok: true,
+            message: inscricao.mensagem,
+            data: inscricao
+          });
+        } catch (err) {
+          console.error('[Evento À Mesa] Erro ao salvar inscrição:', err);
+          return sendJson(res, 400, { ok: false, message: err.message || 'Erro ao processar inscrição.' });
+        }
+      }
+
+      // API: Listar Inscrições À Mesa (/a-mesa/api/inscritas)
+      if (req.method === 'GET' && pathname === '/a-mesa/api/inscritas') {
+        try {
+          const inscritas = eventoAMesa.listarInscricoesAMesa();
+          const stats = eventoAMesa.obterEstatisticasAMesa();
+          return sendJson(res, 200, {
+            ok: true,
+            total: stats.totalInscritas,
+            evento: stats,
+            inscritas
+          });
+        } catch (err) {
+          return sendJson(res, 500, { ok: false, message: 'Erro ao listar inscrições.' });
+        }
+      }
+
+      // API: Cancelar/Excluir Inscrição À Mesa
+      if ((req.method === 'POST' && pathname === '/a-mesa/api/excluir-inscricao') ||
+          (req.method === 'DELETE' && pathname.startsWith('/a-mesa/api/inscricoes/'))) {
+        try {
+          let id = null;
+          if (req.method === 'DELETE') {
+            const parts = pathname.split('/');
+            id = parseInt(parts[parts.length - 1], 10);
+          } else {
+            const body = await parseRequestBody(req);
+            id = body.id ? parseInt(body.id, 10) : null;
+          }
+
+          if (!id || isNaN(id)) {
+            return sendJson(res, 400, { ok: false, message: 'ID da inscrição inválido.' });
+          }
+
+          const excluido = eventoAMesa.excluirInscricaoAMesa(id);
+          if (excluido) {
+            return sendJson(res, 200, { ok: true, message: 'Inscrição cancelada com sucesso.' });
+          } else {
+            return sendJson(res, 404, { ok: false, message: 'Inscrição não encontrada.' });
+          }
+        } catch (err) {
+          console.error('[Evento À Mesa] Erro ao excluir inscrição:', err);
           return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
         }
       }

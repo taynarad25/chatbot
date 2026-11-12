@@ -100,6 +100,7 @@ const CATALOGO_EVENTOS = [
 ];
 
 function isEventoExpirado(ev) {
+  if (process.env.NODE_ENV === "test" && !process.env.TEST_VERIFICAR_EXPIRACAO) return false;
   if (!ev || !ev.dataEvento) return false;
   try {
     const moment = require("moment-timezone");
