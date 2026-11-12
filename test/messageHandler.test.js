@@ -1964,7 +1964,7 @@ test("Menu de Eventos: opção 6 permite ao líder informar uso antes/montagem n
   await enviar(handleMessage, NUMERO_LIDER, "7");
   await enviar(handleMessage, NUMERO_LIDER, "1");
   const [rMenuEventos] = await enviar(handleMessage, NUMERO_LIDER, "1");
-  assert.match(rMenuEventos, /6 - Informar uso do salão antes ou no dia anterior/);
+  assert.match(rMenuEventos, /6 - .*Informar uso do salão antes/i);
 
   // 2. Escolhe opção 6 (pede departamento)
   const [rDepto] = await enviar(handleMessage, NUMERO_LIDER, "6");

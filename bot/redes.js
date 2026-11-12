@@ -16,6 +16,8 @@ const REDES = [
   { numero: "11", nome: "Diaconia", agendaIndex: 3, palavrasChave: ["diaconia", "diáconos", "diaconos"] },
   { numero: "12", nome: "Relacionamentos", agendaIndex: 3, palavrasChave: ["relacionamentos", "relacionamento"] },
   { numero: "13", nome: "Outros", agendaIndex: 3, palavrasChave: [] },
+  { numero: "14", nome: "Diretoria", agendaIndex: 3, palavrasChave: ["diretoria", "diretoria executiva"] },
+  { numero: "15", nome: "Sacerdotes", agendaIndex: 3, palavrasChave: ["sacerdotes", "sacerdote", "sacerdócio", "sacerdocio"] },
 ];
 
 const REDE_PADRAO = REDES.find((r) => r.nome === "Outros") || REDES[REDES.length - 1]; // "Outros", usada como fallback

@@ -1688,6 +1688,310 @@ function createMessageHandler({
     }
   }
 
+  async function processarIntencaoAutomaticaDireta({
+    texto,
+    msg,
+    numero,
+    contato,
+    usuario,
+    etapas,
+    isPastor,
+    isDiretor,
+    isLider,
+    isMembro,
+    client,
+  }) {
+    const tNorm = String(texto || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    if (!tNorm) return false;
+
+    // 1. Inscrições Treinamento de Intercessão
+    const ehIntercessao =
+      /(?:inscric(?:ao|oes)|link|participar|vaga|curso|treinamento).*(?:intercess(?:ao|or)|sentinela)/i.test(tNorm) ||
+      /(?:intercess(?:ao|or)|sentinela).*(?:inscric(?:ao|oes)|link|participar|vaga|curso|treinamento)/i.test(tNorm) ||
+      /^(?:treinamento|curso)\s+de\s+intercess(?:ao|or)$/i.test(tNorm) ||
+      /^intercess(?:ao|or)$/i.test(tNorm);
+
+    if (ehIntercessao) {
+      console.log(`[Intenção Direta: Intercessão] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      await msg.reply(
+        `🔥 *Treinamento de Intercessão: O Chamado das Sentinelas*\n\n` +
+        `📅 *Início:* 15 de Novembro de 2026 às 16h\n` +
+        `📍 *Local:* Templo Principal\n` +
+        `🎟️ *Evento 100% Gratuito* (com emissão de certificado)\n\n` +
+        `🔗 *Faça sua inscrição diretamente pelo link abaixo:*\n` +
+        `https://www.comunidadecristacurados.com.br/treinamento-de-intercessao\n\n` +
+        `⚠️ *Atenção:* As inscrições foram prorrogadas até *14/11*! Garanta já a sua vaga.\n\n` +
+        `_Digite *menu* a qualquer momento para ver as opções._`
+      );
+      return true;
+    }
+
+    // 2. Encontro À Mesa (Rede de Mulheres)
+    const ehAMesa =
+      /(?:inscric(?:ao|oes)|evento|encontro|culto|festa)?\s*(?:a\s*mesa|rede\s+de\s+mulheres).*(?:mulheres|feminino|a\s*mesa)/i.test(tNorm) ||
+      /^(?:a\s*mesa|evento\s+a\s*mesa|encontro\s+a\s*mesa)$/i.test(tNorm);
+
+    if (ehAMesa) {
+      console.log(`[Intenção Direta: À Mesa] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      await msg.reply(
+        `👑 *Encontro Rede de Mulheres — À Mesa*\n\n` +
+        `📅 *Data:* 06 de Dezembro de 2026 às 19:30\n` +
+        `📍 *Local:* Templo Principal\n\n` +
+        `⚠️ *Inscrições e Participação:*\n` +
+        `Para participar deste encontro especial, a contribuição/oferta referente ao buffet/alimentação deve ser tratada diretamente com as líderes *Gisa* e *Gláucia*.\n\n` +
+        `🔗 *Mais informações no site oficial:*\n` +
+        `https://www.comunidadecristacurados.com.br/#eventos\n\n` +
+        `_Digite *menu* a qualquer momento para ver o menu principal._`
+      );
+      return true;
+    }
+
+    // 3. Agendar Novo Evento
+    const ehAgendarEvento =
+      /^(?:agendar|marcar|solicitar|criar)\s+(?:um\s+)?(?:novo\s+)?evento$/i.test(tNorm) ||
+      /^(?:novo\s+evento|agendamento\s+de\s+evento|agendamento)$/i.test(tNorm);
+
+    if (ehAgendarEvento) {
+      console.log(`[Intenção Direta: Agendar Evento] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      if (isLider || isPastor || isDiretor) {
+        etapas[numero] = { fluxo: "agendamento", etapa: "evento_nome" };
+        await msg.reply("📅 *Novo Agendamento*\n\nQual o nome do evento?\n\n_Digite *menu* a qualquer momento para cancelar._");
+        return true;
+      } else if (isMembro) {
+        etapas[numero] = { fluxo: "uso_salao", etapa: "uso_salao_data" };
+        await msg.reply(
+          `🏛️ *Solicitação de Uso do Salão*\n\n` +
+          `Para solicitar o uso do salão da igreja, vamos precisar de algumas informações.\n\n` +
+          `📅 Qual é a *data* desejada? (Ex: 25/10 ou 25/10/2026)\n\n` +
+          `_Digite *menu* a qualquer momento para cancelar._`
+        );
+        return true;
+      } else {
+        await msg.reply(
+          `📅 *Agendamento de Eventos*\n\n` +
+          `O agendamento de eventos e reuniões é realizado por líderes ou pela secretaria da igreja.\n\n` +
+          `Se você deseja falar com a equipe ou solicitar uma data, digite *5* ou *secretaria*.\n\n` +
+          `Digite *menu* para voltar ao menu principal.`
+        );
+        return true;
+      }
+    }
+
+    // 4. Alterar Evento
+    const ehAlterarEvento =
+      /^(?:alterar|mudar|editar|trocar)\s+(?:data\s+ou\s+horario\s+do\s+|data\s+do\s+|horario\s+do\s+|o\s+)?evento$/i.test(tNorm) ||
+      /^(?:alteracao\s+de\s+evento|mudar\s+evento)$/i.test(tNorm);
+
+    if (ehAlterarEvento) {
+      console.log(`[Intenção Direta: Alterar Evento] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      if (isLider || isPastor || isDiretor) {
+        const redesUsuario = obterRedesParaUsuario(usuario);
+        etapas[numero] = {
+          fluxo: "agendamento",
+          acaoEvento: "alterar",
+          etapa: "alterar_departamento",
+          redesDisponiveis: redesUsuario,
+        };
+        await msg.reply(
+          `🏢 De qual departamento é o evento que deseja alterar?\n\n` +
+          `${montarListaRedesParaUsuario(redesUsuario)}\n\n` +
+          `_Digite *menu* a qualquer momento para cancelar._`
+        );
+        return true;
+      } else {
+        await msg.reply(
+          `🔄 *Alteração de Evento*\n\n` +
+          `Solicitações de alteração de eventos devem ser realizadas pelo líder do departamento ou através da secretaria.\n\n` +
+          `Digite *menu* para ver as opções disponíveis.`
+        );
+        return true;
+      }
+    }
+
+    // 5. Cancelar Evento
+    const ehCancelarEvento =
+      /^(?:cancelar|desmarcar|excluir)\s+(?:o\s+)?evento$/i.test(tNorm) ||
+      /^(?:cancelamento\s+de\s+evento|desmarcar\s+evento)$/i.test(tNorm);
+
+    if (ehCancelarEvento) {
+      console.log(`[Intenção Direta: Cancelar Evento] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      if (isLider || isPastor || isDiretor) {
+        const redesUsuario = obterRedesParaUsuario(usuario);
+        etapas[numero] = {
+          fluxo: "agendamento",
+          acaoEvento: "cancelar",
+          etapa: "alterar_departamento",
+          redesDisponiveis: redesUsuario,
+        };
+        await msg.reply(
+          `🏢 De qual departamento é o evento que deseja cancelar?\n\n` +
+          `${montarListaRedesParaUsuario(redesUsuario)}\n\n` +
+          `_Digite *menu* a qualquer momento para cancelar._`
+        );
+        return true;
+      } else {
+        await msg.reply(
+          `🗑️ *Cancelamento de Evento*\n\n` +
+          `Solicitações de cancelamento de eventos devem ser realizadas pelo líder do departamento ou através da secretaria.\n\n` +
+          `Digite *menu* para ver as opções disponíveis.`
+        );
+        return true;
+      }
+    }
+
+    // 6. Sala de Oração
+    const ehSalaOracao =
+      /^(?:sala\s+de\s+oracao|lampada\s+e\s+luz|vigilia\s+lampada\s+e\s+luz)$/i.test(tNorm) ||
+      /(?:sala\s+de\s+oracao|lampada\s+e\s+luz)/i.test(tNorm);
+
+    if (ehSalaOracao) {
+      console.log(`[Intenção Direta: Sala de Oração] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      await msg.reply(
+        `🕯️ *Sala de Oração — Lâmpada e Luz*\n\n` +
+        `📖 _"O Altíssimo não habita em templos feitos por mãos humanas." (Atos 7:48)_\n\n` +
+        `📅 *Data:* 28 de Novembro de 2026\n` +
+        `⏰ *Horário:* 22h\n` +
+        `📍 *Local:* Templo Principal\n\n` +
+        `🙌 Uma geração que não se curva às estruturas, mas se rende ao Espírito.\n` +
+        `🎟️ *Entrada Franca • Todos são bem-vindos!*\n\n` +
+        `_Digite *menu* a qualquer momento para voltar ao menu principal._`
+      );
+      return true;
+    }
+
+    // 7. Culto Especial de Natal
+    const ehNatal =
+      /^(?:culto\s+de\s+natal|culto\s+especial\s+de\s+natal|especial\s+de\s+natal|evento\s+de\s+natal|natal)$/i.test(tNorm) ||
+      /(?:culto\s+(?:especial\s+)?de\s+natal|especial\s+de\s+natal)/i.test(tNorm);
+
+    if (ehNatal) {
+      console.log(`[Intenção Direta: Natal] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      await msg.reply(
+        `✨ *Culto Especial de Natal*\n\n` +
+        `📖 _"Hoje vos nasceu, na cidade de Davi, o Salvador, que é Cristo, o Senhor." (Lucas 2:11)_\n\n` +
+        `📅 *Data:* 20 de Dezembro de 2026\n` +
+        `⏰ *Horário:* 18:00\n` +
+        `📍 *Local:* Templo Principal\n\n` +
+        `🎉 Venha celebrar o nascimento de Jesus conosco em uma noite inesquecível de louvor, gratidão, celebração e adoração com toda a sua família!\n\n` +
+        `🎟️ *Entrada Franca • Traga sua família!*\n\n` +
+        `_Digite *menu* a qualquer momento para voltar ao menu principal._`
+      );
+      return true;
+    }
+
+    // 8. Chave PIX / Dízimos / Ofertas
+    const ehPix =
+      /^(?:chave\s+)?pix$/i.test(tNorm) ||
+      /^(?:dados\s+bancarios|conta\s+bancaria|conta\s+da\s+igreja|dizimos?(?:\s+e\s+ofertas?)?|ofertas?|como\s+(?:dizimar|ofertar|fazer\s+pix))$/i.test(tNorm) ||
+      /(?:chave\s+pix|fazer\s+pix|dizimos?\s+e\s+ofertas?)/i.test(tNorm);
+
+    if (ehPix) {
+      console.log(`[Intenção Direta: PIX] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      await msg.reply(
+        `🕊️ *Dízimos e Ofertas — Comunidade Cristã Curados*\n\n` +
+        `_"Cada um dê conforme determinou em seu coração, não com pesar ou por obrigação, pois Deus ama quem dá com alegria." (2 Coríntios 9:7)_\n\n` +
+        `🔑 *Chave PIX (E-mail):*\n` +
+        `financeiro@comunidadecristacurados.com.br\n\n` +
+        `🏛️ *Favorecido:* Comunidade Cristã Curados\n` +
+        `🏦 *Banco:* Banco Cora SCD\n\n` +
+        `Caso deseje enviar o comprovante para registro nominal ou tenha dúvidas, nossa equipe financeira está à disposição.\n\n` +
+        `_Digite *menu* a qualquer momento para voltar ao menu principal._`
+      );
+      return true;
+    }
+
+    // 9. Endereço / Onde Fica / Como Chegar
+    const ehEndereco =
+      /^(?:onde\s+fica(?:\s+a\s+igreja)?|endereco(?:\s+da\s+igreja)?|localizacao(?:\s+da\s+igreja)?|como\s+chegar(?:\s+na\s+igreja)?|qual\s+o\s+endereco)$/i.test(tNorm);
+
+    if (ehEndereco) {
+      console.log(`[Intenção Direta: Endereço] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      await msg.reply(
+        `📍 *Localização da Comunidade Cristã Curados*\n\n` +
+        `🏠 *Endereço:* Rua Benedicto de Abreu Júnior, 40 — Cidade Saúde, Itapevi - SP\n` +
+        `🧭 *CEP:* 06655-080\n\n` +
+        `🗺️ *Como Chegar (Google Maps):*\n` +
+        `https://maps.google.com/?q=Rua+Benedicto+de+Abreu+Júnior,+40,+Cidade+Saúde,+Itapevi+-+SP\n\n` +
+        `_Digite *menu* a qualquer momento para voltar ao menu principal._`
+      );
+      return true;
+    }
+
+    // 10. Horário dos Cultos
+    const ehHorarioCultos =
+      /^(?:horarios?\s+(?:dos?\s+)?cultos?|que\s+horas\s+(?:sao|comeca)\s+os?\s+cultos?|dias?\s+de\s+culto|quando\s+tem\s+culto)$/i.test(tNorm);
+
+    if (ehHorarioCultos) {
+      console.log(`[Intenção Direta: Horário dos Cultos] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      const mensagemCultos = `✨ *Celebre Conosco!* ✨\n\n` +
+        `Estamos esperando por você e sua família em nossos encontros:\n\n` +
+        `⛪ *Culto de Celebração*\n` +
+        `🗓️ Todos os Domingos\n` +
+        `⏰ Às *18h*\n\n` +
+        `🍞 *Santa Ceia*\n` +
+        `🗓️ Todo 1º Domingo do Mês\n` +
+        `⏰ Às *08h30*\n\n` +
+        `📍 *Endereço:* Rua Benedicto de Abreu Júnior, 40, Cidade Saúde - Itapevi\n\n` +
+        `Venha viver um tempo precioso na presença de Deus! 🙏🙌\n\n` +
+        `Digite *menu* para voltar ao menu principal.`;
+      await msg.reply(mensagemCultos);
+      return true;
+    }
+
+    // 11. Atendimento Pastoral
+    const ehAtendimentoPastoral =
+      /^(?:marcar\s+|agendar\s+)?(?:atendimento\s+)?pastoral$/i.test(tNorm) ||
+      /^(?:falar\s+com\s+(?:o\s+)?pastor|aconselhamento(?:\s+pastoral)?)$/i.test(tNorm);
+
+    if (ehAtendimentoPastoral) {
+      console.log(`[Intenção Direta: Atendimento Pastoral] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      etapas[numero] = { fluxo: "pastoral", etapa: "nome" };
+      await msg.reply("🙏 *Atendimento Pastoral*\n\n📝 Qual é o seu *nome*?\n\n_Digite *menu* a qualquer momento para cancelar._");
+      return true;
+    }
+
+    // 12. Falar com a Secretaria
+    const ehSecretaria =
+      /^(?:falar\s+com\s+(?:a\s+)?secretaria|falar\s+com\s+atendente|falar\s+com\s+humano|contato\s+secretaria)$/i.test(tNorm);
+
+    if (ehSecretaria) {
+      console.log(`[Intenção Direta: Secretaria] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      const avisoSecretaria = `📞 *PEDIDO DE ATENDIMENTO*\n\n👤 *Solicitante:* ${nomeContato(contato, numero)}\n\nO usuário solicitou falar com a secretaria.`;
+      if (typeof notificarSecretaria === "function") {
+        await notificarSecretaria(client, avisoSecretaria);
+      }
+      await msg.reply(`📞 *Secretaria*\n\nUm atendente responderá em breve.\nAtendimento: Terça a Sábado, 08h às 18h.\n\nDigite *menu* para voltar ao menu principal.`);
+      return true;
+    }
+
+    // 13. Ver Agenda / Programação
+    const ehVerAgenda =
+      /^(?:consultar\s+|ver\s+)?(?:agenda(?:\s+da\s+igreja)?|eventos|programacao|proximos\s+eventos)$/i.test(tNorm);
+
+    if (ehVerAgenda) {
+      console.log(`[Intenção Direta: Agenda] Por ${identificarUsuario(contato, numero, isLider, usuario)}`);
+      const agora = moment.tz("America/Sao_Paulo");
+      const mesIndex = agora.month();
+      const mesNome = MESES[mesIndex];
+      const ano = agora.year();
+
+      const inicioBusca = moment.tz([ano, mesIndex], "America/Sao_Paulo").startOf("month").subtract(1, "minute").format();
+      const fimBusca = moment.tz([ano, mesIndex], "America/Sao_Paulo").endOf("month").format();
+
+      etapas[numero] = { fluxo: "ver_agenda", etapa: "detalhe_evento", isPastor };
+      await msg.reply(`🔍 Consultando eventos de *${mesNome}*...`);
+      await entregarAgenda(numero, etapas[numero], inicioBusca, fimBusca, mesNome, msg);
+      return true;
+    }
+
+    return false;
+  }
+
   return async function handleMessage(msg) {
     try {
       if (!msg) return;
@@ -2971,6 +3275,26 @@ function createMessageHandler({
         if (/^[1-7]$/.test(texto)) {
           // Deixa fluir normalmente para a opção escolhida abaixo
         } else {
+          // Se for uma intenção direta automática, responde imediatamente em vez de silenciar
+          const tratouIntencao = await processarIntencaoAutomaticaDireta({
+            texto,
+            msg,
+            numero,
+            contato,
+            usuario,
+            etapas,
+            isPastor,
+            isDiretor,
+            isLider,
+            isMembro,
+            client,
+          });
+          if (tratouIntencao) {
+            clearTimeout(pendente.timer);
+            pendentesSaudacao.delete(numero);
+            return;
+          }
+
           // "se mandar algo que seja outro contexto vc ignora a mensagem e avisa a gente"
           const todasMsgs = [...pendente.textos, msg.body].filter(Boolean).join("\n↳ ");
           console.log(`[Saudação -> Outro Contexto] De: ${identificarUsuario(contato, numero, isLider, usuario)} | Mensagens: "${todasMsgs}"`);
@@ -6865,6 +7189,26 @@ Digite *menu* para voltar ao menu principal.`;
         console.log(`Opção 7 selecionada por ${identificarUsuario(contato, numero, isLider, usuario)}, iniciando Área do Líder`);
         etapas[numero] = { fluxo: "area_lider", etapa: "menu_lider" };
         return msg.reply(montarMenuLider());
+      }
+
+      // Atalhos e intenções automáticas diretas (sem depender de navegação por menus)
+      if (!etapas[numero]) {
+        const tratouIntencao = await processarIntencaoAutomaticaDireta({
+          texto,
+          msg,
+          numero,
+          contato,
+          usuario,
+          etapas,
+          isPastor,
+          isDiretor,
+          isLider,
+          isMembro,
+          client,
+        });
+        if (tratouIntencao) {
+          return;
+        }
       }
 
       if (isMembro && /^(?:solicitar\s+)?(?:uso\s+do\s+)?sal[aã]o$/i.test(texto.trim())) {

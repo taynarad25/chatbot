@@ -30,6 +30,8 @@ const LISTA_TODOS_DEPARTAMENTOS = [
   "Diaconia",
   "Relacionamentos",
   "Liderança",
+  "Diretoria",
+  "Sacerdotes",
   "Geral"
 ];
 
@@ -1372,8 +1374,8 @@ async function criarSolicitacaoEventoWeb(corpo, usuarioLogado, getClient = () =>
       tipo: 'culto_tematico',
       evento: temaFinal,
       nomeEvento: temaFinal,
-      departamento: 'Geral',
-      rede: 'Geral',
+      departamento: corpo.departamento?.trim() || 'Geral',
+      rede: corpo.departamento?.trim() || 'Geral',
       dia: parseInt(diaStr, 10) || 1,
       mes: parseInt(mesStr, 10) || 1,
       ano: parseInt(anoStr, 10) || anoNumCulto,
@@ -2404,6 +2406,7 @@ function renderGestaoHtml({ user }) {
   const deptosParaForm = (perfil?.isPastor || perfil?.isDiretor || perfil?.isAdmin || !perfil?.departamentos || perfil.departamentos.length === 0)
     ? LISTA_TODOS_DEPARTAMENTOS
     : perfil.departamentos;
+  const deptosComDiretoriaESacerdotes = [...new Set([...(deptosParaForm || []), 'Diretoria', 'Sacerdotes'])];
 
   // Carrega instantaneamente os eventos do banco local (SQLite) para renderização imediata sem espera
   let eventosIniciais = [];
@@ -3637,7 +3640,7 @@ function renderGestaoHtml({ user }) {
               <div class="form-group">
                 <label>Ministério / Departamento *</label>
                 <select class="form-control" id="ev_departamento" required>
-                  ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
+                  ${deptosComDiretoriaESacerdotes.map(d => `<option value="${d}">${d}</option>`).join('')}
                 </select>
               </div>
             </div>
@@ -3778,7 +3781,7 @@ function renderGestaoHtml({ user }) {
               <div class="form-group">
                 <label>Departamento / Ministério *</label>
                 <select class="form-control" id="reu_departamento" required>
-                  ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
+                  ${deptosComDiretoriaESacerdotes.map(d => `<option value="${d}">${d}</option>`).join('')}
                 </select>
               </div>
               <div class="form-group">
@@ -3878,9 +3881,17 @@ function renderGestaoHtml({ user }) {
               ✨ <strong>Culto Temático:</strong> Modalidade exclusiva para Pastores e Diretores. O ideal é ser realizado aos domingos e não necessita de preenchimento de ficha de pós-evento.
             </div>
 
-            <div class="form-group">
-              <label>Nome / Tema do Culto Temático *</label>
-              <input type="text" class="form-control" id="culto_tema" placeholder="Ex: Culto da Família, Culto de Missões, Culto da Gratidão..." required />
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label>Nome / Tema do Culto Temático *</label>
+                <input type="text" class="form-control" id="culto_tema" placeholder="Ex: Culto da Família, Culto de Missões, Culto da Gratidão..." required />
+              </div>
+              <div class="form-group">
+                <label>Departamento / Ministério *</label>
+                <select class="form-control" id="culto_departamento" required>
+                  ${deptosComDiretoriaESacerdotes.map(d => `<option value="${d}">${d}</option>`).join('')}
+                </select>
+              </div>
             </div>
 
             <div class="form-row two-cols">
@@ -3946,7 +3957,7 @@ function renderGestaoHtml({ user }) {
               <div class="form-group">
                 <label>Ministério Responsável *</label>
                 <select class="form-control" id="treina_departamento" required>
-                  ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
+                  ${deptosComDiretoriaESacerdotes.map(d => `<option value="${d}">${d}</option>`).join('')}
                 </select>
               </div>
             </div>
@@ -4037,7 +4048,7 @@ function renderGestaoHtml({ user }) {
                 <label>Ministério Responsável *</label>
                 <select class="form-control" id="acao_departamento" required>
                   <option value="">Selecione...</option>
-                  ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
+                  ${deptosComDiretoriaESacerdotes.map(d => `<option value="${d}">${d}</option>`).join('')}
                 </select>
               </div>
               <div class="form-group">
@@ -4167,7 +4178,7 @@ function renderGestaoHtml({ user }) {
             <div class="form-group">
               <label>Departamento / Ministério *</label>
               <select class="form-control" id="midia_departamento" required>
-                ${deptosParaForm.map(d => `<option value="${d}">${d}</option>`).join('')}
+                ${deptosComDiretoriaESacerdotes.map(d => `<option value="${d}">${d}</option>`).join('')}
               </select>
             </div>
             <div class="form-group">
@@ -5997,6 +6008,7 @@ function renderGestaoHtml({ user }) {
       const payload = {
         tipo: 'culto_tematico',
         tema_culto: document.getElementById('culto_tema').value,
+        departamento: document.getElementById('culto_departamento')?.value || 'Geral',
         data: document.getElementById('culto_data').value,
         horario_inicio: document.getElementById('culto_hora_ini').value,
         horario_termino: document.getElementById('culto_hora_fim').value,
