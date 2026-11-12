@@ -88,6 +88,9 @@ const FICHAS_CRIANCAS_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "
 const A_MESA_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "a-mesa.html"))
   ? path.join(__dirname, "public", "a-mesa.html")
   : path.join(__dirname, "web", "public", "a-mesa.html");
+const FICHAS_A_MESA_HTML_FILE = fs.existsSync(path.join(__dirname, "public", "fichas-a-mesa.html"))
+  ? path.join(__dirname, "public", "fichas-a-mesa.html")
+  : path.join(__dirname, "web", "public", "fichas-a-mesa.html");
 
 // Evita log injection (CWE-117): sem isso, alguém poderia mandar um username ou
 // URL com quebra de linha embutida e forjar uma linha de log falsa (ex: fingir um
@@ -1217,6 +1220,47 @@ function startWebServer({ getStatus, startClient, cancelQr, disconnectClient, ge
         } catch (err) {
           console.error('[Evento À Mesa] Erro ao excluir inscrição:', err);
           return sendJson(res, 500, { ok: false, message: 'Erro ao excluir inscrição.' });
+        }
+      }
+
+      // Rota para Líderes: Painel e Planilha de Inscritas do Encontro À Mesa (/a-mesa/fichas, /a-mesa/planilha, /fichas-a-mesa)
+      if (req.method === 'GET' && (
+        pathname === '/a-mesa/fichas' || pathname === '/a-mesa/fichas/' ||
+        pathname === '/a-mesa/planilha' || pathname === '/a-mesa/planilha/' ||
+        pathname === '/a-mesa/inscritas-painel' || pathname === '/a-mesa/inscritas-painel/' ||
+        pathname === '/fichas-a-mesa' || pathname === '/fichas-a-mesa.html'
+      )) {
+        const fileToServe = fs.existsSync(path.join(__dirname, "public", "fichas-a-mesa.html"))
+          ? path.join(__dirname, "public", "fichas-a-mesa.html")
+          : (fs.existsSync(path.join(__dirname, "web", "public", "fichas-a-mesa.html")) ? path.join(__dirname, "web", "public", "fichas-a-mesa.html") : FICHAS_A_MESA_HTML_FILE);
+        if (fileToServe && fs.existsSync(fileToServe)) {
+          const content = fs.readFileSync(fileToServe, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
+            'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+          });
+          return res.end(content);
+        }
+      }
+
+      // API: Exportar Planilha / CSV de Inscritas do Encontro À Mesa (/a-mesa/api/exportar-csv)
+      if (req.method === 'GET' && (
+        pathname === '/a-mesa/api/exportar-csv' || pathname === '/a-mesa/api/planilha-csv' ||
+        pathname === '/a-mesa/exportar' || pathname === '/a-mesa/planilha.csv'
+      )) {
+        try {
+          const csv = eventoAMesa.exportarCsvInscricoesAMesa();
+          res.writeHead(200, {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': 'attachment; filename="Inscricoes_A_Mesa_Rede_Mulheres.csv"',
+            'X-Content-Type-Options': 'nosniff'
+          });
+          return res.end(csv);
+        } catch (errCsv) {
+          console.error('[Evento À Mesa] Erro ao exportar CSV:', errCsv);
+          return sendJson(res, 500, { ok: false, message: 'Erro ao gerar planilha CSV.' });
         }
       }
 

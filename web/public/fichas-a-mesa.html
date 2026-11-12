@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planilha de Inscrições — À Mesa: Com Gratidão e Propósito | Rede de Mulheres</title>
+    <meta name="description" content="Painel oficial de inscritas e planilha do encontro À Mesa para líderes da Rede de Mulheres.">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --cor-dourado: #c59b27;
+            --cor-dourado-brilho: #dfb743;
+            --cor-dourado-claro: #fae8a4;
+            --cor-fundo: #0e0f15;
+            --cor-card: #181923;
+            --cor-card-alt: #222432;
+            --cor-borda: rgba(197, 155, 39, 0.3);
+            --cor-borda-hover: rgba(223, 183, 67, 0.6);
+            --cor-texto: #f9fafb;
+            --cor-texto-mutado: #9ca3af;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--cor-fundo);
+            background-image: radial-gradient(circle at 50% 0%, rgba(197, 155, 39, 0.12), transparent 45%);
+            color: var(--cor-texto);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        header {
+            background: rgba(14, 15, 21, 0.94);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--cor-borda);
+            padding: 14px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .logo-badge {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: rgba(197, 155, 39, 0.18);
+            border: 1px solid rgba(197, 155, 39, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .logo-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--cor-dourado-claro);
+        }
+
+        .logo-sub {
+            font-size: 0.78rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 16px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #dfb743 0%, #c59b27 100%);
+            color: #0f1015;
+            box-shadow: 0 4px 14px rgba(197, 155, 39, 0.35);
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #f3f4f6;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.14);
+            color: #fff;
+        }
+
+        main {
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+            flex: 1;
+        }
+
+        .banner-info {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 18px;
+            padding: 24px 26px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .banner-info h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            color: #ffffff;
+            margin-bottom: 6px;
+        }
+
+        .banner-info h1 span {
+            color: #dfb743;
+            font-style: italic;
+        }
+
+        .banner-info p {
+            color: var(--cor-texto-mutado);
+            font-size: 0.92rem;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .banner-info p strong {
+            color: #f3f4f6;
+        }
+
+        /* Lembrete de liderança */
+        .adendo-lideranca-box {
+            background: linear-gradient(135deg, rgba(197, 155, 39, 0.14) 0%, rgba(214, 51, 132, 0.08) 100%);
+            border: 1.5px solid rgba(223, 183, 67, 0.45);
+            border-radius: 14px;
+            padding: 16px 20px;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 0.92rem;
+            color: #f3f4f6;
+        }
+
+        .adendo-lideranca-box strong {
+            color: #fae8a4;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 14px;
+            padding: 18px 20px;
+            text-align: center;
+        }
+
+        .stat-num {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #dfb743;
+            line-height: 1.1;
+            margin-bottom: 4px;
+        }
+
+        .stat-lbl {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--cor-texto-mutado);
+        }
+
+        /* Controls */
+        .controls-bar {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 14px;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 260px;
+            position: relative;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0.6;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 14px 10px 42px;
+            background: #11131a;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 0.92rem;
+            font-family: inherit;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--cor-dourado-brilho);
+        }
+
+        /* Tabela Responsiva / Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .person-card {
+            background: var(--cor-card);
+            border: 1px solid var(--cor-borda);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .person-card:hover {
+            border-color: var(--cor-borda-hover);
+            transform: translateY(-2px);
+        }
+
+        .person-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .person-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .person-num-badge {
+            background: rgba(197, 155, 39, 0.18);
+            border: 1px solid rgba(197, 155, 39, 0.4);
+            color: #fae8a4;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 700;
+        }
+
+        .person-info {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .person-info-item {
+            font-size: 0.88rem;
+            color: var(--cor-texto-mutado);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .person-info-item a {
+            color: #dfb743;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .person-info-item a:hover {
+            text-decoration: underline;
+        }
+
+        .person-actions {
+            margin-top: auto;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-zap {
+            background: #25d366;
+            color: #fff;
+            border-radius: 8px;
+            padding: 7px 13px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-zap:hover {
+            background: #20bd5a;
+        }
+
+        .date-tag {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--cor-texto-mutado);
+            grid-column: 1 / -1;
+        }
+
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 24px;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--cor-texto-mutado);
+        }
+
+        @media print {
+            header, .controls-bar, .header-actions, .banner-info button, .btn-zap { display: none !important; }
+            body { background: #fff; color: #000; }
+            .person-card { border: 1px solid #ccc; break-inside: avoid; background: #fff; color: #000; }
+            .person-name { color: #000; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-container">
+            <a href="/a-mesa" class="logo-area">
+                <div class="logo-badge">✨</div>
+                <div>
+                    <div class="logo-title">À Mesa: Com Gratidão e Propósito</div>
+                    <div class="logo-sub">Rede de Mulheres • Painel da Liderança</div>
+                </div>
+            </a>
+            <div class="header-actions">
+                <button onclick="window.print()" class="btn-action btn-secondary" title="Imprimir lista">
+                    🖨️ Imprimir
+                </button>
+                <button onclick="copiarLinkCompartilhamento()" class="btn-action btn-secondary" title="Copiar link para líderes">
+                    📋 Copiar Link
+                </button>
+                <a href="/a-mesa/api/exportar-csv" class="btn-action btn-primary" title="Baixar planilha para Excel">
+                    📥 Baixar Planilha (Excel)
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="banner-info">
+            <div>
+                <h1>Planilha de Mulheres <span>Inscritas</span></h1>
+                <p>
+                    <span>🗓️ Data: <strong>12/12/2026 às 16:00</strong></span>
+                    <span>📍 <strong>Templo Principal</strong></span>
+                    <span>✨ <em>Rede de Mulheres</em></span>
+                </p>
+            </div>
+            <div>
+                <button onclick="carregarInscricoes()" class="btn-action btn-secondary" id="btnRecarregar">
+                    🔄 Atualizar Lista
+                </button>
+            </div>
+        </section>
+
+        <section class="adendo-lideranca-box">
+            <span style="font-size: 1.5rem;">☕</span>
+            <div>
+                <strong>Lembrete da Liderança (Comes e Bebes):</strong>
+                Caso alguma participante queira ofertar voluntariamente para o momento de comunhão, o atendimento é feito diretamente com as líderes <strong>Gisa</strong> ou <strong>Gláucia</strong>.
+            </div>
+        </section>
+
+        <!-- CARDS DE ESTATÍSTICAS -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-num" id="statTotal">-</div>
+                <div class="stat-lbl">Total de Inscritas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="statTipo" style="color: #fae8a4;">100%</div>
+                <div class="stat-lbl">Inscrição Individual</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="statDataEvento" style="font-size: 1.5rem; padding-top: 10px;">12/12 às 16h</div>
+                <div class="stat-lbl">Data do Encontro</div>
+            </div>
+        </section>
+
+        <!-- BARRA DE CONTROLE -->
+        <section class="controls-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="campoBusca" class="search-input" placeholder="Buscar participante por nome ou telefone..." oninput="filtrarInscritas()">
+            </div>
+            <div>
+                <a href="/a-mesa/api/exportar-csv" class="btn-action btn-secondary" style="font-size: 0.82rem;">
+                    📄 Exportar CSV
+                </a>
+            </div>
+        </section>
+
+        <!-- GRID DE CARDS -->
+        <section class="cards-grid" id="containerCards">
+            <div class="empty-state">
+                <h3>Carregando inscritas...</h3>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        Comunidade Cristã Curados &copy; 2026 • Rede de Mulheres<br>
+        <small style="opacity: 0.7;">Painel Oficial da Liderança: Gisa e Gláucia</small>
+    </footer>
+
+    <script>
+        let todasInscritas = [];
+
+        async function carregarInscricoes() {
+            const btn = document.getElementById('btnRecarregar');
+            if (btn) btn.innerHTML = '⏳ Carregando...';
+
+            try {
+                const res = await fetch('/a-mesa/api/inscritas');
+                const data = await res.json();
+
+                if (data.ok && Array.isArray(data.inscritas)) {
+                    todasInscritas = data.inscritas;
+                    document.getElementById('statTotal').innerText = data.total ?? todasInscritas.length;
+                    renderizarCards(todasInscritas);
+                } else {
+                    document.getElementById('containerCards').innerHTML = `
+                        <div class="empty-state">
+                            <h3>Nenhuma inscrição encontrada ou erro ao carregar dados.</h3>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error('Erro ao carregar inscritas:', err);
+                document.getElementById('containerCards').innerHTML = `
+                    <div class="empty-state">
+                        <h3>Erro ao carregar lista. Verifique sua conexão e tente novamente.</h3>
+                    </div>
+                `;
+            } finally {
+                if (btn) btn.innerHTML = '🔄 Atualizar Lista';
+            }
+        }
+
+        function renderizarCards(lista) {
+            const container = document.getElementById('containerCards');
+            if (!container) return;
+
+            if (lista.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span style="font-size: 2.5rem; display: block; margin-bottom: 10px;">📋</span>
+                        <h3>Nenhuma participante encontrada</h3>
+                        <p style="color: var(--cor-texto-mutado); margin-top: 6px;">As inscrições confirmadas aparecerão automaticamente aqui.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = lista.map((item, idx) => {
+                const telLimpo = String(item.telefone || '').replace(/\D/g, '');
+                const numZap = telLimpo.startsWith('55') ? telLimpo : '55' + telLimpo;
+                const msgZap = encodeURIComponent(`Olá ${item.nome}! A paz do Senhor! Confirmamos sua presença no encontro À Mesa da Rede de Mulheres neste sábado (12/12) às 16h.`);
+                const linkZap = `https://wa.me/${numZap}?text=${msgZap}`;
+
+                return `
+                    <article class="person-card">
+                        <div class="person-header">
+                            <h3 class="person-name">${escapeHtml(item.nome)}</h3>
+                            <span class="person-num-badge">#${idx + 1}</span>
+                        </div>
+                        <div class="person-info">
+                            <div class="person-info-item">
+                                <span>📱 Telefone:</span>
+                                <a href="tel:${telLimpo}">${escapeHtml(item.telefoneFormatado || item.telefone)}</a>
+                            </div>
+                            <div class="person-info-item">
+                                <span>👤 Modalidade:</span>
+                                <strong style="color: #fae8a4;">${escapeHtml(item.tipo || 'Individual')}</strong>
+                            </div>
+                        </div>
+                        <div class="person-actions">
+                            <span class="date-tag">🗓️ ${escapeHtml(item.dataInscricaoFormatada || '')}</span>
+                            <a href="${linkZap}" target="_blank" rel="noopener noreferrer" class="btn-zap" title="Enviar WhatsApp para ${escapeHtml(item.nome)}">
+                                <span>💬</span> WhatsApp
+                            </a>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
+        function filtrarInscritas() {
+            const termo = document.getElementById('campoBusca').value.toLowerCase().trim();
+            if (!termo) {
+                renderizarCards(todasInscritas);
+                return;
+            }
+
+            const filtradas = todasInscritas.filter(i => {
+                const nome = (i.nome || '').toLowerCase();
+                const tel = (i.telefone || '').toLowerCase();
+                const telFmt = (i.telefoneFormatado || '').toLowerCase();
+                return nome.includes(termo) || tel.includes(termo) || telFmt.includes(termo);
+            });
+
+            renderizarCards(filtradas);
+        }
+
+        function copiarLinkCompartilhamento() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert('Link da planilha copiado para a área de transferência!');
+            }).catch(() => {
+                prompt('Copie o link abaixo:', window.location.href);
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        window.addEventListener('DOMContentLoaded', carregarInscricoes);
+    </script>
+</body>
+</html>

@@ -122,6 +122,78 @@ function excluirInscricaoAMesa(id) {
   return res.changes > 0;
 }
 
+const URL_WEBAPP_A_MESA_PADRAO = process.env.A_MESA_WEBAPP_URL || '';
+
+async function enviarInscricaoPlanilhaAMesa(dados, { url = URL_WEBAPP_A_MESA_PADRAO, fetchFn = global.fetch } = {}) {
+  const webAppUrl = url || process.env.A_MESA_WEBAPP_URL || URL_WEBAPP_A_MESA_PADRAO;
+  if (!webAppUrl) {
+    return { ok: false, message: 'URL do Google Sheets não configurada.' };
+  }
+
+  const payload = {
+    evento: 'À Mesa - Rede de Mulheres',
+    nome: dados.nome || '',
+    telefone: dados.telefone || '',
+    tipo: 'Individual',
+    data: moment.tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm'),
+  };
+
+  try {
+    const res = await fetchFn(webAppUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+    });
+
+    return { ok: res.ok };
+  } catch (err) {
+    console.warn('[Evento À Mesa] Erro ao enviar para o Google Sheets:', err.message);
+    return { ok: false, message: err.message };
+  }
+}
+
+function exportarCsvInscricoesAMesa() {
+  const inscricoes = listarInscricoesAMesa();
+  const BOM = '\uFEFF';
+  const cabecalho = ['ID', 'Nome Completo', 'Telefone', 'Tipo de Inscrição', 'Data da Inscrição', 'Status'].join(';');
+  const linhas = inscricoes.map(i => {
+    return [
+      i.id,
+      `"${(i.nome || '').replace(/"/g, '""')}"`,
+      `"${i.telefoneFormatado || i.telefone || ''}"`,
+      `"${i.tipo || 'Individual'}"`,
+      `"${i.dataInscricaoFormatada || i.data_inscricao || ''}"`,
+      `"${i.status || 'confirmada'}"`
+    ].join(';');
+  });
+
+  return BOM + [cabecalho, ...linhas].join('\r\n');
+}
+
+function gerarResumoTextoAMesa() {
+  const inscritas = listarInscricoesAMesa();
+  const stats = obterEstatisticasAMesa();
+
+  let msg = `✨ *Inscrições — À Mesa: Com Gratidão e Propósito*\n`;
+  msg += `🌸 *Rede de Mulheres | Comunidade Cristã Curados*\n`;
+  msg += `🗓️ *Data:* 12/12/2026 às 16:00 • Templo Principal\n\n`;
+  msg += `📊 *Total de Mulheres Inscritas:* ${stats.totalInscritas}\n\n`;
+
+  if (inscritas.length === 0) {
+    msg += `_Nenhuma inscrição registrada até o momento._\n`;
+  } else {
+    msg += `📋 *Lista de Participantes:*\n`;
+    inscritas.forEach((ins, idx) => {
+      msg += `${idx + 1}. *${ins.nome}* — ${ins.telefoneFormatado}\n`;
+    });
+  }
+
+  msg += `\n💡 _Lembrete de Comunhão: quem puder ofertar voluntariamente para comes e bebes deve procurar Gisa ou Gláucia._`;
+  return msg;
+}
+
 module.exports = {
   DATA_EVENTO_A_MESA,
   isEventoExpirado,
@@ -129,5 +201,8 @@ module.exports = {
   listarInscricoesAMesa,
   obterEstatisticasAMesa,
   excluirInscricaoAMesa,
+  enviarInscricaoPlanilhaAMesa,
+  exportarCsvInscricoesAMesa,
+  gerarResumoTextoAMesa,
 };
 

@@ -65,18 +65,18 @@ test('Auto-Limpeza dos Eventos no Dia Seguinte', async (t) => {
     assert.equal(isEventoExpiradoData('2026-12-12', new Date('2026-12-13T00:00:01-03:00')), true);
   });
 
-  await t.test('Culto de Natal (13/12/2026): visível até 13/12 23:59 e expira em 14/12 00:00:00', () => {
-    // Durante o dia 13/12/2026: NÃO expira
-    assert.equal(isEventoExpiradoData('2026-12-13', new Date('2026-12-13T20:00:00-03:00')), false);
-    // No dia seguinte 14/12/2026: EXPIRA e sai do site
-    assert.equal(isEventoExpiradoData('2026-12-13', new Date('2026-12-14T00:00:01-03:00')), true);
+  await t.test('Culto de Natal (20/12/2026): visível até 20/12 23:59 e expira em 21/12 00:00:00', () => {
+    // Durante o dia 20/12/2026: NÃO expira
+    assert.equal(isEventoExpiradoData('2026-12-20', new Date('2026-12-20T20:00:00-03:00')), false);
+    // No dia seguinte 21/12/2026: EXPIRA e sai do site
+    assert.equal(isEventoExpiradoData('2026-12-20', new Date('2026-12-21T00:00:01-03:00')), true);
   });
 
   await t.test('filtrarHtmlEventosExpirados deve expurgar cards no dia seguinte', () => {
     const htmlExemplo = `
       <div class="card-sala-oracao" data-event-date="2026-11-28">Sala de Oração</div>
       <div class="card-a-mesa" data-event-date="2026-12-12">À Mesa</div>
-      <div class="card-natal" data-event-date="2026-12-13">Natal</div>
+      <div class="card-natal" data-event-date="2026-12-20">Natal</div>
     `;
 
     // Em 29/11/2026: Sala de Oração é removida, À Mesa e Natal continuam
@@ -90,13 +90,13 @@ test('Auto-Limpeza dos Eventos no Dia Seguinte', async (t) => {
     assert.ok(!html13Dez.includes('À Mesa'));
     assert.ok(html13Dez.includes('Natal'));
 
-    // Em 14/12/2026: Natal também é removido
-    const html14Dez = filtrarHtmlEventosExpirados(htmlExemplo, new Date('2026-12-14T08:00:00-03:00'));
-    assert.ok(!html14Dez.includes('Natal'));
+    // Em 21/12/2026: Natal também é removido
+    const html21Dez = filtrarHtmlEventosExpirados(htmlExemplo, new Date('2026-12-21T08:00:00-03:00'));
+    assert.ok(!html21Dez.includes('Natal'));
   });
 });
 
-test('Verificação dos Cards em home.html', () => {
+test('Verificação dos Cards em home.html e Planilha/Fichas À Mesa', () => {
   const homeHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'home.html'), 'utf8');
 
   // Sala de Oração com Saiba Mais (WhatsApp)
@@ -112,9 +112,10 @@ test('Verificação dos Cards em home.html', () => {
   assert.ok(homeHtml.includes('Garantir Minha Vaga (Inscrição Gratuita)'));
   assert.ok(homeHtml.includes('Gisa') && homeHtml.includes('Gláucia'));
 
-  // Culto de Natal com Saiba Mais (WhatsApp)
+  // Culto de Natal com Saiba Mais (WhatsApp) e data 20/12/2026
   assert.ok(homeHtml.includes('card-natal'));
-  assert.ok(homeHtml.includes('data-event-date="2026-12-13"'));
+  assert.ok(homeHtml.includes('data-event-date="2026-12-20"'));
+  assert.ok(homeHtml.includes('20 de Dezembro de 2026'));
   assert.ok(homeHtml.includes('Culto Especial de Natal'));
 
   // Página dedicada de À Mesa existe
@@ -125,5 +126,16 @@ test('Verificação dos Cards em home.html', () => {
   assert.ok(aMesaHtml.includes('campoNome'));
   assert.ok(aMesaHtml.includes('campoTelefone'));
   assert.ok(aMesaHtml.includes('Inscrição Individual'));
+
+  // Painel de Fichas/Planilha das Líderes existe
+  const fichasHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'fichas-a-mesa.html'), 'utf8');
+  assert.ok(fichasHtml.includes('Planilha de Mulheres'));
+  assert.ok(fichasHtml.includes('Baixar Planilha (Excel)'));
+  assert.ok(fichasHtml.includes('/a-mesa/api/exportar-csv'));
+
+  // Exportação CSV do módulo À Mesa funciona
+  const csv = eventoAMesa.exportarCsvInscricoesAMesa();
+  assert.ok(csv.includes('Nome Completo'));
+  assert.ok(csv.includes('Telefone'));
 });
 
