@@ -21,6 +21,9 @@
     fechamentos: [],
     usuarios: [],
     auditoria: [],
+    prestacaoHistorico: [],
+    prestacaoMesFiltro: "",
+    prestacaoResumo: null,
     loginStep: "login", // login | primeiro_acesso | 2fa | recuperar
     loginPhone: "",
     loginPass: "",
@@ -60,6 +63,52 @@
     const p = s.split("-");
     if (p.length !== 3) return iso;
     return `${p[2]}/${p[1]}/${p[0]}`;
+  }
+
+  function fmtDateTime(iso) {
+    if (!iso) return "-";
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  function fmtDetalhesAuditoria(acao, rawJson) {
+    if (!rawJson) return "-";
+    let d = null;
+    try {
+      d = typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+    } catch (_) {
+      return esc(String(rawJson));
+    }
+    if (!d || typeof d !== "object") return esc(String(rawJson));
+
+    if (acao === "solicitacao_prestacao_contas") {
+      const canalStr = d.canal === "whatsapp" ? "💬 WhatsApp Bot" : "💻 Sistema Web";
+      const tel = d.telefone ? ` (${d.telefone})` : "";
+      return `Solicitado via ${canalStr} por <strong>${esc(d.solicitante || "Liderança")}</strong>${esc(tel)}`;
+    }
+    if (acao === "cancelar_lancamento") {
+      const mot = d.motivo ? ` Motivo: "${esc(d.motivo)}"` : "";
+      const desc = d.antes && d.antes.descricao ? ` • Lançamento: ${esc(d.antes.descricao)}` : "";
+      return `Cancelamento registrado.${desc}${mot}`;
+    }
+    if (acao === "login") {
+      return d["2fa"] ? "Login com 2FA verificado" : "Login autenticado com sucesso";
+    }
+    if (acao === "quitar_lancamento") {
+      return "Conta quitada com comprovante/baixa";
+    }
+    const parts = [];
+    for (const [k, v] of Object.entries(d)) {
+      if (v == null || v === "") continue;
+      if (typeof v === "object") continue;
+      parts.push(`${k}: ${v}`);
+    }
+    return parts.length ? esc(parts.join(" • ")) : esc(JSON.stringify(d));
   }
 
   function todayISO() {
@@ -216,6 +265,13 @@
       const aRes = await api("/auditoria").catch(() => ({ auditoria: [] }));
       state.auditoria = aRes.auditoria || [];
     }
+
+    const [histRes, prestRes] = await Promise.all([
+      api("/prestacao-contas/historico" + (state.prestacaoMesFiltro ? `?mes=${state.prestacaoMesFiltro}` : "")).catch(() => ({ logs: [] })),
+      api("/prestacao-contas?registrar_auditoria=0").catch(() => null),
+    ]);
+    state.prestacaoHistorico = histRes.logs || [];
+    if (prestRes) state.prestacaoResumo = prestRes;
   }
 
   function renderApp() {
@@ -229,7 +285,8 @@
       { id: "entradas", label: "📥 Entradas" },
       { id: "dizimos", label: "🙌 Dízimos, Ofertas & Culto" },
       { id: "saidas", label: "📤 Saídas & Contas a Pagar" },
-      { id: "relatorios", label: "📑 Relatórios & Prestação" },
+      { id: "relatorios", label: "📊 Relatórios Financeiros" },
+      { id: "prestacao", label: "📋 Prestação de Contas" },
       { id: "config", label: "⚙️ Categorias, Segurança & Auditoria" },
     ];
 
@@ -374,6 +431,8 @@
         return renderLancamentosTab("saida");
       case "relatorios":
         return renderRelatoriosTab();
+      case "prestacao":
+        return renderPrestacaoTab();
       case "config":
         return renderConfigTab();
       default:
@@ -1186,6 +1245,170 @@
     `;
   }
 
+  // ==================== 7.5. ABA DEDICADA: PRESTAÇÃO DE CONTAS & RASTREABILIDADE ====================
+  function renderPrestacaoTab() {
+    if (!state.dashboard) return `<div class="fin-card">Carregando dados da prestação de contas...</div>`;
+    const ind = state.dashboard.indicadores;
+    const resumo = state.prestacaoResumo;
+    const q = new URLSearchParams(state.filters).toString();
+
+    // Gerar últimos 6 meses para filtro
+    const hoje = todayISO();
+    const [anoAtual, mesAtual] = hoje.split("-").map(Number);
+    const mesesNomes = [
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+
+    const opcoesMeses = [];
+    for (let i = 0; i < 6; i++) {
+      let m = mesAtual - i;
+      let y = anoAtual;
+      if (m <= 0) {
+        m += 12;
+        y -= 1;
+      }
+      const val = `${y}-${String(m).padStart(2, "0")}`;
+      const label = `${mesesNomes[m - 1]} / ${y}`;
+      opcoesMeses.push({ val, label });
+    }
+
+    const logsFiltrados = (state.prestacaoHistorico || []).filter((l) => {
+      if (!state.prestacaoMesFiltro) return true;
+      if (l.criado_em && l.criado_em.startsWith(state.prestacaoMesFiltro)) return true;
+      try {
+        const d = JSON.parse(l.detalhes || "{}");
+        if (d.data_solicitacao && d.data_solicitacao.startsWith(state.prestacaoMesFiltro)) return true;
+      } catch (_) {}
+      return false;
+    });
+
+    return `
+      <div class="fin-card">
+        <div class="fin-card-header" style="flex-wrap:wrap;gap:1rem">
+          <div>
+            <span class="fin-card-title">📋 Prestação de Contas Consolidada</span>
+            <p style="font-size:0.82rem;color:var(--fin-muted)">Comunidade Cristã Curados • Relatório executivo oficial para pastores, conselho e diretoria.</p>
+          </div>
+          <div class="no-print" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button type="button" class="fin-btn fin-btn-primary fin-btn-sm" data-action="gerar-prestacao-oficial">
+              🔄 Atualizar / Gerar Prestação
+            </button>
+            <a href="/controlefinanceiro/api/relatorio.csv?${q}" class="fin-btn fin-btn-success fin-btn-sm">
+              📥 Exportar Planilha (CSV)
+            </a>
+            <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="print-report">
+              🖨️ Imprimir / Salvar PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="fin-kpi-grid">
+          <div class="fin-kpi-card kpi-success">
+            <div class="fin-kpi-label">Entradas no Mês</div>
+            <div class="fin-kpi-value">${fmtMoney(ind.entradas_mes)}</div>
+            <div class="fin-kpi-sub">Dízimos e Ofertas recebidos</div>
+          </div>
+          <div class="fin-kpi-card kpi-danger">
+            <div class="fin-kpi-label">Saídas no Mês</div>
+            <div class="fin-kpi-value">${fmtMoney(ind.saidas_mes)}</div>
+            <div class="fin-kpi-sub">Despesas fixas e ministeriais</div>
+          </div>
+          <div class="fin-kpi-card ${ind.resultado_mes >= 0 ? "kpi-success" : "kpi-danger"}">
+            <div class="fin-kpi-label">Resultado Líquido</div>
+            <div class="fin-kpi-value">${fmtMoney(ind.resultado_mes)}</div>
+            <div class="fin-kpi-sub">${ind.resultado_mes >= 0 ? "Superávit no período ✅" : "Déficit no período ⚠️"}</div>
+          </div>
+          <div class="fin-kpi-card kpi-info">
+            <div class="fin-kpi-label">Saldo Consolidado Geral</div>
+            <div class="fin-kpi-value">${fmtMoney(ind.saldo_total)}</div>
+            <div class="fin-kpi-sub">Disponível livre: ${fmtMoney(ind.total_disponivel)}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:1.25rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;flex-wrap:wrap;gap:8px">
+            <span style="font-weight:700;font-size:0.9rem;color:var(--fin-text)">
+              💬 Resumo Estruturado Oficial (WhatsApp & Reuniões de Liderança):
+            </span>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="fin-btn fin-btn-sm fin-btn-outline" data-action="copy-prestacao-text">
+                📋 Copiar Texto Completo
+              </button>
+              <button type="button" class="fin-btn fin-btn-sm fin-btn-outline" data-action="open-prestacao">
+                🔍 Ver em Janela Cheia
+              </button>
+            </div>
+          </div>
+          <div class="fin-prestacao-box" id="prestacao-texto-box">${esc(resumo ? resumo.textoWhatsApp : "Carregando resumo executivo oficial...")}</div>
+        </div>
+      </div>
+
+      <!-- SEÇÃO EXCLUSIVA: QUEM PEDIU PRESTAÇÃO DE CONTAS NO MÊS -->
+      <div class="fin-card">
+        <div class="fin-card-header" style="flex-wrap:wrap;gap:1rem">
+          <div>
+            <span class="fin-card-title">🛡️ Rastreabilidade: Histórico de Solicitações de Prestação de Contas</span>
+            <p style="font-size:0.82rem;color:var(--fin-muted)">
+              Lista de todos os pastores e diretores que solicitaram a prestação de contas neste mês ou período, com canal de origem (WhatsApp Bot ou Sistema Web), data/hora e auditoria.
+            </p>
+          </div>
+          <div class="no-print" style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
+            <label style="font-size:0.82rem;font-weight:700;color:var(--fin-text)">Mês de Consulta:</label>
+            <select class="fin-select" id="flt-prestacao-mes" style="width:auto;min-width:180px">
+              <option value="">Todos os Meses</option>
+              ${opcoesMeses.map((o) => `<option value="${o.val}" ${state.prestacaoMesFiltro === o.val ? "selected" : ""}>${o.label}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+
+        <div class="fin-table-wrap">
+          <table class="fin-table">
+            <thead>
+              <tr>
+                <th>Data e Horário</th>
+                <th>Solicitante</th>
+                <th>WhatsApp / Contato</th>
+                <th>Canal de Solicitação</th>
+                <th>Origem / IP</th>
+                <th>Auditoria</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                logsFiltrados.length
+                  ? logsFiltrados
+                      .map((l) => {
+                        let det = {};
+                        try { det = JSON.parse(l.detalhes || "{}"); } catch (_) {}
+                        const canalIsWhats = det.canal === "whatsapp";
+                        const canalBadge = canalIsWhats
+                          ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#166534;padding:3px 10px;border-radius:999px;font-size:0.75rem;font-weight:800">💬 WhatsApp Bot</span>`
+                          : `<span style="display:inline-flex;align-items:center;gap:4px;background:#e0e7ff;color:#3730a3;padding:3px 10px;border-radius:999px;font-size:0.75rem;font-weight:800">💻 Sistema Web</span>`;
+                        const telDisplay = det.telefone || (l.usuario && l.usuario.match(/\d{10,13}/) ? l.usuario.match(/\d{10,13}/)[0] : "-");
+                        const nomeDisplay = det.solicitante || (l.usuario ? l.usuario.split("(")[0].trim() : "Liderança");
+                        return `
+                        <tr>
+                          <td style="white-space:nowrap;font-weight:600">${fmtDateTime(l.criado_em)}</td>
+                          <td><strong>${esc(nomeDisplay)}</strong></td>
+                          <td>
+                            ${telDisplay !== "-" ? `<a href="https://wa.me/${telDisplay.replace(/\D/g, "")}" target="_blank" rel="noopener" style="color:var(--fin-primary);text-decoration:none;font-weight:600">📱 ${esc(telDisplay)}</a>` : "-"}
+                          </td>
+                          <td>${canalBadge}</td>
+                          <td><small style="color:var(--fin-muted)">${esc(l.ip || "-")}</small></td>
+                          <td><span class="fin-badge badge-success">🔒 Auditado</span></td>
+                        </tr>`;
+                      })
+                      .join("")
+                  : `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--fin-muted)">Nenhuma solicitação de prestação de contas encontrada para o mês selecionado.</td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   // ==================== 8. CONFIGURAÇÕES, USUÁRIOS & AUDITORIA ====================
   function renderConfigTab() {
     return `
@@ -1282,11 +1505,11 @@
                       .map(
                         (a) => `
                 <tr>
-                  <td>${esc(a.criado_em)}</td>
+                  <td style="white-space:nowrap">${fmtDateTime(a.criado_em)}</td>
                   <td><strong>${esc(a.usuario_nome || "-")}</strong></td>
                   <td><span class="fin-badge badge-info">${esc(a.acao)}</span></td>
                   <td>${esc(a.entidade || "-")} ${a.entidade_id ? `#${a.entidade_id}` : ""}</td>
-                  <td><small style="color:var(--fin-muted)">${esc(a.depois_json || "")}</small></td>
+                  <td><small style="color:var(--fin-text)">${fmtDetalhesAuditoria(a.acao, a.depois_json)}</small></td>
                 </tr>`
                       )
                       .join("")
@@ -2032,6 +2255,14 @@
         window.location.href = "/controlefinanceiro/login";
       } else if (action === "switch-tab") {
         state.tab = btn.getAttribute("data-tab") || "dashboard";
+        if (state.tab === "prestacao") {
+          const [rRes, hRes] = await Promise.all([
+            api("/prestacao-contas?registrar_auditoria=0").catch(() => null),
+            api("/prestacao-contas/historico" + (state.prestacaoMesFiltro ? `?mes=${state.prestacaoMesFiltro}` : "")).catch(() => ({ logs: [] })),
+          ]);
+          if (rRes) state.prestacaoResumo = rRes;
+          state.prestacaoHistorico = hRes.logs || [];
+        }
         renderApp();
       } else if (action === "apply-filters") {
         const p = document.getElementById("flt-periodo");
@@ -2073,15 +2304,29 @@
         if (box) {
           const txt = box.textContent || box.innerText;
           navigator.clipboard.writeText(txt).then(() => {
-            const b = document.getElementById("btn-copy-prestacao");
-            if (b) {
-              const old = b.innerHTML;
-              b.innerHTML = "✅ Copiado!";
-              setTimeout(() => { b.innerHTML = old; }, 2500);
-            }
+            const old = btn.innerHTML;
+            btn.innerHTML = "✅ Copiado!";
+            setTimeout(() => { btn.innerHTML = old; }, 2500);
           }).catch(() => {
             alert("Texto selecionado: use Ctrl+C para copiar.");
           });
+        }
+      } else if (action === "gerar-prestacao-oficial") {
+        btn.disabled = true;
+        const oldHtml = btn.innerHTML;
+        btn.innerHTML = "⏳ Atualizando...";
+        try {
+          const [resumo, hist] = await Promise.all([
+            api("/prestacao-contas?registrar_auditoria=1"),
+            api("/prestacao-contas/historico" + (state.prestacaoMesFiltro ? `?mes=${state.prestacaoMesFiltro}` : "")),
+          ]);
+          state.prestacaoResumo = resumo;
+          state.prestacaoHistorico = hist.logs || [];
+          renderApp();
+        } catch (e) {
+          alert("Erro ao atualizar prestação: " + e.message);
+          btn.disabled = false;
+          btn.innerHTML = oldHtml;
         }
       } else if (action === "open-lancamento") {
         openLancamentoModal({
@@ -2127,9 +2372,15 @@
       }
     });
 
-    document.addEventListener("change", (e) => {
+    document.addEventListener("change", async (e) => {
       if (e.target && e.target.id === "flt-periodo") {
         state.filters.periodo = e.target.value;
+        renderApp();
+      }
+      if (e.target && e.target.id === "flt-prestacao-mes") {
+        state.prestacaoMesFiltro = e.target.value;
+        const hRes = await api("/prestacao-contas/historico" + (state.prestacaoMesFiltro ? `?mes=${state.prestacaoMesFiltro}` : "")).catch(() => ({ logs: [] }));
+        state.prestacaoHistorico = hRes.logs || [];
         renderApp();
       }
     });

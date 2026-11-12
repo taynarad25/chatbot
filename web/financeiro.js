@@ -479,7 +479,7 @@ function formatarCentavos(c) {
   return "R$ " + (Number(c || 0) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function obterResumoPrestacaoContas({ solicitanteNome, solicitanteTel, canal = "web", ip = null }) {
+function obterResumoPrestacaoContas({ solicitanteNome, solicitanteTel, canal = "web", ip = null, auditar = true }) {
   const agora = agoraIso();
   const hoje = hojeSP();
   const [ano, mes] = hoje.split("-").map(Number);
@@ -490,27 +490,29 @@ function obterResumoPrestacaoContas({ solicitanteNome, solicitanteTel, canal = "
   const mesAtualNome = nomesMeses[mes - 1] || "Mês Atual";
 
   // Auditoria obrigatória de acesso/solicitação
-  try {
-    db.prepare(`
-      INSERT INTO fin_auditoria (usuario, acao, entidade, entidade_id, detalhes, ip, criado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      `${solicitanteNome || "Pastor/Diretor"} (${solicitanteTel || "sem telefone"})`,
-      "solicitacao_prestacao_contas",
-      "prestacao_contas",
-      null,
-      JSON.stringify({
-        canal,
-        solicitante: solicitanteNome,
-        telefone: solicitanteTel,
-        horario: agora,
-        data_solicitacao: hoje,
-      }),
-      ip || (canal === "whatsapp" ? "whatsapp_bot" : "web"),
-      agora
-    );
-  } catch (errAud) {
-    console.error("[Financeiro] Erro ao registrar auditoria de prestação de contas:", errAud);
+  if (auditar) {
+    try {
+      db.prepare(`
+        INSERT INTO fin_auditoria (usuario, acao, entidade, entidade_id, detalhes, ip, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        `${solicitanteNome || "Pastor/Diretor"} (${solicitanteTel || "sem telefone"})`,
+        "solicitacao_prestacao_contas",
+        "prestacao_contas",
+        null,
+        JSON.stringify({
+          canal,
+          solicitante: solicitanteNome,
+          telefone: solicitanteTel,
+          horario: agora,
+          data_solicitacao: hoje,
+        }),
+        ip || (canal === "whatsapp" ? "whatsapp_bot" : "web"),
+        agora
+      );
+    } catch (errAud) {
+      console.error("[Financeiro] Erro ao registrar auditoria de prestação de contas:", errAud);
+    }
   }
 
   // Obter panorama consolidado do mês atual
@@ -1299,23 +1301,32 @@ async function handle(req, res, { pathname, searchParams, ip }) {
     // Prestação de Contas (Pastores e Diretores)
     if (metodo === "GET" && pathname === "/controlefinanceiro/api/prestacao-contas") {
       exigir("ver");
+      const auditarAcesso = q.registrar_auditoria !== "0";
       const resumo = obterResumoPrestacaoContas({
         solicitanteNome: user.nome,
         solicitanteTel: user.telefone,
         canal: "web",
         ip,
+        auditar: auditarAcesso,
       });
       json(res, 200, resumo); return true;
     }
 
     if (metodo === "GET" && pathname === "/controlefinanceiro/api/prestacao-contas/historico") {
       exigir("ver");
-      const logs = db.prepare(`
+      const mesFiltro = q.mes && /^\d{4}-\d{2}$/.test(q.mes) ? q.mes : null;
+      let sql = `
         SELECT id, usuario, acao, entidade, detalhes, ip, criado_em
         FROM fin_auditoria
         WHERE acao = 'solicitacao_prestacao_contas'
-        ORDER BY id DESC LIMIT 50
-      `).all();
+      `;
+      const params = [];
+      if (mesFiltro) {
+        sql += ` AND (substr(criado_em, 1, 7) = ? OR detalhes LIKE ?)`;
+        params.push(mesFiltro, `%"data_solicitacao":"${mesFiltro}%`);
+      }
+      sql += ` ORDER BY id DESC LIMIT 200`;
+      const logs = db.prepare(sql).all(...params);
       json(res, 200, { ok: true, logs }); return true;
     }
 
