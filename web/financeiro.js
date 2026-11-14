@@ -716,9 +716,11 @@ function criarLancamento(b, user, ip) {
     if (dup) { const e = new Error(`Já existe um lançamento idêntico (#${dup.id}). Confirme se não é duplicado.`); e.code = "DUPLICADO"; throw e; }
   }
 
-  const parcelas = Math.min(Math.max(parseInt(b.parcelas, 10) || 1, 1), 120);
+  const parcelasTotal = Math.min(Math.max(parseInt(b.total_parcelas || b.parcelas, 10) || 1, 1), 120);
+  const parcelaInicial = Math.min(Math.max(parseInt(b.parcela_inicial || b.comecar_parcela, 10) || 1, 1), parcelasTotal);
+  const modoValor = b.modo_valor === "parcela" ? "parcela" : "total";
   const recorrente = Math.min(Math.max(parseInt(b.repetir_meses, 10) || 0, 0), 60);
-  const grupo = parcelas > 1 || recorrente > 1 ? crypto.randomBytes(6).toString("hex") : null;
+  const grupo = parcelasTotal > 1 || recorrente > 1 ? crypto.randomBytes(6).toString("hex") : null;
   const now = agoraIso();
   const quem = `${user.nome} (${user.telefone})`;
   const ins = db.prepare(`INSERT INTO fin_lancamentos
@@ -738,15 +740,18 @@ function criarLancamento(b, user, ip) {
   };
   db.exec("BEGIN");
   try {
-    if (parcelas > 1) {
-      const vp = Math.floor(valor / parcelas); const resto = valor - vp * parcelas;
+    if (parcelasTotal > 1) {
+      const vp = modoValor === "parcela" ? valor : Math.floor(valor / parcelasTotal);
+      const resto = modoValor === "parcela" ? 0 : (valor - vp * parcelasTotal);
       const ref = vencimento || data;
-      for (let i = 0; i < parcelas; i++) {
-        const st = i === 0 && !pendente ? "efetivado" : "pendente";
-        const dt = addMeses(ref, i);
-        const r = ins.run(tipo, st, `${descricao} (${i + 1}/${parcelas})`, vp + (i === 0 ? resto : 0), st === "efetivado" ? dt : null, st === "pendente" ? dt : null,
+      for (let p = parcelaInicial; p <= parcelasTotal; p++) {
+        const offset = p - parcelaInicial;
+        const st = offset === 0 && !pendente ? "efetivado" : "pendente";
+        const dt = addMeses(ref, offset);
+        const valParcela = modoValor === "parcela" ? vp : (vp + (p === 1 ? resto : 0));
+        const r = ins.run(tipo, st, `${descricao} (${p}/${parcelasTotal})`, valParcela, st === "efetivado" ? dt : null, st === "pendente" ? dt : null,
           base.competencia, categoriaId, conta?.id || null, contaDestino?.id || null, base.forma, base.ministerio, base.evento, base.contribuinte, base.fornecedor, base.observacoes,
-          ajuste, grupo, i + 1, parcelas, i === 0 ? chave : null, quem, now);
+          ajuste, grupo, p, parcelasTotal, offset === 0 ? chave : null, quem, now);
         ids.push(Number(r.lastInsertRowid));
       }
     } else {
@@ -825,25 +830,35 @@ function editarLancamento(id, b, user, ip) {
   if (!l) throw new Error("Lançamento não encontrado.");
   if (l.status === "cancelado") throw new Error("Lançamentos cancelados não podem ser editados.");
   if (l.status === "efetivado" && !pode(user, "corrigir")) throw new Error("Somente o Administrador Financeiro pode corrigir lançamentos efetivados.");
-  const motivo = txt(b.motivo_edicao || b.motivo);
-  if (!motivo) throw new Error("Informe o motivo da correção.");
+  const motivo = txt(b.motivo_edicao || b.motivo) || "Edição de dados pelo painel";
+
+  const statusNovo = b.status === "pendente" || b.status === "efetivado" ? b.status : l.status;
+  const rawData = b.data !== undefined ? b.data : (b.data_movimento !== undefined ? b.data_movimento : l.data);
+  const dataNova = dataValida(rawData) ? rawData : (statusNovo === "efetivado" ? (l.data || hojeSP()) : null);
+  const rawVenc = b.vencimento !== undefined ? b.vencimento : (b.data_vencimento !== undefined ? b.data_vencimento : l.vencimento);
+  const vencNovo = dataValida(rawVenc) ? rawVenc : (statusNovo === "pendente" ? (l.vencimento || dataNova || hojeSP()) : l.vencimento);
+  const compNova = b.competencia !== undefined ? txt(b.competencia, 7) : (dataNova ? dataNova.slice(0, 7) : l.competencia);
+
   const novo = {
     descricao: txt(b.descricao, 200) || l.descricao,
     valor: b.valor !== undefined && b.valor !== "" ? centavos(b.valor) : l.valor,
-    data: l.status === "efetivado" && dataValida(b.data) ? b.data : l.data,
-    vencimento: l.status === "pendente" && dataValida(b.vencimento) ? b.vencimento : l.vencimento,
+    status: statusNovo,
+    data: dataNova,
+    vencimento: vencNovo,
+    competencia: compNova,
     categoria_id: b.categoria_id && l.tipo !== "transferencia" ? validarCategoria(b.categoria_id, l.tipo).id : l.categoria_id,
     conta_id: b.conta_id ? validarConta(b.conta_id).id : l.conta_id,
-    forma: b.forma !== undefined ? txt(b.forma, 40) : l.forma,
+    forma: b.forma !== undefined ? txt(b.forma || b.forma_pagamento, 40) : (b.forma_pagamento !== undefined ? txt(b.forma_pagamento, 40) : l.forma),
     ministerio: b.ministerio !== undefined ? txt(b.ministerio, 80) : l.ministerio,
-    fornecedor: b.fornecedor !== undefined ? txt(b.fornecedor, 120) : l.fornecedor,
+    fornecedor: b.fornecedor !== undefined ? txt(b.fornecedor, 120) : (b.contribuinte_nome !== undefined ? txt(b.contribuinte_nome, 120) : l.fornecedor),
     observacoes: b.observacoes !== undefined ? txt(b.observacoes, 1000) : l.observacoes,
   };
   if (novo.valor <= 0) throw new Error("Valor inválido.");
-  db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, data=?, vencimento=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
-    .run(novo.descricao, novo.valor, novo.data, novo.vencimento, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, agoraIso(), l.id);
+  db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+    .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, agoraIso(), l.id);
   auditar(user, "corrigir_lancamento", "lancamento", l.id, { antes: l, depois: novo, motivo }, ip);
-  return { ok: true, message: "Lançamento corrigido. A alteração foi registrada na auditoria." };
+  const atualizado = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(l.id);
+  return { ok: true, lancamento: atualizado, message: "Lançamento atualizado com sucesso." };
 }
 
 function salvarConta(b, user, ip) {
@@ -1218,18 +1233,30 @@ async function handle(req, res, { pathname, searchParams, ip }) {
 
     // Categorias
     if (metodo === "POST" && pathname === "/controlefinanceiro/api/categorias") {
-      exigir("categorias"); const b = await lerCorpo(req);
+      if (!pode(user, "categorias") && !pode(user, "lancar")) {
+        json(res, 403, { ok: false, erro: "Sem permissão para gerenciar categorias.", message: "Sem permissão para gerenciar categorias." });
+        return true;
+      }
+      const b = await lerCorpo(req);
       const nome = txt(b.nome, 80);
       if (!nome || !["entrada", "saida"].includes(b.tipo)) { json(res, 400, { ok: false, erro: "Informe nome e tipo.", message: "Informe nome e tipo." }); return true; }
       if (b.id) {
         db.prepare("UPDATE fin_categorias SET nome=?, grupo=?, fixa=?, ativa=? WHERE id=?").run(nome, txt(b.grupo, 60), b.fixa ? 1 : 0, b.ativa === false ? 0 : 1, Number(b.id));
         auditar(user, "editar_categoria", "categoria", Number(b.id), b, ip);
+        json(res, 200, { ok: true, message: "Categoria salva." });
+        return true;
       } else {
-        try { db.prepare("INSERT INTO fin_categorias (nome, tipo, grupo, fixa) VALUES (?,?,?,?)").run(nome, b.tipo, txt(b.grupo, 60), b.fixa ? 1 : 0); }
-        catch { json(res, 400, { ok: false, erro: "Categoria já existe.", message: "Categoria já existe." }); return true; }
-        auditar(user, "criar_categoria", "categoria", null, b, ip);
+        try {
+          const r = db.prepare("INSERT INTO fin_categorias (nome, tipo, grupo, fixa) VALUES (?,?,?,?)").run(nome, b.tipo, txt(b.grupo, 60), b.fixa ? 1 : 0);
+          const newId = Number(r.lastInsertRowid);
+          auditar(user, "criar_categoria", "categoria", newId, b, ip);
+          json(res, 200, { ok: true, id: newId, categoria: { id: newId, nome, tipo: b.tipo, grupo: txt(b.grupo, 60), fixa: 0, ativa: 1 }, message: "Categoria criada com sucesso." });
+          return true;
+        } catch {
+          json(res, 400, { ok: false, erro: "Categoria já existe.", message: "Categoria já existe." });
+          return true;
+        }
       }
-      json(res, 200, { ok: true, message: "Categoria salva." }); return true;
     }
 
     // Usuários
@@ -1368,6 +1395,7 @@ module.exports = {
   centavos,
   saldosContas,
   criarLancamento,
+  editarLancamento,
   quitarLancamento,
   cancelarLancamento,
   salvarConferencia,

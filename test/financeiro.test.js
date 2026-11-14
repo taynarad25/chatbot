@@ -269,3 +269,94 @@ test("Gestão — Área de gestão não exibe controle financeiro", () => {
   assert.equal(html.includes("Controle Financeiro"), false, "A área de gestão não deve exibir texto de Controle Financeiro");
 });
 
+test("Controle Financeiro — Edição completa de lançamentos e parcelamento com início personalizado", async () => {
+  const db = require("../db");
+
+  // Garante usuário admin e conta para teste
+  const user = { id: 1, nome: "Admin Teste", papel: "admin", telefone: "5511999990000" };
+  const cat = db.prepare("SELECT id FROM fin_categorias LIMIT 1").get();
+  const cta = db.prepare("SELECT id FROM fin_contas LIMIT 1").get();
+
+  // 1. Parcelamento começando na parcela 7 de 11 (modo_valor = 'parcela')
+  const lancParcelas = financeiro.criarLancamento({
+    tipo: "saida",
+    status: "pendente",
+    descricao: "Compra Equipamento Som Teste Unitario",
+    valor: 150.0,
+    categoria_id: cat.id,
+    conta_id: cta.id,
+    data: "2026-11-14",
+    vencimento: "2026-11-14",
+    parcelas: 11,
+    parcela_inicial: 7,
+    modo_valor: "parcela",
+    confirmar_saldo_negativo: true,
+    confirmar_duplicidade: true,
+  }, user);
+
+  assert.equal(lancParcelas.ok, true);
+  assert.equal(lancParcelas.ids.length, 5, "Devem ser geradas 5 parcelas (da 7 até a 11)");
+  const rowsParcelas = lancParcelas.ids.map((id) => db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(id));
+  assert.ok(rowsParcelas[0].descricao.includes("(7/11)"));
+  assert.ok(rowsParcelas[4].descricao.includes("(11/11)"));
+  assert.equal(rowsParcelas[0].valor, 15000, "Valor armazenado em centavos (150 reais = 15000)");
+  assert.equal(rowsParcelas[4].valor, 15000);
+
+  // 2. Parcelamento com modo_valor = 'total'
+  const lancTotal = financeiro.criarLancamento({
+    tipo: "saida",
+    status: "pendente",
+    descricao: "Reforma Pintura Teste Unitario",
+    valor: 1000.0,
+    categoria_id: cat.id,
+    conta_id: cta.id,
+    data: "2026-11-14",
+    vencimento: "2026-11-14",
+    total_parcelas: 5,
+    parcela_inicial: 3,
+    modo_valor: "total",
+    confirmar_saldo_negativo: true,
+    confirmar_duplicidade: true,
+  }, user);
+
+  assert.equal(lancTotal.ok, true);
+  assert.equal(lancTotal.ids.length, 3, "Devem ser geradas 3 parcelas (da 3 até a 5)");
+  const rowsTotal = lancTotal.ids.map((id) => db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(id));
+  assert.ok(rowsTotal[0].descricao.includes("(3/5)"));
+  assert.equal(rowsTotal[0].valor, 20000, "1000 dividido por 5 parcelas no total = 200 por parcela (20000 centavos)");
+
+  // 3. Edição completa de lançamento sem exigência de motivo
+  const itemParaEditar = rowsTotal[0];
+  const editado = financeiro.editarLancamento(itemParaEditar.id, {
+    descricao: "Reforma Pintura Fachada Principal",
+    valor: 250.0,
+    status: "efetivado",
+    data: "2026-11-15",
+    vencimento: "2026-11-20",
+    competencia: "2026-11",
+    categoria_id: cat.id,
+    conta_id: cta.id,
+    forma: "Cartão de Crédito",
+    ministerio: "Manutenção",
+    fornecedor: "Tintas & Cia",
+    observacoes: "Adiantado conforme combinado",
+  }, user);
+
+  assert.equal(editado.ok, true);
+  assert.equal(editado.lancamento.descricao, "Reforma Pintura Fachada Principal");
+  assert.equal(editado.lancamento.valor, 25000, "250 reais em centavos = 25000");
+  assert.equal(editado.lancamento.status, "efetivado");
+  assert.equal(editado.lancamento.forma, "Cartão de Crédito");
+  assert.equal(editado.lancamento.ministerio, "Manutenção");
+  assert.equal(editado.lancamento.fornecedor, "Tintas & Cia");
+  assert.equal(editado.lancamento.observacoes, "Adiantado conforme combinado");
+
+  // Limpeza dos lançamentos de teste
+  const idsParaLimpar = [...lancParcelas.ids, ...lancTotal.ids];
+  for (const id of idsParaLimpar) {
+    db.prepare("DELETE FROM fin_lancamentos WHERE id = ?").run(id);
+    db.prepare("DELETE FROM fin_auditoria WHERE acao = 'editar_lancamento' AND detalhes LIKE ?").run(`%"id":${id}%`);
+  }
+});
+
+

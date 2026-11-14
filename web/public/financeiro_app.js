@@ -290,6 +290,10 @@
       { id: "config", label: "⚙️ Categorias, Segurança & Auditoria" },
     ];
 
+    const activeTabObj = tabs.find((t) => t.id === state.tab) || tabs[0];
+    const [activeIcon, ...activeNameParts] = activeTabObj.label.split(" ");
+    const activeName = activeNameParts.join(" ");
+
     root.innerHTML = `
       <header class="fin-topbar">
         <div class="fin-brand">
@@ -299,7 +303,17 @@
             <div class="fin-brand-subtitle">Sistema de Controle Financeiro</div>
           </div>
         </div>
-        <div class="fin-user-bar">
+
+        <!-- Seletor Suspenso do Menu Mobile no Topo (Cara de App) -->
+        <div class="fin-mobile-menu-box mobile-only">
+          <button type="button" class="fin-mobile-menu-btn" data-action="toggle-mobile-dropdown">
+            <span class="fin-mobile-menu-icon">${activeIcon}</span>
+            <span class="fin-mobile-menu-text">${activeName}</span>
+            <span class="fin-mobile-menu-caret">▾</span>
+          </button>
+        </div>
+
+        <div class="fin-user-bar desktop-only">
           <div class="fin-user-info">
             <div class="fin-user-name">${esc(state.user.nome)}</div>
             <span class="fin-user-role">${esc(ROLE_LABELS[state.user.papel] || state.user.papel)}</span>
@@ -309,7 +323,29 @@
         </div>
       </header>
 
-      <nav class="fin-nav">
+      <!-- Menu Suspenso Mobile Flutuante -->
+      <div id="fin-mobile-dropdown" class="fin-mobile-dropdown mobile-only" style="display:none">
+        <div class="fin-mobile-dropdown-header">
+          <div class="fin-mobile-dropdown-user">👤 <b>${esc(state.user.nome)}</b> · <span class="fin-user-role" style="font-size:0.65rem">${esc(ROLE_LABELS[state.user.papel] || state.user.papel)}</span></div>
+        </div>
+        <div class="fin-mobile-dropdown-items">
+          ${tabs
+            .map(
+              (t) => `
+            <button type="button" class="fin-mobile-dropdown-item ${state.tab === t.id ? "active" : ""}" data-action="switch-tab" data-tab="${t.id}">
+              <span class="fin-mobile-dropdown-label">${t.label}</span>
+              ${state.tab === t.id ? '<span class="fin-mobile-dropdown-check">✓</span>' : ""}
+            </button>`
+            )
+            .join("")}
+        </div>
+        <div class="fin-mobile-dropdown-actions">
+          <a href="/gestao" class="fin-btn fin-btn-outline fin-btn-sm" style="flex:1;text-align:center">📅 Gestão</a>
+          <button type="button" class="fin-btn fin-btn-danger fin-btn-sm" data-action="logout" style="flex:1">Sair</button>
+        </div>
+      </div>
+
+      <nav class="fin-nav desktop-only">
         ${tabs
           .map(
             (t) => `
@@ -1588,8 +1624,11 @@
                 </div>`
                   : `
                 <div class="fin-field">
-                  <label>Categoria *</label>
-                  <select class="fin-select" name="categoria_id">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem">
+                    <label style="margin:0">Categoria *</label>
+                    <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="quick-add-category" data-tipo="${tipo}" style="padding:0.15rem 0.45rem;font-size:0.75rem;line-height:1;border-radius:4px" title="Adicionar nova categoria">+ Nova</button>
+                  </div>
+                  <select class="fin-select" name="categoria_id" id="novo-cat-select">
                     ${cats.map((c) => `<option value="${c.id}">${esc(c.nome)}</option>`).join("")}
                   </select>
                 </div>`
@@ -1637,14 +1676,63 @@
             ${
               tipo === "saida"
                 ? `
-              <div class="fin-form-grid">
-                <div class="fin-field">
-                  <label>Parcelar em (vezes)</label>
-                  <input type="number" min="1" max="60" class="fin-input" name="parcelas" value="1" />
+              <div class="fin-field" style="grid-column:1 / -1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:0.85rem">
+                <div style="font-weight:600;margin-bottom:0.6rem;font-size:0.88rem;display:flex;align-items:center;gap:0.4rem;color:#334155">
+                  <span>🔁</span> Repetição / Parcelamento
                 </div>
-                <div class="fin-field">
-                  <label>Repetir Mensalmente (Despesa Recorrente)</label>
-                  <input type="number" min="1" max="24" class="fin-input" name="repetir_meses" value="1" />
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem">
+                  <label class="fin-radio-pill">
+                    <input type="radio" name="tipo_repeticao" value="unica" checked />
+                    <span>Não recorrente (1x)</span>
+                  </label>
+                  <label class="fin-radio-pill">
+                    <input type="radio" name="tipo_repeticao" value="parcelada" />
+                    <span>Parcelar ou repetir</span>
+                  </label>
+                  <label class="fin-radio-pill">
+                    <input type="radio" name="tipo_repeticao" value="fixa" />
+                    <span>Fixa mensal</span>
+                  </label>
+                </div>
+
+                <div id="box-repeticao-parcelada" style="display:none;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:0.75rem;margin-bottom:0.5rem">
+                  <div class="fin-form-grid" style="margin-bottom:0.5rem">
+                    <div class="fin-field">
+                      <label>Começar na parcela</label>
+                      <input type="number" min="1" max="120" class="fin-input" name="parcela_inicial" id="rep-parcela-inicial" value="1" />
+                      <small style="color:#64748b;font-size:0.72rem">Ex: se a compra foi em 11x mas você já está no 7º mês, coloque 7</small>
+                    </div>
+                    <div class="fin-field">
+                      <label>Total de parcelas</label>
+                      <input type="number" min="2" max="120" class="fin-input" name="total_parcelas" id="rep-total-parcelas" value="2" />
+                      <small style="color:#64748b;font-size:0.72rem">Quantidade total da compra (ex: 11 vezes)</small>
+                    </div>
+                  </div>
+
+                  <div class="fin-field" style="margin-bottom:0.5rem">
+                    <label style="margin-bottom:0.25rem">O valor digitado acima (R$) refere-se a:</label>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                      <label class="fin-radio-pill">
+                        <input type="radio" name="modo_valor" value="total" checked />
+                        <span>Valor Total (dividido entre as parcelas)</span>
+                      </label>
+                      <label class="fin-radio-pill">
+                        <input type="radio" name="modo_valor" value="parcela" />
+                        <span>Valor de CADA Parcela</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div id="rep-preview-text" style="font-size:0.82rem;font-weight:600;color:#6b21a8;padding:0.45rem 0.65rem;background:#f5f3ff;border-radius:6px;border:1px solid #ddd6fe">
+                  </div>
+                </div>
+
+                <div id="box-repeticao-fixa" style="display:none;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:0.75rem">
+                  <div class="fin-field">
+                    <label>Repetir mensalmente por quantos meses? (Despesa Fixa)</label>
+                    <input type="number" min="2" max="60" class="fin-input" name="repetir_meses" value="12" />
+                    <small style="color:#64748b;font-size:0.72rem">Gera despesas mensais automáticas para os meses seguintes</small>
+                  </div>
                 </div>
               </div>`
                 : ""
@@ -1669,6 +1757,44 @@
         </div>
       </div>
     `;
+
+    // Configuração dinâmica dos cálculos de repetição e parcelamento
+    const radioRep = m.querySelectorAll("input[name='tipo_repeticao']");
+    const boxParcelada = m.querySelector("#box-repeticao-parcelada");
+    const boxFixa = m.querySelector("#box-repeticao-fixa");
+    const inpVal = m.querySelector("input[name='valor']");
+    const inpParcIni = m.querySelector("#rep-parcela-inicial");
+    const inpTotParc = m.querySelector("#rep-total-parcelas");
+    const radiosModo = m.querySelectorAll("input[name='modo_valor']");
+    const txtPreview = m.querySelector("#rep-preview-text");
+
+    function atualizarPreviewRepeticao() {
+      if (!txtPreview) return;
+      const val = parseFloat(inpVal?.value || 0) || 0;
+      const tot = Math.max(parseInt(inpTotParc?.value || 2, 10), 2);
+      const ini = Math.max(Math.min(parseInt(inpParcIni?.value || 1, 10), tot), 1);
+      const qtd = tot - ini + 1;
+      let modo = "total";
+      radiosModo.forEach((r) => { if (r.checked) modo = r.value; });
+      let valParc = modo === "parcela" ? val : (tot > 0 ? val / tot : 0);
+      txtPreview.innerHTML = `💡 Serão geradas <b>${qtd} parcelas</b> (da <b>${ini}ª</b> até a <b>${tot}ª</b>) no valor de <b>R$ ${valParc.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> por mês.`;
+    }
+
+    radioRep.forEach((r) => {
+      r.addEventListener("change", () => {
+        if (boxParcelada) boxParcelada.style.display = r.value === "parcelada" && r.checked ? "block" : "none";
+        if (boxFixa) boxFixa.style.display = r.value === "fixa" && r.checked ? "block" : "none";
+        atualizarPreviewRepeticao();
+      });
+    });
+
+    [inpVal, inpParcIni, inpTotParc].forEach((el) => {
+      if (el) el.addEventListener("input", atualizarPreviewRepeticao);
+    });
+    radiosModo.forEach((r) => {
+      r.addEventListener("change", atualizarPreviewRepeticao);
+    });
+    atualizarPreviewRepeticao();
   }
 
   function openFechamentoCultoModal() {
@@ -1809,30 +1935,100 @@
   function openEditarLancModal(id) {
     const l = state.lancamentos.find((x) => String(x.id) === String(id));
     if (!l) return;
+    const tipo = l.tipo || "saida";
+    const cats = state.categorias.filter((c) => (tipo === "entrada" ? c.tipo === "entrada" : c.tipo === "saida"));
     const m = document.getElementById("fin-modal-root");
     m.innerHTML = `
       <div class="fin-modal-backdrop">
-        <div class="fin-modal" style="max-width:520px">
+        <div class="fin-modal" style="max-width:760px">
           <div class="fin-modal-header">
             <span class="fin-modal-title">✏️ Editar Lançamento #${l.id}</span>
             <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="close-modal">✕</button>
           </div>
           <form id="form-editar-lanc" data-id="${l.id}">
-            <div class="fin-field" style="margin-bottom:0.75rem">
-              <label>Descrição *</label>
-              <input type="text" class="fin-input" name="descricao" value="${esc(l.descricao)}" required />
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Descrição *</label>
+                <input type="text" class="fin-input" name="descricao" value="${esc(l.descricao)}" required placeholder="Ex: Oferta Culto de Domingo / Conta de Luz" />
+              </div>
+              <div class="fin-field">
+                <label>Valor (R$) *</label>
+                <input type="number" step="0.01" class="fin-input" name="valor" value="${(l.valor / 100).toFixed(2)}" required placeholder="0,00" />
+              </div>
             </div>
-            <div class="fin-field" style="margin-bottom:0.75rem">
-              <label>Valor (R$) *</label>
-              <input type="number" step="0.01" class="fin-input" name="valor" value="${(l.valor / 100).toFixed(2)}" required />
+
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Conta Financeira *</label>
+                <select class="fin-select" name="conta_id" required>
+                  ${state.contas
+                    .map((c) => `<option value="${c.id}" ${String(c.id) === String(l.conta_id) ? "selected" : ""}>${esc(c.nome)} (${fmtMoney(c.saldo_atual)})</option>`)
+                    .join("")}
+                </select>
+              </div>
+              <div class="fin-field">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem">
+                  <label style="margin:0">Categoria *</label>
+                  <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="quick-add-category" data-tipo="${tipo}" style="padding:0.15rem 0.45rem;font-size:0.75rem;line-height:1;border-radius:4px" title="Adicionar nova categoria">+ Nova</button>
+                </div>
+                <select class="fin-select" name="categoria_id" id="edit-cat-select">
+                  ${cats.map((c) => `<option value="${c.id}" ${String(c.id) === String(l.categoria_id) ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}
+                </select>
+              </div>
             </div>
-            <div class="fin-field" style="margin-bottom:0.75rem">
-              <label>Motivo da Alteração (Obrigatório p/ Auditoria) *</label>
-              <input type="text" class="fin-input" name="motivo" placeholder="Justifique a correção..." required />
+
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Status *</label>
+                <select class="fin-select" name="status">
+                  <option value="efetivado" ${l.status === "efetivado" ? "selected" : ""}>Efetivado (Pago / Recebido)</option>
+                  <option value="pendente" ${l.status === "pendente" ? "selected" : ""}>Pendente (Conta a Pagar / Receber)</option>
+                </select>
+              </div>
+              <div class="fin-field">
+                <label>Data do Movimento</label>
+                <input type="date" class="fin-input" name="data" value="${l.data || todayISO()}" />
+              </div>
+              <div class="fin-field">
+                <label>Data de Vencimento / Competência</label>
+                <input type="date" class="fin-input" name="vencimento" value="${l.vencimento || l.data || todayISO()}" />
+              </div>
             </div>
+
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Forma de Pagamento</label>
+                <select class="fin-select" name="forma">
+                  ${FORMAS_PAGAMENTO.map((fp) => `<option value="${esc(fp)}" ${fp === (l.forma || "PIX") ? "selected" : ""}>${esc(fp)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="fin-field">
+                <label>Ministério / Departamento</label>
+                <select class="fin-select" name="ministerio">
+                  <option value="">Geral / Sem vínculo</option>
+                  ${state.ministerios.map((m) => `<option value="${esc(m)}" ${m === l.ministerio ? "selected" : ""}>${esc(m)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="fin-field">
+                <label>${tipo === "entrada" ? "Contribuinte (Opcional/Sigiloso)" : "Fornecedor / Beneficiário"}</label>
+                <input type="text" class="fin-input" name="fornecedor" value="${esc(l.fornecedor || l.contribuinte || "")}" placeholder="Opcional" />
+              </div>
+            </div>
+
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Anexar Comprovante / Nota Fiscal (Imagem ou PDF)</label>
+                <input type="file" class="fin-input" id="lanc-edit-arquivo" accept="image/*,application/pdf" />
+              </div>
+              <div class="fin-field">
+                <label>Observações</label>
+                <input type="text" class="fin-input" name="observacoes" value="${esc(l.observacoes || "")}" placeholder="Detalhes adicionais..." />
+              </div>
+            </div>
+
             <div class="fin-modal-footer">
               <button type="button" class="fin-btn fin-btn-outline" data-action="close-modal">Cancelar</button>
-              <button type="submit" class="fin-btn fin-btn-primary">Salvar Correção</button>
+              <button type="submit" class="fin-btn fin-btn-primary">Salvar Alterações</button>
             </div>
           </form>
         </div>
@@ -2235,6 +2431,16 @@
   // ==================== EVENT DELEGATION ====================
   function bindEvents() {
     document.addEventListener("click", async (e) => {
+      // Fechar menu mobile ao clicar fora
+      const dd = document.getElementById("fin-mobile-dropdown");
+      if (dd && dd.style.display !== "none") {
+        if (!e.target.closest("#fin-mobile-dropdown") && !e.target.closest("[data-action='toggle-mobile-dropdown']")) {
+          dd.style.display = "none";
+          const caret = document.querySelector(".fin-mobile-menu-caret");
+          if (caret) caret.style.transform = "rotate(0deg)";
+        }
+      }
+
       const btn = e.target.closest("[data-action]");
       if (!btn) return;
       const action = btn.getAttribute("data-action");
@@ -2255,6 +2461,8 @@
         window.location.href = "/controlefinanceiro/login";
       } else if (action === "switch-tab") {
         state.tab = btn.getAttribute("data-tab") || "dashboard";
+        const dd = document.getElementById("fin-mobile-dropdown");
+        if (dd) dd.style.display = "none";
         if (state.tab === "prestacao") {
           const [rRes, hRes] = await Promise.all([
             api("/prestacao-contas?registrar_auditoria=0").catch(() => null),
@@ -2264,6 +2472,33 @@
           state.prestacaoHistorico = hRes.logs || [];
         }
         renderApp();
+      } else if (action === "toggle-mobile-dropdown") {
+        const dd = document.getElementById("fin-mobile-dropdown");
+        if (dd) {
+          const visivel = dd.style.display !== "none";
+          dd.style.display = visivel ? "none" : "block";
+          const caret = btn.querySelector(".fin-mobile-menu-caret");
+          if (caret) caret.style.transform = visivel ? "rotate(0deg)" : "rotate(180deg)";
+        }
+      } else if (action === "quick-add-category") {
+        const tipo = btn.getAttribute("data-tipo") || "saida";
+        const nome = prompt(`Nova Categoria de ${tipo === "entrada" ? "Receita / Entrada" : "Despesa / Saída"}:`);
+        if (nome && nome.trim()) {
+          try {
+            const res = await api("/categorias", {
+              method: "POST",
+              body: { nome: nome.trim(), tipo, grupo: tipo === "entrada" ? "Receitas" : "Despesas Gerais" }
+            });
+            await loadAllData();
+            const catSelects = document.querySelectorAll("select[name='categoria_id']");
+            catSelects.forEach((sel) => {
+              const cats = state.categorias.filter((c) => (tipo === "entrada" ? c.tipo === "entrada" : c.tipo === "saida"));
+              sel.innerHTML = cats.map((c) => `<option value="${c.id}" ${res.id && c.id === res.id ? "selected" : ""}>${esc(c.nome)}</option>`).join("");
+            });
+          } catch (err) {
+            alert("❌ " + (err.message || "Erro ao cadastrar categoria."));
+          }
+        }
       } else if (action === "apply-filters") {
         const p = document.getElementById("flt-periodo");
         const ini = document.getElementById("flt-inicio");
@@ -2450,6 +2685,18 @@
           const fd = new FormData(form);
           const payload = Object.fromEntries(fd.entries());
           payload.tipo = form.getAttribute("data-tipo");
+          if (payload.tipo_repeticao === "parcelada") {
+            payload.total_parcelas = payload.total_parcelas || 2;
+            payload.parcela_inicial = payload.parcela_inicial || 1;
+            payload.modo_valor = payload.modo_valor || "total";
+            payload.parcelas = payload.total_parcelas;
+          } else if (payload.tipo_repeticao === "fixa") {
+            payload.parcelas = 1;
+            payload.repetir_meses = payload.repetir_meses || 12;
+          } else {
+            payload.parcelas = 1;
+            payload.repetir_meses = 0;
+          }
           const fileInput = document.getElementById("lanc-arquivo");
           if (fileInput && fileInput.files && fileInput.files[0]) {
             const f = fileInput.files[0];
@@ -2514,7 +2761,18 @@
         } else if (form.id === "form-editar-lanc") {
           const id = form.getAttribute("data-id");
           const fd = new FormData(form);
-          await api(`/lancamentos/${id}`, { method: "PUT", body: Object.fromEntries(fd.entries()) });
+          const payload = Object.fromEntries(fd.entries());
+          const fileInput = document.getElementById("lanc-edit-arquivo");
+          if (fileInput && fileInput.files && fileInput.files[0]) {
+            const f = fileInput.files[0];
+            const anexoPayload = {
+              nome_arquivo: f.name,
+              mime_type: f.type,
+              dados_base64: await fileToBase64(f),
+            };
+            await api(`/lancamentos/${id}/anexos`, { method: "POST", body: anexoPayload }).catch(() => {});
+          }
+          await api(`/lancamentos/${id}`, { method: "PUT", body: payload });
           closeModal();
           await loadAllData();
           renderApp();
