@@ -26,12 +26,22 @@
   padding: 0;
 }
 
+html {
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+}
+
 body.fin-body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--fin-bg);
   color: var(--fin-text);
   line-height: 1.5;
   min-height: 100vh;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+  position: relative;
 }
 
 /* Header & Topbar (Harmonizado com a Área de Gestão) */
@@ -47,6 +57,10 @@ body.fin-body {
   z-index: 100;
   border-bottom: 2px solid var(--fin-primary);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .fin-brand {
@@ -157,8 +171,11 @@ body.fin-body {
 /* Main Container */
 .fin-container {
   max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
   padding: 1.5rem;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 /* Login Card */
@@ -240,23 +257,25 @@ body.fin-body {
 /* Hero KPIs Grid */
 .fin-hero-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .fin-hero-card {
   background: var(--fin-surface);
   border: 1px solid var(--fin-border);
   border-radius: 14px;
-  padding: 1.35rem 1.4rem;
+  padding: 1.15rem 1.3rem;
   position: relative;
   overflow: hidden;
   box-shadow: 0 4px 14px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 125px;
+  min-height: 110px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -1026,26 +1045,47 @@ body.fin-body {
   .desktop-only { display: none !important; }
   .mobile-only { display: block !important; }
 
+  /* Impede rigorosamente rolagem horizontal da tela em celulares */
+  html, body.fin-body, #app {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+  }
+
   /* Container */
   .fin-container {
     padding: 0.65rem;
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+    box-sizing: border-box;
   }
 
-  /* Topbar */
+  /* Topbar compacta sem estourar a tela */
   .fin-topbar {
-    padding: 0.55rem 0.85rem;
-    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    gap: 0.45rem;
+    max-width: 100vw !important;
+    overflow: hidden !important;
+    box-sizing: border-box;
   }
   .fin-brand {
-    gap: 0.55rem;
+    gap: 0.45rem;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
   }
   .fin-brand-logo {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
+    flex-shrink: 0;
   }
   .fin-brand-title {
-    font-size: 0.92rem;
+    font-size: 0.84rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .fin-brand-subtitle {
     display: none;
@@ -1086,6 +1126,7 @@ body.fin-body {
     gap: 0.35rem;
     scrollbar-width: none;
     margin-bottom: 0.75rem;
+    max-width: 100%;
   }
   .fin-shortcuts::-webkit-scrollbar { display: none; }
   .fin-shortcuts .fin-btn {
@@ -1102,6 +1143,7 @@ body.fin-body {
     gap: 0.5rem;
     margin-bottom: 0.75rem;
     border-radius: 10px;
+    max-width: 100%;
   }
   .fin-filter-group {
     min-width: 120px;
@@ -1215,46 +1257,80 @@ body.fin-body {
     padding: 0.85rem;
     border-radius: 12px;
     margin-bottom: 0.85rem;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   /* Mobile Menu Button */
+  .fin-mobile-menu-box {
+    flex-shrink: 0;
+  }
   .fin-mobile-menu-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.4rem 0.75rem;
+    gap: 0.35rem;
+    padding: 0.35rem 0.6rem;
     background: rgba(255, 255, 255, 0.95);
     border: 1px solid var(--fin-border);
     border-radius: 999px;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 700;
     color: var(--fin-text);
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     transition: all 0.15s ease;
+    max-width: 145px;
   }
   .fin-mobile-menu-btn:active {
     transform: scale(0.97);
+  }
+  .fin-mobile-menu-text {
+    max-width: 75px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .fin-mobile-menu-caret {
     font-size: 0.65rem;
     transition: transform 0.2s ease;
   }
 
+  /* Backdrop para fechar o menu ao tocar fora */
+  .fin-mobile-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 9998;
+    animation: finFadeIn 0.15s ease-out;
+  }
+
+  @keyframes finFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
   /* Mobile Dropdown Menu */
   .fin-mobile-dropdown {
     position: fixed;
-    top: 56px;
+    top: 54px;
     left: 8px;
     right: 8px;
-    background: #ffffff;
+    background: #18181b;
+    color: #f4f4f5;
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 16px;
-    box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
     z-index: 9999;
     padding: 0.75rem;
-    animation: finSlideDown 0.2s ease-out;
-    max-height: calc(100vh - 80px);
+    animation: finSlideDown 0.18s ease-out;
+    max-height: calc(100vh - 75px);
     overflow-y: auto;
+    box-sizing: border-box;
   }
 
   @keyframes finSlideDown {
@@ -1272,16 +1348,32 @@ body.fin-body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.35rem 0.5rem 0.65rem;
-    border-bottom: 1px solid #f1f5f9;
+    padding: 0.3rem 0.4rem 0.6rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     margin-bottom: 0.45rem;
   }
-  .fin-mobile-dropdown-header span {
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #64748b;
+  .fin-mobile-dropdown-user {
+    font-size: 0.8rem;
+    color: #f4f4f5;
+  }
+  .fin-mobile-dropdown-close {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #e4e4e7;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+  .fin-mobile-dropdown-close:active {
+    background: rgba(239, 68, 68, 0.3);
+    color: #f87171;
   }
 
   .fin-mobile-dropdown-items {
@@ -1295,29 +1387,31 @@ body.fin-body {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    padding: 0.7rem 0.85rem;
+    padding: 0.65rem 0.85rem;
     border-radius: 10px;
     background: transparent;
     border: none;
     text-align: left;
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     font-weight: 600;
-    color: #1e293b;
+    color: #e4e4e7;
     cursor: pointer;
     transition: background 0.15s ease;
   }
   .fin-mobile-dropdown-item:active,
   .fin-mobile-dropdown-item:hover {
-    background: #f8fafc;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
   }
   .fin-mobile-dropdown-item.active {
-    background: rgba(109, 40, 217, 0.1);
-    color: var(--fin-primary);
+    background: rgba(139, 92, 246, 0.22);
+    color: #c4b5fd;
     font-weight: 800;
+    border-left: 3px solid #8b5cf6;
   }
   .fin-mobile-dropdown-check {
     font-weight: 900;
-    color: var(--fin-primary);
+    color: #a78bfa;
     font-size: 1rem;
   }
 
@@ -1326,7 +1420,7 @@ body.fin-body {
     gap: 0.5rem;
     padding-top: 0.75rem;
     margin-top: 0.5rem;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   /* Modais no Mobile (App-like Bottom Sheet) */

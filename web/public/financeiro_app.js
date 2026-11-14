@@ -394,10 +394,12 @@
         </div>
       </header>
 
-      <!-- Menu Suspenso Mobile Flutuante -->
-      <div id="fin-mobile-dropdown" class="fin-mobile-dropdown mobile-only" style="display:none">
+      <!-- Backdrop e Menu Suspenso Mobile Flutuante -->
+      <div id="fin-mobile-backdrop" class="fin-mobile-backdrop" style="display:none" data-action="close-mobile-dropdown"></div>
+      <div id="fin-mobile-dropdown" class="fin-mobile-dropdown" style="display:none">
         <div class="fin-mobile-dropdown-header">
           <div class="fin-mobile-dropdown-user">👤 <b>${esc(state.user.nome)}</b> · <span class="fin-user-role" style="font-size:0.65rem">${esc(ROLE_LABELS[state.user.papel] || state.user.papel)}</span></div>
+          <button type="button" class="fin-mobile-dropdown-close" data-action="close-mobile-dropdown" aria-label="Fechar menu">✕</button>
         </div>
         <div class="fin-mobile-dropdown-items">
           ${tabs
@@ -411,7 +413,7 @@
             .join("")}
         </div>
         <div class="fin-mobile-dropdown-actions">
-          <a href="/gestao" class="fin-btn fin-btn-outline fin-btn-sm" style="flex:1;text-align:center">📅 Gestão</a>
+          <a href="/gestao" class="fin-btn fin-btn-outline fin-btn-sm" style="flex:1;text-align:center" data-action="close-mobile-dropdown">📅 Gestão</a>
           <button type="button" class="fin-btn fin-btn-danger fin-btn-sm" data-action="logout" style="flex:1">Sair</button>
         </div>
       </div>
@@ -584,25 +586,6 @@
     );
 
     return `
-      <!-- BANNER DE PRESTAÇÃO DE CONTAS & CONTATO TESOURARIA -->
-      <div class="fin-prestacao-banner no-print">
-        <div class="fin-prestacao-info">
-          <div class="fin-prestacao-icon">📑</div>
-          <div class="fin-prestacao-text">
-            <h3>Prestação de Contas Consolidada (Pastores & Diretoria)</h3>
-            <p>Resumo oficial de entradas, saídas, saldos bancários e previsão futura com auditoria e rastreabilidade.</p>
-          </div>
-        </div>
-        <div class="fin-prestacao-actions">
-          <span style="font-size:0.82rem;background:#f8fafc;color:#4c1d95;border:1px solid #e2e8f0;padding:0.4rem 0.75rem;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:6px">
-            📞 Tesouraria: +55 11 99111-7612
-          </span>
-          <button type="button" class="fin-btn fin-btn-primary" data-action="open-prestacao">
-            📋 Gerar Prestação de Contas
-          </button>
-        </div>
-      </div>
-
       <!-- CARD EXECUTIVO MOBILE 3-EM-1 (EXCLUSIVO CELULAR) -->
       <div class="fin-mobile-hero mobile-only">
         <div class="fin-mhero-top">
@@ -2951,14 +2934,36 @@
 
   // ==================== EVENT DELEGATION ====================
   function bindEvents() {
+    function closeMobileNav() {
+      const dd = document.getElementById("fin-mobile-dropdown");
+      const bd = document.getElementById("fin-mobile-backdrop");
+      const caret = document.querySelector(".fin-mobile-menu-caret");
+      if (dd) {
+        dd.style.display = "none";
+        dd.classList.remove("open");
+      }
+      if (bd) bd.style.display = "none";
+      if (caret) caret.style.transform = "rotate(0deg)";
+    }
+
+    function openMobileNav() {
+      const dd = document.getElementById("fin-mobile-dropdown");
+      const bd = document.getElementById("fin-mobile-backdrop");
+      const caret = document.querySelector(".fin-mobile-menu-caret");
+      if (dd) {
+        dd.style.display = "block";
+        dd.classList.add("open");
+      }
+      if (bd) bd.style.display = "block";
+      if (caret) caret.style.transform = "rotate(180deg)";
+    }
+
     document.addEventListener("click", async (e) => {
       // Fechar menu mobile ao clicar fora
       const dd = document.getElementById("fin-mobile-dropdown");
-      if (dd && dd.style.display !== "none") {
+      if (dd && (dd.style.display !== "none" || dd.classList.contains("open"))) {
         if (!e.target.closest("#fin-mobile-dropdown") && !e.target.closest("[data-action='toggle-mobile-dropdown']")) {
-          dd.style.display = "none";
-          const caret = document.querySelector(".fin-mobile-menu-caret");
-          if (caret) caret.style.transform = "rotate(0deg)";
+          closeMobileNav();
         }
       }
 
@@ -2966,7 +2971,9 @@
       if (!btn) return;
       const action = btn.getAttribute("data-action");
 
-      if (action === "go-primeiro-acesso") {
+      if (action === "close-mobile-dropdown") {
+        closeMobileNav();
+      } else if (action === "go-primeiro-acesso") {
         const u = document.getElementById("login-usuario");
         if (u) state.loginPhone = u.value;
         state.loginStep = "primeiro_acesso";
@@ -2978,12 +2985,12 @@
         state.loginStep = "login";
         renderLogin();
       } else if (action === "logout") {
+        closeMobileNav();
         await api("/logout", { method: "POST" }).catch(() => {});
         window.location.href = "/controlefinanceiro/login";
       } else if (action === "switch-tab") {
+        closeMobileNav();
         state.tab = btn.getAttribute("data-tab") || "dashboard";
-        const dd = document.getElementById("fin-mobile-dropdown");
-        if (dd) dd.style.display = "none";
         if (state.tab === "prestacao") {
           const [rRes, hRes] = await Promise.all([
             api("/prestacao-contas?registrar_auditoria=0").catch(() => null),
@@ -2995,11 +3002,11 @@
         renderApp();
       } else if (action === "toggle-mobile-dropdown") {
         const dd = document.getElementById("fin-mobile-dropdown");
-        if (dd) {
-          const visivel = dd.style.display !== "none";
-          dd.style.display = visivel ? "none" : "block";
-          const caret = btn.querySelector(".fin-mobile-menu-caret");
-          if (caret) caret.style.transform = visivel ? "rotate(0deg)" : "rotate(180deg)";
+        const visivel = dd && (dd.style.display === "block" || dd.classList.contains("open"));
+        if (visivel) {
+          closeMobileNav();
+        } else {
+          openMobileNav();
         }
       } else if (action === "quick-add-category") {
         const tipo = btn.getAttribute("data-tipo") || "saida";
