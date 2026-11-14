@@ -1537,4 +1537,76 @@ test("Treinamento / Curso: lembrete de 5 dias só é enviado para a 1ª sessão 
   try { removeLider(TEL_LIDER_TR); } catch {}
 });
 
+test("Reuniões: não envia lembrete duplicado mesmo quando o evento consta em múltiplas agendas", async () => {
+  const TEL_LIDER_REUNIAO = "5511988889999";
+  addLider({
+    nome: "Líder Reunião Teste",
+    telefone: TEL_LIDER_REUNIAO,
+    cargos: ["lider"],
+    departamento: "Rede de Homens",
+  });
+
+  // Simula o mesmo evento de reunião cadastrado na agenda de Reuniões e duplicado na de Uso do Salão
+  const reuniaoAgendaOficial = {
+    id: "ev-reuniao-oficial-1",
+    summary: "Reunião de Líderes - Rede de Homens",
+    description: `Agendado via Bot - Departamento: Rede de Homens\nSolicitante: Líder Reunião Teste\nTelefone: ${TEL_LIDER_REUNIAO}`,
+    start: { dateTime: "2026-11-20T20:00:00-03:00" },
+    end: { dateTime: "2026-11-20T21:30:00-03:00" },
+    calendarId: "b8f01bfd149139d388080ec63176c2556e6e1aedce184b84d37671c3d082d238@group.calendar.google.com",
+  };
+
+  const reuniaoAgendaSalao = {
+    id: "ev-reuniao-salao-copia-2",
+    summary: "Reunião de Líderes - Rede de Homens",
+    description: `Uso do Salão para Reunião\nTelefone: ${TEL_LIDER_REUNIAO}`,
+    start: { dateTime: "2026-11-20T20:00:00-03:00" },
+    end: { dateTime: "2026-11-20T21:30:00-03:00" },
+    calendarId: "49b999ac91607d07310d7e36a26fe088ddc3cd2b34ff741a0e139b43a18bdabc@group.calendar.google.com",
+  };
+
+  const msgsEnviadas = [];
+  const fakeClient = {
+    sendMessage: async (to, txt) => {
+      msgsEnviadas.push({ to, txt });
+    },
+  };
+
+  // Executa processarLembretesEventos com 1 dia de antecedência passando ambos os eventos
+  const res = await processarLembretesEventos({
+    client: fakeClient,
+    buscarEventos: async () => [reuniaoAgendaOficial, reuniaoAgendaSalao],
+    agendasParaLer: [],
+    diasAntecedencia: 1,
+    dataBase: new Date("2026-11-19T10:00:00.000Z"),
+  });
+
+  assert.equal(res.enviados, 1, "Deve enviar exatamente 1 lembrete de reunião, deduplicando entre agendas");
+  assert.equal(msgsEnviadas.length, 1, "Apenas 1 mensagem de WhatsApp deve ser enviada para o líder");
+  assert.ok(msgsEnviadas[0].txt.includes("Reunião de Líderes - Rede de Homens"));
+
+  // Se a rotina rodar novamente (ex: 15 min depois), NÃO deve reenviar
+  const msgsSegundaTentativa = [];
+  const fakeClient2 = {
+    sendMessage: async (to, txt) => {
+      msgsSegundaTentativa.push({ to, txt });
+    },
+  };
+
+  const res2 = await processarLembretesEventos({
+    client: fakeClient2,
+    buscarEventos: async () => [reuniaoAgendaOficial, reuniaoAgendaSalao],
+    agendasParaLer: [],
+    diasAntecedencia: 1,
+    dataBase: new Date("2026-11-19T10:15:00.000Z"),
+  });
+
+  assert.equal(res2.enviados, 0, "Segunda execução no mesmo dia não deve reenviar o lembrete");
+  assert.equal(msgsSegundaTentativa.length, 0, "Nenhuma mensagem deve ser enviada na repetição");
+
+  try { removeLider(TEL_LIDER_REUNIAO); } catch {}
+  db.prepare("DELETE FROM lembretes_enviados WHERE eventoId LIKE 'ev-reuniao-%'").run();
+});
+
+
 

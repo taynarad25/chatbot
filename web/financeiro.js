@@ -790,25 +790,32 @@ function quitarLancamento(id, b, user, ip) {
   const now = agoraIso();
   const parcial = valorPago < l.valor;
   const restante = l.valor - valorPago;
+  const novoVenc = dataValida(b.vencimento_restante || b.novo_vencimento) ? (b.vencimento_restante || b.novo_vencimento) : l.vencimento;
+  const descBase = (l.descricao || "").replace(/\s*\(saldo restante\)/gi, "").trim();
+  const descRestante = `${descBase} (saldo restante)`;
+
   db.exec("BEGIN");
   try {
     if (parcial) {
       db.prepare(`INSERT INTO fin_lancamentos (tipo, status, descricao, valor, vencimento, competencia, categoria_id, conta_id, forma, ministerio, evento,
         fornecedor, observacoes, grupo_recorrencia, parcela, total_parcelas, origem_id, criado_por, criado_em)
-        SELECT tipo, 'pendente', descricao || ' (saldo restante)', ?, vencimento, competencia, categoria_id, conta_id, forma, ministerio, evento,
+        SELECT tipo, 'pendente', ?, ?, ?, competencia, categoria_id, conta_id, forma, ministerio, evento,
         fornecedor, observacoes, grupo_recorrencia, parcela, total_parcelas, id, ?, ? FROM fin_lancamentos WHERE id = ?`)
-        .run(restante, `${user.nome} (${user.telefone})`, now, l.id);
+        .run(descRestante, restante, novoVenc, `${user.nome} (${user.telefone})`, now, l.id);
     }
     db.prepare("UPDATE fin_lancamentos SET status='efetivado', valor=?, data=?, conta_id=?, forma=COALESCE(?, forma), atualizado_em=? WHERE id=?")
       .run(valorPago, data, conta.id, txt(b.forma || b.forma_pagamento, 40), now, l.id);
     db.exec("COMMIT");
   } catch (e) { db.exec("ROLLBACK"); throw e; }
-  auditar(user, l.tipo === "saida" ? "registrar_pagamento" : "registrar_recebimento", "lancamento", l.id, { valorPago, valorOriginal: l.valor, conta: conta.nome, data }, ip);
+  auditar(user, l.tipo === "saida" ? "registrar_pagamento" : "registrar_recebimento", "lancamento", l.id, { valorPago, valorOriginal: l.valor, valorRestante: restante, parcial, conta: conta.nome, data }, ip);
   return {
     ok: true,
     parcial,
+    valor_pago: valorPago,
     valor_restante: restante,
-    message: parcial ? "Pagamento parcial registrado. O saldo restante continua pendente." : "Quitação registrada com sucesso."
+    message: parcial
+      ? `Pagamento parcial registrado com sucesso! O valor restante de R$ ${(restante / 100).toFixed(2).replace('.', ',')} continua em aberto.`
+      : "Quitação total registrada com sucesso."
   };
 }
 

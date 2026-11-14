@@ -13,6 +13,9 @@ const {
   URL_PLANILHA_LOGS_PADRAO,
 } = require("./logsEnvioSheet");
 
+// Cache em memória para garantir proteção contra duplicidades em tempo de execução
+const lembretesEnviadosMemoria = new Set();
+
 function ehHorarioComercialEnvio(data = new Date(), ignorarEnv = false) {
   if (!ignorarEnv && process.env.NODE_ENV === "test") return true;
   const m = moment.tz(data, "America/Sao_Paulo");
@@ -467,7 +470,7 @@ function registrarLembreteEnviado(eventoId, tipo, destinatario) {
       INSERT OR IGNORE INTO lembretes_enviados (eventoId, tipo, destinatario, enviadoEm)
       VALUES (?, ?, ?, ?)
     `).run(eventoId, tipo, destinatario, agora);
-    try { db.exec("PRAGMA wal_checkpoint(PASSIVE);"); } catch (_) {}
+    try { db.exec("PRAGMA wal_checkpoint(PASSIVE);"); } catch (_) { }
     return info.changes > 0;
   } catch (err) {
     console.error("[Lembretes] Erro ao registrar lembrete enviado:", err.message);
@@ -530,7 +533,7 @@ function isDataEventoPassada(dataEventoStr) {
     if (d && d.isValid()) {
       return d.isBefore(hoje, "day"); // No dia seguinte ao evento já é passado
     }
-  } catch (_) {}
+  } catch (_) { }
   return false;
 }
 
@@ -669,6 +672,27 @@ async function processarLembretesEventos({
     eventos = unificarEventosPreparacaoLimpeza(eventos);
   }
 
+  // Deduplicação rigorosa de eventos vindos de múltiplas agendas (ex: Reunião constando tanto em Reuniões quanto em Uso do Salão)
+  const eventosUnicos = [];
+  const chavesEventosVistos = new Set();
+  for (const ev of eventos) {
+    if (!ev) continue;
+    const isReuniaoEv = ehReuniao(ev);
+    const isPastoralEv = ehAtendimentoPastoral(ev);
+    const titNorm = (ev.summary || "").trim().toLowerCase();
+    const stNorm = ev.start?.dateTime || ev.start?.date || "";
+    // Chave única por tipo + título normalizado + data/hora de início
+    const chaveSemId = `${isReuniaoEv ? "reuniao" : isPastoralEv ? "pastoral" : "evento"}_${titNorm}_${stNorm}`;
+    if (chavesEventosVistos.has(chaveSemId) || (ev.id && chavesEventosVistos.has(ev.id))) {
+      console.log(`[Lembretes] Evento duplicado ignorado entre agendas: "${ev.summary}" (${stNorm}).`);
+      continue;
+    }
+    if (ev.id) chavesEventosVistos.add(ev.id);
+    chavesEventosVistos.add(chaveSemId);
+    eventosUnicos.push(ev);
+  }
+  eventos = eventosUnicos;
+
   let totalEnviados = 0;
   const tipoLembrete = `${diasAntecedencia}_dias_antes`;
 
@@ -702,8 +726,8 @@ async function processarLembretesEventos({
     const ehMultiplosDias = datasInfo.ehMultiplosDias;
 
     const ehTreinamento = /treinamento|curso|capacita[çc][ãa]o|escola\s+b[íi]blica/i.test(ev.summary || "") ||
-                          /treinamento|curso/i.test(ev.description || "") ||
-                          ev.tipo === 'treinamento';
+      /treinamento|curso/i.test(ev.description || "") ||
+      ev.tipo === 'treinamento';
 
     // Regra específica para Treinamento / Curso:
     // O líder NÃO precisa do lembrete de 5 dias em todas as sessões, APENAS na primeira sessão!
@@ -898,12 +922,22 @@ async function processarLembretesEventos({
       }
     }
 
-    if (destinatarios.length === 0) {
+    // Deduplica destinatários pelo telefone para nunca enviar 2x para a mesma pessoa no mesmo evento
+    const destinatariosUnicos = [];
+    const telefonesVistos = new Set();
+    for (const dest of destinatarios) {
+      const telLimpo = String(dest.telefone || "").replace(/\D/g, "");
+      if (!telLimpo || telefonesVistos.has(telLimpo)) continue;
+      telefonesVistos.add(telLimpo);
+      destinatariosUnicos.push({ ...dest, telefone: telLimpo });
+    }
+
+    if (destinatariosUnicos.length === 0) {
       console.log(`[Lembretes] Nenhum líder ou responsável identificado para o evento: "${titulo}".`);
       continue;
     }
 
-    for (const dest of destinatarios) {
+    for (const dest of destinatariosUnicos) {
       // Bloqueio explícito: confirmação de atendimento pastoral NUNCA deve ser enviada para grupos
       const telDest = String(dest.telefone || "");
       if (isPastoral && telDest.includes("@g.us")) {
@@ -918,6 +952,30 @@ async function processarLembretesEventos({
       const destRemoto = `${dest.nome || "Líder"} (${telLimpoDest || telDest}) - ${eventoId}`;
       const periodoRemoto = dataAlvoStr;
 
+      // Proteção de memória por destinatário + data + título do evento
+      const chaveMemoria = `${tipoRemoto}_${telLimpoDest}_${dataEv}_${tituloBase.toLowerCase()}`;
+      if (lembretesEnviadosMemoria.has(chaveMemoria)) {
+        console.log(`[Lembretes] Lembrete para ${dest.nome} (${telLimpoDest}) já enviado nesta execução (memória: ${chaveMemoria}). Ignorando envio.`);
+        continue;
+      }
+
+      // Verificação no banco de dados local para reuniões e atendimentos
+      if (isReuniao || isPastoral) {
+        try {
+          const jaEnviadoDest = db.prepare(`
+            SELECT id FROM lembretes_enviados
+            WHERE destinatario = ?
+              AND (tipo = ? OR tipo = ?)
+              AND (eventoId = ? OR eventoId LIKE '%' || ?)
+          `).get(telLimpoDest, tipoLembrete, tipoRemoto, eventoId, dataAlvoStr);
+          if (jaEnviadoDest) {
+            console.log(`[Lembretes] Lembrete de reunião/atendimento já enviado anteriormente para ${dest.nome} (${telLimpoDest}) em ${dataAlvoStr}. Ignorando duplicata.`);
+            lembretesEnviadosMemoria.add(chaveMemoria);
+            continue;
+          }
+        } catch (_) { }
+      }
+
       if (!forcar) {
         const remotoEnviado = await verificarEnvioRemoto({
           tipo: tipoRemoto,
@@ -928,7 +986,11 @@ async function processarLembretesEventos({
 
         if (remotoEnviado === true) {
           console.log(`[Lembretes] ${tipoRemoto} para ${destRemoto} (${periodoRemoto}) já enviado anteriormente (verificado na planilha). Ignorando envio.`);
+          lembretesEnviadosMemoria.add(chaveMemoria);
           registrarLembreteEnviado(eventoId, tipoLembrete, dest.telefone);
+          if (tipoRemoto && tipoRemoto !== tipoLembrete) {
+            registrarLembreteEnviado(eventoId, tipoRemoto, dest.telefone);
+          }
           continue;
         }
       }
@@ -996,7 +1058,11 @@ async function processarLembretesEventos({
           }
         }
       }
+      lembretesEnviadosMemoria.add(chaveMemoria);
       registrarLembreteEnviado(eventoId, tipoLembrete, dest.telefone);
+      if (tipoRemoto && tipoRemoto !== tipoLembrete) {
+        registrarLembreteEnviado(eventoId, tipoRemoto, dest.telefone);
+      }
 
       await registrarEnvioRemoto({
         tipo: tipoRemoto,
@@ -1972,64 +2038,94 @@ function iniciarAgendadorLembretes({
     executando = true;
     try {
       // 0. Parabéns aos aniversariantes do dia (diariamente às 08:00)
-      await processarAniversariantesDoDia({
-        client,
-      });
+      try {
+        await processarAniversariantesDoDia({ client });
+      } catch (e0) {
+        console.error("[Agendador Lembretes] Erro em aniversariantes:", e0.message);
+      }
 
       // 1. Lembretes de itens a definir no formulário (7 dias antes)
-      await processarLembretesItensADefinir({
-        client,
-        buscarEventos,
-        agendasParaLer,
-        diasAntecedencia: 7,
-        etapas,
-      });
+      try {
+        await processarLembretesItensADefinir({
+          client,
+          buscarEventos,
+          agendasParaLer,
+          diasAntecedencia: 7,
+          etapas,
+        });
+      } catch (e1) {
+        console.error("[Agendador Lembretes] Erro em itens a definir:", e1.message);
+      }
 
       // 2. Lembretes de eventos gerais para os líderes (5 dias de antecedência)
-      await processarLembretesEventos({
-        client,
-        buscarEventos,
-        agendasParaLer,
-        diasAntecedencia: 5,
-        etapas,
-      });
+      try {
+        await processarLembretesEventos({
+          client,
+          buscarEventos,
+          agendasParaLer,
+          diasAntecedencia: 5,
+          etapas,
+        });
+      } catch (e2) {
+        console.error("[Agendador Lembretes] Erro em lembretes 5 dias:", e2.message);
+      }
 
       // 3. Lembretes de eventos gerais para os líderes (3 dias de antecedência)
-      await processarLembretesEventos({
-        client,
-        buscarEventos,
-        agendasParaLer,
-        diasAntecedencia: 3,
-        etapas,
-      });
+      try {
+        await processarLembretesEventos({
+          client,
+          buscarEventos,
+          agendasParaLer,
+          diasAntecedencia: 3,
+          etapas,
+        });
+      } catch (e3) {
+        console.error("[Agendador Lembretes] Erro em lembretes 3 dias:", e3.message);
+      }
 
       // 4. Lembretes de reuniões e atendimentos pastorais (1 dia antes)
-      await processarLembretesEventos({
-        client,
-        buscarEventos,
-        agendasParaLer,
-        diasAntecedencia: 1,
-        etapas,
-      });
+      try {
+        await processarLembretesEventos({
+          client,
+          buscarEventos,
+          agendasParaLer,
+          diasAntecedencia: 1,
+          etapas,
+        });
+      } catch (e4) {
+        console.error("[Agendador Lembretes] Erro em reuniões/atendimentos 1 dia:", e4.message);
+      }
 
       // 5. Lembretes de divulgação no grupo MULTIMÍDIAS (5 dias antes)
-      await processarLembretesDivulgacaoMultimidia({
-        client,
-        diasAntecedencia: 5,
-      });
+      try {
+        await processarLembretesDivulgacaoMultimidia({
+          client,
+          diasAntecedencia: 5,
+        });
+      } catch (e5) {
+        console.error("[Agendador Lembretes] Erro em multimídias 5 dias:", e5.message);
+      }
 
       // 6. Lembretes de divulgação no grupo MULTIMÍDIAS (3 dias antes)
-      await processarLembretesDivulgacaoMultimidia({
-        client,
-        diasAntecedencia: 3,
-      });
+      try {
+        await processarLembretesDivulgacaoMultimidia({
+          client,
+          diasAntecedencia: 3,
+        });
+      } catch (e6) {
+        console.error("[Agendador Lembretes] Erro em multimídias 3 dias:", e6.message);
+      }
 
       // 7. Agenda quinzenal para secretárias (toda segunda-feira)
-      await processarEnvioAgendaSecretarias({
-        client,
-        buscarEventos,
-        agendasParaLer,
-      });
+      try {
+        await processarEnvioAgendaSecretarias({
+          client,
+          buscarEventos,
+          agendasParaLer,
+        });
+      } catch (e7) {
+        console.error("[Agendador Lembretes] Erro em agenda secretárias:", e7.message);
+      }
 
       // 8. Atualizações de inscritas para líderes da Rede de Mulheres (faltando 10, 5 e 3 dias)
       try {

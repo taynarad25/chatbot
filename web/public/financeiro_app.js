@@ -1089,7 +1089,7 @@
                             <div style="display:flex;gap:0.3rem;flex-wrap:wrap">
                               ${
                                 l.status === "pendente"
-                                  ? `<button type="button" class="fin-btn fin-btn-success fin-btn-sm" data-action="open-quitar" data-id="${l.id}">Quitar</button>`
+                                  ? `<button type="button" class="fin-btn fin-btn-success fin-btn-sm" data-action="open-quitar" data-id="${l.id}" title="Quitar total ou pagar/receber parte da conta mantendo o saldo restante">${l.tipo === "saida" ? "💳 Pagar / Parcial" : "💰 Receber / Parcial"}</button>`
                                   : ""
                               }
                               ${
@@ -1895,41 +1895,160 @@
   function openQuitarModal(id) {
     const l = state.lancamentos.find((x) => String(x.id) === String(id));
     if (!l) return;
+    const isSaida = l.tipo === "saida";
+    const acaoVerbo = isSaida ? "Pagar" : "Receber";
+    const acaoSubst = isSaida ? "Pagamento" : "Recebimento";
+    const totalFloat = (l.valor / 100);
     const m = document.getElementById("fin-modal-root");
     m.innerHTML = `
       <div class="fin-modal-backdrop">
-        <div class="fin-modal" style="max-width:480px">
+        <div class="fin-modal" style="max-width:540px">
           <div class="fin-modal-header">
-            <span class="fin-modal-title">✅ Quitar Lançamento #${l.id}</span>
+            <span class="fin-modal-title">${isSaida ? "💳 Registrar Pagamento" : "💰 Registrar Recebimento"} #${l.id}</span>
             <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="close-modal">✕</button>
           </div>
-          <p style="font-size:0.86rem;margin-bottom:0.85rem">
-            <strong>${esc(l.descricao)}</strong> — Valor total: <strong>${fmtMoney(l.valor)}</strong>.<br/>
-            Se informar um valor menor, o sistema registrará pagamento parcial e manterá o restante pendente automaticamente.
-          </p>
+          
+          <div style="background:#f8fafc;border:1px solid var(--fin-border);border-radius:12px;padding:0.9rem;margin-bottom:1rem">
+            <div style="font-size:0.95rem;font-weight:800;color:var(--fin-text);margin-bottom:0.25rem">${esc(l.descricao)}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem;font-size:0.82rem;color:var(--fin-muted)">
+              <span>${l.categoria_nome ? `📁 ${esc(l.categoria_nome)}` : ""} ${l.fornecedor ? `• 🏢 ${esc(l.fornecedor)}` : ""}</span>
+              <span style="font-size:1.05rem;font-weight:900;color:${isSaida ? 'var(--fin-danger)' : 'var(--fin-success)'}">
+                Total pendente: ${fmtMoney(l.valor)}
+              </span>
+            </div>
+          </div>
+
           <form id="form-quitar-lanc" data-id="${l.id}">
-            <div class="fin-field" style="margin-bottom:0.75rem">
-              <label>Valor Pago Agora (R$) *</label>
-              <input type="number" step="0.01" min="0.01" max="${(l.valor / 100).toFixed(2)}" class="fin-input" name="valor_pago" value="${(l.valor / 100).toFixed(2)}" required />
+            <!-- Seletor de Modo: Quitar Total vs Quitar Parcial -->
+            <div class="fin-field" style="margin-bottom:0.85rem">
+              <label style="font-weight:700">Tipo de ${acaoSubst} *</label>
+              <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                <label class="fin-radio-pill" style="flex:1;justify-content:center">
+                  <input type="radio" name="modo_quitacao" value="total" checked />
+                  <span>Quitar Total (${fmtMoney(l.valor)})</span>
+                </label>
+                <label class="fin-radio-pill" style="flex:1;justify-content:center">
+                  <input type="radio" name="modo_quitacao" value="parcial" />
+                  <span>${acaoVerbo} Parcial (deixar restante)</span>
+                </label>
+              </div>
             </div>
-            <div class="fin-field" style="margin-bottom:0.75rem">
-              <label>Data do Pagamento *</label>
-              <input type="date" class="fin-input" name="data_movimento" value="${todayISO()}" required />
+
+            <!-- Campo Valor Pago/Recebido -->
+            <div class="fin-field" style="margin-bottom:0.85rem">
+              <label id="label-valor-pago">Valor ${isSaida ? "Pago" : "Recebido"} Agora (R$) *</label>
+              <input type="number" step="0.01" min="0.01" max="${totalFloat.toFixed(2)}" class="fin-input" id="input-valor-pago" name="valor_pago" value="${totalFloat.toFixed(2)}" required style="font-size:1.1rem;font-weight:800" />
             </div>
-            <div class="fin-field" style="margin-bottom:0.75rem">
-              <label>Conta Utilizada *</label>
-              <select class="fin-select" name="conta_id">
-                ${state.contas.map((c) => `<option value="${c.id}" ${c.id === l.conta_id ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}
-              </select>
+
+            <!-- Resumo Parcial Dinâmico -->
+            <div id="quitar-parcial-preview" style="display:none;background:rgba(109,40,217,0.06);border:1px dashed var(--fin-primary);border-radius:10px;padding:0.75rem 0.9rem;margin-bottom:0.85rem;font-size:0.84rem">
+              <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem">
+                <span>Valor que será abatido agora:</span>
+                <strong id="preview-abatido" style="color:var(--fin-success)">${fmtMoney(l.valor)}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem">
+                <span>Saldo restante que ficará em aberto:</span>
+                <strong id="preview-restante" style="color:var(--fin-danger)">R$ 0,00</strong>
+              </div>
+              <div style="font-size:0.75rem;color:var(--fin-muted)">
+                ℹ️ O valor restante continuará pendente no sistema com o mesmo vínculo e histórico para ser quitado depois.
+              </div>
             </div>
+
+            <!-- Data do Movimento e Novo Vencimento do Saldo -->
+            <div class="fin-form-grid" style="margin-bottom:0.75rem">
+              <div class="fin-field">
+                <label>Data do ${acaoSubst} *</label>
+                <input type="date" class="fin-input" name="data_movimento" value="${todayISO()}" required />
+              </div>
+              <div class="fin-field" id="campo-novo-vencimento" style="display:none">
+                <label>Vencimento do Saldo Restante</label>
+                <input type="date" class="fin-input" name="vencimento_restante" value="${l.vencimento || todayISO()}" />
+              </div>
+            </div>
+
+            <!-- Conta e Forma de Pagamento -->
+            <div class="fin-form-grid" style="margin-bottom:0.75rem">
+              <div class="fin-field">
+                <label>Conta Utilizada *</label>
+                <select class="fin-select" name="conta_id">
+                  ${state.contas.map((c) => `<option value="${c.id}" ${c.id === l.conta_id ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="fin-field">
+                <label>Forma de ${acaoSubst}</label>
+                <select class="fin-select" name="forma">
+                  <option value="PIX" ${l.forma === "PIX" ? "selected" : ""}>PIX</option>
+                  <option value="Dinheiro" ${l.forma === "Dinheiro" ? "selected" : ""}>Dinheiro (Espécie)</option>
+                  <option value="Cartão de Débito" ${l.forma === "Cartão de Débito" ? "selected" : ""}>Cartão de Débito</option>
+                  <option value="Cartão de Crédito" ${l.forma === "Cartão de Crédito" ? "selected" : ""}>Cartão de Crédito</option>
+                  <option value="Transferência Bancária" ${l.forma === "Transferência Bancária" ? "selected" : ""}>Transferência Bancária (TED/DOC)</option>
+                  <option value="Boleto" ${l.forma === "Boleto" ? "selected" : ""}>Boleto Bancário</option>
+                  <option value="Outro" ${l.forma === "Outro" ? "selected" : ""}>Outro</option>
+                </select>
+              </div>
+            </div>
+
             <div class="fin-modal-footer">
               <button type="button" class="fin-btn fin-btn-outline" data-action="close-modal">Cancelar</button>
-              <button type="submit" class="fin-btn fin-btn-success">Confirmar Quitação</button>
+              <button type="submit" class="fin-btn fin-btn-success" id="btn-submit-quitar">
+                Confirmar ${acaoSubst} Total
+              </button>
             </div>
           </form>
         </div>
       </div>
     `;
+
+    const form = document.getElementById("form-quitar-lanc");
+    const valInput = document.getElementById("input-valor-pago");
+    const previewBox = document.getElementById("quitar-parcial-preview");
+    const vencBox = document.getElementById("campo-novo-vencimento");
+    const prevAbatido = document.getElementById("preview-abatido");
+    const prevRestante = document.getElementById("preview-restante");
+    const submitBtn = document.getElementById("btn-submit-quitar");
+
+    function atualizarCalculo() {
+      const modo = form.querySelector("input[name='modo_quitacao']:checked")?.value || "total";
+      const totalCentavos = l.valor;
+      if (modo === "total") {
+        valInput.value = (totalCentavos / 100).toFixed(2);
+        valInput.readOnly = true;
+        previewBox.style.display = "none";
+        vencBox.style.display = "none";
+        submitBtn.innerHTML = `Confirmar ${acaoSubst} Total`;
+      } else {
+        valInput.readOnly = false;
+        previewBox.style.display = "block";
+        vencBox.style.display = "block";
+        const valAtual = Number(valInput.value || 0);
+        const centAtual = Math.round(valAtual * 100);
+        const centRestante = Math.max(0, totalCentavos - centAtual);
+        prevAbatido.innerText = fmtMoney(centAtual);
+        prevRestante.innerText = fmtMoney(centRestante);
+        submitBtn.innerHTML = `Confirmar ${acaoSubst} Parcial`;
+      }
+    }
+
+    form.querySelectorAll("input[name='modo_quitacao']").forEach((r) => {
+      r.addEventListener("change", () => {
+        if (r.value === "parcial" && Number(valInput.value) >= totalFloat) {
+          valInput.value = (totalFloat / 2).toFixed(2);
+        }
+        atualizarCalculo();
+      });
+    });
+
+    valInput.addEventListener("input", () => {
+      const valAtual = Number(valInput.value || 0);
+      if (valAtual < totalFloat) {
+        const radParcial = form.querySelector("input[name='modo_quitacao'][value='parcial']");
+        if (radParcial && !radParcial.checked) {
+          radParcial.checked = true;
+        }
+      }
+      atualizarCalculo();
+    });
   }
 
   function openEditarLancModal(id) {
@@ -2027,6 +2146,13 @@
             </div>
 
             <div class="fin-modal-footer">
+              ${
+                l.status === "pendente"
+                  ? `<button type="button" class="fin-btn fin-btn-success fin-btn-sm" data-action="open-quitar" data-id="${l.id}" style="margin-right:auto">
+                      ${tipo === "saida" ? "💳 Pagar Agora (Total ou Parcial)" : "💰 Receber Agora (Total ou Parcial)"}
+                    </button>`
+                  : ""
+              }
               <button type="button" class="fin-btn fin-btn-outline" data-action="close-modal">Cancelar</button>
               <button type="submit" class="fin-btn fin-btn-primary">Salvar Alterações</button>
             </div>
@@ -2754,10 +2880,13 @@
         } else if (form.id === "form-quitar-lanc") {
           const id = form.getAttribute("data-id");
           const fd = new FormData(form);
-          await api(`/lancamentos/${id}/quitar`, { method: "POST", body: Object.fromEntries(fd.entries()) });
+          const res = await api(`/lancamentos/${id}/quitar`, { method: "POST", body: Object.fromEntries(fd.entries()) });
           closeModal();
           await loadAllData();
           renderApp();
+          if (res && res.message) {
+            alert("✅ " + res.message);
+          }
         } else if (form.id === "form-editar-lanc") {
           const id = form.getAttribute("data-id");
           const fd = new FormData(form);
