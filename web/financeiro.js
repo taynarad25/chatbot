@@ -149,7 +149,26 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT, usuario TEXT, acao TEXT NOT NULL, entidade TEXT,
     entidade_id INTEGER, detalhes TEXT, ip TEXT, criado_em TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS fin_cartoes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    instituicao TEXT,
+    bandeira TEXT,
+    limite INTEGER NOT NULL DEFAULT 0,
+    dia_fechamento INTEGER NOT NULL DEFAULT 1,
+    dia_vencimento INTEGER NOT NULL DEFAULT 10,
+    conta_id INTEGER,
+    cor TEXT DEFAULT '#6366f1',
+    ativo INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL,
+    atualizado_em TEXT
+  );
 `);
+
+try {
+  db.exec("ALTER TABLE fin_lancamentos ADD COLUMN cartao_id INTEGER;");
+} catch (_) {}
+db.exec("CREATE INDEX IF NOT EXISTS idx_fin_lanc_cartao ON fin_lancamentos(cartao_id);");
 
 function agoraIso() { return new Date().toISOString(); }
 function hojeSP() {
@@ -304,11 +323,30 @@ function saldosContas() {
   const pPag = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' GROUP BY conta_id").all();
   const m = arr => Object.fromEntries(arr.map(r => [r.id, r.v || 0]));
   const E = m(ent), S = m(sai), TO = m(tOut), TI = m(tIn), PR = m(pRec), PP = m(pPag);
+
+  const hoje = hojeSP();
+  const [hy, hm] = hoje.split("-").map(Number);
+  const proxMesIni = addMeses(`${hy}-${String(hm).padStart(2, "0")}-01`, 1);
+  const [py, pm] = proxMesIni.split("-").map(Number);
+  const proxMesFim = new Date(Date.UTC(py, pm, 0)).toISOString().slice(0, 10);
+
+  // Pendentes com vencimento até o final do próximo mês
+  const pRecProx = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='entrada' AND (vencimento <= ? OR data <= ?) GROUP BY conta_id").all(proxMesFim, proxMesFim);
+  const pPagProx = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' AND (vencimento <= ? OR data <= ?) GROUP BY conta_id").all(proxMesFim, proxMesFim);
+  const PRX = m(pRecProx), PPX = m(pPagProx);
+
+  // Movimentações previstas para o próximo mês
+  const entProxMes = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='entrada' AND (vencimento BETWEEN ? AND ? OR data BETWEEN ? AND ?) GROUP BY conta_id").all(proxMesIni, proxMesFim, proxMesIni, proxMesFim);
+  const saiProxMes = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' AND (vencimento BETWEEN ? AND ? OR data BETWEEN ? AND ?) GROUP BY conta_id").all(proxMesIni, proxMesFim, proxMesIni, proxMesFim);
+  const EPM = m(entProxMes), SPM = m(saiProxMes);
+
   return contas.map(c => {
     const entradas = (E[c.id] || 0) + (TI[c.id] || 0);
     const saidas = (S[c.id] || 0) + (TO[c.id] || 0);
     const saldo = c.saldo_inicial + entradas - saidas;
     const valorReservado = c.reserva ? saldo : 0;
+    const saldoProjetado = saldo + (PR[c.id] || 0) - (PP[c.id] || 0);
+    const saldoPrevistoProxMes = saldo + (PRX[c.id] || 0) - (PPX[c.id] || 0);
     return {
       ...c,
       total_entradas: entradas,
@@ -316,9 +354,89 @@ function saldosContas() {
       saldo_atual: saldo,
       valor_reservado: valorReservado,
       saldo_disponivel: saldo - valorReservado,
-      saldo_projetado: saldo + (PR[c.id] || 0) - (PP[c.id] || 0)
+      saldo_projetado: saldoProjetado,
+      entradas_esperadas_proximo_mes: EPM[c.id] || 0,
+      saidas_esperadas_proximo_mes: SPM[c.id] || 0,
+      saldo_previsto_proximo_mes: saldoPrevistoProxMes,
     };
   });
+}
+
+function listarCartoes(incluirInativos = false) {
+  const where = incluirInativos ? "" : "WHERE c.ativo = 1";
+  const cartoes = db.prepare(`
+    SELECT c.*, a.nome AS conta_nome
+    FROM fin_cartoes c
+    LEFT JOIN fin_contas a ON a.id = c.conta_id
+    ${where}
+    ORDER BY c.ativo DESC, c.nome ASC
+  `).all();
+
+  return cartoes.map(card => {
+    const usadoRow = db.prepare(`
+      SELECT COALESCE(SUM(valor), 0) AS total
+      FROM fin_lancamentos
+      WHERE cartao_id = ? AND status != 'cancelado' AND tipo = 'saida' AND status = 'pendente'
+    `).get(card.id);
+    const limiteUsado = usadoRow ? usadoRow.total : 0;
+    const limiteTotal = card.limite || 0;
+    const limiteDisponivel = Math.max(0, limiteTotal - limiteUsado);
+
+    return {
+      ...card,
+      limite_total: limiteTotal,
+      limite_usado: limiteUsado,
+      limite_disponivel: limiteDisponivel,
+    };
+  });
+}
+
+function salvarCartao(b, user, ip) {
+  const nome = txt(b.nome, 100);
+  if (!nome) throw new Error("Informe o nome do cartão.");
+  const limite = centavos(b.limite !== undefined ? b.limite : (b.limite_total !== undefined ? b.limite_total : 0));
+  const diaFechamento = Math.min(Math.max(parseInt(b.dia_fechamento, 10) || 1, 1), 31);
+  const diaVencimento = Math.min(Math.max(parseInt(b.dia_vencimento, 10) || 10, 1), 31);
+  const instituicao = txt(b.instituicao, 100);
+  const bandeira = txt(b.bandeira, 50);
+  const cor = txt(b.cor, 20) || "#6366f1";
+  const contaId = b.conta_id ? Number(b.conta_id) : null;
+  const ativo = b.ativo === false || b.ativo === "0" ? 0 : 1;
+  const now = agoraIso();
+
+  if (b.id) {
+    const antes = db.prepare("SELECT * FROM fin_cartoes WHERE id = ?").get(Number(b.id));
+    if (!antes) throw new Error("Cartão não encontrado.");
+    db.prepare(`
+      UPDATE fin_cartoes
+      SET nome=?, instituicao=?, bandeira=?, limite=?, dia_fechamento=?, dia_vencimento=?, conta_id=?, cor=?, ativo=?, atualizado_em=?
+      WHERE id=?
+    `).run(nome, instituicao, bandeira, limite, diaFechamento, diaVencimento, contaId, cor, ativo, now, antes.id);
+    auditar(user, "editar_cartao", "cartao", antes.id, { antes, depois: b }, ip);
+    return { ok: true, id: antes.id, message: "Cartão atualizado com sucesso." };
+  }
+
+  const r = db.prepare(`
+    INSERT INTO fin_cartoes (nome, instituicao, bandeira, limite, dia_fechamento, dia_vencimento, conta_id, cor, ativo, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(nome, instituicao, bandeira, limite, diaFechamento, diaVencimento, contaId, cor, ativo, now);
+  const novoId = Number(r.lastInsertRowid);
+  auditar(user, "criar_cartao", "cartao", novoId, b, ip);
+  return { ok: true, id: novoId, message: "Cartão cadastrado com sucesso." };
+}
+
+function removerCartao(id, user, ip) {
+  const card = db.prepare("SELECT * FROM fin_cartoes WHERE id = ?").get(Number(id));
+  if (!card) throw new Error("Cartão não encontrado.");
+  const lancCount = db.prepare("SELECT COUNT(*) AS c FROM fin_lancamentos WHERE cartao_id = ?").get(card.id).c;
+  if (lancCount > 0) {
+    db.prepare("UPDATE fin_cartoes SET ativo = 0, atualizado_em = ? WHERE id = ?").run(agoraIso(), card.id);
+    auditar(user, "desativar_cartao", "cartao", card.id, { motivo: "Possui lançamentos vinculados" }, ip);
+    return { ok: true, message: "Cartão desativado pois possui lançamentos vinculados." };
+  }
+  db.prepare("DELETE FROM fin_cartoes WHERE id = ?").run(card.id);
+  auditar(user, "remover_cartao", "cartao", card.id, null, ip);
+  return { ok: true, message: "Cartão removido com sucesso." };
 }
 
 function saldoConta(contaId) {
@@ -328,7 +446,7 @@ function saldoConta(contaId) {
 function periodo(q) {
   const hoje = hojeSP();
   const [y, m] = hoje.split("-").map(Number);
-  const p = q.periodo || "mes";
+  const p = q.periodo || q.mes || "mes";
   if (p === "hoje") return [hoje, hoje];
   if (p === "semana") {
     const d = new Date(hoje + "T12:00:00Z"); const dow = d.getUTCDay();
@@ -338,7 +456,20 @@ function periodo(q) {
   }
   if (p === "mes_anterior") {
     const ini = addMeses(`${y}-${String(m).padStart(2, "0")}-01`, -1);
-    const fim = new Date(Date.UTC(y, m - 1, 0)).toISOString().slice(0, 10);
+    const [yy, mm] = ini.split("-").map(Number);
+    const fim = new Date(Date.UTC(yy, mm, 0)).toISOString().slice(0, 10);
+    return [ini, fim];
+  }
+  if (p === "proximo_mes") {
+    const ini = addMeses(`${y}-${String(m).padStart(2, "0")}-01`, 1);
+    const [yy, mm] = ini.split("-").map(Number);
+    const fim = new Date(Date.UTC(yy, mm, 0)).toISOString().slice(0, 10);
+    return [ini, fim];
+  }
+  if (/^\d{4}-\d{2}$/.test(p)) {
+    const [yy, mm] = p.split("-").map(Number);
+    const ini = `${p}-01`;
+    const fim = new Date(Date.UTC(yy, mm, 0)).toISOString().slice(0, 10);
     return [ini, fim];
   }
   if (p === "ano") return [`${y}-01-01`, `${y}-12-31`];
@@ -416,6 +547,24 @@ function dashboard(q, user) {
   const saiCatMap = Object.fromEntries(saiCat.map(r => [r.nome, r.v]));
   const disponivel = saldoTotal - reservado;
 
+  const cartoes = restrito ? [] : listarCartoes();
+  const limiteTotalCartoes = cartoes.reduce((s, c) => s + (c.limite_total || 0), 0);
+  const limiteUsadoCartoes = cartoes.reduce((s, c) => s + (c.limite_usado || 0), 0);
+  const limiteDisponivelCartoes = Math.max(0, limiteTotalCartoes - limiteUsadoCartoes);
+
+  // Projeção do próximo mês
+  const proxMesIni = addMeses(`${hy}-${String(hm).padStart(2, "0")}-01`, 1);
+  const [py, pm] = proxMesIni.split("-").map(Number);
+  const proxMesFim = new Date(Date.UTC(py, pm, 0)).toISOString().slice(0, 10);
+  const nomesMeses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  const nomeProxMes = `${nomesMeses[pm - 1]} ${py}`;
+
+  const entProxMes = soma(["l.status='pendente'", "l.tipo='entrada'", "(l.vencimento BETWEEN ? AND ? OR l.data BETWEEN ? AND ?)"], [proxMesIni, proxMesFim, proxMesIni, proxMesFim]);
+  const saiProxMes = soma(["l.status='pendente'", "l.tipo='saida'", "(l.vencimento BETWEEN ? AND ? OR l.data BETWEEN ? AND ?)"], [proxMesIni, proxMesFim, proxMesIni, proxMesFim]);
+  const pendAteFimProxEnt = soma(["l.status='pendente'", "l.tipo='entrada'", "(l.vencimento <= ? OR l.data <= ?)"], [proxMesFim, proxMesFim]);
+  const pendAteFimProxSai = soma(["l.status='pendente'", "l.tipo='saida'", "(l.vencimento <= ? OR l.data <= ?)"], [proxMesFim, proxMesFim]);
+  const saldoPrevistoProxMes = saldoTotal + pendAteFimProxEnt - pendAteFimProxSai;
+
   return {
     periodo: { inicio: ini, fim },
     restrito,
@@ -455,6 +604,28 @@ function dashboard(q, user) {
       despesas_variaveis: saidas - fixas,
       previsao: saldoTotal + aReceber - aPagar,
       previsao_saldo_futuro: saldoTotal + aReceber - aPagar,
+      saldo_previsto_proximo_mes: saldoPrevistoProxMes,
+      entradas_proximo_mes: entProxMes,
+      saidas_proximo_mes: saiProxMes,
+      limite_total_cartoes: limiteTotalCartoes,
+      limite_usado_cartoes: limiteUsadoCartoes,
+      limite_disponivel_cartoes: limiteDisponivelCartoes,
+    },
+    proximo_mes: {
+      nome: nomeProxMes,
+      inicio: proxMesIni,
+      fim: proxMesFim,
+      entradas_esperadas: entProxMes,
+      saidas_esperadas: saiProxMes,
+      resultado_esperado: entProxMes - saiProxMes,
+      saldo_previsto: saldoPrevistoProxMes,
+    },
+    cartoes,
+    cartoes_resumo: {
+      total_limite: limiteTotalCartoes,
+      limite_usado: limiteUsadoCartoes,
+      limite_disponivel: limiteDisponivelCartoes,
+      quantidade: cartoes.length,
     },
     graficos: {
       entradas_vs_saidas: { entradas, saidas },
@@ -618,16 +789,18 @@ function listarLancamentos(q, user) {
   }
   if (q.busca) { w.push("(l.descricao LIKE ? OR l.observacoes LIKE ? OR l.fornecedor LIKE ?)"); const b = `%${String(q.busca).slice(0, 80)}%`; p.push(b, b, b); }
   if (q.sem_fechamento) { w.push("l.fechamento_id IS NULL"); }
+  if (q.cartao_id) { w.push("l.cartao_id = ?"); p.push(Number(q.cartao_id)); }
   if (dataValida(q.data_exata)) { w.push("l.data = ?"); p.push(q.data_exata); }
   const ordem = q.status === "pendente" ? "l.vencimento ASC, l.id ASC" : "COALESCE(l.data, l.vencimento) DESC, l.id DESC";
   const lim = Math.min(Number(q.limite) || 500, 2000);
   const rows = db.prepare(`
-    SELECT l.*, c.nome categoria, co.nome conta, cd.nome conta_destino,
+    SELECT l.*, c.nome categoria, co.nome conta, cd.nome conta_destino, car.nome cartao_nome, car.cor cartao_cor,
       (SELECT COUNT(*) FROM fin_anexos a WHERE a.lancamento_id = l.id) anexos
     FROM fin_lancamentos l
     LEFT JOIN fin_categorias c ON c.id = l.categoria_id
     LEFT JOIN fin_contas co ON co.id = l.conta_id
     LEFT JOIN fin_contas cd ON cd.id = l.conta_destino_id
+    LEFT JOIN fin_cartoes car ON car.id = l.cartao_id
     ${w.length ? "WHERE " + w.join(" AND ") : ""}
     ORDER BY ${ordem} LIMIT ${lim}`).all(...p);
   const verContrib = pode(user, "ver_contribuinte");
@@ -640,6 +813,8 @@ function listarLancamentos(q, user) {
       categoria_nome: r.categoria,
       conta_nome: r.conta,
       conta_destino_nome: r.conta_destino,
+      cartao_nome: r.cartao_nome,
+      cartao_cor: r.cartao_cor,
       data_movimento: r.data,
       data_vencimento: r.vencimento,
       forma_pagamento: r.forma,
@@ -721,12 +896,13 @@ function criarLancamento(b, user, ip) {
   const modoValor = b.modo_valor === "parcela" ? "parcela" : "total";
   const recorrente = Math.min(Math.max(parseInt(b.repetir_meses, 10) || 0, 0), 60);
   const grupo = parcelasTotal > 1 || recorrente > 1 ? crypto.randomBytes(6).toString("hex") : null;
+  const cartaoId = b.cartao_id ? Number(b.cartao_id) : null;
   const now = agoraIso();
   const quem = `${user.nome} (${user.telefone})`;
   const ins = db.prepare(`INSERT INTO fin_lancamentos
     (tipo, status, descricao, valor, data, vencimento, competencia, categoria_id, conta_id, conta_destino_id, forma, ministerio, evento,
-     contribuinte, fornecedor, observacoes, ajuste, grupo_recorrencia, parcela, total_parcelas, chave_dedup, criado_por, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+     contribuinte, fornecedor, observacoes, ajuste, grupo_recorrencia, parcela, total_parcelas, chave_dedup, criado_por, criado_em, cartao_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   const ids = [];
   const base = {
@@ -751,18 +927,18 @@ function criarLancamento(b, user, ip) {
         const valParcela = modoValor === "parcela" ? vp : (vp + (p === 1 ? resto : 0));
         const r = ins.run(tipo, st, `${descricao} (${p}/${parcelasTotal})`, valParcela, st === "efetivado" ? dt : null, st === "pendente" ? dt : null,
           base.competencia, categoriaId, conta?.id || null, contaDestino?.id || null, base.forma, base.ministerio, base.evento, base.contribuinte, base.fornecedor, base.observacoes,
-          ajuste, grupo, p, parcelasTotal, offset === 0 ? chave : null, quem, now);
+          ajuste, grupo, p, parcelasTotal, offset === 0 ? chave : null, quem, now, cartaoId);
         ids.push(Number(r.lastInsertRowid));
       }
     } else {
       const r = ins.run(tipo, pendente ? "pendente" : "efetivado", descricao, valor, data, vencimento, base.competencia, categoriaId, conta?.id || null, contaDestino?.id || null,
-        base.forma, base.ministerio, base.evento, base.contribuinte, base.fornecedor, base.observacoes, ajuste, grupo, null, null, chave, quem, now);
+        base.forma, base.ministerio, base.evento, base.contribuinte, base.fornecedor, base.observacoes, ajuste, grupo, null, null, chave, quem, now, cartaoId);
       ids.push(Number(r.lastInsertRowid));
       const ref = vencimento || data;
       const extraMeses = recorrente > 1 ? recorrente - 1 : 0;
       for (let i = 1; i <= extraMeses; i++) {
         const r2 = ins.run(tipo, "pendente", descricao, valor, null, addMeses(ref, i), null, categoriaId, conta?.id || null, null,
-          base.forma, base.ministerio, base.evento, null, base.fornecedor, base.observacoes, 0, grupo, null, null, null, quem, now);
+          base.forma, base.ministerio, base.evento, null, base.fornecedor, base.observacoes, 0, grupo, null, null, null, quem, now, cartaoId);
         ids.push(Number(r2.lastInsertRowid));
       }
     }
@@ -859,10 +1035,11 @@ function editarLancamento(id, b, user, ip) {
     ministerio: b.ministerio !== undefined ? txt(b.ministerio, 80) : l.ministerio,
     fornecedor: b.fornecedor !== undefined ? txt(b.fornecedor, 120) : (b.contribuinte_nome !== undefined ? txt(b.contribuinte_nome, 120) : l.fornecedor),
     observacoes: b.observacoes !== undefined ? txt(b.observacoes, 1000) : l.observacoes,
+    cartao_id: b.cartao_id !== undefined ? (b.cartao_id ? Number(b.cartao_id) : null) : l.cartao_id,
   };
   if (novo.valor <= 0) throw new Error("Valor inválido.");
-  db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
-    .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, agoraIso(), l.id);
+  db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+    .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
   auditar(user, "corrigir_lancamento", "lancamento", l.id, { antes: l, depois: novo, motivo }, ip);
   const atualizado = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(l.id);
   return { ok: true, lancamento: atualizado, message: "Lançamento atualizado com sucesso." };
@@ -1212,6 +1389,25 @@ async function handle(req, res, { pathname, searchParams, ip }) {
       return true;
     }
 
+    // Cartões de Crédito
+    if (metodo === "GET" && pathname === "/controlefinanceiro/api/cartoes") {
+      exigir("ver");
+      if (user.papel === "lider_ministerio") { json(res, 200, { ok: true, itens: [], cartoes: [] }); return true; }
+      const cs = listarCartoes(q.todos === "1");
+      json(res, 200, { ok: true, itens: cs, cartoes: cs }); return true;
+    }
+    if ((metodo === "POST" || metodo === "PUT") && (m = pathname.match(/^\/controlefinanceiro\/api\/cartoes(?:\/(\d+))?$/))) {
+      exigir("contas"); const b = await lerCorpo(req);
+      if (m[1]) b.id = Number(m[1]);
+      try { json(res, m[1] ? 200 : 201, salvarCartao(b, user, ip)); } catch (e) { json(res, 400, { ok: false, erro: e.message, message: e.message }); }
+      return true;
+    }
+    if (metodo === "DELETE" && (m = pathname.match(/^\/controlefinanceiro\/api\/cartoes\/(\d+)$/))) {
+      exigir("contas");
+      try { json(res, 200, removerCartao(m[1], user, ip)); } catch (e) { json(res, 400, { ok: false, erro: e.message, message: e.message }); }
+      return true;
+    }
+
     // Caixa físico
     if (metodo === "GET" && pathname === "/controlefinanceiro/api/conferencias") {
       exigir("ver");
@@ -1401,6 +1597,9 @@ module.exports = {
   handle,
   centavos,
   saldosContas,
+  listarCartoes,
+  salvarCartao,
+  removerCartao,
   criarLancamento,
   editarLancamento,
   quitarLancamento,

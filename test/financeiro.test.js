@@ -359,4 +359,105 @@ test("Controle Financeiro — Edição completa de lançamentos e parcelamento c
   }
 });
 
+test("Controle Financeiro — Cartões de crédito, Receitas parceladas e Projeção do próximo mês", async () => {
+  const db = require("../db");
+  const user = { id: 1, nome: "Larissa Luana", telefone: "5511951617993", papel: "admin_financeiro" };
+  const cta = db.prepare("SELECT * FROM fin_contas LIMIT 1").get();
+  const catEnt = db.prepare("SELECT * FROM fin_categorias WHERE tipo='entrada' LIMIT 1").get();
+  const catSai = db.prepare("SELECT * FROM fin_categorias WHERE tipo='saida' LIMIT 1").get();
+
+  // 1. Cadastrar cartão de crédito
+  const resCard = financeiro.salvarCartao({
+    nome: "Nubank Corporativo Teste",
+    instituicao: "Nubank",
+    bandeira: "Mastercard",
+    limite: 5000.0, // R$ 5.000,00
+    dia_fechamento: 5,
+    dia_vencimento: 15,
+    conta_id: cta.id,
+    cor: "#8b5cf6",
+  }, user);
+
+  assert.equal(resCard.ok, true);
+  const cardId = resCard.id;
+
+  // 2. Listar cartões e verificar limites
+  let cartoes = financeiro.listarCartoes();
+  let cardCriado = cartoes.find((c) => c.id === cardId);
+  assert.ok(cardCriado);
+  assert.equal(cardCriado.limite_total, 500000); // 5000 reais em centavos
+  assert.equal(cardCriado.limite_usado, 0);
+  assert.equal(cardCriado.limite_disponivel, 500000);
+
+  // 3. Lançar despesa no cartão de crédito
+  const lancDespesaCard = financeiro.criarLancamento({
+    tipo: "saida",
+    status: "pendente",
+    descricao: "Equipamento Microfone Teste Cartão",
+    valor: 1200.0, // R$ 1.200,00
+    categoria_id: catSai.id,
+    conta_id: cta.id,
+    cartao_id: cardId,
+    forma: "Cartão de Crédito",
+    vencimento: "2026-11-15",
+    confirmar_saldo_negativo: true,
+    confirmar_duplicidade: true,
+  }, user);
+
+  assert.equal(lancDespesaCard.ok, true);
+
+  // 4. Verificar limite usado e disponível atualizados
+  cartoes = financeiro.listarCartoes();
+  cardCriado = cartoes.find((c) => c.id === cardId);
+  assert.equal(cardCriado.limite_usado, 120000); // R$ 1.200,00
+  assert.equal(cardCriado.limite_disponivel, 380000); // R$ 3.800,00 restantes
+
+  // 5. Receita parcelada (ex: doação ou venda em 4x começando na 2ª parcela)
+  const lancReceitaParc = financeiro.criarLancamento({
+    tipo: "entrada",
+    status: "pendente",
+    descricao: "Doação Campanha Especial",
+    valor: 800.0,
+    categoria_id: catEnt.id,
+    conta_id: cta.id,
+    data: "2026-11-14",
+    vencimento: "2026-11-14",
+    total_parcelas: 4,
+    parcela_inicial: 2,
+    modo_valor: "total",
+    confirmar_duplicidade: true,
+  }, user);
+
+  assert.equal(lancReceitaParc.ok, true);
+  assert.equal(lancReceitaParc.ids.length, 3, "Parcelas 2, 3 e 4 devem ser geradas");
+  const rowsRec = lancReceitaParc.ids.map((id) => db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(id));
+  assert.ok(rowsRec[0].descricao.includes("(2/4)"));
+  assert.ok(rowsRec[2].descricao.includes("(4/4)"));
+  assert.equal(rowsRec[0].tipo, "entrada");
+  assert.equal(rowsRec[0].valor, 20000, "800 total dividido por 4 = 200 por parcela");
+
+  // 6. Projeção por contas e dashboard para o próximo mês
+  const saldos = financeiro.saldosContas();
+  assert.ok(saldos.length > 0);
+  assert.ok("saldo_previsto_proximo_mes" in saldos[0]);
+
+  const dash = financeiro.dashboard({ periodo: "mes" }, user);
+  assert.ok(dash.cartoes.length > 0);
+  assert.ok(dash.proximo_mes);
+  assert.ok("saldo_previsto_proximo_mes" in dash.indicadores);
+
+  // 7. Navegação por mês no dashboard (ex: YYYY-MM)
+  const dashDez = financeiro.dashboard({ periodo: "2026-12" }, user);
+  assert.equal(dashDez.periodo.inicio, "2026-12-01");
+  assert.equal(dashDez.periodo.fim, "2026-12-31");
+
+  // Limpeza
+  financeiro.removerCartao(cardId, user, "127.0.0.1");
+  db.prepare("DELETE FROM fin_lancamentos WHERE id = ?").run(lancDespesaCard.id);
+  for (const id of lancReceitaParc.ids) {
+    db.prepare("DELETE FROM fin_lancamentos WHERE id = ?").run(id);
+  }
+});
+
+
 

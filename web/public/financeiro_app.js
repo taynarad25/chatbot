@@ -14,6 +14,8 @@
     },
     dashboard: null,
     contas: [],
+    cartoes: [],
+    viewMode: "table",
     categorias: [],
     ministerios: [],
     lancamentos: [],
@@ -74,6 +76,73 @@
     } catch (_) {
       return iso;
     }
+  }
+
+  const NOMES_MESES = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ];
+
+  function getPeriodoMesAtual() {
+    if (state.filters.periodo && /^\d{4}-\d{2}$/.test(state.filters.periodo)) {
+      return state.filters.periodo;
+    }
+    if (state.filters.periodo === "mes_anterior") {
+      const d = new Date(); d.setMonth(d.getMonth() - 1);
+      return d.toISOString().slice(0, 7);
+    }
+    return todayISO().slice(0, 7);
+  }
+
+  function formatarMesNome(ym) {
+    if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return ym || "Mês Atual";
+    const [y, m] = ym.split("-").map(Number);
+    return `${NOMES_MESES[m - 1]} de ${y}`;
+  }
+
+  function alterarMesFiltro(delta) {
+    const ym = getPeriodoMesAtual();
+    const [y, m] = ym.split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+    const nextYm = d.toISOString().slice(0, 7);
+    state.filters.periodo = nextYm;
+    state.filters.inicio = "";
+    state.filters.fim = "";
+  }
+
+  function renderMonthNavigator() {
+    const ym = getPeriodoMesAtual();
+    const ind = state.dashboard ? state.dashboard.indicadores : null;
+    const saldo = ind ? ind.saldo_total : 0;
+    const resultado = ind ? ind.resultado_mes : 0;
+    const inicial = ind ? (saldo - resultado) : 0;
+    const previsto = ind ? ind.previsao_saldo_futuro : 0;
+
+    return `
+      <div class="fin-month-nav-container no-print">
+        <div class="fin-month-nav-bar">
+          <button type="button" class="fin-month-nav-arrow" data-action="prev-month" title="Mês anterior">‹</button>
+          <div class="fin-month-nav-label">
+            <span class="fin-month-nav-title">${formatarMesNome(ym)}</span>
+          </div>
+          <button type="button" class="fin-month-nav-arrow" data-action="next-month" title="Próximo mês">›</button>
+        </div>
+        <div class="fin-month-nav-badges">
+          <div class="fin-month-badge">
+            <span class="fin-mb-label">🔘 Inicial</span>
+            <span class="fin-mb-val">${fmtMoney(inicial)}</span>
+          </div>
+          <div class="fin-month-badge fin-mb-active">
+            <span class="fin-mb-label">🔘 Saldo Atual</span>
+            <span class="fin-mb-val">${fmtMoney(saldo)}</span>
+          </div>
+          <div class="fin-month-badge fin-mb-previsto">
+            <span class="fin-mb-label">🔘 Previsto no Mês</span>
+            <span class="fin-mb-val">${fmtMoney(previsto)}</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function fmtDetalhesAuditoria(acao, rawJson) {
@@ -242,15 +311,17 @@
   // ==================== MAIN APP SHELL ====================
   async function loadAllData() {
     const q = new URLSearchParams(state.filters).toString();
-    const [dash, contasRes, lancRes, confRes, fechRes] = await Promise.all([
+    const [dash, contasRes, lancRes, confRes, fechRes, cartoesRes] = await Promise.all([
       api("/dashboard?" + q),
       api("/contas"),
       api("/lancamentos?" + q),
       api("/conferencias"),
       api("/fechamentos"),
+      api("/cartoes").catch(() => ({ cartoes: [] })),
     ]);
     state.dashboard = dash;
     state.contas = dash.contas || contasRes.contas || [];
+    state.cartoes = dash.cartoes || cartoesRes.cartoes || cartoesRes.itens || [];
     state.categorias = dash.categorias || [];
     state.ministerios = dash.ministerios || [];
     state.lancamentos = lancRes.lancamentos || [];
@@ -358,6 +429,7 @@
 
       <main class="fin-container">
         ${renderShortcutsBar()}
+        ${renderMonthNavigator()}
         ${renderFiltersBar()}
         <div id="fin-tab-content">${renderActiveTab()}</div>
       </main>
@@ -389,10 +461,12 @@
         <div class="fin-filter-group">
           <label>Período</label>
           <select class="fin-select" id="flt-periodo">
+            ${/^\d{4}-\d{2}$/.test(f.periodo) ? `<option value="${f.periodo}" selected>📅 ${formatarMesNome(f.periodo)}</option>` : ""}
             <option value="hoje" ${f.periodo === "hoje" ? "selected" : ""}>Hoje</option>
             <option value="semana" ${f.periodo === "semana" ? "selected" : ""}>Esta Semana</option>
             <option value="mes" ${f.periodo === "mes" ? "selected" : ""}>Este Mês</option>
             <option value="mes_anterior" ${f.periodo === "mes_anterior" ? "selected" : ""}>Mês Anterior</option>
+            <option value="proximo_mes" ${f.periodo === "proximo_mes" ? "selected" : ""}>Próximo Mês</option>
             <option value="ano" ${f.periodo === "ano" ? "selected" : ""}>Este Ano</option>
             <option value="personalizado" ${f.periodo === "personalizado" ? "selected" : ""}>Período Personalizado</option>
           </select>
@@ -589,11 +663,67 @@
       <!-- SELETOR RÁPIDO DE BLOCOS (EXCLUSIVO CELULAR) -->
       <div class="fin-dash-pills mobile-only no-print">
         <button type="button" class="fin-pill-btn active" data-action="filter-dash-block" data-target="all">Todos</button>
+        <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="cartoes">💳 Cartões</button>
         <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="saldos">🏦 Saldos</button>
         <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="movimento">⚖️ Movimentação</button>
         <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="dizimos">🙌 Dízimos/Ofertas</button>
         <button type="button" class="fin-pill-btn" data-action="filter-dash-block" data-target="contas">⚠️ Contas a Pagar</button>
       </div>
+
+      <!-- BLOCO: CARTÕES DE CRÉDITO -->
+      <section class="fin-dash-section fin-sec-cartoes">
+        <div class="fin-dash-section-header">
+          <div class="fin-dash-section-title">
+            <span class="badge-icon">💳</span>
+            <span>Cartões de Crédito</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem">
+            <span class="fin-dash-section-sub">Limite total, utilizado e disponível para compras</span>
+            ${canEdit() ? `<button type="button" class="fin-btn fin-btn-primary fin-btn-xs" data-action="open-novo-cartao">➕ Novo Cartão</button>` : ""}
+          </div>
+        </div>
+
+        ${!state.cartoes.length ? `
+          <div class="fin-card" style="padding:1.25rem;text-align:center;color:var(--fin-muted)">
+            <p style="margin-bottom:0.6rem">Nenhum cartão de crédito cadastrado ainda.</p>
+            ${canEdit() ? `<button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="open-novo-cartao">💳 Cadastrar Cartão de Crédito</button>` : ""}
+          </div>
+        ` : `
+          <div class="fin-cartoes-grid">
+            ${state.cartoes.map(card => {
+              const percUsado = card.limite_total > 0 ? Math.min(100, Math.round((card.limite_usado / card.limite_total) * 100)) : 0;
+              return `
+                <div class="fin-credit-card-item" style="border-top: 4px solid ${esc(card.cor || "#6366f1")}">
+                  <div class="fin-cc-top">
+                    <div>
+                      <div class="fin-cc-name">${esc(card.nome)}</div>
+                      <div class="fin-cc-inst">${esc(card.instituicao || "Banco")} • ${esc(card.bandeira || "Cartão")}</div>
+                    </div>
+                    ${canEdit() ? `<button type="button" class="fin-btn fin-btn-outline fin-btn-xs" data-action="open-edit-cartao" data-id="${card.id}">Editar</button>` : ""}
+                  </div>
+                  <div class="fin-cc-limit-row">
+                    <div>
+                      <span class="fin-cc-lbl">Limite Disponível</span>
+                      <div class="fin-cc-val-disp" style="color:#059669">${fmtMoney(card.limite_disponivel)}</div>
+                    </div>
+                    <div style="text-align:right">
+                      <span class="fin-cc-lbl">Limite Total</span>
+                      <div class="fin-cc-val-total">${fmtMoney(card.limite_total)}</div>
+                    </div>
+                  </div>
+                  <div class="fin-cc-bar-track">
+                    <div class="fin-cc-bar-fill" style="width:${percUsado}%;background:${percUsado > 80 ? "#dc2626" : (card.cor || "#6366f1")}"></div>
+                  </div>
+                  <div class="fin-cc-meta">
+                    <span>Limite Usado: <strong>${fmtMoney(card.limite_usado)}</strong></span>
+                    <span>Fecha dia <strong>${card.dia_fechamento}</strong> • Vence dia <strong>${card.dia_vencimento}</strong></span>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `}
+      </section>
 
       <!-- BLOCO 1: LOCALIZAÇÃO DOS SALDOS & LIQUIDEZ -->
       <section class="fin-dash-section fin-sec-saldos">
@@ -602,7 +732,7 @@
             <span class="badge-icon">🏦</span>
             <span>Contas & Saldos por Local</span>
           </div>
-          <span class="fin-dash-section-sub">Onde o recurso da igreja está armazenado no momento</span>
+          <span class="fin-dash-section-sub">Onde o recurso da igreja está armazenado no momento e projeção</span>
         </div>
         <div class="fin-dash-grid">
           <div class="fin-stat-card stat-success">
@@ -620,11 +750,42 @@
             <div class="fin-stat-value">${fmtMoney(ind.total_reservado)}</div>
             <div class="fin-stat-sub">Fundos e projetos com carimbo</div>
           </div>
-          <div class="fin-stat-card">
-            <div class="fin-stat-label">🔮 Previsão de Saldo Futuro</div>
-            <div class="fin-stat-value">${fmtMoney(ind.previsao_saldo_futuro)}</div>
-            <div class="fin-stat-sub">Saldo atual + a receber - a pagar</div>
+          <div class="fin-stat-card" style="border: 2px solid #8b5cf6">
+            <div class="fin-stat-label">🔮 Esperado Próximo Mês</div>
+            <div class="fin-stat-value" style="color:#6d28d9">${fmtMoney(ind.saldo_previsto_proximo_mes || ind.previsao_saldo_futuro)}</div>
+            <div class="fin-stat-sub">${state.dashboard.proximo_mes ? state.dashboard.proximo_mes.nome : "Próximo Mês"} (Projeção)</div>
           </div>
+        </div>
+
+        <!-- CARDS INDIVIDUAIS DE CADA CONTA COM VALOR ESPERADO -->
+        <div class="fin-contas-cards-grid">
+          ${state.contas.map(c => `
+            <div class="fin-conta-summary-card">
+              <div class="fin-cs-header">
+                <div>
+                  <div class="fin-cs-name">${esc(c.nome)}</div>
+                  <div class="fin-cs-sub">${esc(c.tipo)} ${c.instituicao ? `• ${esc(c.instituicao)}` : ""}</div>
+                </div>
+                <span class="fin-cs-badge" style="background:${c.saldo_atual >= 0 ? "#dcfce7" : "#fee2e2"};color:${c.saldo_atual >= 0 ? "#15803d" : "#b91c1c"}">
+                  ${fmtMoney(c.saldo_atual)}
+                </span>
+              </div>
+              <div class="fin-cs-body">
+                <div class="fin-cs-row">
+                  <span>Saldo Previsto no Mês:</span>
+                  <strong>${fmtMoney(c.saldo_projetado)}</strong>
+                </div>
+                <div class="fin-cs-row" style="background:#f8fafc;padding:0.4rem;border-radius:6px;border:1px dashed #cbd5e1">
+                  <span style="color:#4c1d95;font-weight:600">🔮 Esperado Próximo Mês:</span>
+                  <strong style="color:#4c1d95">${fmtMoney(c.saldo_previsto_proximo_mes)}</strong>
+                </div>
+                <div class="fin-cs-micro-details">
+                  <span style="color:var(--fin-success)">+ Previsto: ${fmtMoney(c.entradas_esperadas_proximo_mes || 0)}</span>
+                  <span style="color:var(--fin-danger)">- Previsto: ${fmtMoney(c.saidas_esperadas_proximo_mes || 0)}</span>
+                </div>
+              </div>
+            </div>
+          `).join("")}
         </div>
       </section>
 
@@ -831,6 +992,7 @@
                 <th>Reservado</th>
                 <th>Disponível Livre</th>
                 <th>Saldo Projetado</th>
+                <th>Esperado Próx. Mês</th>
                 <th>Status</th>
                 ${canEdit() ? `<th>Ações</th>` : ""}
               </tr>
@@ -850,6 +1012,7 @@
                   <td><span class="fin-badge badge-warning">${fmtMoney(c.valor_reservado)}</span></td>
                   <td><strong style="color:var(--fin-success)">${fmtMoney(c.saldo_disponivel)}</strong></td>
                   <td>${fmtMoney(c.saldo_projetado)}</td>
+                  <td><strong style="color:#6d28d9">${fmtMoney(c.saldo_previsto_proximo_mes)}</strong></td>
                   <td>${c.ativa ? `<span class="fin-badge badge-success">Ativa</span>` : `<span class="fin-badge badge-muted">Inativa</span>`}</td>
                   ${
                     canEdit()
@@ -859,6 +1022,52 @@
                 </tr>`
                 )
                 .join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="fin-card" style="margin-top:1.5rem">
+        <div class="fin-card-header">
+          <div>
+            <span class="fin-card-title">💳 Cartões de Crédito</span>
+            <p style="font-size:0.8rem;color:var(--fin-muted)">Gerenciamento de cartões, limites disponíveis, faturas e controle de datas de fechamento e vencimento.</p>
+          </div>
+          ${canEdit() ? `<button type="button" class="fin-btn fin-btn-primary fin-btn-sm" data-action="open-novo-cartao">➕ Novo Cartão</button>` : ""}
+        </div>
+        <div class="fin-table-wrap">
+          <table class="fin-table">
+            <thead>
+              <tr>
+                <th>Cartão</th>
+                <th>Instituição / Bandeira</th>
+                <th>Limite Total</th>
+                <th>Limite Usado</th>
+                <th>Limite Disponível</th>
+                <th>Fechamento</th>
+                <th>Vencimento</th>
+                <th>Conta de Pagamento</th>
+                ${canEdit() ? `<th>Ações</th>` : ""}
+              </tr>
+            </thead>
+            <tbody>
+              ${!state.cartoes.length ? `<tr><td colspan="9" style="text-align:center;color:var(--fin-muted);padding:1.5rem">Nenhum cartão cadastrado.</td></tr>` :
+                state.cartoes.map(card => `
+                  <tr>
+                    <td>
+                      <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${esc(card.cor || "#6366f1")};margin-right:6px"></span>
+                      <strong>${esc(card.nome)}</strong>
+                    </td>
+                    <td>${esc(card.instituicao || "Banco")} • ${esc(card.bandeira || "Cartão")}</td>
+                    <td>${fmtMoney(card.limite_total)}</td>
+                    <td style="color:var(--fin-danger)">${fmtMoney(card.limite_usado)}</td>
+                    <td><strong style="color:var(--fin-success)">${fmtMoney(card.limite_disponivel)}</strong></td>
+                    <td>Dia ${card.dia_fechamento}</td>
+                    <td>Dia ${card.dia_vencimento}</td>
+                    <td>${esc(card.conta_nome || "Não vinculada")}</td>
+                    ${canEdit() ? `<td><button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="open-edit-cartao" data-id="${card.id}">Editar</button></td>` : ""}
+                  </tr>
+                `).join("")}
             </tbody>
           </table>
         </div>
@@ -995,22 +1204,106 @@
             <span class="fin-card-title">${isEntrada ? "📥 Controle de Entradas e Receitas" : "📤 Controle de Saídas, Despesas e Contas a Pagar"}</span>
             <p style="font-size:0.8rem;color:var(--fin-muted)">Todos os registros possuem rastreabilidade completa, anexos e proteção contra duplicidade.</p>
           </div>
-          ${
-            canEdit()
-              ? `<div style="display:flex;gap:0.5rem">
-                  <button type="button" class="fin-btn ${isEntrada ? "fin-btn-success" : "fin-btn-danger"} fin-btn-sm" data-action="open-lancamento" data-tipo="${isEntrada ? "entrada" : "saida"}">
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="toggle-view-mode" title="Alternar entre modo tabela e linha do tempo diária">
+              ${state.viewMode === "timeline" ? "📋 Ver Tabela" : "📱 Ver por Dia (Timeline)"}
+            </button>
+            ${
+              canEdit()
+                ? `<button type="button" class="fin-btn ${isEntrada ? "fin-btn-success" : "fin-btn-danger"} fin-btn-sm" data-action="open-lancamento" data-tipo="${isEntrada ? "entrada" : "saida"}">
                     ➕ ${isEntrada ? "Nova Entrada" : "Nova Despesa / Conta a Pagar"}
-                  </button>
-                </div>`
-              : ""
-          }
+                  </button>`
+                : ""
+            }
+          </div>
         </div>
         ${renderLancamentosTable(list)}
       </div>
     `;
   }
 
+  function renderLancamentosTimeline(list) {
+    if (!list || !list.length) {
+      return `<div style="padding:1.5rem;text-align:center;color:var(--fin-muted)">Nenhuma movimentação encontrada para o período selecionado.</div>`;
+    }
+    const grupos = {};
+    for (const l of list) {
+      const dt = l.data_movimento || l.data_vencimento || l.data || l.vencimento || "Sem data";
+      if (!grupos[dt]) grupos[dt] = [];
+      grupos[dt].push(l);
+    }
+    const dias = Object.keys(grupos).sort((a, b) => b.localeCompare(a));
+    const DIAS_SEMANA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+
+    return `
+      <div class="fin-timeline-container">
+        ${dias
+          .map((dt) => {
+            let label = dt;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dt)) {
+              const [yy, mm, dd] = dt.split("-").map(Number);
+              const d = new Date(Date.UTC(yy, mm - 1, dd, 12));
+              label = `${dd} • ${DIAS_SEMANA[d.getUTCDay()]}`;
+            }
+            const itens = grupos[dt];
+            const tot = itens.reduce((s, x) => s + (x.tipo === "saida" ? -x.valor : x.valor), 0);
+            return `
+              <div class="fin-timeline-day-group">
+                <div class="fin-timeline-day-header">
+                  <span class="fin-timeline-day-title">${esc(label)}</span>
+                  <span class="fin-timeline-day-total" style="color:${tot >= 0 ? "var(--fin-success)" : "var(--fin-danger)"}">
+                    ${tot >= 0 ? "+" : ""}${fmtMoney(tot)}
+                  </span>
+                </div>
+                <div class="fin-timeline-items">
+                  ${itens
+                    .map((l) => {
+                      const isSaida = l.tipo === "saida";
+                      const isPendente = l.status === "pendente";
+                      return `
+                        <div class="fin-timeline-item ${isPendente ? "is-pending" : ""}">
+                          <div class="fin-timeline-icon" style="background:${isSaida ? "#fee2e2" : "#dcfce7"};color:${isSaida ? "#b91c1c" : "#15803d"}">
+                            ${isSaida ? (l.cartao_nome ? "💳" : "📤") : "📥"}
+                          </div>
+                          <div class="fin-timeline-info">
+                            <div class="fin-timeline-desc">
+                              <strong>${esc(l.descricao)}</strong>
+                              ${l.parcela_total > 1 ? `<span class="fin-badge badge-purple" style="font-size:0.68rem">${l.parcela_num}/${l.parcela_total}</span>` : ""}
+                            </div>
+                            <div class="fin-timeline-meta">
+                              <span>📁 ${esc(l.categoria_nome || "Geral")}</span>
+                              <span>•</span>
+                              <span>🏦 ${esc(l.conta_nome || "-")}</span>
+                              ${l.cartao_nome ? `<span class="fin-badge" style="background:#e0e7ff;color:#3730a3;font-size:0.68rem">💳 ${esc(l.cartao_nome)}</span>` : ""}
+                              ${l.forma_pagamento ? `<small style="color:var(--fin-muted)">(${esc(l.forma_pagamento)})</small>` : ""}
+                            </div>
+                          </div>
+                          <div class="fin-timeline-val-col">
+                            <div class="fin-timeline-val" style="color:${isSaida ? "var(--fin-danger)" : "var(--fin-success)"};font-weight:700">
+                              ${isSaida ? "-" : "+"}${fmtMoney(l.valor)}
+                            </div>
+                            <div class="fin-timeline-actions">
+                              ${isPendente && canEdit() ? `<button type="button" class="fin-btn fin-btn-success fin-btn-xs" data-action="open-quitar" data-id="${l.id}">Efetivar</button>` : ""}
+                              ${canEdit() ? `<button type="button" class="fin-btn fin-btn-outline fin-btn-xs" data-action="open-editar-lanc" data-id="${l.id}">Editar</button>` : ""}
+                            </div>
+                          </div>
+                        </div>
+                      `;
+                    })
+                    .join("")}
+                </div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
   function renderLancamentosTable(list) {
+    if (state.viewMode === "timeline") {
+      return renderLancamentosTimeline(list);
+    }
     if (!list || !list.length) {
       return `<div style="padding:1.25rem;text-align:center;color:var(--fin-muted)">Nenhuma movimentação encontrada para os filtros selecionados.</div>`;
     }
@@ -1656,8 +1949,15 @@
             <div class="fin-form-grid">
               <div class="fin-field">
                 <label>Forma de Pagamento</label>
-                <select class="fin-select" name="forma_pagamento">
+                <select class="fin-select" name="forma_pagamento" id="lanc-forma-select">
                   ${FORMAS_PAGAMENTO.map((fp) => `<option value="${esc(fp)}" ${fp === formaPadrao ? "selected" : ""}>${esc(fp)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="fin-field" id="box-cartao-credito" style="${formaPadrao === "Cartão de crédito" ? "" : "display:none"}">
+                <label>Cartão de Crédito Utilizado</label>
+                <select class="fin-select" name="cartao_id">
+                  <option value="">Selecione o Cartão...</option>
+                  ${state.cartoes.map((c) => `<option value="${c.id}">${esc(c.nome)} (Disp: ${fmtMoney(c.limite_disponivel)})</option>`).join("")}
                 </select>
               </div>
               <div class="fin-field">
@@ -1674,11 +1974,11 @@
             </div>
 
             ${
-              tipo === "saida"
+              (tipo === "saida" || tipo === "entrada")
                 ? `
               <div class="fin-field" style="grid-column:1 / -1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:0.85rem">
                 <div style="font-weight:600;margin-bottom:0.6rem;font-size:0.88rem;display:flex;align-items:center;gap:0.4rem;color:#334155">
-                  <span>🔁</span> Repetição / Parcelamento
+                  <span>🔁</span> ${tipo === "entrada" ? "Repetição / Parcelamento de Receita" : "Repetição / Parcelamento de Despesa"}
                 </div>
                 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem">
                   <label class="fin-radio-pill">
@@ -1691,7 +1991,7 @@
                   </label>
                   <label class="fin-radio-pill">
                     <input type="radio" name="tipo_repeticao" value="fixa" />
-                    <span>Fixa mensal</span>
+                    <span>Fixa mensal (${tipo === "entrada" ? "Receita Recorrente" : "Despesa Recorrente"})</span>
                   </label>
                 </div>
 
@@ -1700,12 +2000,12 @@
                     <div class="fin-field">
                       <label>Começar na parcela</label>
                       <input type="number" min="1" max="120" class="fin-input" name="parcela_inicial" id="rep-parcela-inicial" value="1" />
-                      <small style="color:#64748b;font-size:0.72rem">Ex: se a compra foi em 11x mas você já está no 7º mês, coloque 7</small>
+                      <small style="color:#64748b;font-size:0.72rem">Ex: se ${tipo === "entrada" ? "o recebimento/contribuição" : "a compra/despesa"} foi em 11x mas você já está no 7º mês, coloque 7</small>
                     </div>
                     <div class="fin-field">
                       <label>Total de parcelas</label>
                       <input type="number" min="2" max="120" class="fin-input" name="total_parcelas" id="rep-total-parcelas" value="2" />
-                      <small style="color:#64748b;font-size:0.72rem">Quantidade total da compra (ex: 11 vezes)</small>
+                      <small style="color:#64748b;font-size:0.72rem">Quantidade total ${tipo === "entrada" ? "do recebimento" : "da compra"} (ex: 11 vezes)</small>
                     </div>
                   </div>
 
@@ -1729,9 +2029,9 @@
 
                 <div id="box-repeticao-fixa" style="display:none;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:0.75rem">
                   <div class="fin-field">
-                    <label>Repetir mensalmente por quantos meses? (Despesa Fixa)</label>
+                    <label>Repetir mensalmente por quantos meses? (${tipo === "entrada" ? "Receita Fixa Mensal" : "Despesa Fixa"})</label>
                     <input type="number" min="2" max="60" class="fin-input" name="repetir_meses" value="12" />
-                    <small style="color:#64748b;font-size:0.72rem">Gera despesas mensais automáticas para os meses seguintes</small>
+                    <small style="color:#64748b;font-size:0.72rem">Gera ${tipo === "entrada" ? "receitas" : "despesas"} mensais automáticas para os meses seguintes</small>
                   </div>
                 </div>
               </div>`
@@ -1794,6 +2094,13 @@
     radiosModo.forEach((r) => {
       r.addEventListener("change", atualizarPreviewRepeticao);
     });
+    const selForma = m.querySelector("#lanc-forma-select");
+    const boxCartao = m.querySelector("#box-cartao-credito");
+    if (selForma && boxCartao) {
+      selForma.addEventListener("change", () => {
+        boxCartao.style.display = selForma.value === "Cartão de crédito" ? "block" : "none";
+      });
+    }
     atualizarPreviewRepeticao();
   }
 
@@ -2117,8 +2424,15 @@
             <div class="fin-form-grid">
               <div class="fin-field">
                 <label>Forma de Pagamento</label>
-                <select class="fin-select" name="forma">
+                <select class="fin-select" name="forma" id="edit-forma-select">
                   ${FORMAS_PAGAMENTO.map((fp) => `<option value="${esc(fp)}" ${fp === (l.forma || "PIX") ? "selected" : ""}>${esc(fp)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="fin-field" id="edit-box-cartao-credito" style="${l.forma === "Cartão de crédito" || l.cartao_id ? "" : "display:none"}">
+                <label>Cartão de Crédito</label>
+                <select class="fin-select" name="cartao_id">
+                  <option value="">Nenhum / Não vinculado</option>
+                  ${state.cartoes.map((c) => `<option value="${c.id}" ${String(c.id) === String(l.cartao_id) ? "selected" : ""}>${esc(c.nome)} (Disp: ${fmtMoney(c.limite_disponivel)})</option>`).join("")}
                 </select>
               </div>
               <div class="fin-field">
@@ -2160,6 +2474,14 @@
         </div>
       </div>
     `;
+
+    const editSelForma = m.querySelector("#edit-forma-select");
+    const editBoxCartao = m.querySelector("#edit-box-cartao-credito");
+    if (editSelForma && editBoxCartao) {
+      editSelForma.addEventListener("change", () => {
+        editBoxCartao.style.display = editSelForma.value === "Cartão de crédito" ? "block" : "none";
+      });
+    }
   }
 
   function openCancelarLancModal(id) {
@@ -2395,6 +2717,79 @@
             <div class="fin-modal-footer">
               <button type="button" class="fin-btn fin-btn-outline" data-action="close-modal">Cancelar</button>
               <button type="submit" class="fin-btn fin-btn-primary">Salvar Conta</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  function openCartaoModal(cardId) {
+    const card = cardId ? state.cartoes.find((x) => String(x.id) === String(cardId)) : null;
+    const m = document.getElementById("fin-modal-root");
+    if (!m) return;
+    m.innerHTML = `
+      <div class="fin-modal-backdrop">
+        <div class="fin-modal" style="max-width:540px">
+          <div class="fin-modal-header">
+            <span class="fin-modal-title">${card ? `💳 Editar Cartão #${card.id}` : "💳 Cadastrar Cartão de Crédito"}</span>
+            <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="close-modal">✕</button>
+          </div>
+          <form id="form-cartao" data-id="${card ? card.id : ""}">
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Nome / Identificação do Cartão *</label>
+                <input type="text" class="fin-input" name="nome" value="${esc(card ? card.nome : "")}" required placeholder="Ex: Nubank Corporativo" />
+              </div>
+              <div class="fin-field">
+                <label>Instituição / Banco</label>
+                <input type="text" class="fin-input" name="instituicao" value="${esc(card ? card.instituicao || "" : "")}" placeholder="Ex: Nubank, Bradesco, Itaú..." />
+              </div>
+            </div>
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Bandeira</label>
+                <select class="fin-select" name="bandeira">
+                  <option value="Mastercard" ${card && card.bandeira === "Mastercard" ? "selected" : ""}>Mastercard</option>
+                  <option value="Visa" ${card && card.bandeira === "Visa" ? "selected" : ""}>Visa</option>
+                  <option value="Elo" ${card && card.bandeira === "Elo" ? "selected" : ""}>Elo</option>
+                  <option value="American Express" ${card && card.bandeira === "American Express" ? "selected" : ""}>American Express</option>
+                  <option value="Hipercard" ${card && card.bandeira === "Hipercard" ? "selected" : ""}>Hipercard</option>
+                  <option value="Outra" ${card && card.bandeira === "Outra" ? "selected" : ""}>Outra</option>
+                </select>
+              </div>
+              <div class="fin-field">
+                <label>Limite Total (R$) *</label>
+                <input type="number" step="0.01" min="0" class="fin-input" name="limite" value="${card ? (card.limite / 100).toFixed(2) : "0.00"}" required />
+              </div>
+            </div>
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Dia de Fechamento da Fatura (1 a 31) *</label>
+                <input type="number" min="1" max="31" class="fin-input" name="dia_fechamento" value="${card ? card.dia_fechamento : "1"}" required />
+              </div>
+              <div class="fin-field">
+                <label>Dia de Vencimento da Fatura (1 a 31) *</label>
+                <input type="number" min="1" max="31" class="fin-input" name="dia_vencimento" value="${card ? card.dia_vencimento : "10"}" required />
+              </div>
+            </div>
+            <div class="fin-form-grid">
+              <div class="fin-field">
+                <label>Conta Bancária para Pagamento da Fatura</label>
+                <select class="fin-select" name="conta_id">
+                  <option value="">Não vinculada / Definir ao pagar</option>
+                  ${state.contas.map((c) => `<option value="${c.id}" ${card && String(c.id) === String(card.conta_id) ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="fin-field">
+                <label>Cor do Cartão</label>
+                <input type="color" class="fin-input" name="cor" value="${card ? esc(card.cor || "#6366f1") : "#6366f1"}" style="height:38px;padding:2px" />
+              </div>
+            </div>
+            <div class="fin-modal-footer">
+              ${card ? `<button type="button" class="fin-btn fin-btn-danger fin-btn-sm" data-action="delete-cartao" data-id="${card.id}" style="margin-right:auto">Excluir Cartão</button>` : ""}
+              <button type="button" class="fin-btn fin-btn-outline" data-action="close-modal">Cancelar</button>
+              <button type="submit" class="fin-btn fin-btn-primary">Salvar Cartão</button>
             </div>
           </form>
         </div>
@@ -2728,6 +3123,29 @@
         const uid = btn.getAttribute("data-id");
         await api(`/usuarios/${uid}`, { method: "PUT", body: { redefinir_senha: true } });
         alert("Redefinição liberada! O usuário já pode clicar em 'Primeiro Acesso / Criar Senha'.");
+      } else if (action === "prev-month") {
+        alterarMesFiltro(-1);
+        await loadAllData();
+        renderApp();
+      } else if (action === "next-month") {
+        alterarMesFiltro(1);
+        await loadAllData();
+        renderApp();
+      } else if (action === "toggle-view-mode") {
+        state.viewMode = state.viewMode === "timeline" ? "table" : "timeline";
+        renderApp();
+      } else if (action === "open-novo-cartao") {
+        openCartaoModal(null);
+      } else if (action === "open-edit-cartao") {
+        openCartaoModal(btn.getAttribute("data-id"));
+      } else if (action === "delete-cartao") {
+        const cid = btn.getAttribute("data-id");
+        if (confirm("Deseja realmente desativar ou excluir este cartão?")) {
+          await api(`/cartoes/${cid}`, { method: "DELETE" });
+          closeModal();
+          await loadAllData();
+          renderApp();
+        }
       } else if (action === "print-report") {
         window.print();
       }
@@ -2935,6 +3353,18 @@
             await api(`/contas/${id}`, { method: "PUT", body });
           } else {
             await api("/contas", { method: "POST", body });
+          }
+          closeModal();
+          await loadAllData();
+          renderApp();
+        } else if (form.id === "form-cartao") {
+          const id = form.getAttribute("data-id");
+          const fd = new FormData(form);
+          const body = Object.fromEntries(fd.entries());
+          if (id) {
+            await api(`/cartoes/${id}`, { method: "PUT", body });
+          } else {
+            await api("/cartoes", { method: "POST", body });
           }
           closeModal();
           await loadAllData();
