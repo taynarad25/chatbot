@@ -313,31 +313,40 @@ function publicoUser(u) {
 }
 
 // ───────────────────────── SALDOS / CONSULTAS ─────────────────────────
-function saldosContas() {
+function saldosContas(ini, fim) {
   const contas = db.prepare("SELECT * FROM fin_contas ORDER BY ativa DESC, nome").all();
   const ent = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='efetivado' AND tipo='entrada' GROUP BY conta_id").all();
   const sai = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='efetivado' AND tipo='saida' GROUP BY conta_id").all();
   const tOut = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='efetivado' AND tipo='transferencia' GROUP BY conta_id").all();
   const tIn = db.prepare("SELECT conta_destino_id id, SUM(valor) v FROM fin_lancamentos WHERE status='efetivado' AND tipo='transferencia' GROUP BY conta_destino_id").all();
-  const pRec = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='entrada' GROUP BY conta_id").all();
-  const pPag = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' GROUP BY conta_id").all();
+
+  const hoje = hojeSP();
+  let pIni = ini, pFim = fim;
+  if (!pIni || !pFim) {
+    const [hy, hm] = hoje.split("-").map(Number);
+    pIni = `${hy}-${String(hm).padStart(2, "0")}-01`;
+    pFim = new Date(Date.UTC(hy, hm, 0)).toISOString().slice(0, 10);
+  }
+
+  // Pendentes APENAS do mês/período selecionado (pensando nas parcelas daquele mês somente)
+  const pRec = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='entrada' AND (COALESCE(vencimento, data) BETWEEN ? AND ?) GROUP BY conta_id").all(pIni, pFim);
+  const pPag = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' AND (COALESCE(vencimento, data) BETWEEN ? AND ?) GROUP BY conta_id").all(pIni, pFim);
   const m = arr => Object.fromEntries(arr.map(r => [r.id, r.v || 0]));
   const E = m(ent), S = m(sai), TO = m(tOut), TI = m(tIn), PR = m(pRec), PP = m(pPag);
 
-  const hoje = hojeSP();
   const [hy, hm] = hoje.split("-").map(Number);
   const proxMesIni = addMeses(`${hy}-${String(hm).padStart(2, "0")}-01`, 1);
   const [py, pm] = proxMesIni.split("-").map(Number);
   const proxMesFim = new Date(Date.UTC(py, pm, 0)).toISOString().slice(0, 10);
 
   // Pendentes com vencimento até o final do próximo mês
-  const pRecProx = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='entrada' AND (vencimento <= ? OR data <= ?) GROUP BY conta_id").all(proxMesFim, proxMesFim);
-  const pPagProx = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' AND (vencimento <= ? OR data <= ?) GROUP BY conta_id").all(proxMesFim, proxMesFim);
+  const pRecProx = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='entrada' AND (COALESCE(vencimento, data) <= ?) GROUP BY conta_id").all(proxMesFim);
+  const pPagProx = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' AND (COALESCE(vencimento, data) <= ?) GROUP BY conta_id").all(proxMesFim);
   const PRX = m(pRecProx), PPX = m(pPagProx);
 
   // Movimentações previstas para o próximo mês
-  const entProxMes = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='entrada' AND (vencimento BETWEEN ? AND ? OR data BETWEEN ? AND ?) GROUP BY conta_id").all(proxMesIni, proxMesFim, proxMesIni, proxMesFim);
-  const saiProxMes = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' AND (vencimento BETWEEN ? AND ? OR data BETWEEN ? AND ?) GROUP BY conta_id").all(proxMesIni, proxMesFim, proxMesIni, proxMesFim);
+  const entProxMes = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='entrada' AND (COALESCE(vencimento, data) BETWEEN ? AND ?) GROUP BY conta_id").all(proxMesIni, proxMesFim);
+  const saiProxMes = db.prepare("SELECT conta_id id, SUM(valor) v FROM fin_lancamentos WHERE status='pendente' AND tipo='saida' AND (COALESCE(vencimento, data) BETWEEN ? AND ?) GROUP BY conta_id").all(proxMesIni, proxMesFim);
   const EPM = m(entProxMes), SPM = m(saiProxMes);
 
   return contas.map(c => {
@@ -355,6 +364,8 @@ function saldosContas() {
       valor_reservado: valorReservado,
       saldo_disponivel: saldo - valorReservado,
       saldo_projetado: saldoProjetado,
+      entradas_esperadas_mes: PR[c.id] || 0,
+      saidas_esperadas_mes: PP[c.id] || 0,
       entradas_esperadas_proximo_mes: EPM[c.id] || 0,
       saidas_esperadas_proximo_mes: SPM[c.id] || 0,
       saldo_previsto_proximo_mes: saldoPrevistoProxMes,
@@ -503,16 +514,23 @@ function dashboard(q, user) {
   const fixas = soma([...efet, "l.tipo='saida'", "(c.fixa=1 OR l.grupo_recorrencia IS NOT NULL)"], [ini, fim]);
 
   const pend = (tipo, extra, params) => soma(["l.status='pendente'", `l.tipo='${tipo}'`, ...extra], params);
-  const aPagar = pend("saida", [], []);
+  const aPagarTotal = pend("saida", [], []);
+  const aReceberTotal = pend("entrada", [], []);
+
+  // Considera apenas as parcelas e pendências daquele mês especificamente
+  const aPagarMes = pend("saida", ["(COALESCE(l.vencimento, l.data) BETWEEN ? AND ?)"], [ini, fim]);
+  const aReceberMes = pend("entrada", ["(COALESCE(l.vencimento, l.data) BETWEEN ? AND ?)"], [ini, fim]);
+  const aPagar = aPagarMes;
+  const aReceber = aReceberMes;
+
   const vencidas = pend("saida", ["l.vencimento < ?"], [hoje]);
   const d7 = new Date(hoje + "T12:00:00Z"); d7.setUTCDate(d7.getUTCDate() + 7);
   const d30 = new Date(hoje + "T12:00:00Z"); d30.setUTCDate(d30.getUTCDate() + 30);
   const venc7 = pend("saida", ["l.vencimento BETWEEN ? AND ?"], [hoje, d7.toISOString().slice(0, 10)]);
   const venc30 = pend("saida", ["l.vencimento BETWEEN ? AND ?"], [hoje, d30.toISOString().slice(0, 10)]);
-  const aReceber = pend("entrada", [], []);
   const qtdVencidas = db.prepare(`SELECT COUNT(*) c FROM fin_lancamentos l ${W(["l.status='pendente'", "l.tipo='saida'", "l.vencimento < ?"])}`).get(...f.p, hoje).c;
 
-  const contas = restrito ? [] : saldosContas().filter(c => c.ativa);
+  const contas = restrito ? [] : saldosContas(ini, fim).filter(c => c.ativa);
   const saldoTotal = contas.reduce((a, c) => a + c.saldo_atual, 0);
   const reservado = contas.filter(c => c.reserva).reduce((a, c) => a + c.saldo_atual, 0);
   const caixa = contas.filter(c => c.tipo === "caixa").reduce((a, c) => a + c.saldo_atual, 0);
@@ -583,8 +601,10 @@ function dashboard(q, user) {
       saidas_mes: saidas,
       resultado: entradas - saidas,
       resultado_mes: entradas - saidas,
-      a_pagar: aPagar,
-      contas_a_pagar: aPagar,
+      a_pagar: aPagarMes,
+      a_pagar_mes: aPagarMes,
+      a_pagar_total: aPagarTotal,
+      contas_a_pagar: aPagarMes,
       vencidas,
       contas_vencidas: vencidas,
       qtd_vencidas: qtdVencidas,
@@ -592,8 +612,10 @@ function dashboard(q, user) {
       contas_vencer_7d: venc7,
       vencer_30: venc30,
       contas_vencer_30d: venc30,
-      a_receber: aReceber,
-      valores_a_receber: aReceber,
+      a_receber: aReceberMes,
+      a_receber_mes: aReceberMes,
+      a_receber_total: aReceberTotal,
+      valores_a_receber: aReceberMes,
       dizimos,
       dizimos_mes: dizimos,
       ofertas,
@@ -602,8 +624,9 @@ function dashboard(q, user) {
       despesas_fixas: fixas,
       despesas_fixas_mensais: fixas,
       despesas_variaveis: saidas - fixas,
-      previsao: saldoTotal + aReceber - aPagar,
-      previsao_saldo_futuro: saldoTotal + aReceber - aPagar,
+      previsao: saldoTotal + aReceberMes - aPagarMes,
+      previsao_saldo_futuro: saldoTotal + aReceberMes - aPagarMes,
+      saldo_previsto_mes: saldoTotal + aReceberMes - aPagarMes,
       saldo_previsto_proximo_mes: saldoPrevistoProxMes,
       entradas_proximo_mes: entProxMes,
       saidas_proximo_mes: saiProxMes,
@@ -1319,7 +1342,8 @@ async function handle(req, res, { pathname, searchParams, ip }) {
     if (metodo === "GET" && pathname === "/controlefinanceiro/api/contas") {
       exigir("ver");
       if (user.papel === "lider_ministerio") { json(res, 200, { ok: true, itens: [], contas: [] }); return true; }
-      const cs = saldosContas();
+      const [ini, fim] = periodo(q);
+      const cs = saldosContas(ini, fim);
       json(res, 200, { ok: true, itens: cs, contas: cs }); return true;
     }
 

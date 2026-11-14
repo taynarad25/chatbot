@@ -446,10 +446,16 @@ test("Controle Financeiro — Cartões de crédito, Receitas parceladas e Proje�
   assert.ok(dash.proximo_mes);
   assert.ok("saldo_previsto_proximo_mes" in dash.indicadores);
 
-  // 7. Navegação por mês no dashboard (ex: YYYY-MM)
+  // 7. Navegação por mês no dashboard (ex: YYYY-MM) e previsão considerando apenas parcelas do mês
   const dashDez = financeiro.dashboard({ periodo: "2026-12" }, user);
   assert.equal(dashDez.periodo.inicio, "2026-12-01");
   assert.equal(dashDez.periodo.fim, "2026-12-31");
+  assert.ok("saldo_previsto_mes" in dashDez.indicadores);
+  assert.equal(
+    dashDez.indicadores.previsao_saldo_futuro,
+    dashDez.indicadores.saldo_total + dashDez.indicadores.a_receber_mes - dashDez.indicadores.a_pagar_mes,
+    "Previsão do mês deve considerar estritamente as parcelas e pendências daquele mês"
+  );
 
   // Limpeza
   financeiro.removerCartao(cardId, user, "127.0.0.1");

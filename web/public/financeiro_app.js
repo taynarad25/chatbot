@@ -116,7 +116,7 @@
     const saldo = ind ? ind.saldo_total : 0;
     const resultado = ind ? ind.resultado_mes : 0;
     const inicial = ind ? (saldo - resultado) : 0;
-    const previsto = ind ? ind.previsao_saldo_futuro : 0;
+    const previsto = ind ? (ind.saldo_previsto_mes !== undefined ? ind.saldo_previsto_mes : ind.previsao_saldo_futuro) : 0;
 
     return `
       <div class="fin-month-nav-container no-print">
@@ -313,7 +313,7 @@
     const q = new URLSearchParams(state.filters).toString();
     const [dash, contasRes, lancRes, confRes, fechRes, cartoesRes] = await Promise.all([
       api("/dashboard?" + q),
-      api("/contas"),
+      api("/contas?" + q),
       api("/lancamentos?" + q),
       api("/conferencias"),
       api("/fechamentos"),
