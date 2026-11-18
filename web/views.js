@@ -602,7 +602,7 @@ function renderRegisterHtml(message = "", options = {}) {
     function aplicarMascaraTelefoneSegura(input) {
       if (!input) return;
       function formatar(str) {
-        let v = String(str || '').replace(/\D/g, '');
+        let v = String(str || '').replace(/[^0-9]/g, '');
         if (v.startsWith('55') && v.length > 11) v = v.substring(2);
         if (v.startsWith('0') && v.length > 10) v = v.substring(1);
         if (v.length > 11) v = v.substring(0, 11);
@@ -619,7 +619,6 @@ function renderRegisterHtml(message = "", options = {}) {
       }
       input.addEventListener('input', function(e) {
         if (e.isComposing) return;
-        if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') return;
         const fmt = formatar(this.value);
         if (this.value !== fmt) this.value = fmt;
       });
@@ -927,7 +926,7 @@ function renderRecuperarSenhaHtml(message = "", options = {}) {
     function aplicarMascaraTelefoneSegura(input) {
       if (!input) return;
       function formatar(str) {
-        let v = String(str || '').replace(/\D/g, '');
+        let v = String(str || '').replace(/[^0-9]/g, '');
         if (v.startsWith('55') && v.length > 11) v = v.substring(2);
         if (v.startsWith('0') && v.length > 10) v = v.substring(1);
         if (v.length > 11) v = v.substring(0, 11);
@@ -944,7 +943,6 @@ function renderRecuperarSenhaHtml(message = "", options = {}) {
       }
       input.addEventListener('input', function(e) {
         if (e.isComposing) return;
-        if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') return;
         const fmt = formatar(this.value);
         if (this.value !== fmt) this.value = fmt;
       });
@@ -4421,7 +4419,7 @@ function renderIndexHtml() {
 
     function renderLideres() {
       const filtroNome = normalizarBusca(document.getElementById('filtroLiderNome').value);
-      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/\D/g, '');
+      const filtroTelefone = document.getElementById('filtroLiderTelefone').value.replace(/[^0-9]/g, '');
 
       const filtrados = lideresCache.filter(l => {
         const cargosStr = Array.isArray(l.cargos) ? l.cargos.join(' ') : (l.cargos || '');

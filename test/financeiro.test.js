@@ -465,5 +465,109 @@ test("Controle Financeiro — Cartões de crédito, Receitas parceladas e Proje�
   }
 });
 
+test("Controle Financeiro — Lançamento único (não recorrente), escopo de edição de parcelas e exclusão de lançamentos/contas", async () => {
+  const db = require("../db");
+  const user = { id: 1, nome: "Admin Teste", telefone: "5511999990000", papel: "admin_financeiro" };
+  const cta = db.prepare("SELECT * FROM fin_contas LIMIT 1").get();
+  const cat = db.prepare("SELECT * FROM fin_categorias WHERE tipo = 'saida' LIMIT 1").get();
+
+  // 1. Lançamento não recorrente com total_parcelas no body (simulando input dormido no form) DEVE criar apenas 1 lançamento
+  const lancUnico = financeiro.criarLancamento({
+    tipo: "saida",
+    tipo_repeticao: "unica",
+    parcelas: 1,
+    total_parcelas: "2", // dormido no form
+    descricao: "Compra Avulsa Material",
+    valor: 150.0,
+    categoria_id: cat.id,
+    conta_id: cta.id,
+    data: "2026-11-18",
+    vencimento: "2026-11-18",
+    confirmar_saldo_negativo: true,
+    confirmar_duplicidade: true,
+  }, user);
+
+  assert.equal(lancUnico.ok, true);
+  assert.equal(lancUnico.ids.length, 1, "Não recorrente deve criar apenas 1 lançamento");
+  const rowUnico = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(lancUnico.ids[0]);
+  assert.ok(rowUnico.total_parcelas === null || rowUnico.total_parcelas === 1, "Não deve ser parcelado");
+  assert.equal(rowUnico.grupo_recorrencia, null);
+
+  // 2. Criar uma série parcelada em 3x
+  const lancSerie = financeiro.criarLancamento({
+    tipo: "saida",
+    tipo_repeticao: "parcelada",
+    total_parcelas: 3,
+    parcela_inicial: 1,
+    modo_valor: "parcela",
+    descricao: "Contratação Sonorização",
+    valor: 300.0,
+    categoria_id: cat.id,
+    conta_id: cta.id,
+    data: "2026-11-18",
+    vencimento: "2026-11-18",
+    confirmar_saldo_negativo: true,
+    confirmar_duplicidade: true,
+  }, user);
+  assert.equal(lancSerie.ids.length, 3);
+  const [p1Id, p2Id, p3Id] = lancSerie.ids;
+
+  // 3. Edição com escopo 'apenas_esta': alterar valor da parcela 1 não deve alterar parcela 2 e 3
+  const edApenasEsta = financeiro.editarLancamento(p1Id, {
+    valor: 450.0, // altera de 300 para 450 apenas nesta parcela
+    escopo_edicao: "apenas_esta",
+  }, user, "127.0.0.1");
+  assert.equal(edApenasEsta.ok, true);
+  const rowP1 = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(p1Id);
+  const rowP2 = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(p2Id);
+  const rowP3 = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(p3Id);
+  assert.equal(rowP1.valor, 45000);
+  assert.equal(rowP2.valor, 30000, "Parcela 2 deve permanecer com valor original");
+  assert.equal(rowP3.valor, 30000, "Parcela 3 deve permanecer com valor original");
+
+  // 4. Edição com escopo 'esta_e_proximas': alterar fornecedor e valor a partir da parcela 2
+  const edProximas = financeiro.editarLancamento(p2Id, {
+    valor: 350.0,
+    fornecedor: "Fornecedor Novo Som",
+    escopo_edicao: "esta_e_proximas",
+  }, user, "127.0.0.1");
+  assert.equal(edProximas.ok, true);
+  const rowP1Apos = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(p1Id);
+  const rowP2Apos = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(p2Id);
+  const rowP3Apos = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(p3Id);
+  assert.equal(rowP1Apos.valor, 45000, "Parcela 1 anterior deve se manter intacta");
+  assert.equal(rowP2Apos.valor, 35000);
+  assert.equal(rowP3Apos.valor, 35000);
+  assert.equal(rowP2Apos.fornecedor, "Fornecedor Novo Som");
+  assert.equal(rowP3Apos.fornecedor, "Fornecedor Novo Som");
+
+  // 5. Excluir lançamento com escopo 'esta_e_proximas'
+  const delParcs = financeiro.excluirLancamento(p2Id, { escopo: "esta_e_proximas" }, user, "127.0.0.1");
+  assert.equal(delParcs.ok, true);
+  assert.equal(delParcs.total_excluidos, 2, "Deve excluir parcelas 2 e 3");
+  assert.ok(db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(p1Id), "Parcela 1 permanece");
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(p2Id));
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(p3Id));
+
+  // 6. Excluir lançamento avulso
+  financeiro.excluirLancamento(p1Id, { escopo: "apenas_esta" }, user, "127.0.0.1");
+  financeiro.excluirLancamento(rowUnico.id, { escopo: "apenas_esta" }, user, "127.0.0.1");
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(p1Id));
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(rowUnico.id));
+
+  // 7. Criar e Excluir Conta Financeira
+  const ctaNova = financeiro.salvarConta({
+    nome: "Conta Poupança Teste Exclusao",
+    tipo: "conta_poupanca",
+    saldo_inicial: 0,
+  }, user, "127.0.0.1");
+  assert.equal(ctaNova.ok, true);
+
+  // Como não possui lançamentos, deve ser excluída diretamente
+  const remCta = financeiro.removerConta(ctaNova.id, user, "127.0.0.1");
+  assert.equal(remCta.ok, true);
+  assert.ok(!db.prepare("SELECT id FROM fin_contas WHERE id = ?").get(ctaNova.id));
+});
+
 
 

@@ -914,10 +914,15 @@ function criarLancamento(b, user, ip) {
     if (dup) { const e = new Error(`Já existe um lançamento idêntico (#${dup.id}). Confirme se não é duplicado.`); e.code = "DUPLICADO"; throw e; }
   }
 
-  const parcelasTotal = Math.min(Math.max(parseInt(b.total_parcelas || b.parcelas, 10) || 1, 1), 120);
-  const parcelaInicial = Math.min(Math.max(parseInt(b.parcela_inicial || b.comecar_parcela, 10) || 1, 1), parcelasTotal);
+  const numParcelas = parseInt(b.total_parcelas || b.parcelas, 10) || 1;
+  const numRepetir = parseInt(b.repetir_meses, 10) || 0;
+  const tipoRep = b.tipo_repeticao
+    ? b.tipo_repeticao
+    : (numParcelas > 1 ? "parcelada" : (numRepetir > 1 ? "fixa" : "unica"));
+  const parcelasTotal = tipoRep === "parcelada" ? Math.min(Math.max(numParcelas, 1), 120) : 1;
+  const parcelaInicial = tipoRep === "parcelada" ? Math.min(Math.max(parseInt(b.parcela_inicial || b.comecar_parcela, 10) || 1, 1), parcelasTotal) : 1;
   const modoValor = b.modo_valor === "parcela" ? "parcela" : "total";
-  const recorrente = Math.min(Math.max(parseInt(b.repetir_meses, 10) || 0, 0), 60);
+  const recorrente = tipoRep === "fixa" ? Math.min(Math.max(numRepetir, 0), 60) : 0;
   const grupo = parcelasTotal > 1 || recorrente > 1 ? crypto.randomBytes(6).toString("hex") : null;
   const cartaoId = b.cartao_id ? Number(b.cartao_id) : null;
   const now = agoraIso();
@@ -1061,11 +1066,154 @@ function editarLancamento(id, b, user, ip) {
     cartao_id: b.cartao_id !== undefined ? (b.cartao_id ? Number(b.cartao_id) : null) : l.cartao_id,
   };
   if (novo.valor <= 0) throw new Error("Valor inválido.");
-  db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
-    .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
-  auditar(user, "corrigir_lancamento", "lancamento", l.id, { antes: l, depois: novo, motivo }, ip);
+
+  const escopo = b.escopo_edicao || "apenas_esta";
+  const desvincular = Boolean(b.desvincular_serie || b.desvincular);
+
+  db.exec("BEGIN");
+  try {
+    if (desvincular) {
+      db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, grupo_recorrencia=NULL, parcela=1, total_parcelas=1, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+        .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
+    } else if (l.grupo_recorrencia && (escopo === "esta_e_proximas" || escopo === "todas")) {
+      db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+        .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
+
+      const queryOutros = escopo === "todas"
+        ? db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ?").all(l.grupo_recorrencia, l.id)
+        : db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ? AND (parcela >= COALESCE(?, 1) OR (parcela IS NULL AND (vencimento >= COALESCE(?, data) OR data >= ?)))")
+            .all(l.grupo_recorrencia, l.id, l.parcela, l.vencimento, l.data);
+
+      const updOutro = db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`);
+      for (const item of queryOutros) {
+        let descItem = novo.descricao;
+        if (item.parcela && item.total_parcelas > 1) {
+          const descBase = novo.descricao.replace(/\s*\(\d+\/\d+\)$/, "");
+          descItem = `${descBase} (${item.parcela}/${item.total_parcelas})`;
+        }
+        updOutro.run(descItem, novo.valor, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), item.id);
+      }
+    } else {
+      db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+        .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
+
+      // Se não era de uma série e o usuário optou por parcelar a partir deste
+      if (!l.grupo_recorrencia && b.tipo_repeticao === "parcelada" && parseInt(b.total_parcelas, 10) > 1) {
+        const totParc = Math.min(Math.max(parseInt(b.total_parcelas, 10), 2), 120);
+        const parcIni = Math.min(Math.max(parseInt(b.parcela_inicial || 1, 10), 1), totParc);
+        const novoGrupo = crypto.randomBytes(6).toString("hex");
+        const descBase = novo.descricao.replace(/\s*\(\d+\/\d+\)$/, "");
+        const descAtual = `${descBase} (${parcIni}/${totParc})`;
+        db.prepare("UPDATE fin_lancamentos SET grupo_recorrencia=?, parcela=?, total_parcelas=?, descricao=? WHERE id=?")
+          .run(novoGrupo, parcIni, totParc, descAtual, l.id);
+
+        const refData = novo.vencimento || novo.data || hojeSP();
+        const insParc = db.prepare(`INSERT INTO fin_lancamentos
+          (tipo, status, descricao, valor, data, vencimento, competencia, categoria_id, conta_id, conta_destino_id, forma, ministerio, evento,
+           contribuinte, fornecedor, observacoes, ajuste, grupo_recorrencia, parcela, total_parcelas, chave_dedup, criado_por, criado_em, cartao_id)
+          VALUES (?, 'pendente', ?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?, ?)`);
+
+        for (let p = parcIni + 1; p <= totParc; p++) {
+          const offset = p - parcIni;
+          const dt = addMeses(refData, offset);
+          const comp = dt.slice(0, 7);
+          insParc.run(
+            l.tipo,
+            `${descBase} (${p}/${totParc})`,
+            novo.valor,
+            dt,
+            comp,
+            novo.categoria_id,
+            novo.conta_id,
+            novo.forma,
+            novo.ministerio,
+            l.evento,
+            l.contribuinte,
+            novo.fornecedor,
+            novo.observacoes,
+            novoGrupo,
+            p,
+            totParc,
+            `${user.nome} (${user.telefone})`,
+            agoraIso(),
+            novo.cartao_id
+          );
+        }
+      }
+    }
+    db.exec("COMMIT");
+  } catch (e) { db.exec("ROLLBACK"); throw e; }
+  auditar(user, "corrigir_lancamento", "lancamento", l.id, { antes: l, depois: novo, motivo, escopo, desvincular }, ip);
   const atualizado = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(l.id);
   return { ok: true, lancamento: atualizado, message: "Lançamento atualizado com sucesso." };
+}
+
+function excluirLancamento(id, b, user, ip) {
+  if (!pode(user, "corrigir") && !pode(user, "tesouraria")) {
+    throw new Error("Permissão insuficiente para excluir lançamentos.");
+  }
+  const l = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(Number(id));
+  if (!l) throw new Error("Lançamento não encontrado.");
+  if (l.status === "efetivado" && !pode(user, "corrigir")) {
+    throw new Error("Somente o Administrador Financeiro pode excluir lançamentos efetivados.");
+  }
+
+  const escopo = (b && (b.escopo || b.escopo_exclusao)) || "apenas_esta";
+  let idsParaExcluir = [l.id];
+
+  if (l.grupo_recorrencia && (escopo === "esta_e_proximas" || escopo === "todas")) {
+    if (escopo === "todas") {
+      const rows = db.prepare("SELECT id FROM fin_lancamentos WHERE grupo_recorrencia = ?").all(l.grupo_recorrencia);
+      idsParaExcluir = rows.map(r => r.id);
+    } else if (escopo === "esta_e_proximas") {
+      const rows = db.prepare("SELECT id FROM fin_lancamentos WHERE grupo_recorrencia = ? AND (parcela >= COALESCE(?, 1) OR (parcela IS NULL AND (vencimento >= COALESCE(?, data) OR data >= ?)))")
+        .all(l.grupo_recorrencia, l.parcela, l.vencimento, l.data);
+      idsParaExcluir = rows.map(r => r.id);
+    }
+  }
+
+  db.exec("BEGIN");
+  try {
+    for (const lid of idsParaExcluir) {
+      db.prepare("DELETE FROM fin_anexos WHERE lancamento_id = ?").run(lid);
+      db.prepare("DELETE FROM fin_lancamentos WHERE id = ?").run(lid);
+    }
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+
+  auditar(user, "excluir_lancamento", "lancamento", l.id, { antes: l, escopo, total_excluidos: idsParaExcluir.length, ids: idsParaExcluir }, ip);
+  return {
+    ok: true,
+    total_excluidos: idsParaExcluir.length,
+    message: idsParaExcluir.length > 1
+      ? `${idsParaExcluir.length} lançamentos da série foram excluídos com sucesso.`
+      : "Lançamento excluído com sucesso."
+  };
+}
+
+function removerConta(id, user, ip) {
+  if (!pode(user, "administrar_contas") && !pode(user, "corrigir")) {
+    throw new Error("Permissão insuficiente para excluir conta financeira.");
+  }
+  const conta = db.prepare("SELECT * FROM fin_contas WHERE id = ?").get(Number(id));
+  if (!conta) throw new Error("Conta não encontrada.");
+
+  const vinculados = db.prepare("SELECT COUNT(*) c FROM fin_lancamentos WHERE (conta_id = ? OR conta_destino_id = ?) AND status != 'cancelado'").get(conta.id, conta.id).c;
+  if (vinculados > 0) {
+    db.prepare("UPDATE fin_contas SET ativa = 0 WHERE id = ?").run(conta.id);
+    auditar(user, "inativar_conta", "conta", conta.id, { conta, motivo: "Inativada por possuir movimentações vinculadas" }, ip);
+    return {
+      ok: true,
+      inativada: true,
+      message: `A conta "${conta.nome}" possui ${vinculados} movimentações vinculadas. Para manter o histórico e a segurança contábil, ela foi inativada e oculta.`
+    };
+  }
+  db.prepare("DELETE FROM fin_contas WHERE id = ?").run(conta.id);
+  auditar(user, "excluir_conta", "conta", conta.id, { conta }, ip);
+  return { ok: true, message: `Conta "${conta.nome}" excluída com sucesso.` };
 }
 
 function salvarConta(b, user, ip) {
@@ -1374,6 +1522,17 @@ async function handle(req, res, { pathname, searchParams, ip }) {
       } catch (e) { json(res, 400, { ok: false, code: e.code, erro: e.message, message: e.message }); }
       return true;
     }
+    if (metodo === "DELETE" && (m = pathname.match(/^\/controlefinanceiro\/api\/lancamentos\/(\d+)$/))) {
+      exigir("lancar");
+      const b = await lerCorpo(req).catch(() => ({}));
+      const params = Object.assign({}, q, b);
+      try {
+        json(res, 200, excluirLancamento(m[1], params, user, ip));
+      } catch (e) {
+        json(res, 400, { ok: false, erro: e.message, message: e.message });
+      }
+      return true;
+    }
 
     // Anexos (comprovantes)
     if (metodo === "POST" && (m = pathname.match(/^\/controlefinanceiro\/api\/lancamentos\/(\d+)\/anexos$/))) {
@@ -1410,6 +1569,11 @@ async function handle(req, res, { pathname, searchParams, ip }) {
       exigir("contas"); const b = await lerCorpo(req);
       if (m[1]) b.id = Number(m[1]);
       try { json(res, m[1] ? 200 : 201, salvarConta(b, user, ip)); } catch (e) { json(res, 400, { ok: false, erro: e.message, message: e.message }); }
+      return true;
+    }
+    if (metodo === "DELETE" && (m = pathname.match(/^\/controlefinanceiro\/api\/contas\/(\d+)$/))) {
+      exigir("contas");
+      try { json(res, 200, removerConta(m[1], user, ip)); } catch (e) { json(res, 400, { ok: false, erro: e.message, message: e.message }); }
       return true;
     }
 
@@ -1624,8 +1788,11 @@ module.exports = {
   listarCartoes,
   salvarCartao,
   removerCartao,
+  salvarConta,
+  removerConta,
   criarLancamento,
   editarLancamento,
+  excluirLancamento,
   quitarLancamento,
   cancelarLancamento,
   salvarConferencia,
