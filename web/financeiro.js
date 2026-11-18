@@ -1050,8 +1050,11 @@ function editarLancamento(id, b, user, ip) {
   const vencNovo = dataValida(rawVenc) ? rawVenc : (statusNovo === "pendente" ? (l.vencimento || dataNova || hojeSP()) : l.vencimento);
   const compNova = b.competencia !== undefined ? txt(b.competencia, 7) : (dataNova ? dataNova.slice(0, 7) : l.competencia);
 
+  const rawDesc = txt(b.descricao, 200) || l.descricao;
+  const descBase = rawDesc.replace(/\s*\(\d+\/\d+\)$/, "");
+
   const novo = {
-    descricao: txt(b.descricao, 200) || l.descricao,
+    descricao: descBase,
     valor: b.valor !== undefined && b.valor !== "" ? centavos(b.valor) : l.valor,
     status: statusNovo,
     data: dataNova,
@@ -1068,44 +1071,28 @@ function editarLancamento(id, b, user, ip) {
   if (novo.valor <= 0) throw new Error("Valor inválido.");
 
   const escopo = b.escopo_edicao || "apenas_esta";
-  const desvincular = Boolean(b.desvincular_serie || b.desvincular);
+  const tipoRep = b.tipo_repeticao; // "unica", "parcelada", "fixa"
+  const desvincular = Boolean(b.desvincular_serie || b.desvincular || tipoRep === "unica");
 
   db.exec("BEGIN");
   try {
-    if (desvincular) {
-      db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, grupo_recorrencia=NULL, parcela=1, total_parcelas=1, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
-        .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
-    } else if (l.grupo_recorrencia && (escopo === "esta_e_proximas" || escopo === "todas")) {
-      db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+    if (tipoRep === "unica" || b.desvincular_serie) {
+      db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, grupo_recorrencia=NULL, parcela=NULL, total_parcelas=NULL, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
         .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
 
-      const queryOutros = escopo === "todas"
-        ? db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ?").all(l.grupo_recorrencia, l.id)
-        : db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ? AND (parcela >= COALESCE(?, 1) OR (parcela IS NULL AND (vencimento >= COALESCE(?, data) OR data >= ?)))")
-            .all(l.grupo_recorrencia, l.id, l.parcela, l.vencimento, l.data);
-
-      const updOutro = db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`);
-      for (const item of queryOutros) {
-        let descItem = novo.descricao;
-        if (item.parcela && item.total_parcelas > 1) {
-          const descBase = novo.descricao.replace(/\s*\(\d+\/\d+\)$/, "");
-          descItem = `${descBase} (${item.parcela}/${item.total_parcelas})`;
-        }
-        updOutro.run(descItem, novo.valor, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), item.id);
+      if (l.grupo_recorrencia) {
+        db.prepare("DELETE FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ? AND status = 'pendente'").run(l.grupo_recorrencia, l.id);
       }
-    } else {
-      db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
-        .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
+    } else if (tipoRep === "parcelada" || (parseInt(b.total_parcelas, 10) > 1 && !tipoRep)) {
+      const totParc = Math.min(Math.max(parseInt(b.total_parcelas, 10) || 2, 2), 120);
+      const parcAtual = Math.min(Math.max(parseInt(b.parcela_atual || b.parcela_inicial || l.parcela || 1, 10), 1), totParc);
+      const descAtual = `${novo.descricao} (${parcAtual}/${totParc})`;
+      let grupoId = l.grupo_recorrencia;
 
-      // Se não era de uma série e o usuário optou por parcelar a partir deste
-      if (!l.grupo_recorrencia && b.tipo_repeticao === "parcelada" && parseInt(b.total_parcelas, 10) > 1) {
-        const totParc = Math.min(Math.max(parseInt(b.total_parcelas, 10), 2), 120);
-        const parcIni = Math.min(Math.max(parseInt(b.parcela_inicial || 1, 10), 1), totParc);
-        const novoGrupo = crypto.randomBytes(6).toString("hex");
-        const descBase = novo.descricao.replace(/\s*\(\d+\/\d+\)$/, "");
-        const descAtual = `${descBase} (${parcIni}/${totParc})`;
-        db.prepare("UPDATE fin_lancamentos SET grupo_recorrencia=?, parcela=?, total_parcelas=?, descricao=? WHERE id=?")
-          .run(novoGrupo, parcIni, totParc, descAtual, l.id);
+      if (!grupoId) {
+        grupoId = crypto.randomBytes(6).toString("hex");
+        db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, grupo_recorrencia=?, parcela=?, total_parcelas=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+          .run(descAtual, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, grupoId, parcAtual, totParc, agoraIso(), l.id);
 
         const refData = novo.vencimento || novo.data || hojeSP();
         const insParc = db.prepare(`INSERT INTO fin_lancamentos
@@ -1113,16 +1100,15 @@ function editarLancamento(id, b, user, ip) {
            contribuinte, fornecedor, observacoes, ajuste, grupo_recorrencia, parcela, total_parcelas, chave_dedup, criado_por, criado_em, cartao_id)
           VALUES (?, 'pendente', ?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?, ?)`);
 
-        for (let p = parcIni + 1; p <= totParc; p++) {
-          const offset = p - parcIni;
+        for (let p = parcAtual + 1; p <= totParc; p++) {
+          const offset = p - parcAtual;
           const dt = addMeses(refData, offset);
-          const comp = dt.slice(0, 7);
           insParc.run(
             l.tipo,
-            `${descBase} (${p}/${totParc})`,
+            `${novo.descricao} (${p}/${totParc})`,
             novo.valor,
             dt,
-            comp,
+            dt.slice(0, 7),
             novo.categoria_id,
             novo.conta_id,
             novo.forma,
@@ -1131,13 +1117,133 @@ function editarLancamento(id, b, user, ip) {
             l.contribuinte,
             novo.fornecedor,
             novo.observacoes,
-            novoGrupo,
+            grupoId,
             p,
             totParc,
             `${user.nome} (${user.telefone})`,
             agoraIso(),
             novo.cartao_id
           );
+        }
+      } else {
+        db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, parcela=?, total_parcelas=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+          .run(descAtual, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, parcAtual, totParc, agoraIso(), l.id);
+
+        if (escopo === "esta_e_proximas" || escopo === "todas") {
+          const queryOutros = escopo === "todas"
+            ? db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ?").all(grupoId, l.id)
+            : db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ? AND (parcela >= COALESCE(?, 1) OR (parcela IS NULL AND (vencimento >= COALESCE(?, data) OR data >= ?)))")
+                .all(grupoId, l.id, l.parcela, l.vencimento, l.data);
+
+          const updOutro = db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, total_parcelas=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`);
+          for (const item of queryOutros) {
+            const pNum = item.parcela || 1;
+            const descItem = `${novo.descricao} (${pNum}/${totParc})`;
+            updOutro.run(descItem, novo.valor, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, totParc, agoraIso(), item.id);
+          }
+
+          db.prepare("DELETE FROM fin_lancamentos WHERE grupo_recorrencia = ? AND parcela > ? AND status = 'pendente'").run(grupoId, totParc);
+
+          const maxP = db.prepare("SELECT MAX(parcela) m FROM fin_lancamentos WHERE grupo_recorrencia = ?").get(grupoId)?.m || parcAtual;
+          if (totParc > maxP) {
+            const refData = novo.vencimento || novo.data || hojeSP();
+            const insFalta = db.prepare(`INSERT INTO fin_lancamentos
+              (tipo, status, descricao, valor, data, vencimento, competencia, categoria_id, conta_id, conta_destino_id, forma, ministerio, evento,
+               contribuinte, fornecedor, observacoes, ajuste, grupo_recorrencia, parcela, total_parcelas, chave_dedup, criado_por, criado_em, cartao_id)
+              VALUES (?, 'pendente', ?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?, ?, ?)`);
+            for (let p = maxP + 1; p <= totParc; p++) {
+              const offset = p - parcAtual;
+              const dt = addMeses(refData, offset);
+              insFalta.run(
+                l.tipo,
+                `${novo.descricao} (${p}/${totParc})`,
+                novo.valor,
+                dt,
+                dt.slice(0, 7),
+                novo.categoria_id,
+                novo.conta_id,
+                novo.forma,
+                novo.ministerio,
+                l.evento,
+                l.contribuinte,
+                novo.fornecedor,
+                novo.observacoes,
+                grupoId,
+                p,
+                totParc,
+                `${user.nome} (${user.telefone})`,
+                agoraIso(),
+                novo.cartao_id
+              );
+            }
+          }
+        }
+      }
+    } else if (tipoRep === "fixa") {
+      const repetirMeses = Math.min(Math.max(parseInt(b.repetir_meses, 10) || 12, 2), 60);
+      let grupoId = l.grupo_recorrencia;
+      if (!grupoId) {
+        grupoId = crypto.randomBytes(6).toString("hex");
+        db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, grupo_recorrencia=?, parcela=NULL, total_parcelas=NULL, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+          .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, grupoId, agoraIso(), l.id);
+
+        const refData = novo.vencimento || novo.data || hojeSP();
+        const insFixa = db.prepare(`INSERT INTO fin_lancamentos
+          (tipo, status, descricao, valor, data, vencimento, competencia, categoria_id, conta_id, conta_destino_id, forma, ministerio, evento,
+           contribuinte, fornecedor, observacoes, ajuste, grupo_recorrencia, parcela, total_parcelas, chave_dedup, criado_por, criado_em, cartao_id)
+          VALUES (?, 'pendente', ?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, NULL, NULL, NULL, ?, ?, ?)`);
+        for (let i = 1; i < repetirMeses; i++) {
+          const dt = addMeses(refData, i);
+          insFixa.run(
+            l.tipo,
+            novo.descricao,
+            novo.valor,
+            dt,
+            dt.slice(0, 7),
+            novo.categoria_id,
+            novo.conta_id,
+            novo.forma,
+            novo.ministerio,
+            l.evento,
+            l.contribuinte,
+            novo.fornecedor,
+            novo.observacoes,
+            grupoId,
+            `${user.nome} (${user.telefone})`,
+            agoraIso(),
+            novo.cartao_id
+          );
+        }
+      } else {
+        db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, parcela=NULL, total_parcelas=NULL, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+          .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
+        if (escopo === "esta_e_proximas" || escopo === "todas") {
+          const queryOutros = escopo === "todas"
+            ? db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ?").all(grupoId, l.id)
+            : db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ? AND (vencimento >= COALESCE(?, data) OR data >= ?)").all(grupoId, l.id, l.vencimento, l.data);
+          const updOutro = db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, parcela=NULL, total_parcelas=NULL, chave_dedup=NULL, atualizado_em=? WHERE id=?`);
+          for (const item of queryOutros) {
+            updOutro.run(novo.descricao, novo.valor, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), item.id);
+          }
+        }
+      }
+    } else {
+      db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, status=?, data=?, vencimento=?, competencia=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`)
+        .run(novo.descricao, novo.valor, novo.status, novo.data, novo.vencimento, novo.competencia, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), l.id);
+
+      if (l.grupo_recorrencia && (escopo === "esta_e_proximas" || escopo === "todas")) {
+        const queryOutros = escopo === "todas"
+          ? db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ?").all(l.grupo_recorrencia, l.id)
+          : db.prepare("SELECT * FROM fin_lancamentos WHERE grupo_recorrencia = ? AND id != ? AND (parcela >= COALESCE(?, 1) OR (parcela IS NULL AND (vencimento >= COALESCE(?, data) OR data >= ?)))")
+              .all(l.grupo_recorrencia, l.id, l.parcela, l.vencimento, l.data);
+
+        const updOutro = db.prepare(`UPDATE fin_lancamentos SET descricao=?, valor=?, categoria_id=?, conta_id=?, forma=?, ministerio=?, fornecedor=?, observacoes=?, cartao_id=?, chave_dedup=NULL, atualizado_em=? WHERE id=?`);
+        for (const item of queryOutros) {
+          let descItem = novo.descricao;
+          if (item.parcela && item.total_parcelas > 1) {
+            descItem = `${novo.descricao} (${item.parcela}/${item.total_parcelas})`;
+          }
+          updOutro.run(descItem, novo.valor, novo.categoria_id, novo.conta_id, novo.forma, novo.ministerio, novo.fornecedor, novo.observacoes, novo.cartao_id, agoraIso(), item.id);
         }
       }
     }
@@ -1166,9 +1272,15 @@ function excluirLancamento(id, b, user, ip) {
       const rows = db.prepare("SELECT id FROM fin_lancamentos WHERE grupo_recorrencia = ?").all(l.grupo_recorrencia);
       idsParaExcluir = rows.map(r => r.id);
     } else if (escopo === "esta_e_proximas") {
-      const rows = db.prepare("SELECT id FROM fin_lancamentos WHERE grupo_recorrencia = ? AND (parcela >= COALESCE(?, 1) OR (parcela IS NULL AND (vencimento >= COALESCE(?, data) OR data >= ?)))")
-        .all(l.grupo_recorrencia, l.parcela, l.vencimento, l.data);
-      idsParaExcluir = rows.map(r => r.id);
+      const refData = l.vencimento || l.data || "1900-01-01";
+      const rows = db.prepare("SELECT id, data, vencimento, parcela FROM fin_lancamentos WHERE grupo_recorrencia = ?").all(l.grupo_recorrencia);
+      const filtrados = rows.filter(r => {
+        if (r.id === l.id) return true;
+        if (l.parcela && r.parcela) return r.parcela >= l.parcela;
+        const dt = r.vencimento || r.data || "1900-01-01";
+        return dt >= refData || r.id >= l.id;
+      });
+      idsParaExcluir = filtrados.map(r => r.id);
     }
   }
 

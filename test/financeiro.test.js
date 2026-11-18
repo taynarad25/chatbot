@@ -567,6 +567,74 @@ test("Controle Financeiro — Lançamento único (não recorrente), escopo de ed
   const remCta = financeiro.removerConta(ctaNova.id, user, "127.0.0.1");
   assert.equal(remCta.ok, true);
   assert.ok(!db.prepare("SELECT id FROM fin_contas WHERE id = ?").get(ctaNova.id));
+
+  // 8. Fixa Mensal (Recorrente): Exclusão com escopos 'apenas_esta', 'esta_e_proximas' e 'todas'
+  const lancFixa = financeiro.criarLancamento({
+    tipo: "saida",
+    tipo_repeticao: "fixa",
+    repetir_meses: 4,
+    descricao: "Internet Fibra Igreja Teste Recorrente",
+    valor: 120.0,
+    categoria_id: cat.id,
+    conta_id: cta.id,
+    data: "2026-11-18",
+    vencimento: "2026-11-18",
+    confirmar_saldo_negativo: true,
+    confirmar_duplicidade: true,
+  }, user);
+  assert.equal(lancFixa.ids.length, 4, "Deve gerar 4 meses de despesa fixa");
+  const [f1, f2, f3, f4] = lancFixa.ids;
+
+  // Excluir 'esta_e_proximas' a partir do 2º mês
+  const delFixaProximas = financeiro.excluirLancamento(f2, { escopo: "esta_e_proximas" }, user, "127.0.0.1");
+  assert.equal(delFixaProximas.ok, true);
+  assert.equal(delFixaProximas.total_excluidos, 3, "Deve excluir mês 2, 3 e 4");
+  assert.ok(db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(f1), "1º mês de fixa permanece");
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(f2));
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(f3));
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(f4));
+
+  // Limpa o mês restante
+  financeiro.excluirLancamento(f1, { escopo: "apenas_esta" }, user, "127.0.0.1");
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(f1));
+
+  // 9. Converter lançamento parcelado em '1 vez só' (avulso) limpando descrição e removendo parcela pendente excedente
+  const catEntrada = db.prepare("SELECT * FROM fin_categorias WHERE tipo = 'entrada' LIMIT 1").get();
+  const lancAcidental = financeiro.criarLancamento({
+    tipo: "entrada",
+    tipo_repeticao: "parcelada",
+    total_parcelas: 2,
+    parcela_inicial: 1,
+    descricao: "Pgto Teste Venda",
+    valor: 40.0,
+    categoria_id: catEntrada.id,
+    conta_id: cta.id,
+    data: "2026-11-18",
+    vencimento: "2026-11-18",
+    confirmar_saldo_negativo: true,
+    confirmar_duplicidade: true,
+  }, user);
+  assert.equal(lancAcidental.ids.length, 2);
+  const [parc1, parc2] = lancAcidental.ids;
+
+  // Usuário edita parcela 1 selecionando '1 vez só'
+  const edParaUnica = financeiro.editarLancamento(parc1, {
+    tipo_repeticao: "unica",
+    descricao: "Pgto Teste Venda",
+  }, user, "127.0.0.1");
+  assert.equal(edParaUnica.ok, true);
+
+  const rowConv = db.prepare("SELECT * FROM fin_lancamentos WHERE id = ?").get(parc1);
+  assert.equal(rowConv.grupo_recorrencia, null, "Deve limpar grupo de recorrência");
+  assert.equal(rowConv.parcela, null, "Parcela deve ser null");
+  assert.equal(rowConv.total_parcelas, null, "Total de parcelas deve ser null");
+  assert.equal(rowConv.descricao, "Pgto Teste Venda", "Descrição não deve ter mais (1/2)");
+
+  // A segunda parcela pendente criada por engano deve ter sido excluída
+  assert.ok(!db.prepare("SELECT id FROM fin_lancamentos WHERE id = ?").get(parc2), "2ª parcela pendente deve ser removida");
+
+  // Limpa parcela 1
+  financeiro.excluirLancamento(parc1, { escopo: "apenas_esta" }, user, "127.0.0.1");
 });
 
 

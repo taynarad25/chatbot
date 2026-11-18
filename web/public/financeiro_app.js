@@ -1273,7 +1273,7 @@
                             <div class="fin-timeline-actions">
                               ${isPendente && canEdit() ? `<button type="button" class="fin-btn fin-btn-success fin-btn-xs" data-action="open-quitar" data-id="${l.id}">Efetivar</button>` : ""}
                               ${canEdit() ? `<button type="button" class="fin-btn fin-btn-outline fin-btn-xs" data-action="open-editar-lanc" data-id="${l.id}">Editar</button>` : ""}
-                              ${canEdit() ? `<button type="button" class="fin-btn fin-btn-outline fin-btn-xs" data-action="delete-lanc" data-id="${l.id}" title="Excluir lançamento" style="color:var(--fin-danger);border-color:#fca5a5">Excluir</button>` : ""}
+                              ${canEdit() ? `<button type="button" class="fin-btn fin-btn-outline fin-btn-xs" data-action="open-excluir-lanc" data-id="${l.id}" title="Excluir lançamento" style="color:var(--fin-danger);border-color:#fca5a5">Excluir</button>` : ""}
                             </div>
                           </div>
                         </div>
@@ -1378,7 +1378,7 @@
                                 l.status !== "cancelado"
                                   ? `<button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="open-editar-lanc" data-id="${l.id}">Editar</button>
                                      <button type="button" class="fin-btn fin-btn-danger fin-btn-sm" data-action="open-cancelar-lanc" data-id="${l.id}">Estornar</button>
-                                     <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="delete-lanc" data-id="${l.id}" title="Excluir lançamento" style="color:var(--fin-danger);border-color:#fca5a5">Excluir</button>`
+                                     <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="open-excluir-lanc" data-id="${l.id}" title="Excluir lançamento" style="color:var(--fin-danger);border-color:#fca5a5">Excluir</button>`
                                   : ""
                               }
                             </div>
@@ -2353,6 +2353,8 @@
     if (!l) return;
     const tipo = l.tipo || "saida";
     const cats = state.categorias.filter((c) => (tipo === "entrada" ? c.tipo === "entrada" : c.tipo === "saida"));
+    const descBase = String(l.descricao || "").replace(/\s*\(\d+\/\d+\)$/, "");
+    const tipoRepAtual = (l.total_parcelas && l.total_parcelas > 1) || l.parcela ? "parcelada" : (l.grupo_recorrencia ? "fixa" : "unica");
     const m = document.getElementById("fin-modal-root");
     m.innerHTML = `
       <div class="fin-modal-backdrop">
@@ -2365,7 +2367,7 @@
             <div class="fin-form-grid">
               <div class="fin-field">
                 <label>Descrição *</label>
-                <input type="text" class="fin-input" name="descricao" value="${esc(l.descricao)}" required placeholder="Ex: Oferta Culto de Domingo / Conta de Luz" />
+                <input type="text" class="fin-input" name="descricao" value="${esc(descBase)}" required placeholder="Ex: Oferta Culto de Domingo / Conta de Luz" />
               </div>
               <div class="fin-field">
                 <label>Valor (R$) *</label>
@@ -2449,59 +2451,74 @@
               </div>
             </div>
 
-            ${
-              l.grupo_recorrencia || (l.total_parcelas && l.total_parcelas > 1)
-                ? `<div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:0.75rem;margin-bottom:0.75rem">
-                    <div style="font-weight:600;font-size:0.85rem;color:#475569;margin-bottom:0.35rem">
-                      🔄 Esta movimentação faz parte de uma série ${l.total_parcelas > 1 ? `(Parcela ${l.parcela || 1} de ${l.total_parcelas})` : "(Recorrente)"}
-                    </div>
-                    <div style="font-size:0.8rem;color:#64748b;margin-bottom:0.5rem">
-                      Ao alterar informações (como valor, data ou categoria), onde deseja aplicar as alterações?
-                    </div>
-                    <div style="display:flex;flex-direction:column;gap:0.4rem;font-size:0.85rem">
-                      <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
-                        <input type="radio" name="escopo_edicao" value="apenas_esta" checked />
-                        <span><b>Apenas esta parcela</b> (alterar dados/valor somente deste mês)</span>
-                      </label>
-                      <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
-                        <input type="radio" name="escopo_edicao" value="esta_e_proximas" />
-                        <span><b>Esta e as próximas parcelas</b> da série</span>
-                      </label>
-                      <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
-                        <input type="radio" name="escopo_edicao" value="todas" />
-                        <span><b>Todas as parcelas da série</b> (passadas e futuras)</span>
-                      </label>
-                      <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;margin-top:0.25rem;padding-top:0.25rem;border-top:1px dashed #cbd5e1;color:#b45309">
-                        <input type="checkbox" name="desvincular_serie" value="1" />
-                        <span>Desvincular da série (tornar lançamento avulso / não recorrente)</span>
-                      </label>
-                    </div>
-                  </div>`
-                : `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:0.65rem 0.75rem;margin-bottom:0.75rem">
-                    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" id="toggle-edit-repeticao">
-                      <span style="font-size:0.82rem;font-weight:600;color:#334155">➕ Parcelar ou Tornar Recorrente a partir deste mês</span>
-                      <span style="font-size:0.8rem;color:#64748b" id="toggle-edit-arrow">▼</span>
-                    </div>
-                    <div id="box-edit-repeticao" style="display:none;margin-top:0.5rem;padding-top:0.5rem;border-top:1px dashed #cbd5e1">
-                      <input type="hidden" name="tipo_repeticao" id="edit-tipo-rep" value="unica" />
-                      <div class="fin-form-grid" style="margin-bottom:0.35rem">
-                        <div class="fin-field">
-                          <label>Começar na parcela</label>
-                          <input type="number" min="1" max="120" class="fin-input" name="parcela_inicial" value="1" />
-                          <small style="color:#64748b;font-size:0.72rem">Ex: se a compra foi em 11x mas já estamos no 7º mês, coloque 7</small>
-                        </div>
-                        <div class="fin-field">
-                          <label>Total de parcelas</label>
-                          <input type="number" min="1" max="120" class="fin-input" name="total_parcelas" id="edit-total-parc" value="1" />
-                          <small style="color:#64748b;font-size:0.72rem">Quantidade total (ex: 11 vezes). 1 = avulso.</small>
-                        </div>
-                      </div>
-                    </div>
-                  </div>`
-            }
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:0.75rem;margin-bottom:0.75rem">
+              <label style="font-weight:600;font-size:0.85rem;color:#334155;display:block;margin-bottom:0.45rem">
+                🔄 Repetição / Parcelamento
+              </label>
+              <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem">
+                <label class="fin-radio-pill">
+                  <input type="radio" name="tipo_repeticao" value="unica" ${tipoRepAtual === "unica" ? "checked" : ""} />
+                  <span>1 vez só (Não recorrente / Avulso)</span>
+                </label>
+                <label class="fin-radio-pill">
+                  <input type="radio" name="tipo_repeticao" value="parcelada" ${tipoRepAtual === "parcelada" ? "checked" : ""} />
+                  <span>Parcelar (em vezes)</span>
+                </label>
+                <label class="fin-radio-pill">
+                  <input type="radio" name="tipo_repeticao" value="fixa" ${tipoRepAtual === "fixa" ? "checked" : ""} />
+                  <span>Fixa mensal (${tipo === "entrada" ? "Receita Recorrente" : "Despesa Recorrente"})</span>
+                </label>
+              </div>
+
+              <!-- Caixa Parcelamento -->
+              <div id="edit-box-parcelada" style="${tipoRepAtual === "parcelada" ? "" : "display:none;"}background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;padding:0.65rem;margin-bottom:0.5rem">
+                <div class="fin-form-grid" style="margin-bottom:0.25rem">
+                  <div class="fin-field">
+                    <label>Parcela deste lançamento</label>
+                    <input type="number" min="1" max="120" class="fin-input" name="parcela_atual" id="edit-rep-parc-atual" value="${l.parcela || 1}" />
+                    <small style="color:#64748b;font-size:0.72rem">Qual parcela é esta (ex: 1, 7)</small>
+                  </div>
+                  <div class="fin-field">
+                    <label>Total de parcelas</label>
+                    <input type="number" min="2" max="120" class="fin-input" name="total_parcelas" id="edit-rep-total-parc" value="${l.total_parcelas && l.total_parcelas > 1 ? l.total_parcelas : 2}" />
+                    <small style="color:#64748b;font-size:0.72rem">Quantidade total ${tipo === "entrada" ? "do recebimento" : "da compra"} (ex: 10, 11)</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Caixa Fixa Mensal -->
+              <div id="edit-box-fixa" style="${tipoRepAtual === "fixa" ? "" : "display:none;"}background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;padding:0.65rem;margin-bottom:0.5rem">
+                <div class="fin-field">
+                  <label>Repetir mensalmente por quantos meses?</label>
+                  <input type="number" min="2" max="60" class="fin-input" name="repetir_meses" value="12" />
+                  <small style="color:#64748b;font-size:0.72rem">Gera lançamentos automáticos para os meses seguintes</small>
+                </div>
+              </div>
+
+              <!-- Escopo de aplicação da alteração -->
+              <div id="edit-box-escopo" style="${l.grupo_recorrencia || tipoRepAtual !== "unica" ? "" : "display:none;"}margin-top:0.5rem;padding-top:0.5rem;border-top:1px dashed #cbd5e1">
+                <div style="font-weight:600;font-size:0.8rem;color:#475569;margin-bottom:0.35rem">
+                  Onde deseja aplicar as alterações?
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.35rem;font-size:0.82rem">
+                  <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                    <input type="radio" name="escopo_edicao" value="apenas_esta" checked />
+                    <span><b>Apenas esta parcela / mês</b> (alterar dados somente deste registro)</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                    <input type="radio" name="escopo_edicao" value="esta_e_proximas" />
+                    <span><b>Esta e as próximas</b> da série</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                    <input type="radio" name="escopo_edicao" value="todas" />
+                    <span><b>Todas as parcelas da série</b> (passadas e futuras)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
 
             <div class="fin-modal-footer">
-              <button type="button" class="fin-btn fin-btn-danger" data-action="delete-lanc" data-id="${l.id}" style="margin-right:auto">🗑️ Apagar Lançamento</button>
+              <button type="button" class="fin-btn fin-btn-danger" data-action="open-excluir-lanc" data-id="${l.id}" style="margin-right:auto">🗑️ Apagar Lançamento</button>
               ${
                 l.status === "pendente"
                   ? `<button type="button" class="fin-btn fin-btn-success fin-btn-sm" data-action="open-quitar" data-id="${l.id}">
@@ -2525,22 +2542,20 @@
       });
     }
 
-    const toggleRep = m.querySelector("#toggle-edit-repeticao");
-    const boxRep = m.querySelector("#box-edit-repeticao");
-    const arrRep = m.querySelector("#toggle-edit-arrow");
-    const hidTipoRep = m.querySelector("#edit-tipo-rep");
-    const inpTotParcEdit = m.querySelector("#edit-total-parc");
-    if (toggleRep && boxRep) {
-      toggleRep.addEventListener("click", () => {
-        const isOpen = boxRep.style.display === "block";
-        boxRep.style.display = isOpen ? "none" : "block";
-        if (arrRep) arrRep.textContent = isOpen ? "▼" : "▲";
-        if (hidTipoRep) hidTipoRep.value = isOpen ? "unica" : "parcelada";
-        if (!isOpen && inpTotParcEdit && parseInt(inpTotParcEdit.value, 10) <= 1) {
-          inpTotParcEdit.value = 2;
+    const editRadiosRep = m.querySelectorAll("input[name='tipo_repeticao']");
+    const editBoxParcelada = m.querySelector("#edit-box-parcelada");
+    const editBoxFixa = m.querySelector("#edit-box-fixa");
+    const editBoxEscopo = m.querySelector("#edit-box-escopo");
+
+    editRadiosRep.forEach((r) => {
+      r.addEventListener("change", () => {
+        if (editBoxParcelada) editBoxParcelada.style.display = r.value === "parcelada" && r.checked ? "block" : "none";
+        if (editBoxFixa) editBoxFixa.style.display = r.value === "fixa" && r.checked ? "block" : "none";
+        if (editBoxEscopo) {
+          editBoxEscopo.style.display = (l.grupo_recorrencia || r.value !== "unica") ? "block" : "none";
         }
       });
-    }
+    });
   }
 
   function openCancelarLancModal(id) {
@@ -2562,6 +2577,77 @@
             <div class="fin-modal-footer">
               <button type="button" class="fin-btn fin-btn-outline" data-action="close-modal">Voltar</button>
               <button type="submit" class="fin-btn fin-btn-danger">Confirmar Estorno</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  function openExcluirLancModal(id) {
+    const l = state.lancamentos.find((x) => String(x.id) === String(id));
+    if (!l) return;
+    const m = document.getElementById("fin-modal-root");
+    if (!m) return;
+    const isSerie = Boolean(l.grupo_recorrencia || (l.total_parcelas && l.total_parcelas > 1));
+    const tipoSerieTexto = l.total_parcelas && l.total_parcelas > 1 ? `Parcela ${l.parcela || 1} de ${l.total_parcelas}` : "Fixa Mensal / Recorrente";
+
+    m.innerHTML = `
+      <div class="fin-modal-backdrop">
+        <div class="fin-modal" style="max-width:500px">
+          <div class="fin-modal-header">
+            <span class="fin-modal-title">🗑️ Apagar Lançamento / Conta</span>
+            <button type="button" class="fin-btn fin-btn-outline fin-btn-sm" data-action="close-modal">✕</button>
+          </div>
+          <form id="form-excluir-lanc" data-id="${l.id}">
+            <div style="background:#f1f5f9;border-radius:6px;padding:0.75rem;margin-bottom:1rem">
+              <div style="font-weight:700;color:#0f172a;font-size:0.95rem">${esc(l.descricao)}</div>
+              <div style="font-size:0.85rem;color:#475569;margin-top:0.25rem">
+                Valor: <b>${fmtMoney(l.valor)}</b> • Vencimento: <b>${fmtDate(l.vencimento || l.data)}</b> • Status: <b>${esc(l.status)}</b>
+              </div>
+            </div>
+
+            ${
+              isSerie
+                ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:0.85rem;margin-bottom:1rem">
+                    <div style="font-weight:700;font-size:0.85rem;color:#991b1b;margin-bottom:0.35rem">
+                      🔄 Esta conta faz parte de uma série (${tipoSerieTexto})
+                    </div>
+                    <div style="font-size:0.82rem;color:#7f1d1d;margin-bottom:0.65rem">
+                      Como você deseja realizar a exclusão?
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:0.55rem;font-size:0.85rem">
+                      <label style="display:flex;align-items:flex-start;gap:0.5rem;cursor:pointer">
+                        <input type="radio" name="escopo_exclusao" value="apenas_esta" checked style="margin-top:0.2rem" />
+                        <div>
+                          <b>Apenas esta</b><br/>
+                          <small style="color:#64748b">Apaga somente esta movimentação (${fmtDate(l.vencimento || l.data)}). Os outros meses/parcelas continuam intactos.</small>
+                        </div>
+                      </label>
+                      <label style="display:flex;align-items:flex-start;gap:0.5rem;cursor:pointer">
+                        <input type="radio" name="escopo_exclusao" value="esta_e_proximas" style="margin-top:0.2rem" />
+                        <div>
+                          <b>Esta e as próximas</b><br/>
+                          <small style="color:#64748b">Apaga a movimentação deste mês e todos os meses futuros da série. O histórico dos meses passados é preservado.</small>
+                        </div>
+                      </label>
+                      <label style="display:flex;align-items:flex-start;gap:0.5rem;cursor:pointer">
+                        <input type="radio" name="escopo_exclusao" value="todas" style="margin-top:0.2rem" />
+                        <div>
+                          <b>Todas</b><br/>
+                          <small style="color:#64748b">Apaga todas as movimentações desta série (passadas, atual e futuras).</small>
+                        </div>
+                      </label>
+                    </div>
+                  </div>`
+                : `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:0.75rem;margin-bottom:1rem;color:#991b1b;font-size:0.85rem">
+                    Tem certeza que deseja apagar permanentemente esta movimentação?
+                  </div>`
+            }
+
+            <div class="fin-modal-footer">
+              <button type="button" class="fin-btn fin-btn-outline" data-action="close-modal">Cancelar</button>
+              <button type="submit" class="fin-btn fin-btn-danger">Confirmar Exclusão</button>
             </div>
           </form>
         </div>
@@ -3182,31 +3268,8 @@
         openQuitarModal(btn.getAttribute("data-id"));
       } else if (action === "open-editar-lanc") {
         openEditarLancModal(btn.getAttribute("data-id"));
-      } else if (action === "delete-lanc") {
-        const id = btn.getAttribute("data-id");
-        const l = state.lancamentos.find((x) => String(x.id) === String(id));
-        if (!l) return;
-        let escopo = "apenas_esta";
-        if (l.grupo_recorrencia || (l.total_parcelas && l.total_parcelas > 1)) {
-          const resp = prompt(
-            `Esta movimentação faz parte de uma série.\n` +
-            `Digite o número da opção desejada para exclusão:\n\n` +
-            `1 - Excluir APENAS esta parcela (#${l.id})\n` +
-            `2 - Excluir ESTA e as PRÓXIMAS parcelas\n` +
-            `3 - Excluir TODAS as parcelas da série\n\n` +
-            `Ou clique em Cancelar para desistir.`
-          );
-          if (resp === "1") escopo = "apenas_esta";
-          else if (resp === "2") escopo = "esta_e_proximas";
-          else if (resp === "3") escopo = "todas";
-          else return;
-        } else {
-          if (!confirm(`Deseja realmente apagar o lançamento "${l.descricao}" (R$ ${(l.valor / 100).toFixed(2).replace('.', ',')})?`)) return;
-        }
-        await api(`/lancamentos/${id}`, { method: "DELETE", body: { escopo } });
-        closeModal();
-        await loadAllData();
-        renderApp();
+      } else if (action === "open-excluir-lanc" || action === "delete-lanc") {
+        openExcluirLancModal(btn.getAttribute("data-id"));
       } else if (action === "delete-conta") {
         const id = btn.getAttribute("data-id");
         const c = state.contas.find((x) => String(x.id) === String(id));
@@ -3433,11 +3496,15 @@
           const id = form.getAttribute("data-id");
           const fd = new FormData(form);
           const payload = Object.fromEntries(fd.entries());
-          if (payload.desvincular_serie) {
+          if (payload.tipo_repeticao === "unica") {
+            payload.total_parcelas = 1;
+            payload.parcelas = 1;
             payload.desvincular_serie = true;
-          }
-          if (payload.total_parcelas && parseInt(payload.total_parcelas, 10) > 1) {
-            payload.tipo_repeticao = "parcelada";
+          } else if (payload.tipo_repeticao === "parcelada") {
+            payload.total_parcelas = Math.max(parseInt(payload.total_parcelas || 2, 10), 2);
+            payload.parcela_atual = Math.max(parseInt(payload.parcela_atual || 1, 10), 1);
+          } else if (payload.tipo_repeticao === "fixa") {
+            payload.repetir_meses = Math.max(parseInt(payload.repetir_meses || 12, 10), 2);
           }
           const fileInput = document.getElementById("lanc-edit-arquivo");
           if (fileInput && fileInput.files && fileInput.files[0]) {
@@ -3450,6 +3517,14 @@
             await api(`/lancamentos/${id}/anexos`, { method: "POST", body: anexoPayload }).catch(() => {});
           }
           await api(`/lancamentos/${id}`, { method: "PUT", body: payload });
+          closeModal();
+          await loadAllData();
+          renderApp();
+        } else if (form.id === "form-excluir-lanc") {
+          const id = form.getAttribute("data-id");
+          const fd = new FormData(form);
+          const escopo = fd.get("escopo_exclusao") || "apenas_esta";
+          await api(`/lancamentos/${id}`, { method: "DELETE", body: { escopo } });
           closeModal();
           await loadAllData();
           renderApp();
